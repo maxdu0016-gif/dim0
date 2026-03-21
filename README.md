@@ -256,6 +256,22 @@ make version-bump
 
 The `version-bump` target uses `uv` to run Commitizen, so no global `cz` install is required.
 
+### GitHub Flow
+
+The recommended rule set is:
+
+- every pull request targeting `main` must pass version sync checks
+- releases happen only from `main`
+- releases are triggered manually with a chosen semantic bump: `patch`, `minor`, or `major`
+
+This repo includes two GitHub Actions workflows:
+
+- `.github/workflows/version-check.yml`
+- `.github/workflows/release.yml`
+
+The PR workflow runs `make version-check`.
+The release workflow runs on manual dispatch from `main`, bumps the version with Commitizen, syncs all manifests, commits the release artifacts, and pushes the Git tag.
+
 ## 🧰 Tech Stack
 
 * **Backend:** Python, uv, python-dotenv, FastAPI (or your framework)
