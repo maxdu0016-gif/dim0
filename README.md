@@ -225,6 +225,37 @@ project-root/
 
 ---
 
+## 🔖 Versioning
+
+Topix uses one shared semantic version for the whole product.
+The source of truth is the repo-root `VERSION` file, and release tooling syncs that version into:
+
+- `backend/pyproject.toml`
+- `webui/package.json`
+- `webui/src-tauri/Cargo.toml`
+
+Version bumps use Commitizen with Conventional Commits.
+
+Check that manifests match `VERSION`:
+
+```bash
+make version-check
+```
+
+Sync manifests from `VERSION`:
+
+```bash
+make version-sync
+```
+
+Bump the next semantic version and sync manifests:
+
+```bash
+make version-bump
+```
+
+The `version-bump` target uses `uv` to run Commitizen, so no global `cz` install is required.
+
 ## 🧰 Tech Stack
 
 * **Backend:** Python, uv, python-dotenv, FastAPI (or your framework)
