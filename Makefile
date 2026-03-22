@@ -1,7 +1,7 @@
 # -------- Settings (tweak if needed) --------
 PROFILE ?= dev                 # dev | local
 ENVFILE ?= .env                # path to your env file (repo root by default)
-COMPOSE := docker compose --env-file $(ENVFILE) -f build/docker-compose.yml
+COMPOSE := ENVFILE=$(ENVFILE) docker compose --env-file $(ENVFILE) -f build/docker-compose.yml
 
 # Allow: make VAR=value ...
 # Ex: make up PROFILE=local API_PORT=9090 API_HOST_PORT=9090 API_ORIGIN=http://localhost:9090
