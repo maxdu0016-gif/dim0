@@ -1,7 +1,9 @@
 # -------- Settings (tweak if needed) --------
 PROFILE ?= dev                 # dev | local
 ENVFILE ?= .env                # path to your env file (repo root by default)
+TOPIX_VERSION ?= $(shell cat VERSION)
 COMPOSE := ENVFILE=$(ENVFILE) docker compose --env-file $(ENVFILE) -f build/docker-compose.yml
+COMPOSE_IMAGES := ENVFILE=$(ENVFILE) TOPIX_VERSION=$(TOPIX_VERSION) docker compose --env-file $(ENVFILE) -f build/docker-compose.images.yml
 
 # Allow: make VAR=value ...
 # Ex: make up PROFILE=local API_PORT=9090 API_HOST_PORT=9090 API_ORIGIN=http://localhost:9090
@@ -23,6 +25,18 @@ up-build: ## Force rebuild images, then start all services for $(PROFILE)
 .PHONY: build
 build: ## Just (re)build images (no start)
 	$(COMPOSE) --profile $(PROFILE) build
+
+.PHONY: pull
+pull: ## Pull published backend and webui images for TOPIX_VERSION
+	$(COMPOSE_IMAGES) pull backend webui
+
+.PHONY: run
+run: ## Run published images from Docker Hub using TOPIX_VERSION
+	$(COMPOSE_IMAGES) up -d
+
+.PHONY: down-run
+down-run: ## Stop published-image containers
+	$(COMPOSE_IMAGES) down --remove-orphans
 
 .PHONY: rebuild
 rebuild: ## Rebuild without cache (no start)

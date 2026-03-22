@@ -300,6 +300,20 @@ docker pull winlp4ever/dim0-backend:0.1.5
 docker pull winlp4ever/dim0-webui:0.1.5
 ```
 
+You can also run the published images locally with the repo Makefile:
+
+```bash
+make pull
+make run
+```
+
+By default these commands use the version from the repo-root `VERSION` file.
+You can override it when needed:
+
+```bash
+make run TOPIX_VERSION=0.1.5 ENVFILE=.env.local
+```
+
 ## 🧰 Tech Stack
 
 * **Backend:** Python, uv, python-dotenv, FastAPI (or your framework)
