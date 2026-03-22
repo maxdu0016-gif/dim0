@@ -311,7 +311,7 @@ By default these commands use the version from the repo-root `VERSION` file.
 You can override it when needed:
 
 ```bash
-make run TOPIX_VERSION=0.1.5 ENVFILE=.env.local
+make run DIM0_VERSION=0.1.5 ENVFILE=.env.local
 ```
 
 ## 🧰 Tech Stack

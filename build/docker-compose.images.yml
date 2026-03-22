@@ -49,7 +49,7 @@ services:
       retries: 10
 
   backend:
-    image: winlp4ever/dim0-backend:${TOPIX_VERSION:?TOPIX_VERSION is required}
+    image: winlp4ever/dim0-backend:${DIM0_VERSION:?DIM0_VERSION is required}
     container_name: topix-backend
     volumes:
       - ../${ENVFILE:-.env}:/.env:ro
@@ -72,7 +72,7 @@ services:
       - "${API_PORT:-8081}:${API_PORT:-8081}"
 
   webui:
-    image: winlp4ever/dim0-webui:${TOPIX_VERSION:?TOPIX_VERSION is required}
+    image: winlp4ever/dim0-webui:${DIM0_VERSION:?DIM0_VERSION is required}
     container_name: topix-webui
     environment:
       API_ORIGIN: ${API_ORIGIN:-http://localhost:${API_PORT:-8081}}
