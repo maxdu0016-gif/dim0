@@ -104,6 +104,8 @@ make pull
 make run
 ```
 
+Open `http://localhost:3000`.
+
 Stop it:
 
 ```bash
@@ -115,8 +117,6 @@ Stop it and remove volumes:
 ```bash
 make kill-run
 ```
-
-Open `http://localhost:5175`.
 
 ### Local Development
 
