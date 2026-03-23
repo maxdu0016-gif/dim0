@@ -1,5 +1,5 @@
 import { cn } from '@/lib/utils'
-import { Suspense, lazy, useEffect, useMemo, useState } from 'react'
+import { Suspense, lazy, useEffect, useMemo, useState, type ReactNode } from 'react'
 
 const DotLottieReact = lazy(async () => {
   const m = await import('@lottiefiles/dotlottie-react')
@@ -107,12 +107,14 @@ function WelcomeLayout({
   className,
   showShuffle = false,
   onShuffle,
+  afterContent,
 }: {
   file: string
   message: string
   className?: string
   showShuffle?: boolean
   onShuffle?: () => void
+  afterContent?: ReactNode
 }) {
   return (
     <div className={cn('relative w-full flex flex-col items-center justify-center text-center', className)}>
@@ -132,11 +134,12 @@ function WelcomeLayout({
           Shuffle
         </button>
       ) : null}
+      {afterContent ? <div className='mt-4 flex justify-center'>{afterContent}</div> : null}
     </div>
   )
 }
 
-export function WelcomeMessage() {
+export function WelcomeMessage({ afterContent }: { afterContent?: ReactNode }) {
   const { mascot, reshuffle } = useRandomMascot()
 
   if (!mascot) {
@@ -156,6 +159,7 @@ export function WelcomeMessage() {
       message={mascot.message}
       showShuffle
       onShuffle={reshuffle}
+      afterContent={afterContent}
     />
   )
 }
@@ -164,7 +168,7 @@ export function WelcomeMessage() {
 /**
  * Render a fixed mascot variant with the shared welcome layout.
  */
-export function ThemedWelcome({ name, message, className }: { name: MascotName, message?: string, className?: string }) {
+export function ThemedWelcome({ name, message, className, afterContent }: { name: MascotName, message?: string, className?: string, afterContent?: ReactNode }) {
   const mascot = MASCOTS.find(m => m.name === name) ?? MASCOTS[0]
 
   const customMessage = message ?? mascot.message
@@ -174,6 +178,7 @@ export function ThemedWelcome({ name, message, className }: { name: MascotName, 
       file={mascot.file}
       message={customMessage}
       className={className}
+      afterContent={afterContent}
     />
   )
 }
