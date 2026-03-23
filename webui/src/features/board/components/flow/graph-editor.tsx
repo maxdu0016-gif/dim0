@@ -46,6 +46,8 @@ import { useCenterAroundParam } from '../../hooks/use-center-around'
 import { useBoardShortcuts } from '../../hooks/use-board-shortcuts'
 import { PresentationControls } from './presentation-controls'
 import { useTheme } from '@/components/theme-provider'
+import { useIsMobile } from '@/hooks/use-mobile'
+import { StackedCardsIllustration } from '@/components/illustrations/stacked-cards-illustration'
 import { darkModeDisplayHex } from '../../lib/colors/dark-variants'
 import { applyBackgroundAlpha, type BoardBackgroundTexture } from '../../utils/board-background'
 
@@ -93,6 +95,77 @@ const drawableNodeTypes: NodeType[] = [
 const isDrawableNodeType = (nodeType: NodeType) => drawableNodeTypes.includes(nodeType)
 
 type ViewMode = 'graph' | 'linear'
+
+type EmptyGraphHintProps = {
+  isMobile: boolean
+}
+
+
+/**
+ * Show a centered empty-state illustration with a directional arrow toward the top bar.
+ */
+function EmptyGraphHint({ isMobile }: EmptyGraphHintProps) {
+  return (
+    <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center px-6 py-10">
+      <div className="relative flex w-full max-w-[960px] items-center justify-center">
+        <StackedCardsIllustration
+          className="h-auto w-full max-w-[620px] opacity-95"
+          shadowColor="hsl(var(--sidebar))"
+          cardColor="hsl(var(--accent))"
+          strokeColor="hsl(var(--accent-foreground))"
+          aria-hidden="true"
+        />
+
+        <svg
+          className="absolute inset-0 h-full w-full overflow-visible"
+          viewBox="0 0 100 100"
+          preserveAspectRatio="none"
+          aria-hidden="true"
+        >
+          {isMobile ? (
+            <>
+              <path
+                d="M68 50 C80 50, 89 50, 97 50"
+                fill="none"
+                stroke="hsl(var(--accent-foreground))"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeDasharray="2 4"
+              />
+              <path
+                d="M94 47 L97 50 L94 53"
+                fill="none"
+                stroke="hsl(var(--accent-foreground))"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </>
+          ) : (
+            <>
+              <path
+                d="M50 22 C50 14, 50 8, 50 3"
+                fill="none"
+                stroke="hsl(var(--accent-foreground))"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeDasharray="2 4"
+              />
+              <path
+                d="M47 6 L50 3 L53 6"
+                fill="none"
+                stroke="hsl(var(--accent-foreground))"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </>
+          )}
+        </svg>
+      </div>
+    </div>
+  )
+}
 
 type GraphViewProps = {
   nodes: NoteNode[]
@@ -198,6 +271,7 @@ function LinearView() {
  */
 export default function GraphEditor() {
   const [viewMode, setViewMode] = useState<ViewMode>('graph')
+  const isMobile = useIsMobile()
 
   const enableSelection = useGraphStore(state => state.isSelectMode)
   const setEnableSelection = useGraphStore(state => state.setIsSelectMode)
@@ -244,6 +318,7 @@ export default function GraphEditor() {
   const canUndo = useGraphStore(state => state.historyPast.length > 0)
   const canRedo = useGraphStore(state => state.historyFuture.length > 0)
   const zoom = useGraphStore(state => state.zoom ?? 1)
+  const isEmptyGraph = nodes.length === 0 && edges.length === 0
 
   const isResizingNode = useGraphStore(state => state.isResizingNode)
   const isDragging = useGraphStore(state => state.isDragging)
@@ -656,6 +731,10 @@ export default function GraphEditor() {
           <GraphContextMenu nodes={nodes} setNodesPersist={setNodesPersist}>
             {({ onPaneContextMenu, onNodeContextMenu }) => (
               <>
+                {isEmptyGraph && !presentationMode && (
+                  <EmptyGraphHint isMobile={isMobile} />
+                )}
+
                 <GraphView
                   nodes={nodes}
                   edges={edgesForRender}
