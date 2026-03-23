@@ -25,6 +25,7 @@ Instead of splitting work across docs, whiteboards, chat tools, code editors, an
 
 - Think spatially with shapes, notes, and connected graph nodes
 - Turn notes into visual structure with AI
+- Create folder nodes to organize your work hierarchically across the board
 - Upload documents and keep their context attached to the board
 - Run code inside nodes
 - Generate live HTML/JS widgets on the canvas
