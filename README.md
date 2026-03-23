@@ -28,6 +28,8 @@ Instead of splitting work across docs, whiteboards, chat tools, code editors, an
 - Upload documents and keep their context attached to the board
 - Run code inside nodes
 - Generate live HTML/JS widgets on the canvas
+- Create frame nodes to group and highlight important parts of the board
+- Present directly from the canvas by walking through frames
 - Work with a board-aware AI agent that can search, reason, and write directly back onto the board
 
 ## Why It's Different
@@ -42,6 +44,7 @@ Knowledge becomes fragmented.
 Important work disappears into chat history.
 
 Dim0 is different: it is built as an agent-native canvas from the start.
+The board is not just where work happens. It is also where you present it.
 
 The agent is not just a chatbot. It can:
 
