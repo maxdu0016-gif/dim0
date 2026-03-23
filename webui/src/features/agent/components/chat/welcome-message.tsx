@@ -98,14 +98,52 @@ function Oc({ file, size = 100 }: { file: string; size?: number }) {
   )
 }
 
+/**
+ * Render the shared centered mascot welcome layout used across chat surfaces.
+ */
+function WelcomeLayout({
+  file,
+  message,
+  className,
+  showShuffle = false,
+  onShuffle,
+}: {
+  file: string
+  message: string
+  className?: string
+  showShuffle?: boolean
+  onShuffle?: () => void
+}) {
+  return (
+    <div className={cn('relative w-full flex flex-col items-center justify-center text-center', className)}>
+      <div className='flex justify-center'>
+        <Oc file={file} />
+      </div>
+      <div className='mt-2 text-xl text-card-foreground'>
+        <span>{message}</span>
+      </div>
+      {showShuffle && onShuffle ? (
+        <button
+          type='button'
+          className='mt-3 rounded-2xl px-3 py-1 text-xs font-medium text-accent-foreground/50 bg-accent hover:bg-muted shadow-sm hover:text-accent-foreground transition-colors'
+          onClick={onShuffle}
+          aria-label='Shuffle welcome message'
+        >
+          Shuffle
+        </button>
+      ) : null}
+    </div>
+  )
+}
+
 export function WelcomeMessage() {
   const { mascot, reshuffle } = useRandomMascot()
 
   if (!mascot) {
     return (
-      <div className="relative w-full flex flex-col sm:flex-row items-center justify-center text-center">
+      <div className='relative w-full flex flex-col items-center justify-center text-center'>
         <div style={{ width: 100, height: 100 }} />
-        <div className="text-xl text-card-foreground">
+        <div className='mt-2 text-xl text-card-foreground'>
           <span>Loading your open‑source sidekick…</span>
         </div>
       </div>
@@ -113,39 +151,29 @@ export function WelcomeMessage() {
   }
 
   return (
-    <div className="relative w-full flex flex-col sm:flex-row items-center justify-center text-center">
-      <Oc file={mascot.file} />
-      <div className="text-xl text-card-foreground">
-        <span>{mascot.message}</span>
-      </div>
-      <button
-        type="button"
-        className="ml-2 rounded-2xl px-3 py-1 text-xs font-medium text-accent-foreground/50 bg-accent hover:bg-muted shadow-sm hover:text-accent-foreground transition-colors"
-        onClick={reshuffle}
-        aria-label="Shuffle welcome message"
-      >
-        Shuffle
-      </button>
-    </div>
+    <WelcomeLayout
+      file={mascot.file}
+      message={mascot.message}
+      showShuffle
+      onShuffle={reshuffle}
+    />
   )
 }
 
+
+/**
+ * Render a fixed mascot variant with the shared welcome layout.
+ */
 export function ThemedWelcome({ name, message, className }: { name: MascotName, message?: string, className?: string }) {
   const mascot = MASCOTS.find(m => m.name === name) ?? MASCOTS[0]
 
   const customMessage = message ?? mascot.message
 
-  const divClass = cn(
-    "relative w-full flex flex-col sm:flex-row items-center justify-center text-center",
-    className
-  )
-
   return (
-    <div className={divClass}>
-      <Oc file={mascot.file} />
-      <div className="text-xl text-card-foreground">
-        <span>{customMessage}</span>
-      </div>
-    </div>
+    <WelcomeLayout
+      file={mascot.file}
+      message={customMessage}
+      className={className}
+    />
   )
 }
