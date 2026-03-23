@@ -4,7 +4,7 @@
 
 <h1 align="center">Dim0 - The Thinking Canvas</h1>
 
-Dim0 is an agent-native thinking canvas where notes, documents, code, widgets, and AI agents work together on one board.
+Dim0 (read "dee-moh") is an agent-native thinking canvas where notes, documents, code, widgets, and AI agents work together on one board.
 
 <p align="center">
   ❤️ If you like Dim0, consider giving this repo a star to support the project.
