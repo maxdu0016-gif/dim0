@@ -68,7 +68,7 @@ This repository contains the full Dim0 product stack:
 - `webui/`: React frontend for the canvas, chat, and board UX
 - `build/`: Docker Compose and build-related assets
 
-## Getting Started
+## 🚀 Getting Started
 
 ### Prerequisites
 
@@ -152,7 +152,7 @@ npm run dev
 
 The frontend uses `APP_PORT` from `.env` and defaults to `5175`.
 
-## Environment Variables
+## 🔑 Environment Variables
 
 The root `.env.sample` includes the main configuration surface:
 
@@ -197,7 +197,7 @@ OPENAI_AGENTS_DONT_LOG_MODEL_DATA=
 OPENAI_AGENTS_DONT_LOG_TOOL_DATA=
 ```
 
-## Docker and Deployment
+## 🐳 Docker and Deployment
 
 Deployment and local services are managed through Docker Compose with Makefile shortcuts.
 
@@ -268,7 +268,7 @@ make down-run
 make kill-run
 ```
 
-## Versioning and Releases
+## 🏷️ Versioning and Releases
 
 Dim0 uses one shared semantic version for the whole product. The source of truth is the repo-root `VERSION` file, and release tooling syncs that version into:
 
@@ -288,13 +288,13 @@ make version-bump
 
 The repository also includes GitHub Actions workflows for version checks, releases, and Docker publishing.
 
-## Troubleshooting
+## 🛠️ Troubleshooting
 
 - If the frontend cannot reach the API, check `VITE_API_URL` in `.env`
 - If ports are already in use, change `API_PORT` or `APP_PORT`
 - If env changes are not applied, restart the backend and frontend after editing `.env`
 - Use `make config` to inspect the fully resolved Compose configuration
 
-## License
+## 📄 License
 
 This repository is available under the MIT License.
