@@ -102,66 +102,28 @@ type EmptyGraphHintProps = {
 
 
 /**
- * Show a centered empty-state illustration with a directional arrow toward the top bar.
+ * Show a centered empty-state illustration with a short onboarding hint.
  */
 function EmptyGraphHint({ isMobile }: EmptyGraphHintProps) {
+  const assistantLocationLabel = isMobile ? "right bar" : "top bar"
+
   return (
     <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center px-6 py-10">
-      <div className="relative flex w-full max-w-[960px] items-center justify-center">
+      <div className="flex w-full max-w-[760px] flex-col items-center rounded-xl bg-sidebar px-8 py-10 text-center">
         <StackedCardsIllustration
-          className="h-auto w-full max-w-[620px] opacity-95"
-          shadowColor="hsl(var(--sidebar))"
-          cardColor="hsl(var(--accent))"
-          strokeColor="hsl(var(--accent-foreground))"
+          className="h-auto w-full max-w-[520px]"
+          shadowColor="color-mix(in oklab, var(--accent-foreground) 10%, transparent)"
+          cardColor="var(--accent)"
+          strokeColor="color-mix(in oklab, var(--accent-foreground) 90%, transparent)"
           aria-hidden="true"
         />
-
-        <svg
-          className="absolute inset-0 h-full w-full overflow-visible"
-          viewBox="0 0 100 100"
-          preserveAspectRatio="none"
-          aria-hidden="true"
-        >
-          {isMobile ? (
-            <>
-              <path
-                d="M68 50 C80 50, 89 50, 97 50"
-                fill="none"
-                stroke="hsl(var(--accent-foreground))"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeDasharray="2 4"
-              />
-              <path
-                d="M94 47 L97 50 L94 53"
-                fill="none"
-                stroke="hsl(var(--accent-foreground))"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </>
-          ) : (
-            <>
-              <path
-                d="M50 22 C50 14, 50 8, 50 3"
-                fill="none"
-                stroke="hsl(var(--accent-foreground))"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeDasharray="2 4"
-              />
-              <path
-                d="M47 6 L50 3 L53 6"
-                fill="none"
-                stroke="hsl(var(--accent-foreground))"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </>
-          )}
-        </svg>
+        <p className="mt-4 max-w-[32rem] text-balance text-lg leading-relaxed text-sidebar-foreground/75">
+          Start adding components and open assistant from{" "}
+          <span className="font-semibold text-sidebar-foreground">{assistantLocationLabel}</span>
+        </p>
+        <p className="mt-3 text-center text-xs leading-relaxed text-sidebar-foreground/60">
+          Use mouse scroll or Ctrl + / Ctrl - to zoom in and out
+        </p>
       </div>
     </div>
   )
