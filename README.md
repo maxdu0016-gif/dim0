@@ -21,6 +21,14 @@ Built for researchers, founders, developers, and visual thinkers who want AI, no
 **Website:** https://dim0.net
 **App:** https://app.dim0.net
 
+## Try Dim0
+
+If you are visiting Dim0 for the first time, start here:
+
+- Visit the website to understand the product: https://dim0.net
+- Open the hosted app to try it directly: https://app.dim0.net
+- Use the local setup below only if you want to self-host or contribute
+
 ## What It Is
 
 Dim0 is built around a simple idea: the canvas should be the primary interface for thinking with AI, not a chat sidebar.
