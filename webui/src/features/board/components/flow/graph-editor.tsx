@@ -121,10 +121,21 @@ function EmptyGraphHint({ isMobile }: EmptyGraphHintProps) {
           Start adding components and open assistant from{" "}
           <span className="font-semibold text-sidebar-foreground">{assistantLocationLabel}</span>
         </p>
-        <p className="mt-3 text-center text-xs leading-relaxed text-sidebar-foreground/60">
-          Use mouse scroll or Ctrl + / Ctrl - to zoom in and out
-        </p>
       </div>
+    </div>
+  )
+}
+
+
+/**
+ * Show a persistent zoom hint at the bottom center of the graph area.
+ */
+function GraphZoomHint() {
+  return (
+    <div className="pointer-events-none absolute inset-x-0 bottom-4 z-10 flex justify-center px-4">
+      <p className="text-center text-xs leading-relaxed text-sidebar-foreground/60">
+        Use Ctrl + mouse scroll or Ctrl + / Ctrl - to zoom in and out
+      </p>
     </div>
   )
 }
@@ -788,6 +799,8 @@ export default function GraphEditor() {
           disableNext={!canNext}
         />
       )}
+
+      {viewMode === 'graph' && !presentationMode && <GraphZoomHint />}
 
       <NodeSurfaceHost />
     </div>
