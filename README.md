@@ -290,3 +290,7 @@ The repository also includes GitHub Actions workflows for version checks, releas
 - If ports are already in use, change `API_PORT` or `APP_PORT`
 - If env changes are not applied, restart the backend and frontend after editing `.env`
 - Use `make config` to inspect the fully resolved Compose configuration
+
+## License
+
+This repository is available under the MIT License.
