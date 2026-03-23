@@ -1,12 +1,19 @@
-# Dim0
+<p align="center">
+  <img src="docs/images/dim0-icon.png" alt="Dim0 icon" width="96" />
+</p>
+
+<h1 align="center">Dim0 - The Thinking Canvas</h1>
 
 Dim0 is an agent-native thinking canvas where notes, documents, code, widgets, and AI agents work together on one board.
+
+<p align="center">
+  ❤️ If you like Dim0, consider giving this repo a star to support the project.
+</p>
 
 ![Dim0 app screenshot](docs/images/app-screenshot.png)
 
 **Website:** https://dim0.net  
-**App:** https://app.dim0.net  
-**Landing page repo:** https://github.com/vcmf/dim0-landingpage
+**App:** https://app.dim0.net
 
 ## What It Is
 
@@ -67,25 +74,61 @@ This repository contains the full Dim0 product stack:
 
 ### Environment Setup
 
-Copy the sample file and edit values as needed:
+Before running Dim0, create a root `.env` from `.env.sample` and add your keys:
 
 ```bash
 cp .env.sample .env
 ```
 
+For now, please provide at least:
+
+- `OPENAI_API_KEY`
+- `MISTRAL_API_KEY`
+- `OPENROUTER_API_KEY`
+- `LINKUP_API_KEY`
+
+This gives the product a reliable minimum setup today.
+We will keep simplifying this more and more.
+
 Important notes:
 
-- Only variables prefixed with `VITE_` are exposed to the frontend
 - Both backend and frontend read the root `.env`
-- For a minimal working app, set at least `OPENAI_API_KEY`, `JWT_SECRET_KEY`, and one web search key such as `LINKUP_API_KEY` or `TAVILY_API_KEY`
+- Only variables prefixed with `VITE_` are exposed to the frontend
 
-### Start Local Databases
+### Run Published Images
+
+Pull and start the published stack:
+
+```bash
+make pull
+make run
+```
+
+Stop it:
+
+```bash
+make down-run
+```
+
+Stop it and remove volumes:
+
+```bash
+make kill-run
+```
+
+Open `http://localhost:5175`.
+
+### Local Development
+
+If you want to run the source code locally instead of the published images, use the steps below.
+
+#### Start Local Databases
 
 ```bash
 make up-db
 ```
 
-### Run the Backend
+#### Run the Backend
 
 ```bash
 cd backend
@@ -95,7 +138,7 @@ uv run python -m topix.api.app
 
 The backend uses `API_PORT` from `.env` and defaults to `8081`.
 
-### Run the Frontend
+#### Run the Frontend
 
 ```bash
 cd webui
@@ -104,8 +147,6 @@ npm run dev
 ```
 
 The frontend uses `APP_PORT` from `.env` and defaults to `5175`.
-
-Open `http://localhost:5175`.
 
 ## Environment Variables
 
@@ -219,6 +260,8 @@ You can also run the published images locally:
 ```bash
 make pull
 make run
+make down-run
+make kill-run
 ```
 
 ## Versioning and Releases
