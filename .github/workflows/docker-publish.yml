@@ -15,6 +15,15 @@ on:
         required: true
         default: true
         type: boolean
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+      push_latest:
+        required: false
+        default: true
+        type: boolean
 
 
 permissions:
