@@ -18,6 +18,7 @@ import { FolderNode } from './folder-node'
 import { DEFAULT_STICKY_NOTE_HEIGHT, DEFAULT_STICKY_NOTE_WIDTH } from '../../types/note'
 
 const CONNECTOR_GAP = 0
+const SHEET_INNER_HEIGHT = 352
 type ResizeHandle = {
   pos: ControlPosition
   className: string
@@ -152,6 +153,8 @@ function NodeViewBase({ id, data, selected, width, height, dragging }: NodeProps
 
   const baseMinH = isVisualNode
     ? 50
+    : nodeType === 'sheet'
+    ? SHEET_INNER_HEIGHT
     : shouldMeasureMinHeight
     ? computedMinH
     : Math.max(20, currentNodeHeight ?? 20)
