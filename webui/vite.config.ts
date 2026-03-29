@@ -4,6 +4,7 @@ import tailwindcss from "@tailwindcss/vite"
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react-swc'
 import { visualizer } from "rollup-plugin-visualizer"
+import { VitePWA } from "vite-plugin-pwa"
 
 const packageJson = JSON.parse(
   readFileSync(path.resolve(__dirname, "./package.json"), "utf8")
@@ -26,7 +27,41 @@ export default defineConfig({
       template: "treemap",
     }),
     react(),
-    tailwindcss()
+    tailwindcss(),
+    VitePWA({
+      registerType: "autoUpdate",
+      includeAssets: [
+        "favicon-16x16.png",
+        "favicon-32x32.png",
+        "apple-touch-icon.png",
+        "dim0.svg",
+      ],
+      manifest: {
+        name: "Dim0",
+        short_name: "Dim0",
+        description: "Visual workspace for boards, notes, and agent-assisted thinking.",
+        theme_color: "#f7f1e8",
+        background_color: "#f7f1e8",
+        display: "standalone",
+        start_url: "/",
+        scope: "/",
+        icons: [
+          {
+            src: "/pwa-192x192.png",
+            sizes: "192x192",
+            type: "image/png",
+          },
+          {
+            src: "/pwa-512x512.png",
+            sizes: "512x512",
+            type: "image/png",
+          },
+        ],
+      },
+      workbox: {
+        globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
+      },
+    }),
   ],
   resolve: {
     alias: {
