@@ -10,6 +10,7 @@ const packageJson = JSON.parse(
   readFileSync(path.resolve(__dirname, "./package.json"), "utf8")
 ) as { version?: string }
 const appVersion = packageJson.version ?? "0.0.0"
+const shouldAnalyzeBundle = process.env.ANALYZE === "true"
 const allowedHosts = [
   "app.dim0.net",
 ]
@@ -20,7 +21,7 @@ export default defineConfig({
     __APP_VERSION__: JSON.stringify(appVersion),
   },
   plugins: [
-    visualizer({
+    shouldAnalyzeBundle && visualizer({
       filename: "dist/stats.html",
       gzipSize: true,
       brotliSize: true,
@@ -71,10 +72,16 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
+        /**
+         * Groups heavy third-party packages into stable chunks so route code
+         * stays smaller and bundle analysis is easier to reason about.
+         */
         manualChunks(id) {
           if (id.includes("node_modules")) {
             if (id.includes("@hugeicons")) return "hugeicons"
             if (id.includes("lucide-react")) return "lucide"
+            if (id.includes("@lobehub/icons")) return "lobehub-icons"
+            if (id.includes("simple-icons")) return "simple-icons"
             if (id.includes("@tanstack")) return "tanstack"
             if (id.includes("@dagrejs")) return "dagre"
             if (id.includes("@radix-ui")) return "radix"
@@ -82,9 +89,9 @@ export default defineConfig({
             if (id.includes("@milkdown")) return "milkdown"
             if (id.includes("@lezer")) return "lezer"
             if (id.includes("@codemirror")) return "codemirror"
-            if (id.includes("framer-motion")) return "framer-motion"
+            if (id.includes("/node_modules/motion/") || id.includes("framer-motion")) return "motion"
             if (id.includes("recharts")) return "recharts"
-            if (id.includes("highlightjs")) return "highlightjs"
+            if (id.includes("highlight.js")) return "highlightjs"
             if (
               id.includes("/node_modules/prosemirror-") ||
               id.includes("/node_modules/@prosemirror/") ||
