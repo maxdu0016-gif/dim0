@@ -1,7 +1,8 @@
 import { InstallPhoneIllustration } from "@/components/illustrations/install-phone-illustration"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { EllipsisVertical, Share } from "lucide-react"
 import type { ReactNode } from "react"
-import { siAndroid, siApple } from "simple-icons"
+import { siAndroid, siApple, siGooglechrome, siSafari } from "simple-icons"
 
 
 type InstallSectionProps = {
@@ -12,6 +13,40 @@ type InstallSectionProps = {
   }
   title: string
   steps: ReactNode[]
+}
+
+
+/**
+ * Renders a small inline icon used inside the install instructions.
+ */
+function InstructionIcon({
+  children,
+}: {
+  children: ReactNode
+}) {
+  return (
+    <span className="mx-1 inline-flex size-4 translate-y-[2px] items-center justify-center text-foreground">
+      {children}
+    </span>
+  )
+}
+
+
+/**
+ * Renders a small inline brand mark inside an instruction line.
+ */
+function BrandIcon({
+  icon,
+}: {
+  icon: InstallSectionProps["icon"]
+}) {
+  return (
+    <span className="mx-1 inline-flex size-4 translate-y-[2px] items-center justify-center text-foreground">
+      <svg viewBox="0 0 24 24" className="size-3.5" fill="none" aria-hidden="true">
+        <path d={icon.path} fill="currentColor" />
+      </svg>
+    </span>
+  )
 }
 
 
@@ -99,10 +134,16 @@ export function InstallScreen() {
                   >
                     app.dim0.net
                   </a>{" "}
-                  in <strong>Safari</strong>.
+                  in <strong>Safari</strong>
+                  <BrandIcon icon={siSafari} />
+                  .
                 </>,
                 <>
-                  Tap <strong>Share</strong>.
+                  Tap <strong>Share</strong>
+                  <InstructionIcon>
+                    <Share className="size-3.5" strokeWidth={2} />
+                  </InstructionIcon>
+                  .
                 </>,
                 <>
                   Choose <strong>Add to Home Screen</strong>.
@@ -127,10 +168,16 @@ export function InstallScreen() {
                   >
                     app.dim0.net
                   </a>{" "}
-                  in <strong>Chrome</strong>.
+                  in <strong>Chrome</strong>
+                  <BrandIcon icon={siGooglechrome} />
+                  .
                 </>,
                 <>
-                  Tap the browser <strong>menu</strong>.
+                  Tap the browser <strong>menu</strong>
+                  <InstructionIcon>
+                    <EllipsisVertical className="size-3.5" strokeWidth={2} />
+                  </InstructionIcon>
+                  .
                 </>,
                 <>
                   Choose <strong>Install app</strong> or <strong>Add to Home screen</strong>.
