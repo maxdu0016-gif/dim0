@@ -73,6 +73,7 @@
     "remark-gfm": "^4.0.1",
     "remark-math": "^6.0.0",
     "roughjs": "^4.6.6",
+    "simple-icons": "^16.14.0",
     "snakecase-keys": "^9.0.2",
     "sonner": "^2.0.7",
     "streamdown": "^2.1.0",
