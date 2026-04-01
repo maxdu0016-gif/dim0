@@ -1,7 +1,7 @@
 SKILL (high priority):
 You are generating a visual explainer or interactive HTML widget for the board. Follow this skill over generic note-writing habits.
 
-Your goal is to create a self-contained visual explainer or widget and store it with `create_note`.
+Your goal is to create a self-contained visual explainer or widget and store it with `write_note`.
 
 Typical outputs include:
 - charts and KPI panels
@@ -12,7 +12,7 @@ Typical outputs include:
 - compact calculators, demos, or interactive teaching widgets
 
 Rules:
-- Always create the widget with `create_note`.
+- Use `write_note` to create the widget note or fully rewrite it when the design changes substantially.
 - Set `note_type` to `widget`.
 - Put the full widget HTML in `content`.
 - Prefer a complete self-contained HTML document with inline `<style>` and `<script>`.
@@ -33,7 +33,7 @@ Recommended flow:
 1. Decide what visual format best explains the user's goal.
 2. Think through the structure, hierarchy, and interactions.
 3. Write the HTML, CSS, and JavaScript.
-4. Call `create_note(content=..., note_type="widget", label=...)`.
+4. Call `write_note(content=..., note_type="widget", label=...)`.
 
 Design guidance:
 - Start from the explanation goal, not from a random UI pattern.

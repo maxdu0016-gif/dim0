@@ -2,7 +2,7 @@ import { useMemo, useState, type ReactNode } from "react"
 import type { ToolCallStep } from "../../types/stream"
 import { ToolNameIcon } from "../../types/stream"
 import { extractStepDescription, getWebSearchUrls } from "../../utils/stream/build"
-import type { CodeInterpreterOutput, CreateNoteOutput, EditNoteOutput } from "../../types/tool-outputs"
+import type { CodeInterpreterOutput, CreateNoteOutput, EditNoteOutput, WriteNoteOutput } from "../../types/tool-outputs"
 import type { ToolStepWidgetAttachment } from "./tool-step-widgets"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { IdeaIcon, Search01Icon, Tick01Icon } from "@hugeicons/core-free-icons"
@@ -77,7 +77,7 @@ const CodeInterpreterResult = ({
 const NoteToolResult = ({
   output,
 }: {
-  output: CreateNoteOutput | EditNoteOutput
+  output: CreateNoteOutput | EditNoteOutput | WriteNoteOutput
 }) => {
   const typeLabel = output.noteType.replace(/-/g, " ")
 
@@ -155,10 +155,10 @@ export const ToolStepRow = ({
     ? step.output as CodeInterpreterOutput
     : null
   const noteToolOutput = (
-    (step.name === "create_note" || step.name === "edit_note") &&
+    (step.name === "write_note" || step.name === "create_note" || step.name === "edit_note") &&
     typeof step.output !== "string"
   )
-    ? step.output as CreateNoteOutput | EditNoteOutput
+    ? step.output as WriteNoteOutput | CreateNoteOutput | EditNoteOutput
     : null
 
   const sources = useMemo(() => {
