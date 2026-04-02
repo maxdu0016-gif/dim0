@@ -1,5 +1,4 @@
 type WidgetThemeTokenName =
-  | "--transparent"
   | "--background"
   | "--foreground"
   | "--card"
@@ -29,7 +28,6 @@ type WidgetThemeTokens = Record<WidgetThemeTokenName, string>
 
 
 const WIDGET_THEME_TOKEN_NAMES: WidgetThemeTokenName[] = [
-  "--transparent",
   "--background",
   "--foreground",
   "--card",
@@ -57,7 +55,6 @@ const WIDGET_THEME_TOKEN_NAMES: WidgetThemeTokenName[] = [
 
 
 const DEFAULT_WIDGET_TOKENS: WidgetThemeTokens = {
-  "--transparent": "transparent",
   "--background": "#ffffff",
   "--foreground": "#18181b",
   "--card": "#ffffff",
@@ -101,7 +98,7 @@ const WIDGET_BASE_STYLE = `
       padding: 0;
       min-height: 100%;
       width: 100%;
-      background: var(--transparent);
+      background: var(--background);
       color: var(--foreground);
     }
 
@@ -156,6 +153,61 @@ const WIDGET_BASE_STYLE = `
 
 
 /**
+ * Builds a tiny resize bridge so an iframe can report its content height to the parent.
+ */
+const buildWidgetResizeScript = (frameId: string) => `
+  <script>
+    (() => {
+      const FRAME_ID = ${JSON.stringify(frameId)}
+
+      const measure = () => {
+        const doc = document.documentElement
+        const body = document.body
+        const height = Math.ceil(Math.max(
+          doc ? doc.scrollHeight : 0,
+          doc ? doc.offsetHeight : 0,
+          body ? body.scrollHeight : 0,
+          body ? body.offsetHeight : 0
+        ))
+
+        window.parent.postMessage({
+          source: "topix-widget-height",
+          frameId: FRAME_ID,
+          height
+        }, "*")
+      }
+
+      const scheduleMeasure = () => window.requestAnimationFrame(measure)
+
+      window.addEventListener("load", scheduleMeasure)
+      window.addEventListener("resize", scheduleMeasure)
+
+      if ("ResizeObserver" in window) {
+        const resizeObserver = new ResizeObserver(scheduleMeasure)
+        resizeObserver.observe(document.documentElement)
+        if (document.body) {
+          resizeObserver.observe(document.body)
+        }
+      }
+
+      if ("MutationObserver" in window && document.body) {
+        const mutationObserver = new MutationObserver(scheduleMeasure)
+        mutationObserver.observe(document.body, {
+          childList: true,
+          subtree: true,
+          attributes: true,
+          characterData: true,
+        })
+      }
+
+      scheduleMeasure()
+      window.setTimeout(scheduleMeasure, 150)
+    })()
+  </script>
+`
+
+
+/**
  * Checks whether widget content already contains a full HTML document shell.
  */
 export const isFullWidgetDocument = (html: string) => {
@@ -200,7 +252,13 @@ export const getWidgetThemeTokens = (): WidgetThemeTokens => {
 /**
  * Wraps body-only widget markup in a themed standalone HTML document.
  */
-export const buildWidgetDocument = (html: string, title = "Widget") => {
+export const buildWidgetDocument = (
+  html: string,
+  title = "Widget",
+  options?: {
+    autoHeightFrameId?: string
+  }
+) => {
   if (isFullWidgetDocument(html)) {
     return html
   }
@@ -212,6 +270,9 @@ export const buildWidgetDocument = (html: string, title = "Widget") => {
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
+  const resizeScript = options?.autoHeightFrameId
+    ? buildWidgetResizeScript(options.autoHeightFrameId)
+    : ""
 
   return `<!doctype html>
 <html lang="en">
@@ -226,6 +287,7 @@ export const buildWidgetDocument = (html: string, title = "Widget") => {
   </head>
   <body>
     ${bodyMarkup}
+    ${resizeScript}
   </body>
 </html>`
 }

@@ -65,11 +65,14 @@ export const NoteWidgetPreview = ({
   }
 
   return (
-    <div className='h-[260px] w-full overflow-hidden rounded-xl bg-background'>
+    <div className='w-full overflow-hidden rounded-xl bg-background'>
       <WidgetIframe
         html={note.content.markdown}
         title={note.label?.markdown || "Widget preview"}
-        className='h-full w-full border-0 bg-transparent rounded-sm'
+        autoHeight
+        maxHeight={800}
+        minHeight={260}
+        className='w-full border-0 bg-transparent rounded-sm'
       />
     </div>
   )
