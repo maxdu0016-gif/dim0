@@ -1,4 +1,5 @@
 import { useMemo, useState, type ReactNode } from "react"
+import { Link } from "@tanstack/react-router"
 import type { ToolCallStep } from "../../types/stream"
 import { ToolNameIcon } from "../../types/stream"
 import { extractStepDescription, getWebSearchUrls } from "../../utils/stream/build"
@@ -13,6 +14,8 @@ import { WeatherCard } from "@/features/widgets/components/weather-card"
 import TradingCard from "@/features/widgets/components/trading-card"
 import ImageSearchStrip from "@/features/widgets/components/image-card"
 import { ImageGenView } from "./image-gen-view"
+import { NoteWidgetPreview } from "./note-widget-preview"
+import { ArrowUpRightIcon } from "lucide-react"
 
 
 /**
@@ -80,10 +83,24 @@ const NoteToolResult = ({
   output: CreateNoteOutput | EditNoteOutput | WriteNoteOutput
 }) => {
   const typeLabel = output.noteType.replace(/-/g, " ")
+  const boardId = output.graphUid
+  const noteId = output.noteId
 
   return (
     <div className='w-full rounded-lg border border-border bg-sidebar-accent/40 p-3'>
-      <div className='text-xs font-medium text-muted-foreground'>note</div>
+      <div className='flex items-center justify-between gap-2 text-xs font-medium text-muted-foreground'>
+        <span>note</span>
+        <Link
+          to='/boards/$id'
+          params={{ id: boardId }}
+          search={{ center_around: noteId }}
+          className='inline-flex items-center gap-1 rounded-md p-1 transition-colors hover:bg-background/70 hover:text-foreground'
+          title='Open on board'
+          aria-label='Open on board'
+        >
+          <ArrowUpRightIcon className='size-3.5' />
+        </Link>
+      </div>
       <div className='mt-1 text-sm text-card-foreground whitespace-pre-line'>
         <span className='font-medium'>{output.label || "Untitled note"}</span>
         {` • ${typeLabel}`}
@@ -107,6 +124,15 @@ const ToolStepWidgetView = ({
 
   return (
     <div className='w-full min-w-0 overflow-hidden flex flex-col gap-3 pt-1'>
+      {attachment.noteWidget && (
+        <div className='w-full min-w-0 overflow-hidden p-1'>
+          <NoteWidgetPreview
+            boardId={attachment.noteWidget.boardId}
+            noteId={attachment.noteWidget.noteId}
+            pending={attachment.noteWidget.pending}
+          />
+        </div>
+      )}
       {attachment.imageFilename && (
         <div className='w-full min-w-0 overflow-hidden p-1'>
           <ImageGenView filename={attachment.imageFilename} />
@@ -274,7 +300,7 @@ export const ToolStepRow = ({
                 Show less
               </button>
             )}
-            {!isStreaming && <ToolStepWidgetView attachment={attachment} />}
+            <ToolStepWidgetView attachment={attachment} />
           </div>
         </div>
       </div>
