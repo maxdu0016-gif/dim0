@@ -20,6 +20,7 @@ Rules:
 - Keep the widget lightweight and responsive inside an iframe.
 - You may include a local `<style>` block in the body content when useful.
 - Prefer semantic theme tokens rather than hardcoded colors:
+  - `var(--transparent)`
   - `var(--background)`
   - `var(--foreground)`
   - `var(--card)`
@@ -41,6 +42,7 @@ Rules:
   - `var(--shadow-md)`
 - Prefer `system-ui` for the main font family unless the design strongly needs something else.
 - Make the design work in both light and dark themes without changing the HTML.
+- Prefer the outer widget background to stay transparent and avoid an outer border by default. Use filled surfaces like `var(--card)` or borders only for intentional panels, cards, or callouts.
 - Prefer `var(--chart-1)` to `var(--chart-5)` for chart series and colorful accents.
 - If you use custom colors, make sure they still work well in both light and dark themes.
 - Keep spacing compact for small widget surfaces.

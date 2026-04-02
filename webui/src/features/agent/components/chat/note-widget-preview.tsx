@@ -69,7 +69,7 @@ export const NoteWidgetPreview = ({
       <WidgetIframe
         html={note.content.markdown}
         title={note.label?.markdown || "Widget preview"}
-        className='h-full w-full border-0 bg-transparent'
+        className='h-full w-full border-0 bg-transparent rounded-sm'
       />
     </div>
   )

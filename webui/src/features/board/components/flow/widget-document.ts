@@ -1,4 +1,5 @@
 type WidgetThemeTokenName =
+  | "--transparent"
   | "--background"
   | "--foreground"
   | "--card"
@@ -28,6 +29,7 @@ type WidgetThemeTokens = Record<WidgetThemeTokenName, string>
 
 
 const WIDGET_THEME_TOKEN_NAMES: WidgetThemeTokenName[] = [
+  "--transparent",
   "--background",
   "--foreground",
   "--card",
@@ -55,6 +57,7 @@ const WIDGET_THEME_TOKEN_NAMES: WidgetThemeTokenName[] = [
 
 
 const DEFAULT_WIDGET_TOKENS: WidgetThemeTokens = {
+  "--transparent": "transparent",
   "--background": "#ffffff",
   "--foreground": "#18181b",
   "--card": "#ffffff",
@@ -98,7 +101,7 @@ const WIDGET_BASE_STYLE = `
       padding: 0;
       min-height: 100%;
       width: 100%;
-      background: var(--background);
+      background: var(--transparent);
       color: var(--foreground);
     }
 
