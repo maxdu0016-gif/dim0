@@ -204,7 +204,7 @@ export const ToolStepRow = ({
   }
 
   const isLoading = isStreaming && step.state === "started"
-  const messageClass = "transition-all w-full h-auto min-h-2 min-w-0 overflow-x-hidden overflow-y-auto scrollbar-thin p-2 rounded-xl"
+  const messageClass = "transition-all w-full h-auto min-h-2 min-w-0 overflow-x-hidden overflow-y-auto scrollbar-thin py-2 rounded-xl"
   const spanMessageClass = "text-sm text-card-foreground whitespace-pre-line"
   const stepIcon = ToolNameIcon[step.name]
   const successIcon = stepIcon || Tick01Icon
