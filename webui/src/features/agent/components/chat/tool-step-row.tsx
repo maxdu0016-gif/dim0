@@ -15,6 +15,7 @@ import TradingCard from "@/features/widgets/components/trading-card"
 import ImageSearchStrip from "@/features/widgets/components/image-card"
 import { ImageGenView } from "./image-gen-view"
 import { NoteWidgetPreview } from "./note-widget-preview"
+import { useChat } from "../../hooks/chat-context"
 import { ArrowUpRightIcon } from "lucide-react"
 
 
@@ -79,8 +80,10 @@ const CodeInterpreterResult = ({
  */
 const NoteToolResult = ({
   output,
+  chatId,
 }: {
   output: CreateNoteOutput | EditNoteOutput | WriteNoteOutput
+  chatId?: string
 }) => {
   const typeLabel = output.noteType.replace(/-/g, " ")
   const boardId = output.graphUid
@@ -93,7 +96,7 @@ const NoteToolResult = ({
         <Link
           to='/boards/$id'
           params={{ id: boardId }}
-          search={{ center_around: noteId }}
+          search={{ center_around: noteId, current_chat_id: chatId || undefined }}
           className='inline-flex items-center gap-1 rounded-md p-1 transition-colors hover:bg-background/70 hover:text-foreground'
           title='Open on board'
           aria-label='Open on board'
@@ -170,6 +173,7 @@ export const ToolStepRow = ({
   isStreaming?: boolean
   attachment?: ToolStepWidgetAttachment
 }) => {
+  const { chatId } = useChat()
   const [viewMore, setViewMore] = useState(false)
   const [isInputCopied, setIsInputCopied] = useState(false)
 
@@ -285,7 +289,7 @@ export const ToolStepRow = ({
               <CodeInterpreterResult output={codeInterpreterOutput} />
             )}
             {canExpand && viewMore && noteToolOutput && (
-              <NoteToolResult output={noteToolOutput} />
+              <NoteToolResult output={noteToolOutput} chatId={chatId} />
             )}
             {canExpand && viewMore && sources.length > 0 && (
               <div className='w-full flex flex-row flex-wrap items-start gap-1 mt-2'>

@@ -41,6 +41,10 @@ Rules:
   - `var(--shadow-md)`
 - Prefer `system-ui` for the main font family unless the design strongly needs something else.
 - Make the design work in both light and dark themes without changing the HTML.
+- Prefer `var(--chart-1)` to `var(--chart-5)` for chart series and colorful accents.
+- If you use custom colors, make sure they still work well in both light and dark themes.
+- Keep spacing compact for small widget surfaces.
+- Prefer low padding and small gaps by default; only use larger spacing when it clearly improves readability.
 - Avoid external dependencies unless they are truly necessary.
 - Prefer plain HTML, CSS, and small vanilla JavaScript.
 - If a chart is the clearest visual form, `Chart.js` is a good option.
@@ -60,6 +64,8 @@ Design guidance:
 - Favor clarity, legibility, and visual hierarchy over decorative complexity.
 - Make the widget immediately useful even without interaction.
 - Keep the visual system calm, warm, and editorial rather than flashy.
+- Prefer moderate corner radii such as `var(--rounded)`, `rounded-md`, or `rounded-lg` equivalents.
+- Avoid overly pill-like or excessively soft rounding unless the user explicitly wants that look.
 - When useful, include concise labels, legends, tooltips, or callouts.
 - Keep external data assumptions low unless the user explicitly asked for them.
 - Prefer self-contained demos over brittle integrations.
