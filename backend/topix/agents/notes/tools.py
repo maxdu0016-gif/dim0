@@ -36,7 +36,8 @@ def create_write_note_tool(
         markdown, code, or widget source. Omit `note_id` to create a new note. Provide
         `note_id` only when you intend to fully rewrite the authored fields of an existing note,
         perform a major restructure, or change the note type. For localized updates to an
-        existing note, use `edit_note` instead.
+        existing note, use `edit_note` instead. If the user asks for a sticky note or post-it,
+        use `note_type="sheet"`.
 
         Args:
             content (str): The complete note body after this write, such as prose, markdown, code, or widget source.
