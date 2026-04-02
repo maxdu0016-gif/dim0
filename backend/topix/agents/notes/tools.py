@@ -34,8 +34,9 @@ def create_write_note_tool(
 
         Use this tool when you need to author full note content in one shot, including prose,
         markdown, code, or widget source. Omit `note_id` to create a new note. Provide
-        `note_id` to fully rewrite the authored fields of an existing note. For small targeted
-        content changes, prefer `edit_note`.
+        `note_id` only when you intend to fully rewrite the authored fields of an existing note,
+        perform a major restructure, or change the note type. For localized updates to an
+        existing note, use `edit_note` instead.
 
         Args:
             content (str): The complete note body after this write, such as prose, markdown, code, or widget source.
@@ -172,9 +173,10 @@ def create_edit_note_tool(
     ) -> EditNoteOutput:
         """Apply a targeted content edit to an existing note field in the current board scope.
 
-        Use this tool for small, incremental updates to existing note content, including prose,
-        markdown, code, or widget source. Pass the exact current value in `old` so the update
-        can fail safely if the note has changed since you last saw it.
+        Use this as the default tool for localized changes to an existing note, including prose,
+        markdown, code, or widget source. Multiple `edit_note` calls are preferred when several
+        small updates are needed. Pass the exact current value in `old` so the update can fail
+        safely if the note has changed since you last saw it.
 
         Args:
             note_id (str): Exact id of the note to update.
