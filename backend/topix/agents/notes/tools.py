@@ -32,12 +32,13 @@ def create_write_note_tool(
     ) -> WriteNoteOutput:
         """Create a new note or fully rewrite an existing note in the current board scope.
 
-        Use this tool when you need to author a full note body in one shot. Omit `note_id`
-        to create a new note. Provide `note_id` to fully rewrite the authored fields of an
-        existing note. For small targeted text updates, prefer `edit_note`.
+        Use this tool when you need to author full note content in one shot, including prose,
+        markdown, code, or widget source. Omit `note_id` to create a new note. Provide
+        `note_id` to fully rewrite the authored fields of an existing note. For small targeted
+        content changes, prefer `edit_note`.
 
         Args:
-            content (str): The complete main markdown body for the note after this write.
+            content (str): The complete note body after this write, such as prose, markdown, code, or widget source.
             label (str | None): Optional short title stored separately from the main body.
             note_type (NodeType): Visual note type to use after the write.
             note_id (str | None): Optional existing note id. Omit to create a new note.
@@ -169,14 +170,15 @@ def create_edit_note_tool(
         old: str,
         new: str,
     ) -> EditNoteOutput:
-        """Apply a targeted text edit to an existing note field in the current board scope.
+        """Apply a targeted content edit to an existing note field in the current board scope.
 
-        Use this tool for small, incremental text changes. Pass the exact current text in `old`
-        so the update can fail safely if the note has changed since you last saw it.
+        Use this tool for small, incremental updates to existing note content, including prose,
+        markdown, code, or widget source. Pass the exact current value in `old` so the update
+        can fail safely if the note has changed since you last saw it.
 
         Args:
             note_id (str): Exact id of the note to update.
-            field (Literal["label", "content"]): Which text field to edit.
+            field (Literal["label", "content"]): Which note field to edit.
             old (str): Exact current value expected for that field.
             new (str): Replacement value for that field.
 
