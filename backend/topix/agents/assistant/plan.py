@@ -101,7 +101,7 @@ class Plan(BaseAgent):
     def _format_message(self, message: dict[str, str]) -> str:
         role = message["role"]
         content = message["content"]
-        return f"<message role='{role}'>\n<![CDATA[\n{content}\n]]>\n</message>"
+        return f"<Message role='{role}'>\n<![CDATA[\n{content}\n]]>\n</Message>"
 
     async def _input_formatter(self, context: ReasoningContext, input: list[dict[str, str]]) -> str:
         # update context with memory search filters from tool if available
