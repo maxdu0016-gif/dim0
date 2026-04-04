@@ -48,6 +48,7 @@ export const useChatStore = create<ChatStore>((set) => ({
     "web_search",
     "memory_search",
     "code_interpreter",
+    "get_note",
     "write_note",
     "edit_note",
     "navigate",
