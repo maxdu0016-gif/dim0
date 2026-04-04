@@ -238,9 +238,9 @@ class CreateNoteOutput(BaseModel):
     ] = None
 
     def to_compact_repr(self) -> str:
-        """Return the created note type and optional label."""
+        """Return the created note metadata in a compact, history-safe form."""
         label = f' "{self.label}"' if self.label else ""
-        return f"created {self.note_type}{label}"
+        return f'created {self.note_type} note_id="{self.note_id}"{label}'
 
 
 class WriteNoteOutput(BaseModel):
@@ -258,9 +258,9 @@ class WriteNoteOutput(BaseModel):
     ] = None
 
     def to_compact_repr(self) -> str:
-        """Return the write action, note type, and optional label."""
+        """Return the write action metadata in a compact, history-safe form."""
         label = f' "{self.label}"' if self.label else ""
-        return f"{self.action} {self.note_type}{label}"
+        return f'{self.action} {self.note_type} note_id="{self.note_id}"{label}'
 
 
 class EditNoteOutput(BaseModel):
@@ -277,9 +277,29 @@ class EditNoteOutput(BaseModel):
     ] = None
 
     def to_compact_repr(self) -> str:
-        """Return the edited note type and optional label."""
+        """Return the edited note metadata in a compact, history-safe form."""
         label = f' "{self.label}"' if self.label else ""
-        return f"edited {self.note_type}{label}"
+        return f'edited {self.note_type} note_id="{self.note_id}"{label}'
+
+
+class GetNoteOutput(BaseModel):
+    """Output from get note tool."""
+
+    type: Literal["get_note"] = "get_note"
+    note_id: Annotated[str, "The unique id of the fetched note."]
+    graph_uid: Annotated[str, "The board id where the note belongs."]
+    label: Annotated[str | None, "Optional short title currently stored on the note."] = None
+    content: Annotated[str, "The current markdown body of the note."]
+    note_type: Annotated[NodeType, "The current node type of the note."]
+    parent_id: Annotated[
+        str | None,
+        "The current parent folder/root note id, if any."
+    ] = None
+
+    def to_compact_repr(self) -> str:
+        """Return the fetched note metadata in a compact, history-safe form."""
+        label = f' "{self.label}"' if self.label else ""
+        return f'read {self.note_type} note_id="{self.note_id}"{label}'
 
 
 class MemorySearchOutput(BaseModel):
@@ -335,6 +355,7 @@ type ToolOutput = Union[
     WriteNoteOutput,
     CreateNoteOutput,
     EditNoteOutput,
+    GetNoteOutput,
     WebSearchOutput,
     MemorySearchOutput,
     NotifyOutput,

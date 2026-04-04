@@ -3,6 +3,7 @@
 from topix.agents.datatypes.outputs import (
     CodeInterpreterOutput,
     CreateNoteOutput,
+    GetNoteOutput,
     MemorySearchOutput,
     WebSearchOutput,
     WriteNoteOutput,
@@ -77,7 +78,7 @@ def test_message_to_chat_message_includes_reasoning_and_content():
 
     assert chat_message["role"] == "assistant"
     assert chat_message["content"].startswith('<Reasoning>\n\n<ToolCall name="create_note">')
-    assert '<Output>created rectangle &quot;Ideas&quot;</Output>' in chat_message["content"]
+    assert '<Output>created rectangle note_id=&quot;note-1&quot; &quot;Ideas&quot;</Output>' in chat_message["content"]
     assert "Final answer body" in chat_message["content"]
 
 
@@ -168,7 +169,7 @@ def test_write_note_output_to_compact_repr_uses_metadata_only():
         note_type="widget",
     )
 
-    assert output.to_compact_repr() == 'rewritten widget "Revenue chart"'
+    assert output.to_compact_repr() == 'rewritten widget note_id="note-1" "Revenue chart"'
 
 
 def test_memory_search_output_to_compact_repr_prefers_reference_count():
@@ -183,3 +184,42 @@ def test_code_interpreter_output_to_compact_repr_uses_status_and_duration():
     output = CodeInterpreterOutput(status="success", duration_ms=842)
 
     assert output.to_compact_repr() == "success in 842ms"
+
+
+def test_get_note_output_to_compact_repr_uses_note_metadata_only():
+    """Get note output should summarize the fetched note by id, type, and label."""
+    output = GetNoteOutput(
+        note_id="note-7",
+        graph_uid="graph-1",
+        label="Roadmap",
+        content="Full note content",
+        note_type="sheet",
+    )
+
+    assert output.to_compact_repr() == 'read sheet note_id="note-7" "Roadmap"'
+
+
+def test_tool_call_to_compact_step_description_summarizes_content_heavy_inputs():
+    """Content-heavy inputs should be summarized instead of dumping raw payload text."""
+    step = ToolCall(
+        id="step-5",
+        name=AgentToolName.WRITE_NOTE,
+        output=WriteNoteOutput(
+            action="rewritten",
+            note_id="note-1",
+            graph_uid="graph-1",
+            note_type="widget",
+        ),
+        arguments={
+            "note_id": "note-1",
+            "content": {"markdown": "<style>.card{padding:16px}</style><div>Hello</div>"},
+            "label": "Revenue chart",
+        },
+    )
+
+    result = step.to_compact_step_description()
+
+    assert result.startswith('<ToolCall name="write_note">\n<Input>note_id=&quot;note-1&quot;')
+    assert "content=&quot;{ markdown=&lt;" in result
+    assert "chars&gt; }&quot;" in result
+    assert '<Output>rewritten widget note_id=&quot;note-1&quot;</Output>' in result
