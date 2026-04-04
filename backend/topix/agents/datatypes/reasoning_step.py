@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from html import escape
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -19,5 +20,10 @@ class ReasoningStep(BaseModel):
 
     def to_compact_step_description(self) -> str:
         """Convert to a compact text representation for retrieval or previews."""
-        chunks = [part.strip() for part in [self.reasoning, self.message] if part.strip()]
-        return " / ".join(chunks)
+        parts = ["<ReasoningStep>"]
+        if self.reasoning.strip():
+            parts.append(f"<Thought>{escape(self.reasoning.strip())}</Thought>")
+        if self.message.strip():
+            parts.append(f"<Message>{escape(self.message.strip())}</Message>")
+        parts.append("</ReasoningStep>")
+        return "\n".join(parts)
