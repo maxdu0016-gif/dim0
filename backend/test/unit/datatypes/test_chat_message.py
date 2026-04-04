@@ -223,3 +223,22 @@ def test_tool_call_to_compact_step_description_summarizes_content_heavy_inputs()
     assert 'content="{ markdown=<' in result
     assert ' chars> }"' in result
     assert '<Output>rewritten widget note_id="note-1"</Output>' in result
+
+
+def test_tool_call_to_compact_step_description_collapses_widget_skill_output():
+    """Widget skill outputs should stay short in compact history because the tool can be recalled."""
+    step = ToolCall(
+        id="step-6",
+        name=AgentToolName.LEARN_GENERATE_HTML_WIDGET,
+        output="Very long widget instruction payload that should not be replayed in full.",
+        arguments={},
+    )
+
+    assert (
+        step.to_compact_step_description()
+        == (
+            '<ToolCall name="learn_generate_html_widget">\n'
+            '<Output>loaded widget generation guidance</Output>\n'
+            '</ToolCall>'
+        )
+    )

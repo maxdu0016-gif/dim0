@@ -74,6 +74,8 @@ class ToolCall(BaseModel):
     def _compact_output_repr(self) -> str:
         """Return a short output summary suitable for chat history compaction."""
         if isinstance(self.output, str):
+            if self.name == AgentToolName.LEARN_GENERATE_HTML_WIDGET:
+                return "loaded widget generation guidance"
             compact = self.output.strip().replace("\n", " ")
             return compact[:MAX_COMPACT_TEXT_LENGTH] + ("..." if len(compact) > MAX_COMPACT_TEXT_LENGTH else "")
 
