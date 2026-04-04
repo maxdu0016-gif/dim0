@@ -29,7 +29,7 @@ def test_tool_call_to_compact_step_description_formats_arguments():
         step.to_compact_step_description()
         == (
             '<ToolCall name="web_search">\n'
-            '<Input>query=&quot;best pizza paris&quot;, scope=&quot;fresh&quot;</Input>\n'
+            '<Input>query="best pizza paris", scope="fresh"</Input>\n'
             '<Output>0 search results</Output>\n'
             '</ToolCall>'
         )
@@ -48,7 +48,7 @@ def test_tool_call_to_compact_step_description_truncates_long_arguments():
 
     result = step.to_compact_step_description()
 
-    assert result.startswith('<ToolCall name="web_search">\n<Input>query=&quot;')
+    assert result.startswith('<ToolCall name="web_search">\n<Input>query="')
     assert result.endswith('</Output>\n</ToolCall>')
     assert "...</Input>" in result
 
@@ -78,7 +78,7 @@ def test_message_to_chat_message_includes_reasoning_and_content():
 
     assert chat_message["role"] == "assistant"
     assert chat_message["content"].startswith('<Reasoning>\n\n<ToolCall name="create_note">')
-    assert '<Output>created rectangle note_id=&quot;note-1&quot; &quot;Ideas&quot;</Output>' in chat_message["content"]
+    assert '<Output>created rectangle note_id="note-1" "Ideas"</Output>' in chat_message["content"]
     assert "Final answer body" in chat_message["content"]
 
 
@@ -219,7 +219,7 @@ def test_tool_call_to_compact_step_description_summarizes_content_heavy_inputs()
 
     result = step.to_compact_step_description()
 
-    assert result.startswith('<ToolCall name="write_note">\n<Input>note_id=&quot;note-1&quot;')
-    assert "content=&quot;{ markdown=&lt;" in result
-    assert "chars&gt; }&quot;" in result
-    assert '<Output>rewritten widget note_id=&quot;note-1&quot;</Output>' in result
+    assert result.startswith('<ToolCall name="write_note">\n<Input>note_id="note-1"')
+    assert 'content="{ markdown=<' in result
+    assert ' chars> }"' in result
+    assert '<Output>rewritten widget note_id="note-1"</Output>' in result

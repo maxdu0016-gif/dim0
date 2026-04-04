@@ -1,7 +1,6 @@
 """Reasoning-related data types."""
 
 from enum import StrEnum
-from html import escape
 from typing import Any, Literal
 
 from pydantic import BaseModel
@@ -56,9 +55,9 @@ class ToolCall(BaseModel):
         output_repr = self._compact_output_repr()
         parts = [f'<ToolCall name="{self.name}">']
         if input_repr:
-            parts.append(f"<Input>{escape(input_repr)}</Input>")
+            parts.append(f"<Input>{input_repr}</Input>")
         if output_repr:
-            parts.append(f"<Output>{escape(output_repr)}</Output>")
+            parts.append(f"<Output>{output_repr}</Output>")
         parts.append("</ToolCall>")
         return "\n".join(parts)
 
