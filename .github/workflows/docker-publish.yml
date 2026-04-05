@@ -10,6 +10,10 @@ on:
         description: Version tag to publish without the leading v
         required: false
         type: string
+      ref:
+        description: Git ref to build (tag, branch, or SHA). Defaults to the triggered ref.
+        required: false
+        type: string
       push_latest:
         description: Also publish the latest tag
         required: true
@@ -18,6 +22,10 @@ on:
   workflow_call:
     inputs:
       version:
+        required: true
+        type: string
+      ref:
+        description: Git ref to check out for the build
         required: true
         type: string
       push_latest:
@@ -37,6 +45,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
 
       - name: Resolve publish version
         id: release_meta

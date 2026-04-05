@@ -94,5 +94,6 @@ jobs:
     uses: ./.github/workflows/docker-publish.yml
     with:
       version: ${{ needs.release.outputs.version }}
+      ref: refs/tags/v${{ needs.release.outputs.version }}
       push_latest: true
     secrets: inherit
