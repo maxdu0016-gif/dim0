@@ -227,6 +227,61 @@ async def test_graph_keeps_links_with_free_endpoints(config, init_collection):
 
 
 @pytest.mark.asyncio
+async def test_update_link_merges_partial_payload(config, init_collection):
+    """Test link updates merge into the stored link instead of replacing it."""
+    store = GraphStore()
+    await store.open()
+    user_uid = "root"
+
+    try:
+        graph = Graph(label="Update Link Graph")
+        await store.add_graph(graph, user_uid=user_uid)
+
+        node1 = Note(
+            label=RichText(markdown="Node 1"),
+            graph_uid=graph.uid,
+        )
+        node2 = Note(
+            label=RichText(markdown="Node 2"),
+            graph_uid=graph.uid,
+        )
+        await store.add_notes([node1, node2])
+
+        link = Link(
+            source=node1.id,
+            target=node2.id,
+            graph_uid=graph.uid,
+            properties={
+                "start_point": PositionProperty(
+                    position=PositionProperty.Position(x=30, y=40),
+                ),
+                "end_point": PositionProperty(
+                    position=PositionProperty.Position(x=130, y=140),
+                ),
+            },
+        )
+        await store.add_links([link])
+
+        await store.update_link(
+            link_id=link.id,
+            data={
+                "parent_id": node1.id,
+            },
+        )
+
+        updated_link = (await store.get_links([link.id]))[0]
+        assert updated_link.parent_id == node1.id
+        assert updated_link.source == node1.id
+        assert updated_link.target == node2.id
+        assert updated_link.graph_uid == graph.uid
+        assert updated_link.properties.start_point is not None
+        assert updated_link.properties.end_point is not None
+    finally:
+        await store.delete_graph(graph.uid, hard_delete=True)
+        await store.close()
+
+
+@pytest.mark.asyncio
 async def test_graph_filters_links_by_parent_scope(config, init_collection):
     """Test graph loading scopes links by their parent_id in nested boards."""
     store = GraphStore()

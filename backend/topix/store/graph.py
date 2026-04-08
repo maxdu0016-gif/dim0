@@ -187,9 +187,19 @@ class GraphStore:
         await self._content_store.add(links)
 
     async def update_link(self, link_id: str, data: dict):
-        """Update a link in the graph."""
-        data["id"] = link_id
-        await self._content_store.update([data])
+        """Patch a link in the graph by merging into the stored payload."""
+        existing_links = await self.get_links([link_id])
+        if not existing_links:
+            return
+
+        existing_link = existing_links[0]
+        merged_payload = self._deep_merge_dict(
+            existing_link.model_dump(exclude_none=False),
+            data,
+        )
+        merged_payload["id"] = link_id
+
+        await self._content_store.update([merged_payload])
 
     async def delete_link(self, link_id: str):
         """Delete a link from the graph."""

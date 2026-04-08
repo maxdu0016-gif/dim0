@@ -1,10 +1,21 @@
-"""Backfill link parent_id values from attached note endpoints."""
+"""Backfill missing link parent_id values for nested board links.
+
+This migration exists because older links did not store an explicit parent scope,
+which makes nested-board reloads ambiguous. It infers parent_id only when at
+least one attached endpoint note exists and all attached notes agree on the same
+non-null parent within the same graph.
+
+Usage:
+    python3 scripts/migrate_link_parent_ids.py --stage local --env-file .env
+    python3 scripts/migrate_link_parent_ids.py --stage local --env-file .env --apply
+"""
 
 from __future__ import annotations
 
 import argparse
 import asyncio
 import logging
+import re
 
 from qdrant_client.models import FieldCondition, Filter, MatchValue
 
@@ -16,6 +27,7 @@ from topix.store.graph import GraphStore
 from topix.utils.logging import logging_config
 
 logger = logging.getLogger(__name__)
+RESOURCE_ID_PATTERN = re.compile(r"^[0-9a-f]{32}$")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -65,7 +77,14 @@ async def infer_parent_id(store: GraphStore, link: Link) -> str | object:
     - `SKIP` when the link is ambiguous or cannot be inferred safely
 
     """
-    endpoint_ids = [link.source, link.target]
+    endpoint_ids = [
+        endpoint_id
+        for endpoint_id in (link.source, link.target)
+        if RESOURCE_ID_PATTERN.fullmatch(endpoint_id)
+    ]
+    if not endpoint_ids:
+        return SKIP
+
     endpoint_nodes = await store.get_nodes(endpoint_ids)
 
     candidate_parents: set[str | None] = set()
