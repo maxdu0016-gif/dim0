@@ -53,6 +53,17 @@ class GraphStore:
         # TODO(folder): reject invalid parent assignments and cycles on create.
         await self._content_store.add(nodes)
 
+    @staticmethod
+    def _link_is_visible_in_scope(
+        link: Link,
+        root_id: str | None,
+    ) -> bool:
+        """Return whether a link belongs to the requested board scope."""
+        if root_id is None:
+            return link.parent_id is None
+
+        return link.parent_id == root_id
+
     def _schedule_note_snapshot(self, note: Note, user_uid: str | None = None) -> None:
         """Persist a note snapshot in the background when revision storage is enabled."""
         if self._note_revision_store is None:
@@ -226,7 +237,6 @@ class GraphStore:
             or (root_id is not None and node.parent_id == root_id)
         ]
 
-        node_ids = {node.id for node in graph.nodes}
         link_results = await self._content_store.filt(
             filters=Filter(
                 must=[
@@ -244,11 +254,8 @@ class GraphStore:
         graph.edges = [
             result.resource
             for result in link_results
-            # Only include links where both source
-            # and target nodes are in the retrieved node set.
             if isinstance(result.resource, Link)
-            and result.resource.source in node_ids
-            and result.resource.target in node_ids
+            and self._link_is_visible_in_scope(result.resource, root_id)
         ]
 
         return graph
