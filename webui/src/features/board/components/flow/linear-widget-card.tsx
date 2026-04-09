@@ -1,7 +1,7 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import clsx from 'clsx'
 
-import { Delete02Icon, Layout01Icon } from '@hugeicons/core-free-icons'
+import { Analytics02Icon, Delete02Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 
 import { useGraphStore } from '../../store/graph-store'
@@ -106,7 +106,7 @@ export const LinearWidgetCard = memo(function LinearWidgetCard({ node }: Props) 
         )}
       >
         <div className='flex w-full max-w-[92px] aspect-square items-center justify-center rounded-2xl border border-border/70 bg-background text-muted-foreground shadow-sm'>
-          <HugeiconsIcon icon={Layout01Icon} className='size-12 shrink-0' strokeWidth={1.8} />
+          <HugeiconsIcon icon={Analytics02Icon} className='size-12 shrink-0' strokeWidth={1.8} />
         </div>
       </button>
 

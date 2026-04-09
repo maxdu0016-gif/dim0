@@ -53,6 +53,7 @@ import { applyBackgroundAlpha, type BoardBackgroundTexture } from '../../utils/b
 
 import './graph-styles.css'
 import { useThumbnailCapture } from '../../hooks/use-thumbnail-capture'
+import { ListView } from './list-view'
 
 const proOptions = { hideAttribution: true }
 
@@ -94,7 +95,7 @@ const drawableNodeTypes: NodeType[] = [
 
 const isDrawableNodeType = (nodeType: NodeType) => drawableNodeTypes.includes(nodeType)
 
-type ViewMode = 'graph' | 'linear'
+type ViewMode = 'graph' | 'linear' | 'list'
 
 type EmptyGraphHintProps = {
   isMobile: boolean
@@ -233,7 +234,7 @@ function GraphView({
 }
 
 /**
- * Linear view (your existing default board)
+ * Files view (card-based board list)
  */
 function LinearView() {
   return <DefaultBoardView />
@@ -780,8 +781,10 @@ export default function GraphEditor() {
               </>
             )}
           </GraphContextMenu>
-        ) : (
+        ) : viewMode === 'linear' ? (
           <LinearView />
+        ) : (
+          <ListView />
         )}
       </div>
 
