@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { memo, useCallback, useEffect, useRef, useState } from "react"
 import type { Viewport } from "@xyflow/react"
 import clsx from "clsx"
 
@@ -61,13 +61,13 @@ export const WidgetNode = memo(function WidgetNode({
   selected = false,
   dragging,
 }: WidgetNodeProps) {
-  const [rendererSize, setRendererSize] = useState<{ width: number; height: number } | null>(null)
-  const { boardId, rootId, graphViewports, isMoving, boardCanEdit } = useGraphStore(useShallow((state) => ({
+  const { boardId, rootId, graphViewports, isMoving, boardCanEdit, rendererSize } = useGraphStore(useShallow((state) => ({
     boardId: state.boardId,
     rootId: state.rootId,
     graphViewports: state.graphViewports,
     isMoving: state.isMoving,
     boardCanEdit: state.boardCanEdit,
+    rendererSize: state.rendererSize,
   })))
   const openNodeSurface = useGraphStore((state) => state.openNodeSurface)
   const updateNodeByIdPersist = useGraphStore((state) => state.updateNodeByIdPersist)
@@ -77,23 +77,8 @@ export const WidgetNode = memo(function WidgetNode({
   const viewport = scopeViewportKey ? graphViewports[scopeViewportKey] : undefined
   const [titleEditing, setTitleEditing] = useState(false)
   const [titleDraft, setTitleDraft] = useState(note.label?.markdown || "")
+  const [isVisibleInViewport, setIsVisibleInViewport] = useState(true)
   const titleInputRef = useRef<HTMLInputElement | null>(null)
-
-  useEffect(() => {
-    const renderer = document.querySelector(".react-flow__renderer") as HTMLElement | null
-    if (!renderer) return
-
-    const updateSize = () => {
-      const rect = renderer.getBoundingClientRect()
-      setRendererSize({ width: rect.width, height: rect.height })
-    }
-
-    updateSize()
-    const observer = new ResizeObserver(() => updateSize())
-    observer.observe(renderer)
-
-    return () => observer.disconnect()
-  }, [])
 
   useEffect(() => {
     if (titleEditing) return
@@ -109,10 +94,11 @@ export const WidgetNode = memo(function WidgetNode({
     return () => cancelAnimationFrame(frame)
   }, [titleEditing])
 
-  const isVisibleInViewport = useMemo(
-    () => isNoteInViewport(note, viewport, rendererSize),
-    [note, rendererSize, viewport],
-  )
+  useEffect(() => {
+    if (isMoving) return
+    setIsVisibleInViewport(isNoteInViewport(note, viewport, rendererSize))
+  }, [isMoving, note, rendererSize, viewport])
+
   const suspendPreview = Boolean(isMoving || dragging || !isVisibleInViewport)
   const canInteractInline = selected && !suspendPreview
 
