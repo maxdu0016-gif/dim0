@@ -47,18 +47,18 @@ function useSortedNodes(nodes: NoteNode[]) {
   )
 }
 
-// snaps to 1 column on small screens using matchMedia
+// snaps to 2 columns on small screens using matchMedia
 function useEffectiveCols(cols: number, breakpointPx: number) {
   const get = () => {
     if (typeof window === 'undefined') return cols
-    return window.innerWidth < breakpointPx ? 1 : cols
+    return window.innerWidth < breakpointPx ? Math.min(2, cols) : cols
   }
   const [effective, setEffective] = useState<number>(get)
 
   useEffect(() => {
     if (typeof window === 'undefined') return
     const mq = window.matchMedia(`(max-width: ${breakpointPx - 0.5}px)`)
-    const update = () => setEffective(mq.matches ? 1 : cols)
+    const update = () => setEffective(mq.matches ? Math.min(2, cols) : cols)
     update()
     mq.addEventListener('change', update)
     return () => {
