@@ -125,43 +125,43 @@ export const CodeSandboxNode = memo(function CodeSandboxNode({
 
       <button
         type="button"
-        className="w-full h-full text-left"
+        className="block h-full w-full text-left"
         onClick={() => {
           if (!boardCanEdit) return
           openNodeSurface(note.id, "code-sandbox")
         }}
       >
-      <div
-        className={`code-sandbox-theme relative w-full h-full overflow-auto scrollbar-thin p-3 ${isDark ? "code-sandbox-theme-dark" : "code-sandbox-theme-light"}`}
-        style={{
-          backgroundColor: palette.bg,
-          color: palette.text,
-        }}
-      >
-        <div className="h-9" />
-        {!suspendPreview && (
-          <pre
-            className="hljs min-h-full whitespace-pre-wrap break-words text-base leading-5 font-mono bg-transparent p-0"
-            dangerouslySetInnerHTML={{ __html: previewHtml }}
-          />
-        )}
-        {suspendPreview && (
-          <div
-            className="absolute inset-0 flex items-center justify-center"
-            style={{ backgroundColor: isDark ? "rgba(31,29,46,0.62)" : "rgba(255,250,243,0.72)" }}
-          >
+        <div
+          className={`code-sandbox-theme relative h-full w-full overflow-auto scrollbar-thin p-3 ${isDark ? "code-sandbox-theme-dark" : "code-sandbox-theme-light"}`}
+          style={{
+            backgroundColor: palette.bg,
+            color: palette.text,
+          }}
+        >
+          <div className="h-9" />
+          {!suspendPreview && (
+            <pre
+              className="hljs min-h-full whitespace-pre-wrap break-words text-base leading-5 font-mono bg-transparent p-0"
+              dangerouslySetInnerHTML={{ __html: previewHtml }}
+            />
+          )}
+          {suspendPreview && (
             <div
-              className="rounded-full px-3 py-1 text-base font-medium"
-              style={{
-                color: palette.muted,
-                backgroundColor: isDark ? "rgba(64,61,82,0.72)" : "rgba(223,218,217,0.8)",
-              }}
+              className="absolute inset-0 flex items-center justify-center"
+              style={{ backgroundColor: isDark ? "rgba(31,29,46,0.62)" : "rgba(255,250,243,0.72)" }}
             >
-              Moving sandbox...
+              <div
+                className="rounded-full px-3 py-1 text-base font-medium"
+                style={{
+                  color: palette.muted,
+                  backgroundColor: isDark ? "rgba(64,61,82,0.72)" : "rgba(223,218,217,0.8)",
+                }}
+              >
+                Moving sandbox...
+              </div>
             </div>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
       </button>
     </div>
   )
