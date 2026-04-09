@@ -92,7 +92,7 @@ export const TopBar = memo(function TopBar({
   const currentFolderDepth = useGraphStore(state => state.currentFolderDepth)
   const maxFolderDepth = useGraphStore(state => state.maxFolderDepth)
   const isAtMaxFolderDepth = currentFolderDepth >= maxFolderDepth
-  const normalButtonClass = 'transition-colors text-card-foreground hover:bg-sidebar-primary hover:text-sidebar-primary-foreground p-2.5 rounded-lg flex items-center justify-center gap-2'
+  const normalButtonClass = 'transition-colors text-card-foreground hover:bg-sidebar-primary hover:text-sidebar-primary-foreground !p-2.5 rounded-lg flex items-center justify-center gap-2'
   const activeButtonClass = clsx(normalButtonClass, 'bg-sidebar-primary text-secondary')
   const [openShareDialog, setOpenShareDialog] = useState(false)
   const [isUpdatingSharing, setIsUpdatingSharing] = useState(false)
@@ -195,8 +195,8 @@ export const TopBar = memo(function TopBar({
                   className='size-4 shrink-0'
                   strokeWidth={2}
                 />
-                <span className='text-[10px] md:not-sr-only'>{currentViewLabel}</span>
-                <ChevronDown className='size-3 shrink-0 text-muted-foreground' />
+                <span className='sr-only md:not-sr-only text-[10px]'>{currentViewLabel}</span>
+                <ChevronDown className='hidden size-3 shrink-0 text-muted-foreground md:block' />
               </Button>
             </DropdownMenuTrigger>
           </TooltipTrigger>
