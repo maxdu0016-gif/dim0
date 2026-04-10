@@ -44,6 +44,8 @@ The agent is not just a chatbot. It can:
 
 ## Node Types
 
+https://github.com/user-attachments/assets/52f70d3f-8ca6-41d7-9d37-aa05f97b0fe2
+
 Everything on the board is a node. Dim0 supports:
 
 - Shape nodes for diagrams and spatial structure
