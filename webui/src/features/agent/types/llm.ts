@@ -26,10 +26,10 @@ export const LlmModels = [
   "openrouter/mistralai/mistral-medium-3.1",
   "openrouter/deepseek/deepseek-v3.2",
   "openrouter/deepseek/deepseek-chat-v3.1",
-  "openrouter/z-ai/glm-4.7",
+  "openrouter/z-ai/glm-4.7:nitro",
   "openrouter/qwen/qwen3.5-plus-02-15",
   "openrouter/qwen/qwen3.6-plus-preview:free",
-  "openrouter/moonshotai/kimi-k2-thinking"
+  "openrouter/moonshotai/kimi-k2.5:nitro"
 ] as const
 
 export type LlmModel = typeof LlmModels[number]
@@ -60,10 +60,10 @@ export const LlmName: Record<LlmModel, string> = {
   "openrouter/mistralai/mistral-medium-3.1": "Mistral Medium",
   "openrouter/deepseek/deepseek-v3.2": "DeepSeek",
   "openrouter/deepseek/deepseek-chat-v3.1": "DeepSeek Chat",
-  "openrouter/z-ai/glm-4.7": "GLM-4.7",
+  "openrouter/z-ai/glm-4.7:nitro": "GLM-4.7",
   "openrouter/qwen/qwen3.5-plus-02-15": "Qwen 3.5 Plus",
   "openrouter/qwen/qwen3.6-plus-preview:free": "Qwen 3.6 Plus Preview",
-  "openrouter/moonshotai/kimi-k2-thinking": "Kimi K2 Thinking"
+  "openrouter/moonshotai/kimi-k2.5:nitro": "Kimi K2.5"
 }
 
 export const LlmDescription: Record<LlmModel, string> = {
@@ -92,10 +92,10 @@ export const LlmDescription: Record<LlmModel, string> = {
   "openrouter/mistralai/mistral-medium-3.1": "Efficient Mistral model offering strong multilingual and structured reasoning",
   "openrouter/deepseek/deepseek-v3.2": "Advanced open-source model with strong performance across various tasks",
   "openrouter/deepseek/deepseek-chat-v3.1": "High-performance open-source model with advanced reasoning and adaptability",
-  "openrouter/z-ai/glm-4.7": "Fast general-purpose model from Z.ai with strong reasoning and coding ability",
+  "openrouter/z-ai/glm-4.7:nitro": "Fast general-purpose model from Z.ai with strong reasoning and coding ability",
   "openrouter/qwen/qwen3.5-plus-02-15": "Versatile Qwen model tuned for strong multilingual reasoning and tool use",
   "openrouter/qwen/qwen3.6-plus-preview:free": "Preview of Qwen 3.6 with stronger reasoning, agentic behavior, and coding performance",
-  "openrouter/moonshotai/kimi-k2-thinking": "Innovative model focused on creative problem-solving and dynamic thinking"
+  "openrouter/moonshotai/kimi-k2.5:nitro": "Fast Moonshot model tuned for stronger reasoning, coding, and agentic tasks"
 }
 
 
@@ -129,10 +129,10 @@ export const LlmBadge: Record<LlmModel, LlmTier> = {
   "openrouter/mistralai/mistral-medium-3.1": "Balanced",
   "openrouter/deepseek/deepseek-v3.2": "Balanced",
   "openrouter/deepseek/deepseek-chat-v3.1": "Balanced",
-  "openrouter/z-ai/glm-4.7": "Balanced",
+  "openrouter/z-ai/glm-4.7:nitro": "Balanced",
   "openrouter/qwen/qwen3.5-plus-02-15": "Balanced",
   "openrouter/qwen/qwen3.6-plus-preview:free": "Balanced",
-  "openrouter/moonshotai/kimi-k2-thinking": "Balanced"
+  "openrouter/moonshotai/kimi-k2.5:nitro": "Balanced"
 }
 
 export const LlmFamilies = [
@@ -175,10 +175,10 @@ export const LlmFamilyMap: Record<LlmModel, LlmFamily> = {
   "openrouter/mistralai/mistral-medium-3.1": "mistralai",
   "openrouter/deepseek/deepseek-v3.2": "deepseek",
   "openrouter/deepseek/deepseek-chat-v3.1": "deepseek",
-  "openrouter/z-ai/glm-4.7": "z-ai",
+  "openrouter/z-ai/glm-4.7:nitro": "z-ai",
   "openrouter/qwen/qwen3.5-plus-02-15": "qwen",
   "openrouter/qwen/qwen3.6-plus-preview:free": "qwen",
-  "openrouter/moonshotai/kimi-k2-thinking": "moonshotai"
+  "openrouter/moonshotai/kimi-k2.5:nitro": "moonshotai"
 }
 
 

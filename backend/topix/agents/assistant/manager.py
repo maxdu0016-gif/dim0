@@ -31,6 +31,9 @@ from topix.utils.common import gen_uid
 
 logger = logging.getLogger(__name__)
 
+AUTO_MODEL_BASE_PLAN = "openrouter/moonshotai/kimi-k2.5:nitro"
+AUTO_MODEL_COMPLEX_PLAN = ModelEnum.OpenAI.GPT_5_4
+
 
 class AssistantManager:
     """Orchestrates the full flow: query rewrite, planning, searching ..."""
@@ -58,7 +61,7 @@ class AssistantManager:
         """Create an instance of AssistantManager from configuration."""
         config_ = config.model_copy(deep=True)
         if auto_mode:
-            config_.plan.model = ModelEnum.OpenAI.GPT_5_4_MINI
+            config_.plan.model = AUTO_MODEL_BASE_PLAN
 
         plan_agent = Plan.from_config(
             content_store,
@@ -85,8 +88,8 @@ class AssistantManager:
         logger.info(f"Auto model classified complexity as {complexity}")
 
         if complexity == "complex":
-            return ModelEnum.OpenAI.GPT_5_4
-        return ModelEnum.OpenAI.GPT_5_4_MINI
+            return AUTO_MODEL_COMPLEX_PLAN
+        return AUTO_MODEL_BASE_PLAN
 
     async def _compose_input(
         self,

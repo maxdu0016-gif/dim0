@@ -41,7 +41,7 @@ class RecordingSession:
 class RecordingPlanAgent:
     """Minimal plan agent stub for manager routing tests."""
 
-    def __init__(self, model: str = "openai/gpt-5.4-mini"):
+    def __init__(self, model: str = "openrouter/moonshotai/kimi-k2.5:nitro"):
         """Store only the fields the manager needs to mutate."""
         self.model = model
 
@@ -216,7 +216,7 @@ async def test_select_plan_model_uses_full_model_for_complex(monkeypatch: pytest
 
 @pytest.mark.asyncio
 async def test_select_plan_model_uses_mini_for_medium(monkeypatch: pytest.MonkeyPatch):
-    """Auto mode should keep medium requests on the mini plan model."""
+    """Auto mode should keep medium requests on the fast Kimi base plan."""
     manager = AssistantManager(plan_agent=RecordingPlanAgent(), auto_mode=True)
 
     async def fake_classify(messages: list[dict[str, str]]) -> str:
@@ -226,4 +226,4 @@ async def test_select_plan_model_uses_mini_for_medium(monkeypatch: pytest.Monkey
 
     selected_model = await manager._select_plan_model([{"role": "user", "content": "Medium task"}])
 
-    assert selected_model == ModelEnum.OpenAI.GPT_5_4_MINI
+    assert selected_model == "openrouter/moonshotai/kimi-k2.5:nitro"
