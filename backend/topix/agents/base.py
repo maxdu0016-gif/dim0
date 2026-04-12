@@ -116,7 +116,9 @@ class BaseAgent(Agent[Context]):
                 "drop_params": True,
                 "additional_drop_params": ["frequency_penalty", "presence_penalty"]
             }
+            model_settings.extra_body = {}
         elif isinstance(model, str) and model.startswith("openai"):
+            model_settings.extra_args = {}
             model_settings.extra_body = {
                 **(model_settings.extra_body or {}),
                 "prompt_cache_retention": "24h",
