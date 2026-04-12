@@ -179,7 +179,7 @@ async def classify_auto_model_complexity(messages: list[dict[str, str]]) -> Comp
             ],
             response_format=AutoModelDecision,
             temperature=0,
-            max_completion_tokens=120,
+            max_completion_tokens=1000,
         )
 
         parsed = response.choices[0].message.parsed
