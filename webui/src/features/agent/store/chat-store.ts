@@ -90,15 +90,18 @@ export const useChatStore = create<ChatStore>((set) => ({
       ],
     }
 
-    const defaultLlm = servicesWithAuto.llm.find((service) => (
-      service.name === DEFAULT_LLM_MODEL && service.available
-    ))
-    const firstAvailableLlm = servicesWithAuto.llm.find((service) => service.available)
-    const selectedLlm = defaultLlm ?? firstAvailableLlm
+    set((state) => {
+      const currentLlm = servicesWithAuto.llm.find((service) => (
+        service.name === state.llmModel && service.available
+      ))
+      const defaultLlm = servicesWithAuto.llm.find((service) => (
+        service.name === DEFAULT_LLM_MODEL && service.available
+      ))
+      const firstAvailableLlm = servicesWithAuto.llm.find((service) => service.available)
+      const selectedLlm = currentLlm ?? defaultLlm ?? firstAvailableLlm
 
-    if (selectedLlm) {
-      set({ llmModel: selectedLlm.name })
-    }
+      return selectedLlm ? { llmModel: selectedLlm.name } : {}
+    })
 
     const firstAvailableSearch = services.search.find((service) => service.available)
     if (firstAvailableSearch) {
