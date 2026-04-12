@@ -39,6 +39,7 @@ export type ServiceName = typeof SERVICE_NAMES[number]
  */
 export const defaultServices: () => Services = () => ({
   llm: [
+    { name: "auto", available: true, provider: "dim0" },
     { name: "openai/gpt-5.2", available: false, provider: "openai" },
     { name: "openai/gpt-5.2-chat-latest", available: false, provider: "openai" },
     { name: "openai/gpt-5.1", available: false, provider: "openai" },

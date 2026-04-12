@@ -1,6 +1,7 @@
 import { OpenAI, Gemini, DeepSeek, Mistral, Moonshot, Claude, Qwen, ZAI } from '@lobehub/icons'
 
 export const LlmModels = [
+  "auto",
   "openai/gpt-5.2",
   "openai/gpt-5.2-chat-latest",
   "openai/gpt-5.1",
@@ -34,6 +35,7 @@ export const LlmModels = [
 export type LlmModel = typeof LlmModels[number]
 
 export const LlmName: Record<LlmModel, string> = {
+  "auto": "Auto",
   "openai/gpt-5.2": "GPT-5.2",
   "openai/gpt-5.2-chat-latest": "GPT-5.2 Chat",
   "openai/gpt-5.1-chat-latest": "GPT-5.1 Chat",
@@ -65,6 +67,7 @@ export const LlmName: Record<LlmModel, string> = {
 }
 
 export const LlmDescription: Record<LlmModel, string> = {
+  "auto": "Choose the best model per task complexity",
   "openai/gpt-5.2": "Next-generation model offering advanced reasoning and broader skill coverage",
   "openai/gpt-5.2-chat-latest": "Latest GPT-5.2 model optimized for chat applications with enhanced capabilities",
   "openai/gpt-5.1": "Next-generation model offering advanced reasoning and broader skill coverage",
@@ -101,6 +104,7 @@ export type LlmTier = typeof LlmTiers[number]
 
 
 export const LlmBadge: Record<LlmModel, LlmTier> = {
+  "auto": "Balanced",
   "openai/gpt-5.2": "Elite",
   "openai/gpt-5.2-chat-latest": "Elite",
   "openai/gpt-5.1-chat-latest": "Elite",
@@ -132,6 +136,7 @@ export const LlmBadge: Record<LlmModel, LlmTier> = {
 }
 
 export const LlmFamilies = [
+  "dim0",
   "openai",
   "google",
   "anthropic",
@@ -145,6 +150,7 @@ export const LlmFamilies = [
 export type LlmFamily = typeof LlmFamilies[number]
 
 export const LlmFamilyMap: Record<LlmModel, LlmFamily> = {
+  "auto": "dim0",
   "openai/gpt-5.2": "openai",
   "openai/gpt-5.2-chat-latest": "openai",
   "openai/gpt-5.1-chat-latest": "openai",
@@ -177,6 +183,7 @@ export const LlmFamilyMap: Record<LlmModel, LlmFamily> = {
 
 
 export const LlmFamilyIcon: Record<LlmFamily, React.ComponentType<{ size?: number | string, color?: string }>> = {
+  dim0: OpenAI,
   openai: OpenAI,
   google: Gemini.Color,
   anthropic: Claude.Color,
