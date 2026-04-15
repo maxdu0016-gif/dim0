@@ -258,6 +258,7 @@ export const NodeCard = memo(function NodeCard({
       data: {
         ...node.data,
         content: { markdown: debouncedLabelDraft },
+        shouldRecomputeContentMinHeight: true,
       },
     }))
   }, [debouncedLabelDraft, labelEditing, nonSheetDisplayValue, note.id, updateNodeByIdPersist])
@@ -282,6 +283,7 @@ export const NodeCard = memo(function NodeCard({
             ...data.style,
             ...next,
           },
+          shouldRecomputeContentMinHeight: true,
         },
       }
     })

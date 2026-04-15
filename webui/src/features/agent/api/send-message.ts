@@ -16,6 +16,7 @@ import { convertNoteToNode } from "@/features/board/utils/graph"
 import type { NoteNode } from "@/features/board/types/flow"
 import type { CreateNoteOutput, EditNoteOutput, WriteNoteOutput } from "../types/tool-outputs"
 import { isReasoningTextStep, isToolCallStep, normalizeReasoningSteps } from "../types/stream"
+import { supportsContentMinHeight } from "@/features/board/utils/compute-node-content-min-height"
 
 export class SendMessageError extends Error {
   status: number
@@ -364,13 +365,22 @@ const applyRemoteNoteNode = (
         measured: existingNode.measured ?? nextNode.measured,
       }
     : nextNode
+  const normalizedBaseNode = supportsContentMinHeight(baseNode.data.style.type)
+    ? {
+        ...baseNode,
+        data: {
+          ...baseNode.data,
+          shouldRecomputeContentMinHeight: true,
+        },
+      }
+    : baseNode
 
   if (existingNode) {
     return prevNodes.map((node) =>
       node.id === nextNode.id
         ? {
-            ...baseNode,
-            selected: selectNode ? true : baseNode.selected,
+            ...normalizedBaseNode,
+            selected: selectNode ? true : normalizedBaseNode.selected,
           }
         : (selectNode ? { ...node, selected: false } : node)
     )
@@ -384,9 +394,9 @@ const applyRemoteNoteNode = (
   }, 0)
 
   const appendedNode = {
-    ...baseNode,
+    ...normalizedBaseNode,
     selected: selectNode,
-    zIndex: baseNode.data.style?.type === "slide" ? -1000 : maxZ + 1,
+    zIndex: normalizedBaseNode.data.style?.type === "slide" ? -1000 : maxZ + 1,
   }
 
   const clearedNodes = selectNode

@@ -25,6 +25,7 @@ import { ColorGrid } from './color-panel'
 import { useStyleDefaults } from '../../style-provider'
 import { useTheme } from '@/components/theme-provider'
 import { darkModeDisplayHex } from '../../lib/colors/dark-variants'
+import { supportsContentMinHeight } from '../../utils/compute-node-content-min-height'
 
 /** Shared glyphs */
 const Section = ({ title, children }: { title: string, children: React.ReactNode }): ReactElement => (
@@ -575,6 +576,11 @@ export function GraphSidebar(): ReactElement | null {
   const edgeStyle: LinkStyle | null = selectedEdges[0]?.data?.style ?? null
 
   const handleNodeStyleChange = (next: Partial<Style>): void => {
+    const affectsContentMinHeight =
+      next.fontFamily !== undefined ||
+      next.fontSize !== undefined ||
+      next.textStyle !== undefined
+
     recordNodeStyleChange(next)
     setNodes(ns =>
       (ns as NoteNode[]).map(n => {
@@ -584,7 +590,10 @@ export function GraphSidebar(): ReactElement | null {
           ...n,
           data: {
             ...n.data,
-            style: { ...n.data.style, ...next }
+            style: { ...n.data.style, ...next },
+            ...(affectsContentMinHeight && supportsContentMinHeight(n.data.style.type)
+              ? { shouldRecomputeContentMinHeight: true }
+              : {}),
           }
         }
       })

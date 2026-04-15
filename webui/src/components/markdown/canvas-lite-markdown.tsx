@@ -412,12 +412,16 @@ const getFontFamily = (type: InlineType, fontFamily: FontFamily): string => {
 /**
  * Resolves pixel font size for renderer layout and drawing.
  */
-const getFontSizePx = (fontSize: FontSize, _fontFamily: FontFamily): number =>
-  FONT_SIZE_MAP[fontSize]
+const getFontSizePx = (fontSize: FontSize, fontFamily: FontFamily): number => {
+  void fontFamily
+  return FONT_SIZE_MAP[fontSize]
+}
 
 
-const getLineHeightPx = (fontSize: FontSize, _fontFamily: FontFamily): number =>
-  LINE_HEIGHT_MAP[fontSize]
+const getLineHeightPx = (fontSize: FontSize, fontFamily: FontFamily): number => {
+  void fontFamily
+  return LINE_HEIGHT_MAP[fontSize]
+}
 
 
 /**

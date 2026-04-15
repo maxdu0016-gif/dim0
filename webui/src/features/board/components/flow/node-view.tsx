@@ -1,4 +1,4 @@
-import { memo, useState } from 'react'
+import { memo, useRef, useState } from 'react'
 import {
   type ControlPosition,
   type NodeProps,
@@ -12,10 +12,10 @@ import { useTheme } from '@/components/theme-provider'
 import { darkModeDisplayHex } from '../../lib/colors/dark-variants'
 import { useContentMinHeight } from '../../hooks/use-content-min-height'
 import { ShapeChrome } from './shape-chrome'
-import { getShapeContentScale } from '../../utils/shape-content-scale'
 import { Grip } from 'lucide-react'
 import { FolderNode } from './folder-node'
 import { DEFAULT_STICKY_NOTE_HEIGHT, DEFAULT_STICKY_NOTE_WIDTH } from '../../types/note'
+import { supportsContentMinHeight } from '../../utils/compute-node-content-min-height'
 
 const CONNECTOR_GAP = 0
 const SHEET_INNER_HEIGHT = 352
@@ -121,26 +121,22 @@ const SlideFrame = memo(function SlideFrame({ slideName }: SlideFrameProps) {
 function NodeViewBase({ id, data, selected, width, height, dragging }: NodeProps<NoteNode>) {
   const { resolvedTheme } = useTheme()
   const isDark = resolvedTheme === 'dark'
-  const [isEditing, setIsEditing] = useState(false)
-  const [isResizingLocal, setIsResizingLocal] = useState(false)
+  const [, setIsEditing] = useState(false)
+  const [, setIsResizingLocal] = useState(false)
 
   const setIsResizingNode = useGraphStore(state => state.setIsResizingNode)
+  const updateNodeByIdPersist = useGraphStore(state => state.updateNodeByIdPersist)
   const viewSlides = useGraphStore(state => state.viewSlides)
+  const contentRef = useRef<HTMLDivElement | null>(null)
 
   const nodeType = data.style.type
   const isVisualNode = nodeType === 'image' || nodeType === 'icon' || nodeType === 'slide'
-  const shouldMeasureMinHeight = !isVisualNode && (isEditing || isResizingLocal)
-
-  // Measure content with ResizeObserver only while editing/resizing.
-  const contentScale = getShapeContentScale(nodeType)
-  const { contentRef, computedMinH } = useContentMinHeight(id, 0, 20, contentScale, {
-    enabled: shouldMeasureMinHeight,
-  })
 
   const persistedHeight = data.properties.nodeSize?.size?.height
   const persistedWidth = data.properties.nodeSize?.size?.width
   const liveHeight = typeof height === 'number' && Number.isFinite(height) ? height : undefined
   const liveWidth = typeof width === 'number' && Number.isFinite(width) ? width : undefined
+  const contentMinH = useContentMinHeight(id, data, liveWidth ?? persistedWidth)
   // Sticky notes use a fixed visual frame. Keep the outer node box pinned to the
   // canonical sticky dimensions so edge attachment math does not drift based on
   // remeasurement deeper in the render tree.
@@ -151,14 +147,13 @@ function NodeViewBase({ id, data, selected, width, height, dragging }: NodeProps
     ? DEFAULT_STICKY_NOTE_WIDTH
     : liveWidth ?? persistedWidth
 
-  const baseMinH = isVisualNode
+  const contentFloorH = isVisualNode
     ? 50
     : nodeType === 'sheet'
     ? SHEET_INNER_HEIGHT
-    : shouldMeasureMinHeight
-    ? computedMinH
-    : Math.max(20, currentNodeHeight ?? 20)
-  const innerMinH = Math.max(20, baseMinH)
+    : Math.max(20, contentMinH)
+  const innerMinH = Math.max(20, contentFloorH)
+  const effectiveShapeHeight = Math.max(currentNodeHeight ?? 20, contentFloorH)
 
   const isPinned = data.properties.pinned.boolean
 
@@ -180,6 +175,15 @@ function NodeViewBase({ id, data, selected, width, height, dragging }: NodeProps
   const handleResizeEnd = () => {
     setIsResizingLocal(false)
     setIsResizingNode(false)
+    if (supportsContentMinHeight(nodeType)) {
+      updateNodeByIdPersist(id, (node) => ({
+        ...node,
+        data: {
+          ...node.data,
+          shouldRecomputeContentMinHeight: true,
+        },
+      }))
+    }
   }
   const resizeMinWidth = isVisualNode ? 80 : 20
   const resizeMinHeight = isVisualNode ? 80 : innerMinH
@@ -230,9 +234,9 @@ function NodeViewBase({ id, data, selected, width, height, dragging }: NodeProps
       >
         <ShapeChrome
           type={nodeType}
-          minHeight={computedMinH}
+          minHeight={innerMinH}
           widthPx={currentNodeWidth}
-          heightPx={currentNodeHeight}
+          heightPx={effectiveShapeHeight}
           rounded={rounded}
           frameClass={frameClass}
           textColor={textColor}
@@ -280,35 +284,25 @@ function NodeViewBase({ id, data, selected, width, height, dragging }: NodeProps
 
   return (
     <div className='border-none relative bg-transparent overflow-visible w-full h-full p-0'>
-      <div
-        className='absolute inset-0'
-        style={{
-          top: CONNECTOR_GAP,
-          right: CONNECTOR_GAP,
-          bottom: CONNECTOR_GAP,
-          left: CONNECTOR_GAP,
-        }}
+      <ShapeChrome
+        type={nodeType}
+        minHeight={innerMinH}
+        widthPx={currentNodeWidth}
+        heightPx={effectiveShapeHeight}
+        rounded={rounded}
+        frameClass={frameClass}
+        textColor={textColor}
+        backgroundColor={backgroundColor}
+        strokeColor={strokeColor}
+        roughness={data.style.roughness}
+        fillStyle={data.style.fillStyle}
+        strokeStyle={data.style.strokeStyle}
+        strokeWidth={data.style.strokeWidth}
+        seed={data.roughSeed}
+        className='w-full h-full'
       >
-        <ShapeChrome
-          type={nodeType}
-          minHeight={innerMinH}
-          widthPx={currentNodeWidth}
-          heightPx={currentNodeHeight}
-          rounded={rounded}
-          frameClass={frameClass}
-          textColor={textColor}
-          backgroundColor={backgroundColor}
-          strokeColor={strokeColor}
-          roughness={data.style.roughness}
-          fillStyle={data.style.fillStyle}
-          strokeStyle={data.style.strokeStyle}
-          strokeWidth={data.style.strokeWidth}
-          seed={data.roughSeed}
-          className='w-full h-full'
-        >
-          {content}
-        </ShapeChrome>
-      </div>
+        {content}
+      </ShapeChrome>
 
       <ResizeHandles
         selected={selected}

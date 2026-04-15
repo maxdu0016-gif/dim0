@@ -6,6 +6,7 @@ import { convertNoteToNode } from "../utils/graph"
 import type { NodeType } from "../types/style"
 import { useStyleDefaults } from "../style-provider"
 import { useShallow } from "zustand/react/shallow"
+import { supportsContentMinHeight } from "../utils/compute-node-content-min-height"
 
 
 /**
@@ -92,8 +93,12 @@ export function useAddNoteNode() {
       newNote.properties.nodeSize = { size, type: 'size' }
     }
     const node = convertNoteToNode(newNote)
-    if (nodeType === 'text') {
-      node.data = { ...node.data, autoEdit: true }
+    if (nodeType === 'text' || supportsContentMinHeight(nodeType)) {
+      node.data = {
+        ...node.data,
+        ...(nodeType === 'text' ? { autoEdit: true } : {}),
+        shouldRecomputeContentMinHeight: true,
+      }
     }
     const maxZ = nodes.reduce((acc, n) => {
       const kind = (n.data as { kind?: string }).kind
