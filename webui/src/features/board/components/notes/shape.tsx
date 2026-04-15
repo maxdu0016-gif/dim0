@@ -400,13 +400,14 @@ export const Shape = memo(function Shape({
   const outerContainerPaddingPx = nodeType === 'text' ? 0 : 8
   const horizontalPaddingPx = nodeType === 'text' ? 0 : 16
   const verticalPaddingPx = 16
+  const descenderAllowancePx = 4
   const scaledRenderWidth = renderWidth ? Math.floor(renderWidth * Math.min(1, contentScale)) : undefined
   const scaledRenderHeight = renderHeight ? Math.floor(renderHeight * Math.min(1, contentScale)) : undefined
   const innerRenderWidth = scaledRenderWidth
     ? Math.max(1, scaledRenderWidth - outerContainerPaddingPx - horizontalPaddingPx)
     : undefined
   const innerRenderHeight = scaledRenderHeight
-    ? Math.max(1, scaledRenderHeight - outerContainerPaddingPx - verticalPaddingPx)
+    ? Math.max(1, scaledRenderHeight - outerContainerPaddingPx - verticalPaddingPx + descenderAllowancePx)
     : undefined
   const notEditingSpanClass = value.trim() ? '' : 'text-muted-foreground/50'
 
