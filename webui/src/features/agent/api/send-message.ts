@@ -250,6 +250,7 @@ export const useSendMessage = () => {
           const {
             boardId: activeBoardId,
             setNodesPersist,
+            markNodeContentMinHeightDirty,
           } = useGraphStore.getState()
 
           if (activeBoardId) {
@@ -267,6 +268,9 @@ export const useSendMessage = () => {
                       || (output.type === "write_note" && output.action === "created")
                   ),
                 { persist: false })
+                if (supportsContentMinHeight(fetchedNode.data.style.type)) {
+                  markNodeContentMinHeightDirty(fetchedNode.id, true)
+                }
               } catch (error) {
                 console.error("Failed to apply remote note update locally:", error)
               }
@@ -365,22 +369,13 @@ const applyRemoteNoteNode = (
         measured: existingNode.measured ?? nextNode.measured,
       }
     : nextNode
-  const normalizedBaseNode = supportsContentMinHeight(baseNode.data.style.type)
-    ? {
-        ...baseNode,
-        data: {
-          ...baseNode.data,
-          shouldRecomputeContentMinHeight: true,
-        },
-      }
-    : baseNode
 
   if (existingNode) {
     return prevNodes.map((node) =>
       node.id === nextNode.id
         ? {
-            ...normalizedBaseNode,
-            selected: selectNode ? true : normalizedBaseNode.selected,
+            ...baseNode,
+            selected: selectNode ? true : baseNode.selected,
           }
         : (selectNode ? { ...node, selected: false } : node)
     )
@@ -394,9 +389,9 @@ const applyRemoteNoteNode = (
   }, 0)
 
   const appendedNode = {
-    ...normalizedBaseNode,
+    ...baseNode,
     selected: selectNode,
-    zIndex: normalizedBaseNode.data.style?.type === "slide" ? -1000 : maxZ + 1,
+    zIndex: baseNode.data.style?.type === "slide" ? -1000 : maxZ + 1,
   }
 
   const clearedNodes = selectNode

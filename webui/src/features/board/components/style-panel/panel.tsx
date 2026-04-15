@@ -552,6 +552,7 @@ export function GraphSidebar(): ReactElement | null {
   const { recordNodeStyleChange, recordLinkStyleChange } = useStyleDefaults()
 
   const { nodes, edges } = useGraphStore()
+  const markNodesContentMinHeightDirty = useGraphStore(state => state.markNodesContentMinHeightDirty)
   const { setNodes, setEdges } = useReactFlow()
 
   // selected nodes (exclude sheets as before)
@@ -582,6 +583,11 @@ export function GraphSidebar(): ReactElement | null {
       next.textStyle !== undefined
 
     recordNodeStyleChange(next)
+    const affectedNodeIds = affectsContentMinHeight
+      ? selectedNodes
+          .filter(n => supportsContentMinHeight(n.data.style.type))
+          .map(n => n.id)
+      : []
     setNodes(ns =>
       (ns as NoteNode[]).map(n => {
         if (!n.selected) return n
@@ -591,13 +597,13 @@ export function GraphSidebar(): ReactElement | null {
           data: {
             ...n.data,
             style: { ...n.data.style, ...next },
-            ...(affectsContentMinHeight && supportsContentMinHeight(n.data.style.type)
-              ? { shouldRecomputeContentMinHeight: true }
-              : {}),
           }
         }
       })
     )
+    if (affectedNodeIds.length > 0) {
+      markNodesContentMinHeightDirty(affectedNodeIds, true)
+    }
   }
 
   const handleEdgeStyleChange = (next: Partial<LinkStyle>): void => {

@@ -12,8 +12,6 @@ type NoteNodeData = (Note | Document) & {
   attachedToNodeId?: string
   attachedDirection?: { x: number; y: number }
   autoEdit?: boolean
-  contentMinHeight?: number
-  shouldRecomputeContentMinHeight?: boolean
 }
 
 export type NoteNode = Node<NoteNodeData>

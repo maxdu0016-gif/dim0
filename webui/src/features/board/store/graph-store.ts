@@ -102,6 +102,39 @@ const buildAttachedPointIdsByNode = (nodes: NoteNode[]) => {
 const cloneAttachedPointIdsByNode = (source: Map<string, Set<string>>) =>
   new Map(Array.from(source.entries()).map(([id, set]) => [id, new Set(set)]))
 
+const cloneStringSet = (source: Set<string>) => new Set(source)
+
+const pruneNodeUiState = (
+  nextNodes: NoteNode[],
+  contentMinHeightByNodeId: Map<string, number>,
+  dirtyContentMinHeightNodeIds: Set<string>,
+) => {
+  const nextNodeIds = new Set(nextNodes.map((node) => node.id))
+
+  let nextContentMinHeightByNodeId = contentMinHeightByNodeId
+  for (const nodeId of contentMinHeightByNodeId.keys()) {
+    if (nextNodeIds.has(nodeId)) continue
+    if (nextContentMinHeightByNodeId === contentMinHeightByNodeId) {
+      nextContentMinHeightByNodeId = new Map(contentMinHeightByNodeId)
+    }
+    nextContentMinHeightByNodeId.delete(nodeId)
+  }
+
+  let nextDirtyContentMinHeightNodeIds = dirtyContentMinHeightNodeIds
+  for (const nodeId of dirtyContentMinHeightNodeIds) {
+    if (nextNodeIds.has(nodeId)) continue
+    if (nextDirtyContentMinHeightNodeIds === dirtyContentMinHeightNodeIds) {
+      nextDirtyContentMinHeightNodeIds = cloneStringSet(dirtyContentMinHeightNodeIds)
+    }
+    nextDirtyContentMinHeightNodeIds.delete(nodeId)
+  }
+
+  return {
+    contentMinHeightByNodeId: nextContentMinHeightByNodeId,
+    dirtyContentMinHeightNodeIds: nextDirtyContentMinHeightNodeIds,
+  }
+}
+
 const getScopeKey = ({ boardId, rootId }: GraphScope) =>
   boardId ? `${boardId}:${rootId ?? "root"}` : undefined
 
@@ -891,6 +924,8 @@ export interface GraphStore {
   nodes: NoteNode[]
   nodesById: Map<string, NoteNode>
   attachedPointIdsByNode: Map<string, Set<string>>
+  contentMinHeightByNodeId: Map<string, number>
+  dirtyContentMinHeightNodeIds: Set<string>
   edges: LinkEdge[]
 
   deletedNodes: NoteNode[]
@@ -934,6 +969,10 @@ export interface GraphStore {
 
   setNodes: (nodes: Updater<NoteNode[]>) => void
   setEdges: (edges: Updater<LinkEdge[]>) => void
+  setNodeContentMinHeight: (nodeId: string, minHeight: number) => void
+  markNodeContentMinHeightDirty: (nodeId: string, dirty?: boolean) => void
+  markNodesContentMinHeightDirty: (nodeIds: Iterable<string>, dirty?: boolean) => void
+  clearNodeContentMinHeight: (nodeId: string) => void
 
   setNodesPersist: (nodes: Updater<NoteNode[]>, options?: PersistOptions) => void
   /**
@@ -1014,6 +1053,8 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
             boardCanEdit: true,
             boardLabel: "",
             activeNodeSurface: null,
+            contentMinHeightByNodeId: new Map(),
+            dirtyContentMinHeightNodeIds: new Set(),
           }
         : {
             boardId,
@@ -1032,6 +1073,8 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   nodes: [],
   nodesById: new Map(),
   attachedPointIdsByNode: new Map(),
+  contentMinHeightByNodeId: new Map(),
+  dirtyContentMinHeightNodeIds: new Set(),
   edges: [],
 
   deletedNodes: [],
@@ -1092,10 +1135,17 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   setNodes: (nodesOrUpdater) =>
     set((state) => {
       const nextNodes = resolveUpdater<NoteNode[]>(nodesOrUpdater, state.nodes)
+      const nextNodeUiState = pruneNodeUiState(
+        nextNodes,
+        state.contentMinHeightByNodeId,
+        state.dirtyContentMinHeightNodeIds,
+      )
       return {
         nodes: nextNodes,
         nodesById: buildNodesById(nextNodes),
         attachedPointIdsByNode: buildAttachedPointIdsByNode(nextNodes),
+        contentMinHeightByNodeId: nextNodeUiState.contentMinHeightByNodeId,
+        dirtyContentMinHeightNodeIds: nextNodeUiState.dirtyContentMinHeightNodeIds,
       }
     }),
 
@@ -1103,6 +1153,105 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     set((state) => ({
       edges: resolveUpdater<LinkEdge[]>(edgesOrUpdater, state.edges),
     })),
+
+  /**
+   * Caches the latest frontend-only content floor for a node and clears its dirty flag.
+   */
+  setNodeContentMinHeight: (nodeId, minHeight) =>
+    set((state) => {
+      const currentMinHeight = state.contentMinHeightByNodeId.get(nodeId)
+      const isDirty = state.dirtyContentMinHeightNodeIds.has(nodeId)
+      if (currentMinHeight === minHeight && !isDirty) return state
+
+      const nextContentMinHeightByNodeId = new Map(state.contentMinHeightByNodeId)
+      nextContentMinHeightByNodeId.set(nodeId, minHeight)
+
+      const nextDirtyContentMinHeightNodeIds = cloneStringSet(state.dirtyContentMinHeightNodeIds)
+      nextDirtyContentMinHeightNodeIds.delete(nodeId)
+
+      return {
+        contentMinHeightByNodeId: nextContentMinHeightByNodeId,
+        dirtyContentMinHeightNodeIds: nextDirtyContentMinHeightNodeIds,
+      }
+    }),
+
+  /**
+   * Marks a single node's content floor cache as stale or fresh.
+   */
+  markNodeContentMinHeightDirty: (nodeId, dirty = true) =>
+    set((state) => {
+      if (!state.nodesById.has(nodeId)) return state
+
+      const isDirty = state.dirtyContentMinHeightNodeIds.has(nodeId)
+      if (isDirty === dirty) return state
+
+      const nextDirtyContentMinHeightNodeIds = cloneStringSet(state.dirtyContentMinHeightNodeIds)
+      if (dirty) {
+        nextDirtyContentMinHeightNodeIds.add(nodeId)
+      } else {
+        nextDirtyContentMinHeightNodeIds.delete(nodeId)
+      }
+
+      return {
+        dirtyContentMinHeightNodeIds: nextDirtyContentMinHeightNodeIds,
+      }
+    }),
+
+  /**
+   * Marks multiple nodes' content floor caches as stale or fresh in one update.
+   */
+  markNodesContentMinHeightDirty: (nodeIds, dirty = true) =>
+    set((state) => {
+      let changed = false
+      const nextDirtyContentMinHeightNodeIds = cloneStringSet(state.dirtyContentMinHeightNodeIds)
+
+      for (const nodeId of nodeIds) {
+        if (!state.nodesById.has(nodeId)) continue
+        const isDirty = nextDirtyContentMinHeightNodeIds.has(nodeId)
+        if (isDirty === dirty) continue
+        changed = true
+        if (dirty) {
+          nextDirtyContentMinHeightNodeIds.add(nodeId)
+        } else {
+          nextDirtyContentMinHeightNodeIds.delete(nodeId)
+        }
+      }
+
+      if (!changed) return state
+
+      return {
+        dirtyContentMinHeightNodeIds: nextDirtyContentMinHeightNodeIds,
+      }
+    }),
+
+  /**
+   * Clears all cached content-floor state for a node.
+   */
+  clearNodeContentMinHeight: (nodeId) =>
+    set((state) => {
+      const hasCachedMinHeight = state.contentMinHeightByNodeId.has(nodeId)
+      const isDirty = state.dirtyContentMinHeightNodeIds.has(nodeId)
+      if (!hasCachedMinHeight && !isDirty) return state
+
+      const nextContentMinHeightByNodeId = hasCachedMinHeight
+        ? new Map(state.contentMinHeightByNodeId)
+        : state.contentMinHeightByNodeId
+      if (hasCachedMinHeight) {
+        nextContentMinHeightByNodeId.delete(nodeId)
+      }
+
+      const nextDirtyContentMinHeightNodeIds = isDirty
+        ? cloneStringSet(state.dirtyContentMinHeightNodeIds)
+        : state.dirtyContentMinHeightNodeIds
+      if (isDirty) {
+        nextDirtyContentMinHeightNodeIds.delete(nodeId)
+      }
+
+      return {
+        contentMinHeightByNodeId: nextContentMinHeightByNodeId,
+        dirtyContentMinHeightNodeIds: nextDirtyContentMinHeightNodeIds,
+      }
+    }),
 
   // --- set + background diff + debounced persist ---
 
@@ -1116,11 +1265,18 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       typeof nodesOrUpdater === "function"
         ? (nodesOrUpdater as (prev: NoteNode[]) => NoteNode[])(prevNodes)
         : nodesOrUpdater
+    const nextNodeUiState = pruneNodeUiState(
+      nextNodes,
+      get().contentMinHeightByNodeId,
+      get().dirtyContentMinHeightNodeIds,
+    )
 
     set({
       nodes: nextNodes,
       nodesById: buildNodesById(nextNodes),
       attachedPointIdsByNode: buildAttachedPointIdsByNode(nextNodes),
+      contentMinHeightByNodeId: nextNodeUiState.contentMinHeightByNodeId,
+      dirtyContentMinHeightNodeIds: nextNodeUiState.dirtyContentMinHeightNodeIds,
     })
 
     if (recording) {
@@ -1538,10 +1694,17 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       nextNodes = nextNodes.map(n => nextById.get(n.id) ?? n)
       nextNodesById = buildNodesById(nextNodes)
     }
+    const nextNodeUiState = pruneNodeUiState(
+      nextNodes,
+      get().contentMinHeightByNodeId,
+      get().dirtyContentMinHeightNodeIds,
+    )
     set({
       nodes: nextNodes,
       nodesById: nextNodesById,
       attachedPointIdsByNode: attachedIndexDirty ? attachedIndex : get().attachedPointIdsByNode,
+      contentMinHeightByNodeId: nextNodeUiState.contentMinHeightByNodeId,
+      dirtyContentMinHeightNodeIds: nextNodeUiState.dirtyContentMinHeightNodeIds,
     })
 
     if (draggingDirty) {
@@ -1805,6 +1968,11 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     const updatedNodes = get().nodes.filter(
       (node) => !nodes.some((n) => n.id === node.id),
     )
+    const nextNodeUiState = pruneNodeUiState(
+      updatedNodes,
+      get().contentMinHeightByNodeId,
+      get().dirtyContentMinHeightNodeIds,
+    )
     const deletedNodes = nodes.map((node) => ({
       ...node,
       data: { ...node.data, deletedAt: new Date().toISOString() },
@@ -1817,6 +1985,10 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
 
     set({
       nodes: updatedNodes,
+      nodesById: buildNodesById(updatedNodes),
+      attachedPointIdsByNode: buildAttachedPointIdsByNode(updatedNodes),
+      contentMinHeightByNodeId: nextNodeUiState.contentMinHeightByNodeId,
+      dirtyContentMinHeightNodeIds: nextNodeUiState.dirtyContentMinHeightNodeIds,
       deletedNodes: [...get().deletedNodes, ...deletedNodes],
     })
     // DB delete is covered via onNodesChange's background diff
@@ -1852,6 +2024,11 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     const updatedNodes = deletedPointIds.size > 0
       ? get().nodes.filter((node) => !deletedPointIds.has(node.id))
       : get().nodes
+    const nextNodeUiState = pruneNodeUiState(
+      updatedNodes,
+      get().contentMinHeightByNodeId,
+      get().dirtyContentMinHeightNodeIds,
+    )
     const updatedAttachedIndex = deletedPointIds.size > 0
       ? buildAttachedPointIdsByNode(updatedNodes)
       : get().attachedPointIdsByNode
@@ -1862,6 +2039,8 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       nodes: updatedNodes,
       nodesById: deletedPointIds.size > 0 ? buildNodesById(updatedNodes) : get().nodesById,
       attachedPointIdsByNode: updatedAttachedIndex,
+      contentMinHeightByNodeId: nextNodeUiState.contentMinHeightByNodeId,
+      dirtyContentMinHeightNodeIds: nextNodeUiState.dirtyContentMinHeightNodeIds,
     })
     // DB delete is covered via onEdgesChange's background diff
   },
@@ -2000,6 +2179,11 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       ? applyEdgePatches(state.edges, patch.edges, "undo")
       : state.edges
     const affectedEdgeIds = collectAffectedEdgeIdsForNodeChanges(prevNodes, nextNodes, nextEdges)
+    const nextNodeUiState = pruneNodeUiState(
+      nextNodes,
+      state.contentMinHeightByNodeId,
+      state.dirtyContentMinHeightNodeIds,
+    )
 
     set({
       historyRecording: false,
@@ -2009,6 +2193,8 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       edges: nextEdges,
       nodesById: buildNodesById(nextNodes),
       attachedPointIdsByNode: buildAttachedPointIdsByNode(nextNodes),
+      contentMinHeightByNodeId: nextNodeUiState.contentMinHeightByNodeId,
+      dirtyContentMinHeightNodeIds: nextNodeUiState.dirtyContentMinHeightNodeIds,
     })
 
     const scopeKey = getScopeKey(state)
@@ -2055,6 +2241,11 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       ? applyEdgePatches(state.edges, patch.edges, "redo")
       : state.edges
     const affectedEdgeIds = collectAffectedEdgeIdsForNodeChanges(prevNodes, nextNodes, nextEdges)
+    const nextNodeUiState = pruneNodeUiState(
+      nextNodes,
+      state.contentMinHeightByNodeId,
+      state.dirtyContentMinHeightNodeIds,
+    )
 
     set({
       historyRecording: false,
@@ -2064,6 +2255,8 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       edges: nextEdges,
       nodesById: buildNodesById(nextNodes),
       attachedPointIdsByNode: buildAttachedPointIdsByNode(nextNodes),
+      contentMinHeightByNodeId: nextNodeUiState.contentMinHeightByNodeId,
+      dirtyContentMinHeightNodeIds: nextNodeUiState.dirtyContentMinHeightNodeIds,
     })
 
     const scopeKey = getScopeKey(state)

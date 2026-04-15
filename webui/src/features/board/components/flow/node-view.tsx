@@ -125,7 +125,7 @@ function NodeViewBase({ id, data, selected, width, height, dragging }: NodeProps
   const [, setIsResizingLocal] = useState(false)
 
   const setIsResizingNode = useGraphStore(state => state.setIsResizingNode)
-  const updateNodeByIdPersist = useGraphStore(state => state.updateNodeByIdPersist)
+  const markNodeContentMinHeightDirty = useGraphStore(state => state.markNodeContentMinHeightDirty)
   const viewSlides = useGraphStore(state => state.viewSlides)
   const contentRef = useRef<HTMLDivElement | null>(null)
 
@@ -176,13 +176,7 @@ function NodeViewBase({ id, data, selected, width, height, dragging }: NodeProps
     setIsResizingLocal(false)
     setIsResizingNode(false)
     if (supportsContentMinHeight(nodeType)) {
-      updateNodeByIdPersist(id, (node) => ({
-        ...node,
-        data: {
-          ...node.data,
-          shouldRecomputeContentMinHeight: true,
-        },
-      }))
+      markNodeContentMinHeightDirty(id, true)
     }
   }
   const resizeMinWidth = isVisualNode ? 80 : 20

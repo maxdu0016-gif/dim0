@@ -10,6 +10,7 @@ import { darkModeDisplayHex } from "../../lib/colors/dark-variants"
 import { fontFamilyToTwClass, fontSizeToTwClass, textStyleToTwClass } from "../../types/style"
 import type { NoteNode } from "../../types/flow"
 import type { Note, NoteProperties } from "../../types/note"
+import { supportsContentMinHeight } from "../../utils/compute-node-content-min-height"
 
 
 export type NoteWithPin = Note & { pinned?: boolean; autoEdit?: boolean }
@@ -146,6 +147,7 @@ export const NodeCard = memo(function NodeCard({
 
   const setNodesPersist = useGraphStore((state) => state.setNodesPersist)
   const updateNodeByIdPersist = useGraphStore((state) => state.updateNodeByIdPersist)
+  const markNodeContentMinHeightDirty = useGraphStore((state) => state.markNodeContentMinHeightDirty)
   const setEdgesPersist = useGraphStore((state) => state.setEdgesPersist)
   const boardCanEdit = useGraphStore((state) => state.boardCanEdit)
   const openNodeSurface = useGraphStore((state) => state.openNodeSurface)
@@ -258,10 +260,20 @@ export const NodeCard = memo(function NodeCard({
       data: {
         ...node.data,
         content: { markdown: debouncedLabelDraft },
-        shouldRecomputeContentMinHeight: true,
       },
     }))
-  }, [debouncedLabelDraft, labelEditing, nonSheetDisplayValue, note.id, updateNodeByIdPersist])
+    if (supportsContentMinHeight(note.style.type)) {
+      markNodeContentMinHeightDirty(note.id, true)
+    }
+  }, [
+    debouncedLabelDraft,
+    labelEditing,
+    markNodeContentMinHeightDirty,
+    nonSheetDisplayValue,
+    note.id,
+    note.style.type,
+    updateNodeByIdPersist,
+  ])
 
   const handleLabelChange = useCallback((event: React.ChangeEvent<HTMLTextAreaElement>) => {
     const next = event.target.value
@@ -283,11 +295,13 @@ export const NodeCard = memo(function NodeCard({
             ...data.style,
             ...next,
           },
-          shouldRecomputeContentMinHeight: true,
         },
       }
     })
-  }, [note.id, updateNodeByIdPersist])
+    if (supportsContentMinHeight(note.style.type)) {
+      markNodeContentMinHeightDirty(note.id, true)
+    }
+  }, [markNodeContentMinHeightDirty, note.id, note.style.type, updateNodeByIdPersist])
 
   const stopDragging = useCallback((event: React.PointerEvent) => {
     if (labelEditing) {

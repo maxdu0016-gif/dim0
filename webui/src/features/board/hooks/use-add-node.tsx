@@ -29,6 +29,7 @@ export function useAddNoteNode() {
   const boardId = useGraphStore(state => state.boardId)
   const rootId = useGraphStore(state => state.rootId)
   const setNodesPersist = useGraphStore(state => state.setNodesPersist)
+  const markNodeContentMinHeightDirty = useGraphStore(state => state.markNodeContentMinHeightDirty)
   const nodes = useGraphStore(useShallow(state => state.nodes))
 
   const { applyDefaultNodeStyle } = useStyleDefaults()
@@ -93,11 +94,10 @@ export function useAddNoteNode() {
       newNote.properties.nodeSize = { size, type: 'size' }
     }
     const node = convertNoteToNode(newNote)
-    if (nodeType === 'text' || supportsContentMinHeight(nodeType)) {
+    if (nodeType === 'text') {
       node.data = {
         ...node.data,
-        ...(nodeType === 'text' ? { autoEdit: true } : {}),
-        shouldRecomputeContentMinHeight: true,
+        autoEdit: true,
       }
     }
     const maxZ = nodes.reduce((acc, n) => {
@@ -110,5 +110,16 @@ export function useAddNoteNode() {
     const newNodes = nodes.map(n => ({ ...n, selected: false }))
     node.selected = true
     setNodesPersist([...newNodes, node])
-  }, [boardId, rootId, getViewport, setNodesPersist, nodes, applyDefaultNodeStyle])
+    if (supportsContentMinHeight(nodeType)) {
+      markNodeContentMinHeightDirty(node.id, true)
+    }
+  }, [
+    applyDefaultNodeStyle,
+    boardId,
+    getViewport,
+    markNodeContentMinHeightDirty,
+    nodes,
+    rootId,
+    setNodesPersist,
+  ])
 }

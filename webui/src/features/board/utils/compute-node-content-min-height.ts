@@ -41,10 +41,10 @@ export function computeNodeContentMinHeight(
   const markdown = node.content?.markdown ?? node.label?.markdown ?? ''
   if (!markdown.trim()) return MIN_NODE_HEIGHT
   if (markdown.includes('$$')) {
-    return Math.max(MIN_NODE_HEIGHT, node.contentMinHeight ?? MIN_NODE_HEIGHT)
+    return MIN_NODE_HEIGHT
   }
 
-  const contentScale = getShapeContentScale(nodeType)
+  const contentScale: number = getShapeContentScale(nodeType)
   const outerPadding = nodeType === 'text' ? 0 : SHAPE_OUTER_PADDING
   const horizontalPadding = nodeType === 'text' ? 0 : SHAPE_HORIZONTAL_PADDING
   const verticalPadding = nodeType === 'text' ? TEXT_VERTICAL_PADDING : SHAPE_VERTICAL_PADDING
