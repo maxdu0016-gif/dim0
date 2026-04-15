@@ -397,15 +397,16 @@ export const Shape = memo(function Shape({
   const placeHolder = nodeType === 'text' ? 'Add text...' : isImageNode ? 'Add caption...' : ''
   const contentScale = getShapeContentScale(nodeType)
   const contentSize = contentScale < 1 ? `${contentScale * 100}%` : '100%'
+  const outerContainerPaddingPx = nodeType === 'text' ? 0 : 8
   const horizontalPaddingPx = nodeType === 'text' ? 0 : 16
   const verticalPaddingPx = 16
   const scaledRenderWidth = renderWidth ? Math.floor(renderWidth * Math.min(1, contentScale)) : undefined
   const scaledRenderHeight = renderHeight ? Math.floor(renderHeight * Math.min(1, contentScale)) : undefined
   const innerRenderWidth = scaledRenderWidth
-    ? Math.max(1, scaledRenderWidth - horizontalPaddingPx)
+    ? Math.max(1, scaledRenderWidth - outerContainerPaddingPx - horizontalPaddingPx)
     : undefined
   const innerRenderHeight = scaledRenderHeight
-    ? Math.max(1, scaledRenderHeight - verticalPaddingPx)
+    ? Math.max(1, scaledRenderHeight - outerContainerPaddingPx - verticalPaddingPx)
     : undefined
   const notEditingSpanClass = value.trim() ? '' : 'text-muted-foreground/50'
 

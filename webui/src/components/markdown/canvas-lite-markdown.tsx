@@ -775,9 +775,10 @@ const drawToCanvas = (ctx: CanvasRenderingContext2D, opts: RenderOptions, lines:
   const availableHeight = Math.max(0, opts.height)
   const shouldCenterVertically = contentHeight <= availableHeight
   const centeredTop = Math.floor((opts.height - contentHeight) / 2)
+  const topInset = Math.ceil(fontSizePx * 0.85)
   const startBaseline = shouldCenterVertically
-    ? Math.max(fontSizePx, centeredTop + fontSizePx)
-    : fontSizePx
+    ? Math.max(topInset, centeredTop + topInset)
+    : topInset
   let y = startBaseline
 
   for (const line of lines) {
