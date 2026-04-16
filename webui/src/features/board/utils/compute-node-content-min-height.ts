@@ -1,5 +1,4 @@
-import type { NoteNode } from '../types/flow'
-import type { NodeType } from '../types/style'
+import type { FontFamily, FontSize, NodeType, TextStyle } from '../types/style'
 import { estimateMarkdownContentHeight } from './markdown-height-estimate'
 import { getShapeContentScale } from './shape-content-scale'
 
@@ -24,21 +23,31 @@ const SHAPE_HORIZONTAL_PADDING = 16
 const SHAPE_VERTICAL_PADDING = 16
 const DESCENDER_ALLOWANCE = 4
 
+type ContentMinHeightInput = {
+  nodeType: NodeType
+  markdown: string
+  width?: number
+  fontFamily: FontFamily
+  fontSize: FontSize
+  textStyle: TextStyle
+}
+
 export function supportsContentMinHeight(nodeType: NodeType) {
   return SUPPORTED_NODE_TYPES.has(nodeType)
 }
 
+/**
+ * Estimates the minimum safe node height for wrapped markdown content.
+ */
 export function computeNodeContentMinHeight(
-  node: NoteNode['data'],
-  width?: number,
+  input: ContentMinHeightInput,
 ) {
-  const nodeType = node.style.type
+  const { nodeType, markdown, width, fontFamily, fontSize, textStyle } = input
   if (!supportsContentMinHeight(nodeType)) return MIN_NODE_HEIGHT
 
   const safeWidth = Number.isFinite(width) ? Math.max(1, Math.floor(width ?? 0)) : null
   if (!safeWidth) return MIN_NODE_HEIGHT
 
-  const markdown = node.content?.markdown ?? node.label?.markdown ?? ''
   if (!markdown.trim()) return MIN_NODE_HEIGHT
   if (markdown.includes('$$')) {
     return MIN_NODE_HEIGHT
@@ -54,9 +63,9 @@ export function computeNodeContentMinHeight(
   const estimatedContentHeight = estimateMarkdownContentHeight({
     text: markdown,
     width: innerContentWidth,
-    fontFamily: node.style.fontFamily,
-    fontSize: node.style.fontSize,
-    textStyle: node.style.textStyle,
+    fontFamily,
+    fontSize,
+    textStyle,
   })
 
   const scaledMinHeight =

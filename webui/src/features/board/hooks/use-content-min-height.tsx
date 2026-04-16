@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useGraphStore } from '../store/graph-store'
 import type { NoteNode } from '../types/flow'
 import {
@@ -21,34 +21,60 @@ export function useContentMinHeight(
   )
   const clearNodeContentMinHeight = useGraphStore(state => state.clearNodeContentMinHeight)
   const setNodeContentMinHeight = useGraphStore(state => state.setNodeContentMinHeight)
+  const nodeType = nodeData.style.type
+  const markdown = nodeData.content?.markdown ?? nodeData.label?.markdown ?? ''
+  const supportsMinHeight = supportsContentMinHeight(nodeType)
+  const shouldComputeMinHeight = supportsMinHeight && (shouldRecomputeContentMinHeight || cachedMinHeight == null)
 
-  const computedMinH = computeNodeContentMinHeight(nodeData, width)
+  const computedMinH = useMemo(() => {
+    if (!shouldComputeMinHeight) {
+      return cachedMinHeight ?? 20
+    }
+
+    return computeNodeContentMinHeight({
+      nodeType,
+      markdown,
+      width,
+      fontFamily: nodeData.style.fontFamily,
+      fontSize: nodeData.style.fontSize,
+      textStyle: nodeData.style.textStyle,
+    })
+  }, [
+    cachedMinHeight,
+    markdown,
+    nodeData.style.fontFamily,
+    nodeData.style.fontSize,
+    nodeData.style.textStyle,
+    nodeType,
+    shouldComputeMinHeight,
+    width,
+  ])
 
   useEffect(() => {
-    if (!supportsContentMinHeight(nodeData.style.type)) return
+    if (!supportsMinHeight) return
     if (!shouldRecomputeContentMinHeight) return
 
     setNodeContentMinHeight(nodeId, computedMinH)
-  }, [computedMinH, nodeData.style.type, nodeId, setNodeContentMinHeight, shouldRecomputeContentMinHeight])
+  }, [computedMinH, nodeId, setNodeContentMinHeight, shouldRecomputeContentMinHeight, supportsMinHeight])
 
   useEffect(() => {
-    if (supportsContentMinHeight(nodeData.style.type)) return
+    if (supportsMinHeight) return
 
     clearNodeContentMinHeight(nodeId)
-  }, [clearNodeContentMinHeight, nodeData.style.type, nodeId])
+  }, [clearNodeContentMinHeight, nodeId, supportsMinHeight])
 
   useEffect(() => {
     const selector = `.react-flow__node[data-id="${CSS?.escape ? CSS.escape(nodeId) : nodeId}"]`
     const el = document.querySelector<HTMLElement>(selector)
     if (!el) return
 
-    if (!supportsContentMinHeight(nodeData.style.type) || cachedMinHeight == null) {
+    if (!supportsMinHeight || cachedMinHeight == null) {
       el.style.removeProperty('min-height')
       return
     }
 
     el.style.minHeight = `${cachedMinHeight}px`
-  }, [cachedMinHeight, nodeData.style.type, nodeId])
+  }, [cachedMinHeight, nodeId, supportsMinHeight])
 
   return cachedMinHeight ?? computedMinH
 }

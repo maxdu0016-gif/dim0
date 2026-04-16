@@ -1135,17 +1135,10 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   setNodes: (nodesOrUpdater) =>
     set((state) => {
       const nextNodes = resolveUpdater<NoteNode[]>(nodesOrUpdater, state.nodes)
-      const nextNodeUiState = pruneNodeUiState(
-        nextNodes,
-        state.contentMinHeightByNodeId,
-        state.dirtyContentMinHeightNodeIds,
-      )
       return {
         nodes: nextNodes,
         nodesById: buildNodesById(nextNodes),
         attachedPointIdsByNode: buildAttachedPointIdsByNode(nextNodes),
-        contentMinHeightByNodeId: nextNodeUiState.contentMinHeightByNodeId,
-        dirtyContentMinHeightNodeIds: nextNodeUiState.dirtyContentMinHeightNodeIds,
       }
     }),
 
@@ -1265,11 +1258,16 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       typeof nodesOrUpdater === "function"
         ? (nodesOrUpdater as (prev: NoteNode[]) => NoteNode[])(prevNodes)
         : nodesOrUpdater
-    const nextNodeUiState = pruneNodeUiState(
-      nextNodes,
-      get().contentMinHeightByNodeId,
-      get().dirtyContentMinHeightNodeIds,
-    )
+    const nextNodeUiState = nextNodes.length < prevNodes.length
+      ? pruneNodeUiState(
+          nextNodes,
+          get().contentMinHeightByNodeId,
+          get().dirtyContentMinHeightNodeIds,
+        )
+      : {
+          contentMinHeightByNodeId: get().contentMinHeightByNodeId,
+          dirtyContentMinHeightNodeIds: get().dirtyContentMinHeightNodeIds,
+        }
 
     set({
       nodes: nextNodes,
@@ -1694,11 +1692,17 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       nextNodes = nextNodes.map(n => nextById.get(n.id) ?? n)
       nextNodesById = buildNodesById(nextNodes)
     }
-    const nextNodeUiState = pruneNodeUiState(
-      nextNodes,
-      get().contentMinHeightByNodeId,
-      get().dirtyContentMinHeightNodeIds,
-    )
+    const hasRemoveChange = changes.some((change) => change.type === 'remove')
+    const nextNodeUiState = hasRemoveChange
+      ? pruneNodeUiState(
+          nextNodes,
+          get().contentMinHeightByNodeId,
+          get().dirtyContentMinHeightNodeIds,
+        )
+      : {
+          contentMinHeightByNodeId: get().contentMinHeightByNodeId,
+          dirtyContentMinHeightNodeIds: get().dirtyContentMinHeightNodeIds,
+        }
     set({
       nodes: nextNodes,
       nodesById: nextNodesById,
@@ -2179,11 +2183,16 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       ? applyEdgePatches(state.edges, patch.edges, "undo")
       : state.edges
     const affectedEdgeIds = collectAffectedEdgeIdsForNodeChanges(prevNodes, nextNodes, nextEdges)
-    const nextNodeUiState = pruneNodeUiState(
-      nextNodes,
-      state.contentMinHeightByNodeId,
-      state.dirtyContentMinHeightNodeIds,
-    )
+    const nextNodeUiState = nextNodes.length !== prevNodes.length
+      ? pruneNodeUiState(
+          nextNodes,
+          state.contentMinHeightByNodeId,
+          state.dirtyContentMinHeightNodeIds,
+        )
+      : {
+          contentMinHeightByNodeId: state.contentMinHeightByNodeId,
+          dirtyContentMinHeightNodeIds: state.dirtyContentMinHeightNodeIds,
+        }
 
     set({
       historyRecording: false,
@@ -2241,11 +2250,16 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       ? applyEdgePatches(state.edges, patch.edges, "redo")
       : state.edges
     const affectedEdgeIds = collectAffectedEdgeIdsForNodeChanges(prevNodes, nextNodes, nextEdges)
-    const nextNodeUiState = pruneNodeUiState(
-      nextNodes,
-      state.contentMinHeightByNodeId,
-      state.dirtyContentMinHeightNodeIds,
-    )
+    const nextNodeUiState = nextNodes.length !== prevNodes.length
+      ? pruneNodeUiState(
+          nextNodes,
+          state.contentMinHeightByNodeId,
+          state.dirtyContentMinHeightNodeIds,
+        )
+      : {
+          contentMinHeightByNodeId: state.contentMinHeightByNodeId,
+          dirtyContentMinHeightNodeIds: state.dirtyContentMinHeightNodeIds,
+        }
 
     set({
       historyRecording: false,
