@@ -17,7 +17,7 @@ export function TierBadge({ plan }: TierBadgeProps) {
     <Badge
       variant="outline"
       className={[
-        "font-mono font-medium uppercase tracking-wide",
+        "font-mono font-medium uppercase tracking-wide text-[10px]",
         plan === "plus"
           ? "border-secondary-foreground bg-secondary-foreground/10 text-foreground"
           : "border-border bg-muted text-foreground",
