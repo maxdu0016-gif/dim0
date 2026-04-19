@@ -32,8 +32,8 @@ const RESIZE_HANDLES: ResizeHandle[] = [
 ]
 
 const getHandleTransform = (pos: ControlPosition) => {
-  const x = pos.includes('right') ? '50%' : '-50%'
-  const y = pos.includes('bottom') ? '50%' : '-50%'
+  const x = pos.includes('right') ? '25%' : '-25%'
+  const y = pos.includes('bottom') ? '25%' : '-25%'
   return `translate(${x}, ${y})`
 }
 

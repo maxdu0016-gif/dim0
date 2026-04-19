@@ -60,10 +60,12 @@
   --font-handwriting: var(--font-handwriting);
   --font-informal: var(--font-informal);
 
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  /* ── layout ─────────────────────────────────────────────── */
+  --radius: 0.75rem;
+  --radius-sm: calc(var(--radius) - 8px);   /* 4px  — chips, inline code */
+  --radius-md: calc(var(--radius) - 4px);   /* 8px  — buttons, inputs */
+  --radius-lg: var(--radius);               /* 12px — popovers, cards */
+  --radius-xl: calc(var(--radius) + 4px);   /* 16px — large panels */
 
   --shadow-2xs: var(--shadow-2xs);
   --shadow-xs: var(--shadow-xs);
@@ -147,9 +149,6 @@
   --font-handwriting: 'Architects Daughter', cursive;
   /* Sticky notes, casual callouts — expressive handwriting */
   --font-informal: 'Shantell Sans', ui-handwriting, cursive;
-
-  /* ── layout ─────────────────────────────────────────────── */
-  --radius: 0.75rem;
 
   /* ── shadows (very subtle — warm parchment feel) ─────────── */
   --shadow-2xs: 0px 2px 4px 0px hsl(0 0% 0% / 0.03);
