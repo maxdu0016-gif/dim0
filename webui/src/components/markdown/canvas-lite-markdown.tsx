@@ -75,12 +75,15 @@ const INLINE_PATTERN =
 const HR_LINE_PATTERN = /^[ \t]*---[ \t]*$/
 const DOUBLE_HR_LINE_PATTERN = /^[ \t]*===[ \t]*$/
 
+/**
+ * Mirrors the font stacks defined in index.css so canvas measurement matches DOM text.
+ */
 const FONT_FAMILY_MAP: Record<FontFamily, string> = {
-  handwriting: '"Shantell Sans", "Geist Handwriting Fallback", ui-handwriting, cursive',
-  'sans-serif': 'system-ui, "Instrument Sans", "Geist Fallback", ui-sans-serif, sans-serif',
-  serif: '"Source Serif 4", ui-serif, Georgia, serif',
-  monospace: '"Ubuntu Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-  informal: '"Gochi Hand", "Comic Sans", cursive, sans-serif',
+  handwriting: '"Architects Daughter", cursive',
+  'sans-serif': '"Plus Jakarta Sans", system-ui, "Instrument Sans", ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji"',
+  serif: '"Lora", "Source Serif 4", ui-serif, Georgia, Cambria, "Times New Roman", Times, serif',
+  monospace: '"Ubuntu Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+  informal: '"Shantell Sans", ui-handwriting, cursive',
 }
 
 const FONT_SIZE_MAP: Record<FontSize, number> = {
