@@ -54,7 +54,7 @@ export const ReasoningStepRow = ({
             />
           </button>
           {viewMore && (
-            <div className='mt-2 text-muted-foreground/80 rounded-lg border border-border p-2 bg-sidebar border-dashed [&_p]:!text-sm [&_li]:!text-sm italic'>
+            <div className='mt-2 font-serif text-muted-foreground/80 rounded-lg border border-border p-2 bg-sidebar border-dashed [&_p]:!text-sm [&_li]:!text-sm italic'>
               <MarkdownView content={step.reasoning} />
             </div>
           )}
@@ -62,7 +62,7 @@ export const ReasoningStepRow = ({
       )}
       {step.message !== "" ? (
         <div
-          className="text-base text-card-foreground"
+          className="font-serif text-base text-card-foreground"
         >
           <MarkdownView content={step.message} isStreaming={isStreaming} />
         </div>

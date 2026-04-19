@@ -30,8 +30,8 @@
   --crepe-color-inline-area: var(--color-input);            /* inline edit bg */
 
   /* ===== Fonts ===== */
-  --crepe-font-title: var(--font-sans);
-  --crepe-font-default: var(--font-sans);
+  --crepe-font-title: var(--font-serif);
+  --crepe-font-default: var(--font-serif);
   --crepe-font-code: var(--font-mono);
 
   /* ===== Shadows ===== */
