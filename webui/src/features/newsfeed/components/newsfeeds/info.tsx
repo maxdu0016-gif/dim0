@@ -217,20 +217,20 @@ export function SubscriptionInfoPanel({
               {(kwVal.length ? kwVal : ['—']).map(k => (
                 k === '—'
                   ? <span key='empty' className='text-sm text-muted-foreground'>—</span>
-                  : <Badge key={k} variant='outline' className='px-2 py-1 h-7 rounded-md bg-background font-mono'>{k}</Badge>
+                  : <Badge key={k} variant='outline' className='px-2 py-1 h-7 rounded-sm bg-background font-mono'>{k}</Badge>
               ))}
             </div>
           ) : (
             <div className='space-y-3'>
               <div className='flex flex-wrap gap-2'>
                 {kwVal.map(k => (
-                  <Badge key={k} variant='outline' className='px-2 py-1 h-7 rounded-md flex flex-row items-center gap-1 font-mono bg-card'>
+                  <Badge key={k} variant='outline' className='px-2 py-1 h-7 rounded-sm flex flex-row items-center gap-1 font-mono bg-card'>
                     {k}
                     <button
                       type='button'
                       onClick={() => removeKeyword(k)}
                       title='Remove'
-                      className='transition-all hover:bg-muted p-1 rounded-full -mr-1'
+                      className='transition-all hover:bg-muted p-1 rounded-md -mr-1'
                     >
                       <HugeiconsIcon icon={Delete02Icon} className='size-3' strokeWidth={2} />
                     </button>
@@ -347,7 +347,7 @@ function Box({
             onClick={onEdit}
             title='Edit'
             aria-label='Edit'
-            className='rounded-full !p-1 bg-background text-muted-foreground'
+            className='rounded-md !p-1 bg-background text-muted-foreground'
           >
             <HugeiconsIcon icon={PencilEditIcon} className='size-4' strokeWidth={2} />
           </Button>
@@ -360,7 +360,7 @@ function Box({
               title='Cancel'
               aria-label='Cancel'
               disabled={saving}
-              className='rounded-full !p-1 border border-border'
+              className='rounded-md !p-1 border border-border'
             >
               <HugeiconsIcon icon={Cancel01Icon} className='size-4' strokeWidth={2} />
             </Button>
@@ -370,7 +370,7 @@ function Box({
               title='Save'
               aria-label='Save'
               disabled={saving}
-              className='bg-primary text-primary-foreground hover:opacity-90 rounded-full !p-1'
+              className='bg-primary text-primary-foreground hover:opacity-90 rounded-md !p-1'
             >
               <HugeiconsIcon icon={Tick01Icon} className='size-4' strokeWidth={2} />
             </Button>

@@ -60,7 +60,7 @@ const HistoryList = ({
             <Button
               variant="ghost"
               size="icon"
-              className="rounded-full border border-border shadow-sm bg-accent hover:bg-background transition-colors"
+              className="rounded-md border border-border shadow-sm bg-accent hover:bg-background transition-colors"
             >
               <HugeiconsIcon icon={Message02Icon} className="size-4" strokeWidth={2} />
               <span className="sr-only">Open chat history</span>
@@ -134,7 +134,7 @@ const HistoryList = ({
                 key={chat.uid}
                 onClick={() => onSelectChat(chat.uid)}
                 className={cn(
-                  "text-left rounded-lg border px-3 py-2 transition-colors",
+                  "text-left rounded-md border px-3 py-2 transition-colors",
                   "hover:border-border hover:bg-accent/40",
                   isActive ? "border-border bg-accent/50" : "border-transparent bg-card/60"
                 )}
@@ -235,7 +235,7 @@ const ChatBody = ({
         <Button
           variant="ghost"
           size="icon"
-          className="rounded-full border border-border shadow-sm bg-accent hover:bg-background transition-colors"
+          className="rounded-md border border-border shadow-sm bg-accent hover:bg-background transition-colors"
           onClick={handleNewChat}
           aria-label="Create new chat"
           title="Create new chat"

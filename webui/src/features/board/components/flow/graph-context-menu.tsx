@@ -278,7 +278,7 @@ export function GraphContextMenu({ nodes, setNodesPersist, children }: GraphCont
 
       {menuPosition && (
         <div
-          className='fixed z-50 min-w-[180px] max-w-[320px] rounded-md border bg-popover text-popover-foreground shadow-lg p-1 text-sm'
+          className='fixed z-50 min-w-[180px] max-w-[320px] rounded-lg border bg-popover text-popover-foreground shadow-lg p-1 text-sm'
           style={{ top: menuPosition.y, left: menuPosition.x }}
           onMouseDown={event => event.stopPropagation()}
           onContextMenu={event => event.preventDefault()}
@@ -292,7 +292,7 @@ export function GraphContextMenu({ nodes, setNodesPersist, children }: GraphCont
             <TooltipTrigger asChild>
               <button
                 type='button'
-                className='w-full px-3 py-2 text-left rounded hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2'
+                className='w-full px-3 py-2 text-left rounded-md hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2'
                 onClick={handleSendBackward}
                 disabled={!canSendBackward}
               >
@@ -308,7 +308,7 @@ export function GraphContextMenu({ nodes, setNodesPersist, children }: GraphCont
             <TooltipTrigger asChild>
               <button
                 type='button'
-                className='w-full px-3 py-2 text-left rounded hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2'
+                className='w-full px-3 py-2 text-left rounded-md hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2'
                 onClick={handleSendForward}
                 disabled={!canSendForward}
               >
@@ -324,7 +324,7 @@ export function GraphContextMenu({ nodes, setNodesPersist, children }: GraphCont
             <TooltipTrigger asChild>
               <button
                 type='button'
-                className='w-full px-3 py-2 text-left rounded hover:bg-muted flex items-center gap-2'
+                className='w-full px-3 py-2 text-left rounded-md hover:bg-muted flex items-center gap-2'
                 onClick={handleSendToBack}
               >
                 <HugeiconsIcon icon={LayerSendToBackIcon} strokeWidth={2} className='size-4' />
@@ -339,7 +339,7 @@ export function GraphContextMenu({ nodes, setNodesPersist, children }: GraphCont
             <TooltipTrigger asChild>
               <button
                 type='button'
-                className='w-full px-3 py-2 text-left rounded hover:bg-muted flex items-center gap-2'
+                className='w-full px-3 py-2 text-left rounded-md hover:bg-muted flex items-center gap-2'
                 onClick={handleSendToFront}
               >
                 <HugeiconsIcon icon={LayerBringToFrontIcon} strokeWidth={2} className='size-4' />
@@ -356,7 +356,7 @@ export function GraphContextMenu({ nodes, setNodesPersist, children }: GraphCont
           </div>
           <button
             type='button'
-            className='w-full px-3 py-2 text-left rounded hover:bg-muted flex items-center gap-2'
+            className='w-full px-3 py-2 text-left rounded-md hover:bg-muted flex items-center gap-2'
             onClick={() => void exportSelectionPng(exportTransparentBackground)}
           >
             <HugeiconsIcon icon={ClipboardIcon} strokeWidth={2} className='size-4' />
@@ -394,7 +394,7 @@ export function GraphContextMenu({ nodes, setNodesPersist, children }: GraphCont
                   <TooltipTrigger asChild>
                     <button
                       type='button'
-                      className='w-full px-3 py-2 text-left rounded hover:bg-muted flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed'
+                      className='w-full px-3 py-2 text-left rounded-md hover:bg-muted flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed'
                       onClick={() => handleAiAction(action.key)}
                       disabled={!!processingKey}
                     >
@@ -403,7 +403,7 @@ export function GraphContextMenu({ nodes, setNodesPersist, children }: GraphCont
                       ) : null}
                       <span>{action.label}</span>
                       {action.key === 'drawify' && (
-                        <span className='ml-auto text-[10px] uppercase tracking-wide text-muted-foreground border border-border rounded-full px-2 py-0.5'>
+                        <span className='ml-auto text-[10px] uppercase tracking-wide text-muted-foreground border border-border rounded-sm px-2 py-0.5'>
                           Beta
                         </span>
                       )}
@@ -417,7 +417,7 @@ export function GraphContextMenu({ nodes, setNodesPersist, children }: GraphCont
               <div className='my-1 h-px bg-border' />
               <button
                 type='button'
-                className='w-full px-3 py-2 text-left rounded hover:bg-muted flex items-center gap-2'
+                className='w-full px-3 py-2 text-left rounded-md hover:bg-muted flex items-center gap-2'
                 onClick={() => setTranslateOpen((open) => !open)}
               >
                 <HugeiconsIcon icon={ChatTranslateIcon} strokeWidth={2} className='size-4 text-secondary-foreground' />
@@ -434,7 +434,7 @@ export function GraphContextMenu({ nodes, setNodesPersist, children }: GraphCont
                 <div className='pl-3 pr-2 pb-2 pt-1 flex flex-col gap-2'>
                   <div className='flex items-center gap-2'>
                     <input
-                      className='flex-1 h-7 rounded border border-input bg-background px-2 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary-foreground/30'
+                      className='flex-1 h-7 rounded-md border border-input bg-background px-2 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary-foreground/30'
                       placeholder='Custom language…'
                       value={customLanguage}
                       onChange={(event) => setCustomLanguage(event.target.value)}
@@ -453,7 +453,7 @@ export function GraphContextMenu({ nodes, setNodesPersist, children }: GraphCont
                       <button
                         key={language}
                         type='button'
-                        className='px-2 py-1 rounded-full bg-muted text-xs font-medium hover:bg-muted/70'
+                        className='px-2 py-1 rounded-sm bg-muted text-xs font-medium hover:bg-muted/70'
                         onClick={() => handleTranslate(language)}
                       >
                         {language}

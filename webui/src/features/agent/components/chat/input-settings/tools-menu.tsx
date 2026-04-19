@@ -15,7 +15,7 @@ type ToolsMenuProps = {
 
 export const ToolsMenu = ({ memorySearchAvailable = true }: ToolsMenuProps) => {
   const buttonClass = clsx(
-    "transition-all shrink-0 my-icon p-2 rounded-full",
+    "transition-all shrink-0 my-icon p-2 rounded-md",
     "hover:bg-accent dark:bg-input/30 dark:hover:bg-accent/50",
     "border border-transparent hover:border-border transition-colors",
     "text-muted-foreground"
@@ -24,7 +24,7 @@ export const ToolsMenu = ({ memorySearchAvailable = true }: ToolsMenuProps) => {
   return (
     <Dialog>
       <Tooltip delayDuration={400}>
-        <div className="rounded-full bg-background backdrop-blur-md supports-[backdrop-filter]:bg-sidebar/50">
+        <div className="rounded-md bg-background backdrop-blur-md supports-[backdrop-filter]:bg-sidebar/50">
           <TooltipTrigger asChild>
             <DialogTrigger asChild>
               <button
@@ -40,7 +40,7 @@ export const ToolsMenu = ({ memorySearchAvailable = true }: ToolsMenuProps) => {
           Settings
         </TooltipContent>
       </Tooltip>
-      <DialogContent className="w-[320px] max-w-[calc(100%-2rem)] rounded-2xl p-4">
+      <DialogContent className="w-[320px] max-w-[calc(100%-2rem)] rounded-lg p-4">
         <DialogHeader className="mb-2">
           <DialogTitle className="text-sm font-medium text-muted-foreground">
             Settings

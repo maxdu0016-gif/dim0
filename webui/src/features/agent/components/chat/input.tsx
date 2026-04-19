@@ -278,7 +278,7 @@ export const InputBar = ({
   )
 
   const inboxClass = clsx(
-    'rounded-2xl relative flex flex-col text-card-foreground text-base p-2 border transition-colors transition-shadow',
+    'rounded-lg relative flex flex-col text-card-foreground text-base p-2 border transition-colors transition-shadow',
     chatId ? 'bg-accent backdrop-blur-lg supports-[backdrop-filter]:bg-accent/70 dark:border dark:border-border/50 shadow-lg' :
       'bg-accent text-base shadow-xl',
     'border-transparent hover:border-border/70 focus-within:border-border/70'
@@ -353,7 +353,7 @@ export const InputBar = ({
               onChange={(e) => setInput(e.target.value)}
               minRows={4}
               maxRows={18}
-              className="w-full resize-none rounded-lg border border-border/50 shadow-sm bg-background px-3 py-2 text-base outline-none"
+              className="w-full resize-none rounded-md border border-border/50 shadow-sm bg-background px-3 py-2 text-base outline-none"
               placeholder="Refine your prompt here..."
               autoFocus
             />

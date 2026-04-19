@@ -22,7 +22,7 @@ const SearchEngineCard: React.FC<{ searchEngine: WebSearchEngine | "-1", availab
   )
 
   const contentClass = clsx(
-    "w-48 rounded-xl border border-border bg-popover shadow text-sm",
+    "w-48 rounded-lg border border-border bg-popover shadow text-sm",
   )
 
   const Icon = searchEngine !== "-1" ? WebSearchEngineIcons[searchEngine] : null

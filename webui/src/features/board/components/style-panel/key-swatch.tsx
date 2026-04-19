@@ -16,10 +16,10 @@ type KeySwatchProps = {
 }
 
 const SIZE_MAP = {
-  dot: "h-6 w-6 rounded-full",
+  dot: "h-6 w-6 rounded-sm",
   sm: "h-7 w-7 rounded-md",
-  md: "h-9 w-9 rounded-lg",
-  lg: "h-11 w-11 rounded-xl",
+  md: "h-9 w-9 rounded-md",
+  lg: "h-11 w-11 rounded-lg",
 } as const
 
 export const KeySwatch = ({

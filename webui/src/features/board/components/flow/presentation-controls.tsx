@@ -20,7 +20,7 @@ export function PresentationControls({
     <div
       className={`
         fixed z-50 left-1/2 bottom-4 -translate-x-1/2
-        bg-sidebar/90 backdrop-blur-md border border-border rounded-full
+        bg-sidebar/90 backdrop-blur-md border border-border rounded-lg
         px-3 py-2 shadow-lg flex items-center gap-2
       `}
       role="toolbar"

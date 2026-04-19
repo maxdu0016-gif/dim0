@@ -103,7 +103,7 @@ export const AiSparkDialog = ({
                     <span className="flex items-center gap-2">
                       <span>{action.label}</span>
                       {action.key === "drawify" && (
-                        <span className="text-[10px] uppercase tracking-wide text-muted-foreground border border-border rounded-full px-2 py-0.5">
+                        <span className="text-[10px] uppercase tracking-wide text-muted-foreground border border-border rounded-sm px-2 py-0.5">
                           Beta
                         </span>
                       )}

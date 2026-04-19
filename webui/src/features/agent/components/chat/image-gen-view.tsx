@@ -86,7 +86,7 @@ export const ImageGenView = ({
           <button
             type="button"
             onClick={handleDownload}
-            className="absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-full bg-background/80 shadow-sm backdrop-blur-sm border hover:bg-accent transition"
+            className="absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-md bg-background/80 shadow-sm backdrop-blur-sm border hover:bg-accent transition"
             aria-label="Download image"
           >
             <HugeiconsIcon icon={Download04Icon} className="size-4" strokeWidth={2} />

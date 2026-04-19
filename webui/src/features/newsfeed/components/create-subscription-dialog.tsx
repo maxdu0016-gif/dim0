@@ -63,7 +63,7 @@ export function CreateSubscriptionDialog({
     <Dialog open={open} onOpenChange={o => { setOpen(o); if (!o) reset() }}>
       <DialogTrigger asChild>
         {trigger ?? (
-          <Button size='sm' className='rounded-full'>Add new subscription</Button>
+          <Button size='sm' className='rounded-md'>Add new subscription</Button>
         )}
       </DialogTrigger>
 
@@ -94,7 +94,7 @@ export function CreateSubscriptionDialog({
                     <Badge
                       key={k}
                       className={[
-                        'cursor-pointer select-none p-2 rounded-lg border border-border',
+                        'cursor-pointer select-none p-2 rounded-sm border border-border',
                         active
                           ? 'bg-primary text-primary-foreground'
                           : 'bg-card text-card-foreground backdrop-blur hover:bg-accent transition-all'
@@ -136,7 +136,7 @@ export function CreateSubscriptionDialog({
             {/* Actions */}
             <div className='flex justify-end gap-2'>
               <Button variant='ghost' onClick={() => setOpen(false)}>Cancel</Button>
-              <Button onClick={submit} disabled={disabledCreate} className='rounded-lg'>
+              <Button onClick={submit} disabled={disabledCreate} className='rounded-md'>
                 Create
               </Button>
             </div>
