@@ -248,7 +248,7 @@ export const EdgeView = memo(function EdgeView({
     if (!hasLabel && !isLabelEditing) return null
     if (isLabelEditing) return null
 
-    const padding = 6
+    const padding = 0
     const rectX = pathData.labelX - estimatedLabelSize.width / 2 - padding
     const rectY = pathData.labelY - estimatedLabelSize.height / 2 - padding
     const rectW = estimatedLabelSize.width + padding * 2
