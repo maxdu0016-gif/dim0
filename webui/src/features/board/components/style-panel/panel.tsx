@@ -62,7 +62,7 @@ const RailButton = ({
       'text-muted-foreground hover:text-foreground hover:bg-muted/30 hover:border-border/60'
     )}
   >
-    <span className='text-xs font-mono font-normal truncate'>{title}</span>
+    <span className='text-xs font-sans font-normal truncate'>{title}</span>
     <span className='inline-flex h-6 w-6 shrink-0 items-center justify-center'>
       {indicator}
     </span>
