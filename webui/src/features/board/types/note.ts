@@ -169,6 +169,10 @@ export const createDefaultNote = ({
     style: { ...createDefaultStyle({ type: nodeType }) },
     minWidth: nodeType === 'sheet'
       ? DEFAULT_STICKY_NOTE_WIDTH
+      : nodeType === 'text'
+      ? DEFAULT_TEXT_NOTE_WIDTH
+      : nodeType === 'slide'
+      ? DEFAULT_SLIDE_WIDTH
       : nodeType === 'folder'
       ? DEFAULT_FOLDER_WIDTH
       : nodeType === 'code-sandbox'
@@ -182,6 +186,10 @@ export const createDefaultNote = ({
       : DEFAULT_RECTANGLE_NOTE_WIDTH,
     minHeight: nodeType === 'sheet'
       ? DEFAULT_STICKY_NOTE_HEIGHT
+      : nodeType === 'text'
+      ? DEFAULT_TEXT_NOTE_HEIGHT
+      : nodeType === 'slide'
+      ? DEFAULT_SLIDE_HEIGHT
       : nodeType === 'folder'
       ? DEFAULT_FOLDER_HEIGHT
       : nodeType === 'code-sandbox'
