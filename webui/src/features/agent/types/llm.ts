@@ -1,4 +1,5 @@
 import { OpenAI, Gemini, DeepSeek, Mistral, Moonshot, Claude, Qwen, ZAI } from '@lobehub/icons'
+import { BotMessageSquare } from 'lucide-react'
 
 export const LlmModels = [
   "auto",
@@ -183,7 +184,7 @@ export const LlmFamilyMap: Record<LlmModel, LlmFamily> = {
 
 
 export const LlmFamilyIcon: Record<LlmFamily, React.ComponentType<{ size?: number | string, color?: string }>> = {
-  dim0: OpenAI,
+  dim0: BotMessageSquare,
   openai: OpenAI,
   google: Gemini.Color,
   anthropic: Claude.Color,
