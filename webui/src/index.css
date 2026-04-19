@@ -61,7 +61,7 @@
   --font-informal: var(--font-informal);
 
   /* ── layout ─────────────────────────────────────────────── */
-  --radius: 0.75rem;
+  --radius: 0.625rem;
   --radius-sm: calc(var(--radius) - 8px);   /* 4px  — chips, inline code */
   --radius-md: calc(var(--radius) - 4px);   /* 8px  — buttons, inputs */
   --radius-lg: var(--radius);               /* 12px — popovers, cards */
