@@ -18,12 +18,12 @@ export const CreateSubscriptionCardTrigger = React.forwardRef<HTMLButtonElement,
               {...props}
               className={cn(
                 'w-64 h-20 rounded-xl border-2 border-dashed border-border',
-                'hover:border-secondary hover:ring-2 hover:ring-secondary/20 transition-colors cursor-pointer',
+                'hover:border-secondary-foreground hover:ring-2 hover:ring-secondary-foreground/20 transition-colors cursor-pointer',
                 'flex items-center justify-center bg-background',
                 className
               )}
             >
-              <HugeiconsIcon icon={PlusSignIcon} className='w-6 h-6 text-secondary' strokeWidth={2} />
+              <HugeiconsIcon icon={PlusSignIcon} className='w-6 h-6 text-secondary-foreground' strokeWidth={2} />
               {children}
             </button>
           </TooltipTrigger>

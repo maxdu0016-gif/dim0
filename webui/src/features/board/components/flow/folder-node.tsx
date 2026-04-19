@@ -111,7 +111,7 @@ export const FolderNode = memo(function FolderNode({ id, data }: FolderNodeProps
             onMouseDown={event => event.stopPropagation()}
             onDoubleClick={event => event.stopPropagation()}
             onClick={event => event.stopPropagation()}
-            className={`w-full bg-transparent border-0 border-b border-foreground/30 focus:border-secondary focus:outline-none px-0 py-0.5 ${textAlignClass} ${fontClass} ${sizeClass} ${textStyleClass}`}
+            className={`w-full bg-transparent border-0 border-b border-foreground/30 focus:border-secondary-foreground focus:outline-none px-0 py-0.5 ${textAlignClass} ${fontClass} ${sizeClass} ${textStyleClass}`}
             style={{ color: displayTextColor }}
             placeholder="Untitled folder"
           />

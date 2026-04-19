@@ -386,7 +386,7 @@ export function GraphContextMenu({ nodes, setNodesPersist, children }: GraphCont
             <>
               <div className='my-1 h-px bg-border' />
               <div className='px-3 py-1 text-xs font-medium text-muted-foreground flex items-center gap-2'>
-                <Sparkles className='size-3 text-secondary' />
+                <Sparkles className='size-3 text-secondary-foreground' />
                 AI Spark
               </div>
               {aiMenuActions.map((action) => (
@@ -399,7 +399,7 @@ export function GraphContextMenu({ nodes, setNodesPersist, children }: GraphCont
                       disabled={!!processingKey}
                     >
                       {aiActionIcons[action.key] ? (
-                        <HugeiconsIcon icon={aiActionIcons[action.key]} strokeWidth={2} className='size-4 text-secondary' />
+                        <HugeiconsIcon icon={aiActionIcons[action.key]} strokeWidth={2} className='size-4 text-secondary-foreground' />
                       ) : null}
                       <span>{action.label}</span>
                       {action.key === 'drawify' && (
@@ -420,7 +420,7 @@ export function GraphContextMenu({ nodes, setNodesPersist, children }: GraphCont
                 className='w-full px-3 py-2 text-left rounded hover:bg-muted flex items-center gap-2'
                 onClick={() => setTranslateOpen((open) => !open)}
               >
-                <HugeiconsIcon icon={ChatTranslateIcon} strokeWidth={2} className='size-4 text-secondary' />
+                <HugeiconsIcon icon={ChatTranslateIcon} strokeWidth={2} className='size-4 text-secondary-foreground' />
                 <span>Translate</span>
                 <span className='ml-auto text-xs text-muted-foreground'>
                   <HugeiconsIcon
@@ -434,7 +434,7 @@ export function GraphContextMenu({ nodes, setNodesPersist, children }: GraphCont
                 <div className='pl-3 pr-2 pb-2 pt-1 flex flex-col gap-2'>
                   <div className='flex items-center gap-2'>
                     <input
-                      className='flex-1 h-7 rounded border border-input bg-background px-2 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary/30'
+                      className='flex-1 h-7 rounded border border-input bg-background px-2 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary-foreground/30'
                       placeholder='Custom language…'
                       value={customLanguage}
                       onChange={(event) => setCustomLanguage(event.target.value)}
@@ -442,7 +442,7 @@ export function GraphContextMenu({ nodes, setNodesPersist, children }: GraphCont
                     />
                     <button
                       type='button'
-                      className='h-7 px-2 rounded-sm bg-muted text-xs hover:text-secondary font-medium bg-muted/70 border border-border'
+                      className='h-7 px-2 rounded-sm bg-muted text-xs hover:text-secondary-foreground font-medium bg-muted/70 border border-border'
                       onClick={() => handleTranslate(customLanguage.trim() || 'English')}
                     >
                       Go

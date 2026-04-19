@@ -12,7 +12,7 @@ export const HomeMenuItem = () => {
 
   return (
     <SidebarMenuItem>
-      <SidebarMenuButton className="text-xs text-secondary font-medium transition-all" onClick={handleClick}>
+      <SidebarMenuButton className="text-xs text-secondary-foreground font-medium transition-all" onClick={handleClick}>
         <HugeiconsIcon icon={Home12Icon} className="text-xs shrink-0 text-sidebar-icon-3" strokeWidth={2} />
         <span>Home</span>
       </SidebarMenuButton>

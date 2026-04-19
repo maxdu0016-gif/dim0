@@ -32,7 +32,7 @@ export const CodeInterpreterChoiceMenu = () => {
   )
   const iconClass = clsx(
     "size-4 shrink-0",
-    isEnabled ? "text-secondary" : "text-muted-foreground"
+    isEnabled ? "text-secondary-foreground" : "text-muted-foreground"
   )
 
   return (

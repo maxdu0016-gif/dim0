@@ -167,7 +167,7 @@ export function SubscriptionInfoPanel({
                 value={titleVal}
                 onChange={e => setTitleVal(e.target.value)}
                 placeholder='Topic title'
-                className='focus-visible:ring-2 focus-visible:ring-secondary/50 focus-visible:border-secondary border border-border font-medium bg-card'
+                className='focus-visible:ring-2 focus-visible:ring-secondary-foreground/50 focus-visible:border-secondary-foreground border border-border font-medium bg-card'
               />
             </div>
           )}
@@ -195,7 +195,7 @@ export function SubscriptionInfoPanel({
               value={descVal}
               onChange={e => setDescVal(e.target.value)}
               placeholder='Describe your topic…'
-              className='border border-border resize-none focus-visible:ring-2 focus-visible:ring-secondary/50 focus-visible:border-secondary bg-card'
+              className='border border-border resize-none focus-visible:ring-2 focus-visible:ring-secondary-foreground/50 focus-visible:border-secondary-foreground bg-card'
             />
           )}
         </Box>
@@ -243,7 +243,7 @@ export function SubscriptionInfoPanel({
                   onChange={e => setKwInput(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter') addKeyword() }}
                   placeholder='Add keyword and press Enter'
-                  className='focus-visible:ring-2 focus-visible:ring-secondary/50 focus-visible:border-secondary border border-border font-mono bg-card'
+                  className='focus-visible:ring-2 focus-visible:ring-secondary-foreground/50 focus-visible:border-secondary-foreground border border-border font-mono bg-card'
                 />
                 <Button type='button' size='icon' onClick={addKeyword}>
                   <HugeiconsIcon icon={PlusSignIcon} className='size-4' strokeWidth={2} />
@@ -282,7 +282,7 @@ export function SubscriptionInfoPanel({
                         const v = e.target.value
                         setSeedVal(prev => prev.map(x => x === u ? v : x))
                       }}
-                      className='focus-visible:ring-2 focus-visible:ring-secondary/50 focus-visible:border-secondary min-w-[300px] border border-border font-mono text-sm bg-card'
+                      className='focus-visible:ring-2 focus-visible:ring-secondary-foreground/50 focus-visible:border-secondary-foreground min-w-[300px] border border-border font-mono text-sm bg-card'
                     />
                     <Button type='button' variant='ghost' size='icon' onClick={() => removeSeed(u)}>
                       <HugeiconsIcon icon={Delete02Icon} className='size-4' strokeWidth={2} />
@@ -296,7 +296,7 @@ export function SubscriptionInfoPanel({
                   onChange={e => setSeedInput(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter') addSeed() }}
                   placeholder='Add a source URL then Enter'
-                  className='focus-visible:ring-2 focus-visible:ring-secondary/50 focus-visible:border-secondary border border-border font-mono text-sm bg-card'
+                  className='focus-visible:ring-2 focus-visible:ring-secondary-foreground/50 focus-visible:border-secondary-foreground border border-border font-mono text-sm bg-card'
                 />
                 <Button type='button' size='icon' onClick={addSeed}>
                   <HugeiconsIcon icon={PlusSignIcon} className='size-4' strokeWidth={2} />

@@ -154,7 +154,7 @@ export const SheetNodeView = memo(function SheetNodeView({
       <div
         className={clsx(
           'relative w-full h-full rounded-xl overflow-hidden paper-note-texture',
-          isPinned && 'ring-2 ring-secondary border-secondary',
+          isPinned && 'ring-2 ring-secondary-foreground border-secondary-foreground',
           !suspendContent && 'sticky-note-shadow',
         )}
         style={{ backgroundColor }}
@@ -182,7 +182,7 @@ export const SheetNodeView = memo(function SheetNodeView({
                 {paletteOptions.map(c => (
                   <button
                     key={c.name}
-                    className='h-6 w-6 rounded-full border border-border shadow-sm transition hover:brightness-95 focus:outline-none focus:ring-2 focus:ring-secondary'
+                    className='h-6 w-6 rounded-full border border-border shadow-sm transition hover:brightness-95 focus:outline-none focus:ring-2 focus:ring-secondary-foreground'
                     style={{ backgroundColor: c.resolved }}
                     title={`${c.name}-400`}
                     aria-label={`${c.name}-400`}
@@ -200,7 +200,7 @@ export const SheetNodeView = memo(function SheetNodeView({
             title='Pin/Unpin'
           >
             {isPinned
-              ? <HugeiconsIcon icon={PinIcon} className='w-4 h-4 text-secondary' strokeWidth={2} />
+              ? <HugeiconsIcon icon={PinIcon} className='w-4 h-4 text-secondary-foreground' strokeWidth={2} />
               : <HugeiconsIcon icon={PinOffIcon} className='w-4 h-4' strokeWidth={2} />
             }
           </button>

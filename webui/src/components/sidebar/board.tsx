@@ -71,7 +71,7 @@ export function NewBoardItem() {
           <TooltipTrigger asChild>
             <span className="block">
               <SidebarMenuButton
-                className="text-xs text-secondary/60 font-medium transition-all cursor-not-allowed opacity-60"
+                className="text-xs text-secondary-foreground/60 font-medium transition-all cursor-not-allowed opacity-60"
                 disabled
                 onClick={handleClick}
               >
@@ -90,7 +90,7 @@ export function NewBoardItem() {
 
   return (
     <SidebarMenuItem>
-      <SidebarMenuButton className="text-xs text-secondary font-medium transition-all" onClick={handleClick}>
+      <SidebarMenuButton className="text-xs text-secondary-foreground font-medium transition-all" onClick={handleClick}>
         <HugeiconsIcon icon={Edit01Icon} className="text-xs shrink-0 text-sidebar-icon-1" strokeWidth={2} />
         <span>New Board</span>
       </SidebarMenuButton>

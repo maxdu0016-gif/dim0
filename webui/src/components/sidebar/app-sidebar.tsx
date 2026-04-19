@@ -224,10 +224,10 @@ export function AppSidebar({ onLogout }: AppSidebarProps) {
                       </DropdownMenuItem>
                       {BILLING_ENABLED ? (
                         <DropdownMenuItem
-                          className='text-xs bg-gradient-to-br from-secondary/10 via-secondary/5 to-transparent text-secondary'
+                          className='text-xs bg-gradient-to-br from-secondary-foreground/10 via-secondary-foreground/5 to-transparent text-secondary-foreground'
                           onClick={() => navigate({ to: "/settings/billing" })}
                         >
-                          <HugeiconsIcon icon={Award04Icon} className="mr-2 h-4 w-4 text-secondary" strokeWidth={2} />
+                          <HugeiconsIcon icon={Award04Icon} className="mr-2 h-4 w-4 text-secondary-foreground" strokeWidth={2} />
                           <span>Upgrade Plan</span>
                         </DropdownMenuItem>
                       ) : null}

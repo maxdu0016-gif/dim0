@@ -64,14 +64,14 @@ const defaultEdgeOptions = {
   type: 'default',
   zIndex: 1000,
   style: {
-    stroke: 'var(--secondary)',
+    stroke: 'var(--secondary-foreground)',
     strokeWidth: 2,
     strokeDasharray: '8 6',
     strokeLinecap: 'round' as const,
   },
   markerEnd: {
     type: MarkerType.ArrowClosed,
-    color: 'var(--secondary)',
+    color: 'var(--secondary-foreground)',
     width: 22,
     height: 22,
   },

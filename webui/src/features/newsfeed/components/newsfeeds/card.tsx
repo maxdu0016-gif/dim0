@@ -48,7 +48,7 @@ export function NewsletterCard({
 
   const textClass = lum > 0.7 ? 'text-slate-900' : 'text-slate-50'
   const subTextClass = lum > 0.7 ? 'text-slate-700' : 'text-slate-100/80'
-  const ringWhenActive = 'ring-2 ring-secondary/40 border-secondary'
+  const ringWhenActive = 'ring-2 ring-secondary-foreground/40 border-secondary-foreground'
 
   const createdMs = useMemo(() => new Date(createdAt).getTime(), [createdAt])
 
@@ -104,7 +104,7 @@ export function NewsletterCard({
           <Card
             style={{ backgroundColor: bgColor }}
             className={cn(
-              'rounded-xl h-24 transition hover:shadow-sm hover:ring-2 hover:ring-secondary/20 hover:border-secondary/60 border border-transparent',
+              'rounded-xl h-24 transition hover:shadow-sm hover:ring-2 hover:ring-secondary-foreground/20 hover:border-secondary-foreground/60 border border-transparent',
               active && ringWhenActive,
               (generating || del.isPending) && 'pointer-events-none',
               'bg-transparent'

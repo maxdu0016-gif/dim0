@@ -19,13 +19,13 @@ export function TierBadge({ plan }: TierBadgeProps) {
       className={[
         "font-mono font-medium uppercase tracking-wide",
         plan === "plus"
-          ? "border-secondary bg-secondary/10 text-foreground"
+          ? "border-secondary-foreground bg-secondary-foreground/10 text-foreground"
           : "border-border bg-muted text-foreground",
       ].join(" ")}
     >
       {plan === "plus" ? <HugeiconsIcon
         icon={Crown03Icon}
-        className="h-3.5 w-3.5 text-secondary"
+        className="h-3.5 w-3.5 text-secondary-foreground"
         strokeWidth={2} /> : null}
       <span>{plan === "plus" ? "plus" : "free"}</span>
     </Badge>

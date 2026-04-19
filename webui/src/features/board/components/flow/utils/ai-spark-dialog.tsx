@@ -82,7 +82,7 @@ export const AiSparkDialog = ({
       <DialogContent className="sm:max-w-xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Sparkles className="size-4 text-secondary" />
+            <Sparkles className="size-4 text-secondary-foreground" />
             <span>AI Spark</span>
           </DialogTitle>
           <DialogDescription>
@@ -130,7 +130,7 @@ export const AiSparkDialog = ({
               <label className="text-xs font-medium text-muted-foreground">Context</label>
               <button
                 type="button"
-                className="text-xs text-secondary underline-offset-2 hover:underline disabled:opacity-50"
+                className="text-xs text-secondary-foreground underline-offset-2 hover:underline disabled:opacity-50"
                 onClick={() => setUseSelection(!useSelection)}
                 disabled={selectionContext.length === 0}
               >

@@ -264,7 +264,7 @@ export const ToolStepRow = ({
               <h4 className='text-sm font-normal text-muted-foreground block h-6 leading-6'>{title}</h4>
               {canExpand && !viewMore && (
                 <button
-                  className='text-xs text-secondary font-sans hover:underline'
+                  className='text-xs text-secondary-foreground font-sans hover:underline'
                   onClick={() => setViewMore(true)}
                 >
                   Show details
@@ -310,7 +310,7 @@ export const ToolStepRow = ({
             )}
             {canExpand && viewMore && (
               <button
-                className='text-xs text-secondary font-sans hover:underline ml-2'
+                className='text-xs text-secondary-foreground font-sans hover:underline ml-2'
                 onClick={() => setViewMore(false)}
               >
                 Show less

@@ -195,7 +195,7 @@ export const CodeSandboxDialog = memo(function CodeSandboxDialog({
                       stopTitleEdit(false)
                     }
                   }}
-                  className="w-full bg-transparent text-sm font-semibold border-0 border-b border-current/30 focus:border-secondary focus:outline-none px-0 py-0.5"
+                  className="w-full bg-transparent text-sm font-semibold border-0 border-b border-current/30 focus:border-secondary-foreground focus:outline-none px-0 py-0.5"
                   style={{ color: palette.text }}
                   placeholder="Untitled sandbox"
                 />

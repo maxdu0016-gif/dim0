@@ -84,7 +84,7 @@ export function CreateSubscriptionDialog({
                 placeholder='custom topic'
                 value={topic}
                 onChange={e => setTopic(e.target.value)}
-                className='focus-visible:ring-2 focus-visible:ring-secondary/20 focus-visible:border-secondary transition-all'
+                className='focus-visible:ring-2 focus-visible:ring-secondary-foreground/20 focus-visible:border-secondary-foreground transition-all'
               />
               <div className='flex flex-wrap gap-2'>
                 {PREDEFINED_TOPICS.map(k => {
@@ -125,7 +125,7 @@ export function CreateSubscriptionDialog({
                 rows={6}
                 value={desc}
                 onChange={e => setDesc(e.target.value)}
-                className='resize-none focus-visible:ring-2 focus-visible:ring-secondary/20 focus-visible:border-secondary transition-all'
+                className='resize-none focus-visible:ring-2 focus-visible:ring-secondary-foreground/20 focus-visible:border-secondary-foreground transition-all'
                 placeholder='Describe your topic in more details'
               />
               <div className='text-xs text-muted-foreground'>

@@ -17,7 +17,7 @@ export const DeepResearchChoiceMenu = () => {
 
   const buttonClass = clsx(
     "transition-all shrink-0 my-icon p-2 rounded-full hover:bg-accent dark:bg-input/30 dark:hover:bg-accent/50 text-xs flex flex-row items-center gap-2 border border-transparent hover:border-border transition-colors",
-    useDeepResearch ? '!text-secondary' : 'text-muted-foreground'
+    useDeepResearch ? '!text-secondary-foreground' : 'text-muted-foreground'
   )
 
   return (

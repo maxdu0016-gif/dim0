@@ -360,7 +360,7 @@ export const EdgeView = memo(function EdgeView({
         <path
           key={`edge-hidden-${index}`}
           d={segment}
-          className='stroke-secondary'
+          className='stroke-secondary-foreground'
           style={{
             strokeWidth,
             fill: 'none',
@@ -401,7 +401,7 @@ export const EdgeView = memo(function EdgeView({
             cx={displayBendPoint!.x}
             cy={displayBendPoint!.y}
             r={6}
-            className='cursor-move fill-background stroke-secondary stroke-2'
+            className='cursor-move fill-background stroke-secondary-foreground stroke-2'
             pointerEvents='all'
             onPointerDown={handleControlPointPointerDown}
           />

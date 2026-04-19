@@ -91,7 +91,7 @@ export const ImageSearchDialog = ({ openImageSearch, setOpenImageSearch }: Image
   return (
     <Dialog open={openImageSearch} onOpenChange={setOpenImageSearch}>
       <DialogContent className='sm:max-w-2xl p-0 overflow-hidden sm:w-1/3 sm:h-[50vh] flex flex-col'>
-        <DialogHeader className='p-4 border-b text-secondary w-full text-center'>
+        <DialogHeader className='p-4 border-b text-secondary-foreground w-full text-center'>
           <DialogTitle>Search images</DialogTitle>
         </DialogHeader>
         <div className='p-4'>
@@ -100,7 +100,7 @@ export const ImageSearchDialog = ({ openImageSearch, setOpenImageSearch }: Image
             value={q}
             onChange={e => setQ(e.target.value)}
             autoFocus
-            className='focus-visible:ring-2 focus-visible:ring-secondary/75 focus-visible:border-secondary'
+            className='focus-visible:ring-2 focus-visible:ring-secondary-foreground/75 focus-visible:border-secondary-foreground'
           />
         </div>
         <div className='p-4 pt-2 h-full w-full flex-1 overflow-y-auto scrollbar-thin'>
@@ -115,7 +115,7 @@ export const ImageSearchDialog = ({ openImageSearch, setOpenImageSearch }: Image
               {data?.map(img => (
                 <button
                   key={img.url}
-                  className='group relative aspect-square rounded-md overflow-hidden border hover:ring-2 hover:ring-secondary/75'
+                  className='group relative aspect-square rounded-md overflow-hidden border hover:ring-2 hover:ring-secondary-foreground/75'
                   onClick={() => { void handleSelectImage(img.url) }}
                 >
                   <img src={img.url} alt={img.description || 'image'} className='size-full object-cover' />

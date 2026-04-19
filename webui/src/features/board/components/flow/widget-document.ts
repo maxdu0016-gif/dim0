@@ -7,8 +7,8 @@ type WidgetThemeTokenName =
   | "--muted-foreground"
   | "--primary"
   | "--primary-foreground"
-  | "--secondary"
   | "--secondary-foreground"
+  | "--secondary"
   | "--accent"
   | "--accent-foreground"
   | "--destructive"
@@ -36,8 +36,8 @@ const WIDGET_THEME_TOKEN_NAMES: WidgetThemeTokenName[] = [
   "--muted-foreground",
   "--primary",
   "--primary-foreground",
-  "--secondary",
   "--secondary-foreground",
+  "--secondary",
   "--accent",
   "--accent-foreground",
   "--destructive",
@@ -63,8 +63,8 @@ const DEFAULT_WIDGET_TOKENS: WidgetThemeTokens = {
   "--muted-foreground": "#71717a",
   "--primary": "#18181b",
   "--primary-foreground": "#fafafa",
-  "--secondary": "#e4e4e7",
-  "--secondary-foreground": "#18181b",
+  "--secondary-foreground": "#e4e4e7",
+  "--secondary": "#18181b",
   "--accent": "#f4f4f5",
   "--accent-foreground": "#18181b",
   "--destructive": "#dc2626",

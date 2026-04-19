@@ -125,7 +125,7 @@ export const LinearCodeSandboxCard = memo(function LinearCodeSandboxCard({ node 
             }}
             onMouseDown={event => event.stopPropagation()}
             onClick={event => event.stopPropagation()}
-            className='w-full bg-transparent text-center text-sm font-semibold text-foreground border-0 border-b border-foreground/30 focus:border-secondary focus:outline-none px-0 py-0.5'
+            className='w-full bg-transparent text-center text-sm font-semibold text-foreground border-0 border-b border-foreground/30 focus:border-secondary-foreground focus:outline-none px-0 py-0.5'
             placeholder='Untitled sandbox'
           />
         ) : (

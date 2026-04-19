@@ -67,7 +67,7 @@ const ResizeHandles = memo(function ResizeHandles({
       keepAspectRatio={keepAspectRatio}
     >
       <div
-        className={`absolute w-3 h-3 bg-secondary rounded-full ${className} z-20`}
+        className={`absolute w-3 h-3 bg-secondary-foreground rounded-full ${className} z-20`}
         style={{ transform: getHandleTransform(pos) }}
       />
     </NodeResizeControl>
@@ -86,13 +86,13 @@ const NodeStatusOverlay = memo(function NodeStatusOverlay({
   isNew,
 }: NodeStatusOverlayProps) {
   if (selected && nodeType !== 'sheet') {
-    return <div className='absolute inset-1 border border-secondary pointer-events-none rounded z-10' />
+    return <div className='absolute inset-1 border border-secondary-foreground pointer-events-none rounded z-10' />
   }
   if (selected && nodeType === 'sheet') {
-    return <div className='absolute inset-0 border-2 border-secondary pointer-events-none z-10 rounded-xl' />
+    return <div className='absolute inset-0 border-2 border-secondary-foreground pointer-events-none z-10 rounded-xl' />
   }
   if (!selected && isNew) {
-    return <div className='absolute inset-0 border-2 border-dashed border-secondary pointer-events-none rounded z-10' />
+    return <div className='absolute inset-0 border-2 border-dashed border-secondary-foreground pointer-events-none rounded z-10' />
   }
   return null
 })
@@ -110,7 +110,7 @@ const SlideFrame = memo(function SlideFrame({ slideName }: SlideFrameProps) {
         </span>
         {slideName}
       </div>
-      <div className='w-full h-full rounded-lg border-2 border-dashed border-secondary/60 bg-transparent' />
+      <div className='w-full h-full rounded-lg border-2 border-dashed border-secondary-foreground/60 bg-transparent' />
     </div>
   )
 })
@@ -167,7 +167,7 @@ function NodeViewBase({ id, data, selected, width, height, dragging }: NodeProps
     nodeType !== 'widget' && 'drag-handle',
   )
   const rounded = data.style.roundness > 0 ? 'rounded-2xl' : 'none'
-  const frameClass = clsx('rounded-xl', isPinned && 'ring-2 ring-secondary')
+  const frameClass = clsx('rounded-xl', isPinned && 'ring-2 ring-secondary-foreground')
 
   const backgroundColor = isDark ? darkModeDisplayHex(data.style.backgroundColor) || undefined : data.style.backgroundColor
   const strokeColor = isDark ? darkModeDisplayHex(data.style.strokeColor) || undefined : data.style.strokeColor

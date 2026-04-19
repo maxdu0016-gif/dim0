@@ -150,7 +150,7 @@ export const WidgetNode = memo(function WidgetNode({
               }
             }}
             onPointerDown={(event) => event.stopPropagation()}
-            className="nodrag w-full bg-transparent border-0 border-b border-foreground/30 focus:border-secondary focus:outline-none px-0 py-0.5 text-center text-sm font-medium text-foreground"
+            className="nodrag w-full bg-transparent border-0 border-b border-foreground/30 focus:border-secondary-foreground focus:outline-none px-0 py-0.5 text-center text-sm font-medium text-foreground"
             placeholder="Untitled widget"
           />
         ) : (

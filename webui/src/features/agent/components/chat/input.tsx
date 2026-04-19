@@ -376,7 +376,7 @@ export const InputBar = ({
         <DialogContent className="sm:max-w-[560px]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <HugeiconsIcon icon={Alert02Icon} className="size-5 shrink-0 text-secondary" strokeWidth={2} />
+              <HugeiconsIcon icon={Alert02Icon} className="size-5 shrink-0 text-secondary-foreground" strokeWidth={2} />
               <span>{limitDialogCopy?.title}</span>
             </DialogTitle>
             <DialogDescription className="text-sm leading-7 text-foreground/80">

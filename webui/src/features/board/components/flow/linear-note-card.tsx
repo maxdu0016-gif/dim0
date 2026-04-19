@@ -113,8 +113,8 @@ export function LinearNoteCard({ node }: Props) {
     'transition rounded-lg relative bg-background overflow-hidden transition-all duration-200 group sticky-note-shadow paper-note-texture p-0.5',
     usesHostedSurface && boardCanEdit && 'cursor-pointer',
     isPinned
-      ? 'ring-2 ring-secondary/60'
-      : 'hover:ring-2 hover:ring-secondary/40'
+      ? 'ring-2 ring-secondary-foreground/60'
+      : 'hover:ring-2 hover:ring-secondary-foreground/40'
   )
 
   const CardBody = useMemo(() => (
@@ -167,7 +167,7 @@ export function LinearNoteCard({ node }: Props) {
             title='Pin/Unpin'
           >
             {isPinned
-              ? <HugeiconsIcon icon={PinIcon} className='w-4 h-4 text-secondary' strokeWidth={2} />
+              ? <HugeiconsIcon icon={PinIcon} className='w-4 h-4 text-secondary-foreground' strokeWidth={2} />
               : <HugeiconsIcon icon={PinOffIcon} className='w-4 h-4' strokeWidth={2} />
             }
           </button>
@@ -265,7 +265,7 @@ export function LinearNoteCard({ node }: Props) {
               }
             }}
             onClick={e => e.stopPropagation()}
-            className='w-full bg-transparent text-center text-sm font-semibold text-foreground border-0 border-b border-foreground/30 focus:border-secondary focus:outline-none px-0 py-0.5'
+            className='w-full bg-transparent text-center text-sm font-semibold text-foreground border-0 border-b border-foreground/30 focus:border-secondary-foreground focus:outline-none px-0 py-0.5'
             placeholder='Untitled note'
           />
         ) : (

@@ -140,7 +140,7 @@ export function LinePlacementOverlay({
             y1={line.y1}
             x2={line.x2}
             y2={line.y2}
-            stroke="var(--secondary)"
+            stroke="var(--secondary-foreground)"
             strokeWidth={2}
             strokeDasharray="6 4"
           />

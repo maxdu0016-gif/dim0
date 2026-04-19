@@ -69,7 +69,7 @@ export function VerifyEmailPage() {
       <Card className="bg-card text-card-foreground border border-border shadow-xl">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl flex items-center justify-center gap-2">
-            <MailCheck className="h-6 w-6 text-secondary" />
+            <MailCheck className="h-6 w-6 text-secondary-foreground" />
             Verify your email
           </CardTitle>
           <CardDescription className="text-muted-foreground">

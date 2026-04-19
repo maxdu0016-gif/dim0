@@ -88,7 +88,7 @@ export const ViewportControls = memo(function ViewportControls({
               className={controlButtonClass}
               aria-label='Reset zoom to 100%'
             >
-              <span className='text-xs font-medium text-secondary min-w-[2.4rem] text-center'>
+              <span className='text-xs font-medium text-secondary-foreground min-w-[2.4rem] text-center'>
                 {Math.round((zoom || 1) * 100)}%
               </span>
             </Button>
@@ -157,7 +157,7 @@ export const ViewportControls = memo(function ViewportControls({
               <PopoverTrigger asChild>
                 <Button variant={null} size='icon' type='button' className={controlButtonClass} aria-label='Board background'>
                   <span
-                    className='w-4 h-4 rounded-full border-2 border-secondary/50'
+                    className='w-4 h-4 rounded-full border-2 border-secondary-foreground/50'
                     style={{
                       backgroundColor: applyBackgroundAlpha(
                         isDark ? darkModeDisplayHex(boardBackground) || boardBackground : boardBackground,
@@ -215,7 +215,7 @@ export const ViewportControls = memo(function ViewportControls({
                   className={clsx(
                     'h-7 w-7 rounded-md text-[8px] font-medium transition-colors flex items-center justify-center',
                     option.value === boardBackgroundTexture
-                      ? 'bg-sidebar-primary text-secondary'
+                      ? 'bg-sidebar-primary text-secondary-foreground'
                       : 'bg-muted text-muted-foreground/50 hover:bg-muted/70'
                   )}
                   onClick={() => onBoardBackgroundTextureChange(option.value)}

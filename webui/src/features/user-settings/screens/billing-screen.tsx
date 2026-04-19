@@ -248,10 +248,10 @@ export function BillingScreen() {
             </CardContent>
           </Card>
 
-          <Card className="relative border-secondary/60 bg-gradient-to-br from-secondary/20 via-secondary/10 to-card">
+          <Card className="relative border-secondary-foreground/60 bg-gradient-to-br from-secondary-foreground/20 via-secondary-foreground/10 to-card">
             <CardHeader>
               <div className="flex items-center gap-2">
-                <HugeiconsIcon icon={Crown03Icon} className="h-6 w-6 text-secondary" strokeWidth={2} />
+                <HugeiconsIcon icon={Crown03Icon} className="h-6 w-6 text-secondary-foreground" strokeWidth={2} />
                 <CardTitle className="text-4xl font-informal">Plus</CardTitle>
                 {userPlan === "plus" ? (
                   <Badge variant="outline" className="w-fit bg-background/40 font-mono font-medium uppercase tracking-wide">

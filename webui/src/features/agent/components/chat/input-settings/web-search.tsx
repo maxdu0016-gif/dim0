@@ -74,7 +74,7 @@ export const SearchEngineChoiceMenu = () => {
 
   const iconClass = clsx(
     "size-4 shrink-0 my-icon",
-    enabledTools.includes("web_search") ? '!text-secondary' : ''
+    enabledTools.includes("web_search") ? '!text-secondary-foreground' : ''
   )
 
   const defaultValue = enabledTools.includes("web_search") ? webSearchEngine : "-1"

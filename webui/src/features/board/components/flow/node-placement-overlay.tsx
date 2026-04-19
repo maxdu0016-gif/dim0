@@ -200,7 +200,7 @@ export function NodePlacementOverlay({
     >
       {preview && (
         <div
-          className="absolute border-2 border-dashed border-secondary/80 bg-secondary/10 pointer-events-none"
+          className="absolute border-2 border-dashed border-secondary-foreground/80 bg-secondary-foreground/10 pointer-events-none"
           style={{
             left: preview.x,
             top: preview.y,

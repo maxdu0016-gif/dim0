@@ -92,8 +92,8 @@ export const TopBar = memo(function TopBar({
   const currentFolderDepth = useGraphStore(state => state.currentFolderDepth)
   const maxFolderDepth = useGraphStore(state => state.maxFolderDepth)
   const isAtMaxFolderDepth = currentFolderDepth >= maxFolderDepth
-  const normalButtonClass = 'transition-colors text-card-foreground hover:bg-sidebar-primary hover:text-sidebar-primary-foreground !p-2.5 rounded-lg flex items-center justify-center gap-2'
-  const activeButtonClass = clsx(normalButtonClass, 'bg-sidebar-primary text-secondary')
+  const normalButtonClass = 'transition-colors text-card-foreground hover:bg-secondary hover:text-secondary-foreground !p-2.5 rounded-lg flex items-center justify-center gap-2'
+  const activeButtonClass = clsx(normalButtonClass, 'bg-secondary text-secondary-foreground')
   const [openShareDialog, setOpenShareDialog] = useState(false)
   const [isUpdatingSharing, setIsUpdatingSharing] = useState(false)
   const [shareError, setShareError] = useState<string | null>(null)
@@ -386,7 +386,7 @@ export const TopBar = memo(function TopBar({
                 <span>Widget</span>
               </DropdownMenuItem>
               <DropdownMenuItem onSelect={() => setOpenAiSpark(true)} className='gap-2 text-sm' disabled={!boardId}>
-                <Sparkles className='size-4 shrink-0 text-secondary' strokeWidth={2} />
+                <Sparkles className='size-4 shrink-0 text-secondary-foreground' strokeWidth={2} />
                 <span>AI actions</span>
                 <DropdownMenuShortcut>B</DropdownMenuShortcut>
               </DropdownMenuItem>

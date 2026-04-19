@@ -161,7 +161,7 @@ export const WidgetDialog = memo(function WidgetDialog({
                       stopTitleEdit(false)
                     }
                   }}
-                  className="w-full bg-transparent text-sm font-semibold text-foreground border-0 border-b border-foreground/30 focus:border-secondary focus:outline-none px-0 py-0.5"
+                  className="w-full bg-transparent text-sm font-semibold text-foreground border-0 border-b border-foreground/30 focus:border-secondary-foreground focus:outline-none px-0 py-0.5"
                   placeholder="Untitled widget"
                 />
               ) : (

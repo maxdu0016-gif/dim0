@@ -36,7 +36,7 @@ export const MemorySearchChoiceMenu = ({ available = true }: { available?: boole
   )
   const iconClass = clsx(
     "size-4 shrink-0",
-    available && isEnabled ? "text-secondary" : "text-muted-foreground"
+    available && isEnabled ? "text-secondary-foreground" : "text-muted-foreground"
   )
 
   return (
