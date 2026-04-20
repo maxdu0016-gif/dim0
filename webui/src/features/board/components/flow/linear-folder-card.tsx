@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { DeleteIcon, FolderTreeIcon } from '@/components/icons'
+import { DeleteIcon, FolderIcon } from '@/components/icons'
 
 import type { NoteNode } from '../../types/flow'
 import { useGraphStore } from '../../store/graph-store'
@@ -98,7 +98,7 @@ export const LinearFolderCard = memo(function LinearFolderCard({ node }: Props) 
         className='w-full min-h-[100px] max-h-[225px] rounded-md border-2 border-transparent bg-transparent transition-colors group-hover:bg-accent group-hover:border-border flex items-center justify-center p-3'
       >
         <div className='flex w-full max-w-[92px] aspect-square items-center justify-center rounded-2xl border border-border/70 bg-background text-muted-foreground shadow-sm'>
-          <FolderTreeIcon className='size-12 shrink-0' strokeWidth={1.8} />
+          <FolderIcon className='size-12 shrink-0' strokeWidth={1.8} />
         </div>
       </button>
 

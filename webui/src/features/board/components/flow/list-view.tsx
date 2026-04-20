@@ -3,10 +3,10 @@ import { useNavigate } from '@tanstack/react-router'
 import {
   ConsoleIcon,
   DeleteIcon,
-  FolderTreeIcon,
+  FolderIcon,
   LearnWidgetIcon,
+  NotepadIcon,
   PdfIcon,
-  WriteNoteStarterIcon,
   type AppIconComponent,
 } from '@/components/icons'
 
@@ -63,7 +63,7 @@ function useListRowMeta(node: NoteNode): ListRowMeta {
 
   if (node.data?.style?.type === 'folder') {
     return {
-      icon: FolderTreeIcon,
+      icon: FolderIcon,
       label: node.data.label?.markdown?.trim() || 'Untitled folder',
       onOpen: boardId
         ? () => {
@@ -101,7 +101,7 @@ function useListRowMeta(node: NoteNode): ListRowMeta {
   }
 
   return {
-    icon: WriteNoteStarterIcon,
+    icon: NotepadIcon,
     label: node.data.label?.markdown?.trim() || 'Untitled note',
     onOpen: boardCanEdit ? () => openNodeSurface(node.id, 'sheet') : undefined,
   }
@@ -135,11 +135,11 @@ const ListRow = memo(function ListRow({ node, index, isLast }: ListRowProps) {
         {!isLast ? (
           <div className='absolute left-5 top-1/2 bottom-0 w-px bg-border/80 transition-colors group-hover:bg-foreground/45' />
         ) : null}
-        <div className='absolute left-5 top-1/2 h-4 w-4 -translate-y-1/2 rounded-bl-2xl border-b border-l border-border/80 transition-colors group-hover:border-foreground/45' />
+        <div className='absolute left-5 top-1/2 h-4 w-4 -translate-y-1/2 rounded-bl-md border-b border-l border-border/80 transition-colors group-hover:border-foreground/45' />
       </div>
 
       <div
-        className='select-none flex min-h-11 items-center gap-3 rounded-lg border border-transparent px-3 py-2 transition-colors group-hover:border-border/70 group-hover:bg-accent/30'
+        className='select-none flex min-h-11 items-center gap-3 rounded-md border border-transparent px-3 py-2 transition-colors group-hover:border-border/70 group-hover:bg-accent/30'
         onMouseDown={event => {
           if (event.detail > 1) {
             event.preventDefault()

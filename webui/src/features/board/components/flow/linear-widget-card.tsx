@@ -1,7 +1,8 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import clsx from 'clsx'
 
-import { ChartBar, Trash } from '@phosphor-icons/react'
+import { Trash } from '@phosphor-icons/react'
+import { LearnWidgetIcon } from '@/components/icons'
 
 import { useGraphStore } from '../../store/graph-store'
 import type { NoteNode } from '../../types/flow'
@@ -105,7 +106,7 @@ export const LinearWidgetCard = memo(function LinearWidgetCard({ node }: Props) 
         )}
       >
         <div className='flex w-full max-w-[92px] aspect-square items-center justify-center rounded-2xl border border-border/70 bg-background text-muted-foreground shadow-sm'>
-          <ChartBar className='size-12 shrink-0' />
+          <LearnWidgetIcon className='size-12 shrink-0' />
         </div>
       </button>
 

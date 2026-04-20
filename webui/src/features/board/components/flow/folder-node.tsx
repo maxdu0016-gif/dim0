@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { FolderTreeIcon } from "@/components/icons"
+import { FolderIcon } from "@/components/icons"
 import type { NoteNode } from "../../types/flow"
 import { useGraphStore } from "../../store/graph-store"
 import { useTheme } from "@/components/theme-provider"
@@ -81,7 +81,7 @@ export const FolderNode = memo(function FolderNode({ id, data }: FolderNodeProps
   return (
     <div className="relative w-full h-full">
       <div className="flex h-full w-full items-center justify-center">
-        <FolderTreeIcon
+        <FolderIcon
           className="h-full w-full"
           strokeWidth={1.8}
           color={displayStrokeColor}

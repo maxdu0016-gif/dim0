@@ -1,31 +1,36 @@
 import { memo, useState } from 'react'
-import {
-  ChartBar,
-  Circle,
-  CirclesFour,
-  Cursor,
-  Diamond,
-  DotsThree,
-  FileCode,
-  FileDoc,
-  FolderPlus,
-  Graph,
-  Hand,
-  HandGrabbing,
-  Images,
-  List,
-  Note,
-  Path,
-  PresentationChart,
-  PuzzlePiece,
-  Shapes,
-  Square,
-  SquaresFour,
-  Tag,
-  TextT,
-} from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
-import { ChatHistoryIcon, ChevronDownIcon, LayerStackIcon, ShareIcon, SparklesIcon, WeatherCloudIcon } from '@/components/icons'
+import {
+  ChatHistoryIcon,
+  ChevronDownIcon,
+  CircleClusterIcon,
+  CircleShapeIcon,
+  CodeFileIcon,
+  ConnectorPathIcon,
+  CursorSelectIcon,
+  DiamondShapeIcon,
+  DocumentFileIcon,
+  EllipsisIcon,
+  FolderPlusActionIcon,
+  GraphViewIcon,
+  GridViewIcon,
+  HandGrabIcon,
+  HandPanIcon,
+  ImageStackIcon,
+  LayerStackIcon,
+  LearnWidgetIcon,
+  ListViewIcon,
+  NotepadIcon,
+  PresentationIcon,
+  PuzzlePieceIcon,
+  ShapesMenuIcon,
+  ShareIcon,
+  SparklesIcon,
+  SquareShapeIcon,
+  TagIcon,
+  TextTIcon,
+  WeatherCloudIcon,
+} from '@/components/icons'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuShortcut, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Separator } from '@/components/ui/separator'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -118,16 +123,16 @@ export const TopBar = memo(function TopBar({
   )
 
   const shapeOptions: { nodeType: NodeType; label: string; icon: React.ReactNode; shortcut?: string }[] = [
-    { nodeType: 'rectangle', label: 'Rectangle', icon: <Square className='size-4 shrink-0' /> , shortcut: 'R' },
+    { nodeType: 'rectangle', label: 'Rectangle', icon: <SquareShapeIcon className='size-4 shrink-0' /> , shortcut: 'R' },
     { nodeType: 'layered-rectangle', label: 'Layered card', icon: <LayerStackIcon className='w-4 h-4 shrink-0' /> },
-    { nodeType: 'ellipse', label: 'Ellipse', icon: <Circle className='size-4 shrink-0' />, shortcut: 'O' },
-    { nodeType: 'diamond', label: 'Diamond', icon: <Diamond className='size-4 shrink-0' />, shortcut: 'D' },
-    { nodeType: 'soft-diamond', label: 'Double diamond', icon: <Diamond className='size-4 shrink-0' />, shortcut: 'D' },
+    { nodeType: 'ellipse', label: 'Ellipse', icon: <CircleShapeIcon className='size-4 shrink-0' />, shortcut: 'O' },
+    { nodeType: 'diamond', label: 'Diamond', icon: <DiamondShapeIcon className='size-4 shrink-0' />, shortcut: 'D' },
+    { nodeType: 'soft-diamond', label: 'Double diamond', icon: <DiamondShapeIcon className='size-4 shrink-0' />, shortcut: 'D' },
     { nodeType: 'layered-diamond', label: 'Layered diamond', icon: <LayerStackIcon className='w-4 h-4 shrink-0' /> },
-    { nodeType: 'layered-circle', label: 'Layered circle', icon: <CirclesFour className='size-4 shrink-0' /> },
-    { nodeType: 'tag', label: 'Tag', icon: <Tag className='size-4 shrink-0' /> },
+    { nodeType: 'layered-circle', label: 'Layered circle', icon: <CircleClusterIcon className='size-4 shrink-0' /> },
+    { nodeType: 'tag', label: 'Tag', icon: <TagIcon className='size-4 shrink-0' /> },
     { nodeType: 'thought-cloud', label: 'Cloud', icon: <WeatherCloudIcon className='w-4 h-4 shrink-0' /> },
-    { nodeType: 'capsule', label: 'Capsule', icon: <Tag className='size-4 shrink-0' /> },
+    { nodeType: 'capsule', label: 'Capsule', icon: <TagIcon className='size-4 shrink-0' /> },
   ]
 
   const tooltipCopy = {
@@ -189,10 +194,10 @@ export const TopBar = memo(function TopBar({
             <DropdownMenuTrigger asChild>
               <Button variant={null} size='default' className={activeButtonClass}>
                 {viewMode === 'graph'
-                  ? <Graph className='size-4 shrink-0' />
+                  ? <GraphViewIcon className='size-4 shrink-0' />
                   : viewMode === 'linear'
-                    ? <SquaresFour className='size-4 shrink-0' />
-                    : <List className='size-4 shrink-0' />
+                    ? <GridViewIcon className='size-4 shrink-0' />
+                    : <ListViewIcon className='size-4 shrink-0' />
                 }
                 <span className='sr-only md:not-sr-only text-[10px]'>{currentViewLabel}</span>
                 <ChevronDownIcon className='hidden size-3 shrink-0 text-muted-foreground md:block' />
@@ -203,15 +208,15 @@ export const TopBar = memo(function TopBar({
         </Tooltip>
         <DropdownMenuContent align='start' side='bottom' sideOffset={8} className='min-w-[160px]'>
           <DropdownMenuItem onSelect={() => setViewMode('graph')} className='gap-2 text-sm'>
-            <Graph className='size-4 shrink-0' />
+            <GraphViewIcon className='size-4 shrink-0' />
             <span>Board</span>
           </DropdownMenuItem>
           <DropdownMenuItem onSelect={() => setViewMode('linear')} className='gap-2 text-sm'>
-            <SquaresFour className='size-4 shrink-0' />
+            <GridViewIcon className='size-4 shrink-0' />
             <span>Files</span>
           </DropdownMenuItem>
           <DropdownMenuItem onSelect={() => setViewMode('list')} className='gap-2 text-sm'>
-            <List className='size-4 shrink-0' />
+            <ListViewIcon className='size-4 shrink-0' />
             <span>List</span>
           </DropdownMenuItem>
         </DropdownMenuContent>
@@ -226,8 +231,8 @@ export const TopBar = memo(function TopBar({
               <Button variant={null} size='icon' onClick={() => setEnableSelection(!enableSelection)} className={enableSelection ? normalButtonClass : activeButtonClass} aria-label='Pan mode'>
                 <div className='relative'>
                   {enableSelection
-                    ? <Hand className='size-4 shrink-0' />
-                    : <HandGrabbing className='size-4 shrink-0' />
+                    ? <HandPanIcon className='size-4 shrink-0' />
+                    : <HandGrabIcon className='size-4 shrink-0' />
                   }
                   {renderButtonShortcut('P')}
                 </div>
@@ -239,7 +244,7 @@ export const TopBar = memo(function TopBar({
             <TooltipTrigger asChild>
               <Button variant={null} size='icon' onClick={() => setEnableSelection(!enableSelection)} className={enableSelection ? activeButtonClass : normalButtonClass} aria-label='Selection mode'>
                 <div className='relative'>
-                  <Cursor className='size-4 shrink-0' />
+                  <CursorSelectIcon className='size-4 shrink-0' />
                   {renderButtonShortcut('V')}
                 </div>
               </Button>
@@ -255,7 +260,7 @@ export const TopBar = memo(function TopBar({
                 <DropdownMenuTrigger asChild>
                   <Button variant={null} className={normalButtonClass} size='icon' aria-label='Add shape'>
                     <div className='flex flex-col items-center gap-0.5 relative'>
-                      <Shapes className='size-4 shrink-0' />
+                      <ShapesMenuIcon className='size-4 shrink-0' />
                       {renderButtonShortcut('S')}
                       <ChevronDownIcon className='absolute inset-x-0 -bottom-3.5 w-3 h-3 text-muted-foreground' />
                     </div>
@@ -279,7 +284,7 @@ export const TopBar = memo(function TopBar({
             <TooltipTrigger asChild>
               <Button variant={null} className={normalButtonClass} size='icon' onClick={onAddLine} aria-label='Add connector'>
                 <div className='relative'>
-                  <Path className='size-4 shrink-0' />
+                  <ConnectorPathIcon className='size-4 shrink-0' />
                   {renderButtonShortcut('A')}
                 </div>
               </Button>
@@ -291,7 +296,7 @@ export const TopBar = memo(function TopBar({
             <TooltipTrigger asChild>
               <Button variant={null} className={normalButtonClass} size='icon' onClick={() => onAddNode({ nodeType: 'text' })} aria-label='Add point text'>
                 <div className='relative'>
-                  <TextT className='size-4 shrink-0' />
+                  <TextTIcon className='size-4 shrink-0' />
                   {renderButtonShortcut('T')}
                 </div>
               </Button>
@@ -309,7 +314,7 @@ export const TopBar = memo(function TopBar({
                 aria-label='Add sticky note'
               >
                 <div className='relative'>
-                  <Note className='size-4 shrink-0' />
+                  <NotepadIcon className='size-4 shrink-0' />
                   {renderButtonShortcut('N')}
                 </div>
               </Button>
@@ -330,7 +335,7 @@ export const TopBar = memo(function TopBar({
                 disabled={!boardId}
               >
                 <div className='relative'>
-                  <PresentationChart className='size-4 shrink-0' />
+                  <PresentationIcon className='size-4 shrink-0' />
                   {renderButtonShortcut('M')}
                 </div>
               </Button>
@@ -343,7 +348,7 @@ export const TopBar = memo(function TopBar({
               <TooltipTrigger asChild>
                 <DropdownMenuTrigger asChild>
                   <Button variant={null} className={normalButtonClass} size='icon' aria-label='More actions'>
-                    <DotsThree className='size-4 shrink-0' />
+                    <EllipsisIcon className='size-4 shrink-0' />
                   </Button>
                 </DropdownMenuTrigger>
               </TooltipTrigger>
@@ -351,12 +356,12 @@ export const TopBar = memo(function TopBar({
             </Tooltip>
             <DropdownMenuContent align='end' side='bottom' sideOffset={8} className='min-w-[190px]'>
               <DropdownMenuItem onSelect={() => setOpenIconSearch(true)} className='gap-2 text-sm'>
-                <PuzzlePiece className='size-4 shrink-0' />
+                <PuzzlePieceIcon className='size-4 shrink-0' />
                 <span>Icons</span>
                 <DropdownMenuShortcut>G</DropdownMenuShortcut>
               </DropdownMenuItem>
               <DropdownMenuItem onSelect={() => setOpenImageSearch(true)} className='gap-2 text-sm'>
-                <Images className='size-4 shrink-0' />
+                <ImageStackIcon className='size-4 shrink-0' />
                 <span>Images</span>
                 <DropdownMenuShortcut>I</DropdownMenuShortcut>
               </DropdownMenuItem>
@@ -367,20 +372,20 @@ export const TopBar = memo(function TopBar({
                 }}
                 className={clsx('gap-2 text-sm', isAtMaxFolderDepth && 'opacity-50')}
               >
-                <FolderPlus className='size-4 shrink-0' />
+                <FolderPlusActionIcon className='size-4 shrink-0' />
                 <span>Sub-board</span>
               </DropdownMenuItem>
               <DropdownMenuItem onSelect={() => setOpenDocumentUpload(true)} className='gap-2 text-sm' disabled={!boardId || documentUploadLimited}>
-                <FileDoc className='size-4 shrink-0' />
+                <DocumentFileIcon className='size-4 shrink-0' />
                 <span>Document</span>
               </DropdownMenuItem>
               <DropdownMenuItem onSelect={() => onAddNode({ nodeType: 'code-sandbox' })} className='gap-2 text-sm'>
-                <FileCode className='size-4 shrink-0' />
+                <CodeFileIcon className='size-4 shrink-0' />
                 <span>Code sandbox</span>
                 <DropdownMenuShortcut>Y</DropdownMenuShortcut>
               </DropdownMenuItem>
               <DropdownMenuItem onSelect={() => onAddNode({ nodeType: 'widget' })} className='gap-2 text-sm'>
-                <ChartBar className='size-4 shrink-0' />
+                <LearnWidgetIcon className='size-4 shrink-0' />
                 <span>Widget</span>
               </DropdownMenuItem>
               <DropdownMenuItem onSelect={() => setOpenAiSpark(true)} className='gap-2 text-sm' disabled={!boardId}>
@@ -404,7 +409,7 @@ export const TopBar = memo(function TopBar({
                 onClick={() => onAddNode({ nodeType: 'sheet' })}
                 aria-label='Add sticky note'
               >
-                <Note className='size-4 shrink-0' />
+                <NotepadIcon className='size-4 shrink-0' />
               </Button>
             </TooltipTrigger>
             <TooltipContent side='bottom' sideOffset={10}>{tooltipCopy.note}</TooltipContent>
@@ -422,7 +427,7 @@ export const TopBar = memo(function TopBar({
                 }}
                 aria-label='Add folder'
               >
-                <FolderPlus className='size-4 shrink-0' />
+                <FolderPlusActionIcon className='size-4 shrink-0' />
               </Button>
             </TooltipTrigger>
             <TooltipContent side='bottom' sideOffset={10}>{tooltipCopy.folder}</TooltipContent>
@@ -437,7 +442,7 @@ export const TopBar = memo(function TopBar({
                 aria-label='Upload document'
                 disabled={!boardId || documentUploadLimited}
               >
-                <FileDoc className='size-4 shrink-0' />
+                <DocumentFileIcon className='size-4 shrink-0' />
               </Button>
             </TooltipTrigger>
             <TooltipContent side='bottom' sideOffset={10}>{tooltipCopy.document}</TooltipContent>
@@ -451,7 +456,7 @@ export const TopBar = memo(function TopBar({
                 onClick={() => onAddNode({ nodeType: 'code-sandbox' })}
                 aria-label='Add code sandbox'
               >
-                <FileCode className='size-4 shrink-0' />
+                <CodeFileIcon className='size-4 shrink-0' />
               </Button>
             </TooltipTrigger>
             <TooltipContent side='bottom' sideOffset={10}>Code snippet</TooltipContent>
@@ -465,7 +470,7 @@ export const TopBar = memo(function TopBar({
                 onClick={() => onAddNode({ nodeType: 'widget' })}
                 aria-label='Add widget'
               >
-                <ChartBar className='size-4 shrink-0' />
+                <LearnWidgetIcon className='size-4 shrink-0' />
               </Button>
             </TooltipTrigger>
             <TooltipContent side='bottom' sideOffset={10}>Widget</TooltipContent>
