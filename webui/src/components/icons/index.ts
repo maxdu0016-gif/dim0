@@ -1,6 +1,7 @@
 export {
   AddIcon,
   AlertIcon,
+  ArticleSummaryIcon,
   ArrowCollapseIcon,
   ArrowExpandIcon,
   ArrowRevealIcon,
@@ -38,6 +39,7 @@ export {
   DownloadIcon,
   DragHandleIcon,
   DragGripIcon,
+  DrawIcon,
   EditIcon,
   EditNoteIcon,
   EllipsisIcon,

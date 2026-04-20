@@ -3,7 +3,16 @@ import type { ReactFlowProps } from '@xyflow/react'
 import { Clipboard, StackMinus, StackPlus } from '@phosphor-icons/react'
 
 import type { LinkEdge, NoteNode } from '../../types/flow'
-import { ChevronDownIcon, ChevronRightIcon, SparklesIcon, ChatTranslateIcon as ChatTranslateSharedIcon } from '@/components/icons'
+import {
+  ArticleSummaryIcon,
+  ChatTranslateIcon as ChatTranslateSharedIcon,
+  ChevronDownIcon,
+  ChevronRightIcon,
+  DrawIcon,
+  SchemaMapIcon,
+  SparklesIcon,
+  TreeMapIcon,
+} from '@/components/icons'
 import { useGraphStore } from '../../store/graph-store'
 import { buildContextTextFromNodes } from '../../utils/context-text'
 import { toast } from 'sonner'
@@ -373,11 +382,11 @@ export function GraphContextMenu({ nodes, setNodesPersist, children }: GraphCont
                       onClick={() => handleAiAction(action.key)}
                     disabled={!!processingKey}
                   >
-                    {action.key === 'summarize' ? <Clipboard className='size-4 text-secondary-foreground' /> : null}
-                    {action.key === 'mapify' ? <StackPlus className='size-4 text-secondary-foreground' /> : null}
-                    {action.key === 'schemify' ? <StackMinus className='size-4 text-secondary-foreground' /> : null}
+                    {action.key === 'summarize' ? <ArticleSummaryIcon className='size-4 text-secondary-foreground' /> : null}
+                    {action.key === 'mapify' ? <TreeMapIcon className='size-4 text-secondary-foreground' /> : null}
+                    {action.key === 'schemify' ? <SchemaMapIcon className='size-4 text-secondary-foreground' /> : null}
                     {action.key === 'quizify' ? <Clipboard className='size-4 text-secondary-foreground' /> : null}
-                    {action.key === 'drawify' ? <SparklesIcon className='size-4 text-secondary-foreground' /> : null}
+                    {action.key === 'drawify' ? <DrawIcon className='size-4 text-secondary-foreground' /> : null}
                     {action.key === 'explain' ? <SparklesIcon className='size-4 text-secondary-foreground' /> : null}
                       <span>{action.label}</span>
                       {action.key === 'drawify' && (

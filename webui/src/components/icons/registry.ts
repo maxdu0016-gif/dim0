@@ -1,9 +1,9 @@
 import { Claude, DeepSeek, Exa, Gemini, Mistral, Moonshot, OpenAI, Perplexity, Qwen, Tavily, ZAI } from "@lobehub/icons"
 import {
+  ArticleIcon,
   ArrowsClockwiseIcon,
   ArrowsOutSimpleIcon,
   ArrowSquareOutIcon,
-  BrainIcon,
   CardsThreeIcon,
   CaretDownIcon,
   CaretLeftIcon,
@@ -15,6 +15,7 @@ import {
   CheckCircleIcon,
   CheckIcon as CheckmarkGlyphIcon,
   CircleIcon,
+  CircuitryIcon,
   ClockIcon as ClockGlyphIcon,
   CloudFogIcon,
   CloudIcon,
@@ -59,6 +60,7 @@ import {
   PaintBrushIcon,
   PaperPlaneRightIcon,
   PencilIcon,
+  PentagramIcon,
   PlusIcon as PlusGlyphIcon,
   PresentationChartIcon,
   ProjectorScreenChartIcon,
@@ -97,6 +99,7 @@ import type { AppIconComponent, AppIconName } from "./types"
 
 export const AddIcon = createPhosphorIcon(PlusGlyphIcon)
 export const AlertIcon = createPhosphorIcon(WarningCircleIcon)
+export const ArticleSummaryIcon = createPhosphorIcon(ArticleIcon)
 export const ArrowCollapseIcon = createPhosphorIcon(CaretDownIcon)
 export const ArrowExpandIcon = createPhosphorIcon(CaretRightIcon)
 export const ArrowRevealIcon = createPhosphorIcon(CaretUpIcon)
@@ -131,6 +134,7 @@ export const DocumentIcon = createPhosphorIcon(FileDocIcon)
 export const DownloadIcon = createPhosphorIcon(ArrowSquareOutIcon)
 export const DragHandleIcon = createPhosphorIcon(ArrowsOutSimpleIcon)
 export const DragGripIcon = createPhosphorIcon(DotsSixVerticalIcon)
+export const DrawIcon = createPhosphorIcon(PentagramIcon)
 export const EditIcon = createPhosphorIcon(PencilIcon)
 export const EditNoteIcon = createPhosphorIcon(PencilIcon)
 export const EllipsisIcon = createPhosphorIcon(DotsThreeIcon)
@@ -161,7 +165,7 @@ export const LayoutIcon = createPhosphorIcon(SquaresFourIcon)
 export const MailCheckIcon = createPhosphorIcon(EnvelopeIcon)
 export const MailIcon = createPhosphorIcon(EnvelopeIcon)
 export const MapPinIcon = createPhosphorIcon(MapPinGlyphIcon)
-export const MemorySearchIcon = createPhosphorIcon(BrainIcon)
+export const MemorySearchIcon = createPhosphorIcon(CircuitryIcon)
 export const MistralBrandIcon = createReactIcon(Mistral.Color)
 export const MinusIcon = createPhosphorIcon(MinusGlyphIcon)
 export const MonitorIcon = createPhosphorIcon(MonitorGlyphIcon)
