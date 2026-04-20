@@ -1,3 +1,4 @@
+import { useEditorState } from "@tiptap/react"
 import type { Editor } from "@tiptap/react"
 import { BubbleMenu } from "@tiptap/react/menus"
 import {
@@ -46,6 +47,22 @@ function BDivider() {
 }
 
 export function EditorBubbleMenu({ editor }: Props) {
+  const s = useEditorState({
+    editor,
+    selector: (ctx) => ({
+      isBold: ctx.editor.isActive("bold"),
+      isItalic: ctx.editor.isActive("italic"),
+      isUnderline: ctx.editor.isActive("underline"),
+      isStrike: ctx.editor.isActive("strike"),
+      isCode: ctx.editor.isActive("code"),
+      isLink: ctx.editor.isActive("link"),
+      isBlockquote: ctx.editor.isActive("blockquote"),
+      isH1: ctx.editor.isActive("heading", { level: 1 }),
+      isH2: ctx.editor.isActive("heading", { level: 2 }),
+      isH3: ctx.editor.isActive("heading", { level: 3 }),
+    }),
+  })
+
   return (
     <BubbleMenu
       editor={editor}
@@ -58,28 +75,28 @@ export function EditorBubbleMenu({ editor }: Props) {
       {/* ── marks ────────────────────────────────────────────── */}
       <BBtn
         tooltip="Bold"
-        active={editor.isActive("bold")}
+        active={s.isBold}
         onClick={() => editor.chain().focus().toggleBold().run()}
       >
         <TextB size={14} weight="bold" />
       </BBtn>
       <BBtn
         tooltip="Italic"
-        active={editor.isActive("italic")}
+        active={s.isItalic}
         onClick={() => editor.chain().focus().toggleItalic().run()}
       >
         <TextItalic size={14} />
       </BBtn>
       <BBtn
         tooltip="Underline"
-        active={editor.isActive("underline")}
+        active={s.isUnderline}
         onClick={() => editor.chain().focus().toggleUnderline().run()}
       >
         <TextUnderline size={14} />
       </BBtn>
       <BBtn
         tooltip="Strikethrough"
-        active={editor.isActive("strike")}
+        active={s.isStrike}
         onClick={() => editor.chain().focus().toggleStrike().run()}
       >
         <TextStrikethrough size={14} />
@@ -90,21 +107,21 @@ export function EditorBubbleMenu({ editor }: Props) {
       {/* ── headings ─────────────────────────────────────────── */}
       <BBtn
         tooltip="Heading 1"
-        active={editor.isActive("heading", { level: 1 })}
+        active={s.isH1}
         onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
       >
         <span className="font-sans text-[11px] font-bold leading-none">H1</span>
       </BBtn>
       <BBtn
         tooltip="Heading 2"
-        active={editor.isActive("heading", { level: 2 })}
+        active={s.isH2}
         onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
       >
         <span className="font-sans text-[11px] font-bold leading-none">H2</span>
       </BBtn>
       <BBtn
         tooltip="Heading 3"
-        active={editor.isActive("heading", { level: 3 })}
+        active={s.isH3}
         onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
       >
         <span className="font-sans text-[11px] font-bold leading-none">H3</span>
@@ -115,21 +132,21 @@ export function EditorBubbleMenu({ editor }: Props) {
       {/* ── inline specials ───────────────────────────────────── */}
       <BBtn
         tooltip="Inline code"
-        active={editor.isActive("code")}
+        active={s.isCode}
         onClick={() => editor.chain().focus().toggleCode().run()}
       >
         <Code size={14} />
       </BBtn>
       <BBtn
         tooltip="Blockquote"
-        active={editor.isActive("blockquote")}
+        active={s.isBlockquote}
         onClick={() => editor.chain().focus().toggleBlockquote().run()}
       >
         <Quotes size={14} />
       </BBtn>
       <BBtn
         tooltip="Link"
-        active={editor.isActive("link")}
+        active={s.isLink}
         onClick={() => {
           if (editor.isActive("link")) {
             editor.chain().focus().unsetLink().run()

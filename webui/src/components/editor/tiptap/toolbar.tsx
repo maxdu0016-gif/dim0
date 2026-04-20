@@ -1,4 +1,6 @@
+import { useEditorState } from "@tiptap/react"
 import type { Editor } from "@tiptap/react"
+import { undoDepth, redoDepth } from "@tiptap/pm/history"
 import {
   ArrowCounterClockwise,
   ArrowClockwise,
@@ -88,20 +90,38 @@ function currentStyle(editor: Editor): string {
 }
 
 export function Toolbar({ editor }: Props) {
+  const s = useEditorState({
+    editor,
+    selector: (ctx) => ({
+      canUndo: undoDepth(ctx.editor.state) > 0,
+      canRedo: redoDepth(ctx.editor.state) > 0,
+      isBold: ctx.editor.isActive("bold"),
+      isItalic: ctx.editor.isActive("italic"),
+      isUnderline: ctx.editor.isActive("underline"),
+      isStrike: ctx.editor.isActive("strike"),
+      isCode: ctx.editor.isActive("code"),
+      isLink: ctx.editor.isActive("link"),
+      isBulletList: ctx.editor.isActive("bulletList"),
+      isOrderedList: ctx.editor.isActive("orderedList"),
+      isBlockquote: ctx.editor.isActive("blockquote"),
+      style: currentStyle(ctx.editor),
+    }),
+  })
+
   return (
     <div className="flex h-10 shrink-0 items-center gap-0.5 border-b border-border bg-sidebar px-2">
       {/* ── undo / redo ──────────────────────────────────────── */}
       <TBtn
         tooltip="Undo (Ctrl+Z)"
-        disabled={!editor.can().undo()}
-        onClick={() => editor.chain().focus().undo().run()}
+        disabled={!s.canUndo}
+        onClick={() => editor.commands.undo()}
       >
         <ArrowCounterClockwise size={16} />
       </TBtn>
       <TBtn
         tooltip="Redo (Ctrl+Y)"
-        disabled={!editor.can().redo()}
-        onClick={() => editor.chain().focus().redo().run()}
+        disabled={!s.canRedo}
+        onClick={() => editor.commands.redo()}
       >
         <ArrowClockwise size={16} />
       </TBtn>
@@ -115,21 +135,21 @@ export function Toolbar({ editor }: Props) {
             type="button"
             className="flex h-8 items-center gap-1 rounded-md px-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
-            <span className="font-sans">{currentStyle(editor)}</span>
+            <span className="font-sans">{s.style}</span>
             <CaretDown size={12} weight="bold" />
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="min-w-36 font-sans text-sm">
-          {STYLES.map((s) => (
+          {STYLES.map((st) => (
             <DropdownMenuItem
-              key={s.key}
+              key={st.key}
               onMouseDown={(e) => {
                 e.preventDefault()
-                s.action(editor)
+                st.action(editor)
               }}
-              className={cn(currentStyle(editor) === s.label && "bg-secondary text-secondary-foreground")}
+              className={cn(s.style === st.label && "bg-secondary text-secondary-foreground")}
             >
-              {s.label}
+              {st.label}
             </DropdownMenuItem>
           ))}
         </DropdownMenuContent>
@@ -140,28 +160,28 @@ export function Toolbar({ editor }: Props) {
       {/* ── marks ────────────────────────────────────────────── */}
       <TBtn
         tooltip="Bold (Ctrl+B)"
-        active={editor.isActive("bold")}
+        active={s.isBold}
         onClick={() => editor.chain().focus().toggleBold().run()}
       >
         <TextB size={16} weight="bold" />
       </TBtn>
       <TBtn
         tooltip="Italic (Ctrl+I)"
-        active={editor.isActive("italic")}
+        active={s.isItalic}
         onClick={() => editor.chain().focus().toggleItalic().run()}
       >
         <TextItalic size={16} />
       </TBtn>
       <TBtn
         tooltip="Underline (Ctrl+U)"
-        active={editor.isActive("underline")}
+        active={s.isUnderline}
         onClick={() => editor.chain().focus().toggleUnderline().run()}
       >
         <TextUnderline size={16} />
       </TBtn>
       <TBtn
         tooltip="Strikethrough"
-        active={editor.isActive("strike")}
+        active={s.isStrike}
         onClick={() => editor.chain().focus().toggleStrike().run()}
       >
         <TextStrikethrough size={16} />
@@ -172,14 +192,14 @@ export function Toolbar({ editor }: Props) {
       {/* ── inline elements ───────────────────────────────────── */}
       <TBtn
         tooltip="Code (Ctrl+E)"
-        active={editor.isActive("code")}
+        active={s.isCode}
         onClick={() => editor.chain().focus().toggleCode().run()}
       >
         <Code size={16} />
       </TBtn>
       <TBtn
         tooltip="Link"
-        active={editor.isActive("link")}
+        active={s.isLink}
         onClick={() => {
           if (editor.isActive("link")) {
             editor.chain().focus().unsetLink().run()
@@ -197,21 +217,21 @@ export function Toolbar({ editor }: Props) {
       {/* ── lists ────────────────────────────────────────────── */}
       <TBtn
         tooltip="Bullet list"
-        active={editor.isActive("bulletList")}
+        active={s.isBulletList}
         onClick={() => editor.chain().focus().toggleBulletList().run()}
       >
         <ListBullets size={16} />
       </TBtn>
       <TBtn
         tooltip="Numbered list"
-        active={editor.isActive("orderedList")}
+        active={s.isOrderedList}
         onClick={() => editor.chain().focus().toggleOrderedList().run()}
       >
         <ListNumbers size={16} />
       </TBtn>
       <TBtn
         tooltip="Blockquote"
-        active={editor.isActive("blockquote")}
+        active={s.isBlockquote}
         onClick={() => editor.chain().focus().toggleBlockquote().run()}
       >
         <Quotes size={16} />
