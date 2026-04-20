@@ -34,7 +34,12 @@ const TabHandler = Extension.create({
     return {
       Tab: () => {
         const { editor } = this
-        if (editor.isActive("codeBlock")) return editor.commands.insertContent("\t")
+        if (editor.isActive("codeBlock")) {
+          const { state, view } = editor
+          const { from, to } = state.selection
+          view.dispatch(state.tr.insertText("\t", from, to))
+          return true
+        }
         if (editor.isActive("listItem")) return editor.commands.sinkListItem("listItem")
         if (editor.isActive("taskItem")) return editor.commands.sinkListItem("taskItem")
         return true // consume Tab everywhere else to prevent focus escape
