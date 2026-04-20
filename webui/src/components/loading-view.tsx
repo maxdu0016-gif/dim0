@@ -48,7 +48,7 @@ export interface LoadingWindowProps {
 export const LoadingWindow = ({ message, viewMode = "compact", className = undefined }: LoadingWindowProps) => {
   const clName = clsx(
     "z-30 flex flex-col items-center justify-center gap-2 p-4 bg-card text-card-foreground",
-    viewMode === "full" ? "absolute inset-0 z-20 w-full h-full border-none" : " w-64 border border-border rounded-xl shadow-lg",
+    viewMode === "full" ? "absolute inset-0 z-20 w-full h-full border-none" : " w-64 border border-border rounded-md shadow-lg",
     className
   )
   return (

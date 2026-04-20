@@ -67,7 +67,7 @@ const ResizeHandles = memo(function ResizeHandles({
       keepAspectRatio={keepAspectRatio}
     >
       <div
-        className={`absolute w-3 h-3 bg-secondary-foreground rounded-full ${className} z-20`}
+        className={`absolute w-3 h-3 bg-secondary-foreground rounded-sm ${className} z-20`}
         style={{ transform: getHandleTransform(pos) }}
       />
     </NodeResizeControl>
@@ -86,7 +86,7 @@ const NodeStatusOverlay = memo(function NodeStatusOverlay({
   isNew,
 }: NodeStatusOverlayProps) {
   if (selected && nodeType !== 'sheet') {
-    return <div className='absolute inset-1 border border-secondary-foreground pointer-events-none rounded z-10' />
+    return <div className='absolute inset-1 border border-secondary-foreground pointer-events-none rounded-md z-10' />
   }
   if (selected && nodeType === 'sheet') {
     return <div className='absolute inset-0 border-2 border-secondary-foreground pointer-events-none z-10 rounded-xl' />
