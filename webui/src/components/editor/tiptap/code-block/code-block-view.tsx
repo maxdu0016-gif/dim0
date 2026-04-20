@@ -2,32 +2,31 @@ import { useState, useEffect, useRef } from "react"
 import { NodeViewWrapper, NodeViewContent } from "@tiptap/react"
 import type { NodeViewProps } from "@tiptap/react"
 import { CopySimple, Check, CaretDown } from "@phosphor-icons/react"
-import { cn } from "@/lib/utils"
 import { highlightCode, LANGUAGE_OPTIONS } from "./shiki"
 
 
 export function CodeBlockView({ node, updateAttributes }: NodeViewProps) {
-  const [highlighted, setHighlighted] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
 
   const code = node.textContent
   const lang = (node.attrs.language as string | null) ?? "plaintext"
 
+  // Direct DOM refs — avoid React state updates so ProseMirror's cursor is never disturbed
+  const shikiLayerRef = useRef<HTMLDivElement>(null)
+  const editPreRef = useRef<HTMLPreElement>(null)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
-    // Debounce so mid-keystroke re-renders don't jump the cursor
     if (timerRef.current) clearTimeout(timerRef.current)
+    // Short debounce to batch rapid keystrokes, but no React state → no re-render → no cursor jump
     timerRef.current = setTimeout(() => {
-      let cancelled = false
       highlightCode(code, lang).then((html) => {
-        if (!cancelled) setHighlighted(html)
+        if (shikiLayerRef.current) shikiLayerRef.current.innerHTML = html
+        // Add class once to make editable text transparent; only one DOM write needed
+        editPreRef.current?.classList.add("shiki-loaded")
       })
-      return () => { cancelled = true }
-    }, 300)
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current)
-    }
+    }, 80)
+    return () => { if (timerRef.current) clearTimeout(timerRef.current) }
   }, [code, lang])
 
   function copyCode() {
@@ -73,17 +72,15 @@ export function CodeBlockView({ node, updateAttributes }: NodeViewProps) {
       {/* ── body: Shiki overlay + transparent editable layer ── */}
       <div className="code-block-body">
 
-        {/* Shiki highlighted backdrop (non-interactive) */}
-        {highlighted !== null && (
-          <div
-            className="code-block-shiki-layer"
-            aria-hidden="true"
-            dangerouslySetInnerHTML={{ __html: highlighted }}
-          />
-        )}
+        {/* Shiki highlighted backdrop — mutated directly via ref, never via React state */}
+        <div
+          ref={shikiLayerRef}
+          className="code-block-shiki-layer"
+          aria-hidden="true"
+        />
 
         {/* Editable ProseMirror content — transparent once Shiki is ready */}
-        <pre className={cn("code-block-edit-pre", highlighted !== null && "shiki-loaded")}>
+        <pre ref={editPreRef} className="code-block-edit-pre">
           <NodeViewContent as={"code" as "div"} className="code-block-editable" />
         </pre>
 
