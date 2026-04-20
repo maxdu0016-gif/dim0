@@ -11,9 +11,11 @@ import { Extension } from "@tiptap/core"
 import Suggestion from "@tiptap/suggestion"
 import { keymap } from "@tiptap/pm/keymap"
 import { sinkListItem, liftListItem } from "@tiptap/pm/schema-list"
+import Highlight from "@tiptap/extension-highlight"
 import { TableKit } from "@tiptap/extension-table"
 import { ShikiCodeBlock } from "./code-block/code-block-extension"
 import { InlineMathMarkdown, BlockMathMarkdown } from "./math/math-extensions"
+import { TagDecoration } from "./tag/tag-decoration"
 import { slashSuggestion } from "./slash-command/suggestion"
 import "katex/dist/katex.min.css"
 
@@ -75,6 +77,8 @@ export function getExtensions(placeholder = "Start writing…") {
     ShikiCodeBlock,
     InlineMathMarkdown,
     BlockMathMarkdown,
+    Highlight.configure({ multicolor: false }),
+    TagDecoration,
     TableKit,
     Placeholder.configure({ placeholder }),
     CharacterCount,

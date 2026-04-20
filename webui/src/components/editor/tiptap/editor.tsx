@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useEditor, EditorContent } from "@tiptap/react"
 import { useDebouncedCallback } from "use-debounce"
 import { getExtensions } from "./extensions"
@@ -8,6 +8,9 @@ import { TableMenu } from "./table-menu"
 import { BlockHandle } from "./block-handle"
 import { StatusBar } from "./status-bar"
 import { TocPanel } from "./toc"
+import { TagPanel } from "./tag/tag-panel"
+import { scanTags } from "./tag/tag-utils"
+import type { TagGroup } from "./tag/tag-utils"
 import "./editor.css"
 
 export interface MdEditorProps {
@@ -22,8 +25,11 @@ export function TipTapEditor({ markdown, onSave, placeholder, className }: MdEdi
   const onSaveRef = useRef(onSave)
   useEffect(() => { onSaveRef.current = onSave }, [onSave])
 
+  const [tags, setTags] = useState<TagGroup[]>(() => scanTags(markdown))
+
   const debouncedSave = useDebouncedCallback((md: string) => {
     onSaveRef.current(md)
+    setTags(scanTags(md))
   }, 2000)
 
   const editor = useEditor({
@@ -44,7 +50,9 @@ export function TipTapEditor({ markdown, onSave, placeholder, className }: MdEdi
         if (!editor) return
         debouncedSave.flush()
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        onSaveRef.current((editor as any).storage.markdown.getMarkdown())
+        const md = (editor as any).storage.markdown.getMarkdown() as string
+        onSaveRef.current(md)
+        setTags(scanTags(md))
       }
     }
     window.addEventListener("keydown", handler)
@@ -66,6 +74,7 @@ export function TipTapEditor({ markdown, onSave, placeholder, className }: MdEdi
           <TableMenu editor={editor} />
           <BlockHandle editor={editor} />
           <EditorContent editor={editor} />
+          <TagPanel tags={tags} />
         </div>
         <TocPanel editor={editor} scrollRef={scrollRef} />
       </div>

@@ -9,6 +9,7 @@ import {
   Code,
   Link,
   Quotes,
+  NotePencilIcon,
 } from "@phosphor-icons/react"
 import { cn } from "@/lib/utils"
 
@@ -56,6 +57,7 @@ export function EditorBubbleMenu({ editor }: Props) {
       isStrike: ctx.editor.isActive("strike"),
       isCode: ctx.editor.isActive("code"),
       isLink: ctx.editor.isActive("link"),
+      isHighlight: ctx.editor.isActive("highlight"),
       isBlockquote: ctx.editor.isActive("blockquote"),
       isH1: ctx.editor.isActive("heading", { level: 1 }),
       isH2: ctx.editor.isActive("heading", { level: 2 }),
@@ -134,6 +136,13 @@ export function EditorBubbleMenu({ editor }: Props) {
       <BDivider />
 
       {/* ── inline specials ───────────────────────────────────── */}
+      <BBtn
+        tooltip="Highlight"
+        active={s.isHighlight}
+        onClick={() => editor.chain().focus().toggleHighlight().run()}
+      >
+        <NotePencilIcon size={14} />
+      </BBtn>
       <BBtn
         tooltip="Inline code"
         active={s.isCode}
