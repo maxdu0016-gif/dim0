@@ -5,6 +5,7 @@ import { getExtensions } from "./extensions"
 import { Toolbar } from "./toolbar"
 import { EditorBubbleMenu } from "./bubble-menu"
 import { StatusBar } from "./status-bar"
+import { TocPanel } from "./toc"
 import "./editor.css"
 
 export interface MdEditorProps {
@@ -15,6 +16,7 @@ export interface MdEditorProps {
 }
 
 export function TipTapEditor({ markdown, onSave, placeholder, className }: MdEditorProps) {
+  const scrollRef = useRef<HTMLDivElement>(null)
   const onSaveRef = useRef(onSave)
   useEffect(() => { onSaveRef.current = onSave }, [onSave])
 
@@ -56,9 +58,12 @@ export function TipTapEditor({ markdown, onSave, placeholder, className }: MdEdi
     <div className={`flex h-full flex-col overflow-hidden${className ? ` ${className}` : ""}`}>
       <Toolbar editor={editor} />
 
-      <div className="tiptap-editor editor-body scrollbar-thin min-h-0 flex-1">
-        <EditorBubbleMenu editor={editor} />
-        <EditorContent editor={editor} />
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+        <div ref={scrollRef} className="tiptap-editor editor-body scrollbar-thin flex-1">
+          <EditorBubbleMenu editor={editor} />
+          <EditorContent editor={editor} />
+        </div>
+        <TocPanel editor={editor} scrollRef={scrollRef} />
       </div>
 
       <StatusBar editor={editor} />
