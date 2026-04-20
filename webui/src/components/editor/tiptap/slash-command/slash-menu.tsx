@@ -45,7 +45,7 @@ export const SlashMenu = forwardRef<SlashMenuHandle, Props>(
 
     if (items.length === 0) {
       return (
-        <div className="slash-menu">
+        <div className="slash-menu" onMouseDown={(e) => e.preventDefault()}>
           <p className="px-3 py-2 font-sans text-xs text-muted-foreground">
             No results
           </p>
@@ -54,7 +54,7 @@ export const SlashMenu = forwardRef<SlashMenuHandle, Props>(
     }
 
     return (
-      <div className="slash-menu">
+      <div className="slash-menu" onMouseDown={(e) => e.preventDefault()}>
         <p className="px-3 pb-1 pt-2 font-sans text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
           Basic blocks
         </p>
@@ -66,6 +66,7 @@ export const SlashMenu = forwardRef<SlashMenuHandle, Props>(
               key={item.title}
               ref={(el) => { itemRefs.current[index] = el }}
               type="button"
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => command(item)}
               className={cn(
                 "flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left transition-colors",

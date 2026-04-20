@@ -48,10 +48,7 @@ function TBtn({
       <TooltipTrigger asChild>
         <button
           type="button"
-          onMouseDown={(e) => {
-            e.preventDefault() // keep editor focus
-            if (!disabled) onClick()
-          }}
+          onClick={onClick}
           disabled={disabled}
           data-active={active}
           className={cn(
@@ -109,7 +106,10 @@ export function Toolbar({ editor }: Props) {
   })
 
   return (
-    <div className="flex h-10 shrink-0 items-center gap-0.5 border-b border-border bg-sidebar px-2">
+    <div
+      className="flex h-10 shrink-0 items-center gap-0.5 border-b border-border bg-sidebar px-2"
+      onMouseDown={(e) => e.preventDefault()}
+    >
       {/* ── undo / redo ──────────────────────────────────────── */}
       <TBtn
         tooltip="Undo (Ctrl+Z)"
@@ -143,10 +143,7 @@ export function Toolbar({ editor }: Props) {
           {STYLES.map((st) => (
             <DropdownMenuItem
               key={st.key}
-              onMouseDown={(e) => {
-                e.preventDefault()
-                st.action(editor)
-              }}
+              onSelect={() => st.action(editor)}
               className={cn(s.style === st.label && "bg-secondary text-secondary-foreground")}
             >
               {st.label}
