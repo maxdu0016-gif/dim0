@@ -12,6 +12,7 @@ import {
   CaretDown,
   Code,
   Quotes,
+  NotePencilIcon,
   ListBullets,
   ListNumbers,
 } from "@phosphor-icons/react"
@@ -100,6 +101,7 @@ export function Toolbar({ editor }: Props) {
       isLink: ctx.editor.isActive("link"),
       isBulletList: ctx.editor.isActive("bulletList"),
       isOrderedList: ctx.editor.isActive("orderedList"),
+      isHighlight: ctx.editor.isActive("highlight"),
       isBlockquote: ctx.editor.isActive("blockquote"),
       style: currentStyle(ctx.editor),
     }),
@@ -187,6 +189,13 @@ export function Toolbar({ editor }: Props) {
       <Divider />
 
       {/* ── inline elements ───────────────────────────────────── */}
+      <TBtn
+        tooltip="Highlight"
+        active={s.isHighlight}
+        onClick={() => editor.chain().focus().toggleHighlight().run()}
+      >
+        <NotePencilIcon size={16} />
+      </TBtn>
       <TBtn
         tooltip="Code (Ctrl+E)"
         active={s.isCode}
