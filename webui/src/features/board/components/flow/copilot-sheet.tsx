@@ -1,7 +1,7 @@
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Chat } from '@/features/agent/components/chat-view'
-import { ArrowExpandIcon, Dim0Icon, ExternalLinkIcon } from '@/components/icons'
+import { ArrowExpandIcon, ChatHistoryIcon, ExternalLinkIcon } from '@/components/icons'
 
 interface CopilotSheetProps {
   open: boolean
@@ -38,7 +38,7 @@ export function CopilotSheet({
         </SheetHeader>
         <div className="px-4 py-3 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 text-sm font-medium">
-            <Dim0Icon className="size-4 text-sidebar-icon-4" />
+            <ChatHistoryIcon className="size-4 text-sidebar-icon-4" />
             Board Assistant
           </div>
           <div className="flex items-center gap-1">

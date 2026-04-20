@@ -4,14 +4,13 @@ import {
   ArrowsOutSimpleIcon,
   ArrowSquareOutIcon,
   BrainIcon,
+  CardsThreeIcon,
   CaretDownIcon,
   CaretLeftIcon,
   CaretRightIcon,
   CaretUpIcon,
   ChartLineIcon,
   ChartLineUpIcon,
-  ChartScatterIcon,
-  ChatCenteredDotsIcon,
   ChatsIcon,
   CheckCircleIcon,
   CheckIcon as CheckmarkGlyphIcon,
@@ -37,6 +36,7 @@ import {
   FoldersIcon,
   GitForkIcon,
   GlobeHemisphereWestIcon,
+  GlobeSimpleIcon,
   GraduationCapIcon,
   GraphIcon,
   HouseIcon,
@@ -61,6 +61,7 @@ import {
   PencilIcon,
   PlusIcon as PlusGlyphIcon,
   PresentationChartIcon,
+  ProjectorScreenChartIcon,
   PushPinIcon,
   PushPinSlashIcon,
   SelectionIcon,
@@ -83,6 +84,7 @@ import {
   TrashIcon,
   TrendDownIcon as TrendDownGlyphIcon,
   TrendUpIcon as TrendUpGlyphIcon,
+  TreeIcon,
   TreeStructureIcon,
   UserIcon as UserGlyphIcon,
   UserSquareIcon as UserSquareGlyphIcon,
@@ -99,8 +101,8 @@ export const ArrowCollapseIcon = createPhosphorIcon(CaretDownIcon)
 export const ArrowExpandIcon = createPhosphorIcon(CaretRightIcon)
 export const ArrowRevealIcon = createPhosphorIcon(CaretUpIcon)
 export const AwardIcon = createPhosphorIcon(MedalIcon)
-export const BoardContextIcon = createPhosphorIcon(BrainIcon)
-export const BrowserSearchIcon = createPhosphorIcon(GlobeHemisphereWestIcon)
+export const BoardContextIcon = createPhosphorIcon(CardsThreeIcon)
+export const BrowserSearchIcon = createPhosphorIcon(GlobeSimpleIcon)
 export const CancelPlainIcon = createPhosphorIcon(XIcon)
 export const CancelCircleStatusIcon = createPhosphorIcon(XCircleIcon)
 export const CancelStatusIcon = createPhosphorIcon(XCircleIcon)
@@ -124,7 +126,7 @@ export const CreateNoteIcon = createPhosphorIcon(PencilIcon)
 export const DashboardAddIcon = createPhosphorIcon(SquaresFourIcon)
 export const DashboardIcon = createPhosphorIcon(SquaresFourIcon)
 export const DeleteIcon = createPhosphorIcon(TrashIcon)
-export const Dim0Icon = createPhosphorIcon(ChatCenteredDotsIcon)
+export const Dim0Icon = createPhosphorIcon(TreeIcon)
 export const DocumentIcon = createPhosphorIcon(FileDocIcon)
 export const DownloadIcon = createPhosphorIcon(ArrowSquareOutIcon)
 export const DragHandleIcon = createPhosphorIcon(ArrowsOutSimpleIcon)
@@ -184,7 +186,7 @@ export const ReadNoteIcon = createPhosphorIcon(EyeIcon)
 export const ResearchIcon = createPhosphorIcon(ListMagnifyingGlassIcon)
 export const RadioIndicatorIcon = createPhosphorIcon(CircleIcon)
 export const SchemaMapIcon = createPhosphorIcon(GraphIcon)
-export const SearchEngineIcon = createPhosphorIcon(ListMagnifyingGlassIcon)
+export const SearchEngineIcon = createPhosphorIcon(GlobeSimpleIcon)
 export const SelectionContextIcon = createPhosphorIcon(SelectionIcon)
 export const SendIcon = createPhosphorIcon(PaperPlaneRightIcon)
 export const ShareIcon = createPhosphorIcon(ShareNetworkIcon)
@@ -224,7 +226,7 @@ export const WeatherCloudDrizzleIcon = createPhosphorIcon(CloudFogIcon)
 export const WeatherCloudRainIcon = createPhosphorIcon(CloudRainIcon)
 export const WeatherCloudSnowIcon = createPhosphorIcon(CloudSnowIcon)
 export const WeatherCloudSunIcon = createPhosphorIcon(CloudSunIcon)
-export const VisualizeStarterIcon = createPhosphorIcon(ChartScatterIcon)
+export const VisualizeStarterIcon = createPhosphorIcon(ProjectorScreenChartIcon)
 export const WeatherWidgetIcon = createPhosphorIcon(CloudSunIcon)
 export const WebCollectorIcon = createPhosphorIcon(GlobeHemisphereWestIcon)
 export const WriteNoteStarterIcon = createPhosphorIcon(PencilIcon)

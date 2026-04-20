@@ -5,7 +5,7 @@ import { trimText } from "@/lib/common"
 import { UNTITLED_LABEL } from "@/features/board/const"
 import { useNavigate, useParams, useRouterState, useSearch } from "@tanstack/react-router"
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "../ui/context-menu"
-import { DashboardAddIcon, DeleteIcon, EditIcon, MinusIcon, NoteIcon, PlusIcon } from "@/components/icons"
+import { BoardContextIcon, DashboardAddIcon, DeleteIcon, EditIcon, MinusIcon, PlusIcon } from "@/components/icons"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../ui/collapsible"
 import { ChatMenuItem, NewChatItem } from "./chat"
 import { ConfirmDeleteBoardAlert } from "./confirm-delete-board"
@@ -164,7 +164,7 @@ export function BoardItem({ boardId, label }: { boardId: string, label?: string 
                 className="text-xs font-medium truncate"
                 isActive={isActive}
               >
-                  <NoteIcon className="shrink-0 size-4" strokeWidth={2} />
+                  <BoardContextIcon className="shrink-0 size-4" />
                   <span>{boardDisplayLabel}</span>
                 </SidebarMenuButton>
               </ContextMenuTrigger>

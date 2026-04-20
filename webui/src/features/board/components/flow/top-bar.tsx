@@ -1,20 +1,23 @@
 import { memo, useState } from 'react'
 import {
   ChartBar,
-  ChartScatter,
   Circle,
   CirclesFour,
-  CursorClick,
   Cursor,
   Diamond,
   DotsThree,
   FileCode,
   FileDoc,
   FolderPlus,
+  Graph,
+  Hand,
+  HandGrabbing,
   Images,
+  List,
   Note,
   Path,
   PresentationChart,
+  PuzzlePiece,
   Shapes,
   Square,
   SquaresFour,
@@ -22,7 +25,7 @@ import {
   TextT,
 } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
-import { ChevronDownIcon, Dim0Icon, LayerStackIcon, ShareIcon, SparklesIcon, WeatherCloudIcon } from '@/components/icons'
+import { ChatHistoryIcon, ChevronDownIcon, LayerStackIcon, ShareIcon, SparklesIcon, WeatherCloudIcon } from '@/components/icons'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuShortcut, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Separator } from '@/components/ui/separator'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -186,10 +189,10 @@ export const TopBar = memo(function TopBar({
             <DropdownMenuTrigger asChild>
               <Button variant={null} size='default' className={activeButtonClass}>
                 {viewMode === 'graph'
-                  ? <ChartScatter className='size-4 shrink-0' />
+                  ? <Graph className='size-4 shrink-0' />
                   : viewMode === 'linear'
                     ? <SquaresFour className='size-4 shrink-0' />
-                    : <CirclesFour className='size-4 shrink-0' />
+                    : <List className='size-4 shrink-0' />
                 }
                 <span className='sr-only md:not-sr-only text-[10px]'>{currentViewLabel}</span>
                 <ChevronDownIcon className='hidden size-3 shrink-0 text-muted-foreground md:block' />
@@ -200,7 +203,7 @@ export const TopBar = memo(function TopBar({
         </Tooltip>
         <DropdownMenuContent align='start' side='bottom' sideOffset={8} className='min-w-[160px]'>
           <DropdownMenuItem onSelect={() => setViewMode('graph')} className='gap-2 text-sm'>
-            <ChartScatter className='size-4 shrink-0' />
+            <Graph className='size-4 shrink-0' />
             <span>Board</span>
           </DropdownMenuItem>
           <DropdownMenuItem onSelect={() => setViewMode('linear')} className='gap-2 text-sm'>
@@ -208,7 +211,7 @@ export const TopBar = memo(function TopBar({
             <span>Files</span>
           </DropdownMenuItem>
           <DropdownMenuItem onSelect={() => setViewMode('list')} className='gap-2 text-sm'>
-            <CirclesFour className='size-4 shrink-0' />
+            <List className='size-4 shrink-0' />
             <span>List</span>
           </DropdownMenuItem>
         </DropdownMenuContent>
@@ -223,8 +226,8 @@ export const TopBar = memo(function TopBar({
               <Button variant={null} size='icon' onClick={() => setEnableSelection(!enableSelection)} className={enableSelection ? normalButtonClass : activeButtonClass} aria-label='Pan mode'>
                 <div className='relative'>
                   {enableSelection
-                    ? <Cursor className='size-4 shrink-0' />
-                    : <CursorClick className='size-4 shrink-0' />
+                    ? <Hand className='size-4 shrink-0' />
+                    : <HandGrabbing className='size-4 shrink-0' />
                   }
                   {renderButtonShortcut('P')}
                 </div>
@@ -236,7 +239,7 @@ export const TopBar = memo(function TopBar({
             <TooltipTrigger asChild>
               <Button variant={null} size='icon' onClick={() => setEnableSelection(!enableSelection)} className={enableSelection ? activeButtonClass : normalButtonClass} aria-label='Selection mode'>
                 <div className='relative'>
-                  <CursorClick className='size-4 shrink-0' />
+                  <Cursor className='size-4 shrink-0' />
                   {renderButtonShortcut('V')}
                 </div>
               </Button>
@@ -348,7 +351,7 @@ export const TopBar = memo(function TopBar({
             </Tooltip>
             <DropdownMenuContent align='end' side='bottom' sideOffset={8} className='min-w-[190px]'>
               <DropdownMenuItem onSelect={() => setOpenIconSearch(true)} className='gap-2 text-sm'>
-                <Shapes className='size-4 shrink-0' />
+                <PuzzlePiece className='size-4 shrink-0' />
                 <span>Icons</span>
                 <DropdownMenuShortcut>G</DropdownMenuShortcut>
               </DropdownMenuItem>
@@ -483,7 +486,7 @@ export const TopBar = memo(function TopBar({
             disabled={!boardId}
           >
             <div className='relative'>
-              <Dim0Icon className='size-4 shrink-0 text-sidebar-icon-4' />
+              <ChatHistoryIcon className='size-4 shrink-0 text-sidebar-icon-4' />
               {renderButtonShortcut('C')}
             </div>
           </Button>
