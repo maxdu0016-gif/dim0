@@ -11,9 +11,9 @@ import { Extension } from "@tiptap/core"
 import Suggestion from "@tiptap/suggestion"
 import { keymap } from "@tiptap/pm/keymap"
 import { sinkListItem, liftListItem } from "@tiptap/pm/schema-list"
-import { Mathematics } from "@tiptap/extension-mathematics"
 import { TableKit } from "@tiptap/extension-table"
 import { ShikiCodeBlock } from "./code-block/code-block-extension"
+import { InlineMathMarkdown, BlockMathMarkdown } from "./math/math-extensions"
 import { slashSuggestion } from "./slash-command/suggestion"
 import "katex/dist/katex.min.css"
 
@@ -73,7 +73,8 @@ export function getExtensions(placeholder = "Start writing…") {
       codeBlock: false, // replaced by ShikiCodeBlock
     }),
     ShikiCodeBlock,
-    Mathematics,
+    InlineMathMarkdown,
+    BlockMathMarkdown,
     TableKit,
     Placeholder.configure({ placeholder }),
     CharacterCount,
