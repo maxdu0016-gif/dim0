@@ -75,7 +75,7 @@ export function CodeBlockView({ node, updateAttributes }: NodeViewProps) {
 
         {/* Editable ProseMirror content — transparent once Shiki is ready */}
         <pre className={cn("code-block-edit-pre", highlighted !== null && "shiki-loaded")}>
-          <NodeViewContent as="code" className="code-block-editable" />
+          <NodeViewContent as={"code" as "div"} className="code-block-editable" />
         </pre>
 
       </div>

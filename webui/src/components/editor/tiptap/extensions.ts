@@ -35,7 +35,7 @@ export function getExtensions(placeholder = "Start writing…") {
     }),
     ShikiCodeBlock,
     Mathematics,
-    TableKit.configure({ resizable: false }),
+    TableKit,
     Placeholder.configure({ placeholder }),
     CharacterCount,
     TaskList,
