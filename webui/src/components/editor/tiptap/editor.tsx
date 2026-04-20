@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react"
 import { useEditor, EditorContent } from "@tiptap/react"
 import { useDebouncedCallback } from "use-debounce"
 import { getExtensions } from "./extensions"
-import { Toolbar } from "./toolbar"
 import { EditorBubbleMenu } from "./bubble-menu"
 import { TableMenu } from "./table-menu"
 import { BlockHandle } from "./block-handle"
@@ -66,8 +65,6 @@ export function TipTapEditor({ markdown, onSave, placeholder, className }: MdEdi
 
   return (
     <div className={`flex h-full flex-col overflow-hidden${className ? ` ${className}` : ""}`}>
-      <Toolbar editor={editor} />
-
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <div ref={scrollRef} className="tiptap-editor editor-body scrollbar-thin flex-1">
           <EditorBubbleMenu editor={editor} />
