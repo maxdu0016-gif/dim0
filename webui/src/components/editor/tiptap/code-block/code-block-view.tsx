@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { NodeViewWrapper, NodeViewContent } from "@tiptap/react"
 import type { NodeViewProps } from "@tiptap/react"
 import { CopySimple, Check, CaretDown } from "@phosphor-icons/react"
@@ -13,12 +13,21 @@ export function CodeBlockView({ node, updateAttributes }: NodeViewProps) {
   const code = node.textContent
   const lang = (node.attrs.language as string | null) ?? "plaintext"
 
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   useEffect(() => {
-    let cancelled = false
-    highlightCode(code, lang).then((html) => {
-      if (!cancelled) setHighlighted(html)
-    })
-    return () => { cancelled = true }
+    // Debounce so mid-keystroke re-renders don't jump the cursor
+    if (timerRef.current) clearTimeout(timerRef.current)
+    timerRef.current = setTimeout(() => {
+      let cancelled = false
+      highlightCode(code, lang).then((html) => {
+        if (!cancelled) setHighlighted(html)
+      })
+      return () => { cancelled = true }
+    }, 300)
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current)
+    }
   }, [code, lang])
 
   function copyCode() {
