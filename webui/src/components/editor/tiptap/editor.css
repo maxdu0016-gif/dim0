@@ -176,6 +176,27 @@
   outline: none;
 }
 
+/* ── slash command menu ─────────────────────────────────────────────────── */
+
+.slash-menu {
+  min-width: 220px;
+  max-width: 260px;
+  max-height: 320px;
+  overflow-y: auto;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--card);
+  padding: 4px;
+  box-shadow: var(--shadow-lg);
+  font-family: var(--font-sans);
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+.slash-menu:hover {
+  scrollbar-color: rgba(120, 120, 130, 0.4) transparent;
+}
+
 /* ── responsive ─────────────────────────────────────────────────────────── */
 
 @media (max-width: 768px) {

@@ -7,6 +7,21 @@ import Link from "@tiptap/extension-link"
 import Underline from "@tiptap/extension-underline"
 import Typography from "@tiptap/extension-typography"
 import { Markdown } from "tiptap-markdown"
+import { Extension } from "@tiptap/core"
+import Suggestion from "@tiptap/suggestion"
+import { slashSuggestion } from "./slash-command/suggestion"
+
+const SlashCommand = Extension.create({
+  name: "slashCommand",
+  addProseMirrorPlugins() {
+    return [
+      Suggestion({
+        editor: this.editor,
+        ...slashSuggestion,
+      }),
+    ]
+  },
+})
 
 export function getExtensions(placeholder = "Start writing…") {
   return [
@@ -28,5 +43,6 @@ export function getExtensions(placeholder = "Start writing…") {
       transformCopiedText: true,
       transformPastedText: true,
     }),
+    SlashCommand,
   ]
 }
