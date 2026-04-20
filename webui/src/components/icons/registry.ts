@@ -14,7 +14,7 @@ import {
   CancelCircleIcon,
   CancelIcon,
   ChatAdd01Icon,
-  ChatTranslateIcon,
+  ChatTranslateIcon as ChatTranslateGlyphIcon,
   ChipIcon,
   ChartBubble02Icon,
   ChartBubbleIcon,
@@ -28,6 +28,7 @@ import {
   DashboardSquare03Icon,
   DashboardBrowsingIcon,
   Delete02Icon,
+  DragDropIcon,
   DocumentAttachmentIcon,
   Download04Icon,
   EarthIcon,
@@ -36,17 +37,20 @@ import {
   Folder01Icon,
   GitForkIcon,
   GlobalIcon,
-  GridViewIcon,
+  GridViewIcon as GridViewGlyphIcon,
   Home12Icon,
   InformationCircleIcon,
   Idea01Icon,
   Image01Icon,
   InternetIcon,
+  Layout01Icon,
   LeftToRightListBulletIcon,
   Link02Icon,
   Link04Icon,
+  LinkSquare02Icon,
   LogoutSquareIcon,
   Mail01Icon,
+  Maximize01Icon,
   Message02Icon,
   MicroscopeIcon,
   MinusSignIcon,
@@ -65,10 +69,11 @@ import {
   PropertyNewIcon,
   ReloadIcon,
   SearchList01Icon,
+  SidebarLeft01Icon,
   Stethoscope02Icon,
   SquareLock01Icon,
   SourceCodeIcon,
-  SparklesIcon,
+  SparklesIcon as SparklesFeatureGlyphIcon,
   ThermometerWarmIcon,
   TextAlignLeftIcon,
   Tick01Icon,
@@ -100,10 +105,17 @@ import {
   Moon,
   Send,
   Share,
+  CircleIcon as CircleGlyphIcon,
   Sun,
   TrendingDown,
   TrendingUp,
   TriangleAlertIcon,
+  XIcon as CloseGlyphIcon,
+  ChevronDownIcon as ChevronDownGlyphIcon,
+  ChevronRightIcon as ChevronRightGlyphIcon,
+  ChevronUpIcon as ChevronUpGlyphIcon,
+  CheckIcon as CheckGlyphIcon,
+  Sparkles,
 } from "lucide-react"
 import { createHugeIcon, createLucideIcon, createReactIcon } from "./icon-base"
 import type { AppIconComponent, AppIconName } from "./types"
@@ -121,10 +133,14 @@ export const CancelCircleStatusIcon = createHugeIcon(CancelCircleIcon)
 export const CancelStatusIcon = createHugeIcon(CancelIcon)
 export const ChatHistoryIcon = createHugeIcon(Message02Icon)
 export const ChatNewIcon = createHugeIcon(ChatAdd01Icon)
-export const ChatTranslateIcon = createHugeIcon(ChatTranslateIcon)
+export const ChatTranslateIcon = createHugeIcon(ChatTranslateGlyphIcon)
 export const CheckIcon = createHugeIcon(Tick01Icon)
 export const CheckCircleStatusIcon = createHugeIcon(CheckmarkCircle03Icon)
+export const CheckmarkIcon = createLucideIcon(CheckGlyphIcon)
 export const ClockIcon = createHugeIcon(Clock02Icon)
+export const ChevronDownIcon = createLucideIcon(ChevronDownGlyphIcon)
+export const ChevronRightIcon = createLucideIcon(ChevronRightGlyphIcon)
+export const ChevronUpIcon = createLucideIcon(ChevronUpGlyphIcon)
 export const CodeInterpreterIcon = createHugeIcon(CodeIcon)
 export const ConsoleIcon = createHugeIcon(ComputerTerminal01Icon)
 export const CodeStarterIcon = createHugeIcon(AiProgrammingIcon)
@@ -136,6 +152,7 @@ export const DeleteIcon = createHugeIcon(Delete02Icon)
 export const Dim0Icon = createReactIcon(BotMessageSquare)
 export const DocumentIcon = createHugeIcon(DocumentAttachmentIcon)
 export const DownloadIcon = createHugeIcon(Download04Icon)
+export const DragHandleIcon = createHugeIcon(DragDropIcon)
 export const EditIcon = createHugeIcon(Edit01Icon)
 export const EditNoteIcon = createHugeIcon(NoteEditIcon)
 export const EllipsisIcon = createLucideIcon(Ellipsis)
@@ -145,7 +162,7 @@ export const FolderIcon = createHugeIcon(Folder02Icon)
 export const FolderTreeIcon = createHugeIcon(Folder01Icon)
 export const GeminiBrandIcon = createReactIcon(Gemini.Color)
 export const GlobeIcon = createHugeIcon(GlobalIcon)
-export const GridViewIcon = createHugeIcon(GridViewIcon)
+export const GridViewIcon = createHugeIcon(GridViewGlyphIcon)
 export const HomeIcon = createHugeIcon(Home12Icon)
 export const IdeaIcon = createHugeIcon(Idea01Icon)
 export const ImagePlaceholderIcon = createHugeIcon(Image01Icon)
@@ -162,6 +179,7 @@ export const Loader2Icon = createLucideIcon(Loader2)
 export const LoaderIcon = createLucideIcon(LoaderCircle)
 export const LockIcon = createHugeIcon(SquareLock01Icon)
 export const LogoutIcon = createHugeIcon(LogoutSquareIcon)
+export const LayoutIcon = createHugeIcon(Layout01Icon)
 export const MailCheckIcon = createLucideIcon(MailCheck)
 export const MailIcon = createHugeIcon(Mail01Icon)
 export const MapPinIcon = createLucideIcon(MapPin)
@@ -186,15 +204,17 @@ export const PlayIcon = createHugeIcon(PlayGlyphIcon)
 export const PlusIcon = createHugeIcon(PlusSignIcon)
 export const PropertyIcon = createHugeIcon(PropertyNewIcon)
 export const QwenBrandIcon = createReactIcon(Qwen.Color)
-export const ReadNoteIcon = createHugeIcon(ViewIcon)
+export const ReadNoteIcon = createHugeIcon(ViewGlyphIcon)
 export const ResearchIcon = createHugeIcon(MicroscopeIcon)
+export const RadioIndicatorIcon = createLucideIcon(CircleGlyphIcon)
 export const SchemaMapIcon = createHugeIcon(ChartBubbleIcon)
 export const SearchEngineIcon = createHugeIcon(InternetIcon)
 export const SelectionContextIcon = createHugeIcon(CursorMagicSelection04Icon)
 export const SendIcon = createLucideIcon(Send)
 export const ShareIcon = createLucideIcon(Share)
 export const SidebarMenuIcon = createLucideIcon(EllipsisVertical)
-export const SparklesFeatureIcon = createHugeIcon(SparklesIcon)
+export const SparklesFeatureIcon = createHugeIcon(SparklesFeatureGlyphIcon)
+export const SparklesIcon = createLucideIcon(Sparkles)
 export const StockWidgetIcon = createHugeIcon(DashboardBrowsingIcon)
 export const StethoscopeIcon = createHugeIcon(Stethoscope02Icon)
 export const SunIcon = createLucideIcon(Sun)
@@ -213,6 +233,10 @@ export const UserProfileIcon = createHugeIcon(UserIcon)
 export const UserSquareIcon = createHugeIcon(UserSquareGlyphIcon)
 export const ViewIcon = createHugeIcon(ViewGlyphIcon)
 export const ViewOffIcon = createHugeIcon(ViewOffSlashIcon)
+export const ExpandIcon = createHugeIcon(Maximize01Icon)
+export const SidebarToggleIcon = createHugeIcon(SidebarLeft01Icon)
+export const SheetExternalLinkIcon = createHugeIcon(LinkSquare02Icon)
+export const CloseIcon = createLucideIcon(CloseGlyphIcon)
 export const WarningIcon = createLucideIcon(TriangleAlertIcon)
 export const WeatherCloudIcon = createLucideIcon(Cloud)
 export const WeatherCloudDrizzleIcon = createLucideIcon(CloudDrizzle)

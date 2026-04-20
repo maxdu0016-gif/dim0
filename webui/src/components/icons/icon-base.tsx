@@ -1,7 +1,7 @@
 import type { IconSvgElement } from "@hugeicons/react"
 import { HugeiconsIcon } from "@hugeicons/react"
 import type { LucideIcon } from "lucide-react"
-import type { ComponentType } from "react"
+import { createElement, type ComponentType } from "react"
 import type { AppIconComponent, AppIconProps } from "./types"
 
 /**
@@ -26,7 +26,7 @@ export const createHugeIcon = (icon: IconSvgElement): AppIconComponent => {
  */
 export const createLucideIcon = (icon: LucideIcon): AppIconComponent => {
   const LucideWrappedIcon = ({ size, strokeWidth = 2, ...props }: AppIconProps) => (
-    icon({
+    createElement(icon, {
       size,
       strokeWidth,
       ...props,

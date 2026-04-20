@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from "react"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
+import { SparklesIcon } from "@/components/icons"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import type { NoteNode } from "@/features/board/types/flow"
 import { buildContextTextFromNodes } from "@/features/board/utils/context-text"
 import { useAiSparkActions } from "@/features/board/hooks/use-ai-spark-actions"
-import { Sparkles } from "lucide-react"
 
 export interface AiSparkDialogProps {
   open: boolean
@@ -82,7 +82,7 @@ export const AiSparkDialog = ({
       <DialogContent className="sm:max-w-xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Sparkles className="size-4 text-secondary-foreground" />
+            <SparklesIcon className="size-4 text-secondary-foreground" />
             <span>AI Spark</span>
           </DialogTitle>
           <DialogDescription>
