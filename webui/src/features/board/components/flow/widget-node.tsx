@@ -4,7 +4,7 @@ import clsx from "clsx"
 
 import { useShallow } from "zustand/react/shallow"
 
-import { DragHandleIcon, ExpandIcon, LayoutIcon } from "@/components/icons"
+import { DragGripIcon, ExpandIcon, LayoutIcon } from "@/components/icons"
 import { useGraphStore } from "../../store/graph-store"
 import type { Note } from "../../types/note"
 import { WidgetIframe } from "./widget-iframe"
@@ -174,7 +174,7 @@ export const WidgetNode = memo(function WidgetNode({
           title="Drag widget"
           aria-label="Drag widget"
         >
-          <DragHandleIcon className="size-4 shrink-0" />
+          <DragGripIcon className="size-4 shrink-0" />
         </div>
 
         {boardCanEdit && (
