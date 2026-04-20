@@ -66,6 +66,10 @@ export function EditorBubbleMenu({ editor }: Props) {
   return (
     <BubbleMenu
       editor={editor}
+      shouldShow={({ editor: e, state }) =>
+        !e.isActive("tableCell") && !e.isActive("tableHeader") &&
+        !state.selection.empty
+      }
       options={{ placement: "top" }}
       className={cn(
         "flex items-center gap-0.5 rounded-lg border border-border/70 bg-card px-1 py-0.5",
