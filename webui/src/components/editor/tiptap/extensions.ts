@@ -9,6 +9,8 @@ import Typography from "@tiptap/extension-typography"
 import { Markdown } from "tiptap-markdown"
 import { Extension } from "@tiptap/core"
 import Suggestion from "@tiptap/suggestion"
+import { keymap } from "@tiptap/pm/keymap"
+import { sinkListItem, liftListItem } from "@tiptap/pm/schema-list"
 import { Mathematics } from "@tiptap/extension-mathematics"
 import { TableKit } from "@tiptap/extension-table"
 import { ShikiCodeBlock } from "./code-block/code-block-extension"
@@ -27,30 +29,40 @@ const SlashCommand = Extension.create({
   },
 })
 
-/** Traps Tab inside the editor: indents in code blocks, sinks list items elsewhere, and prevents focus escape everywhere. */
+/** Traps Tab inside the editor using a raw ProseMirror keymap for reliability. */
 const TabHandler = Extension.create({
   name: "tabHandler",
-  addKeyboardShortcuts() {
-    return {
-      Tab: () => {
-        const { editor } = this
-        if (editor.isActive("codeBlock")) {
-          const { state, view } = editor
-          const { from, to } = state.selection
-          view.dispatch(state.tr.insertText("\t", from, to))
+  addProseMirrorPlugins() {
+    return [
+      keymap({
+        Tab: (state, dispatch) => {
+          const { $from } = state.selection
+
+          // Walk ancestors — reliable check regardless of NodeView context
+          for (let d = $from.depth; d >= 0; d--) {
+            if ($from.node(d).type.name === "codeBlock") {
+              if (dispatch) dispatch(state.tr.insertText("\t"))
+              return true
+            }
+          }
+
+          // List items via prosemirror-schema-list commands
+          const li = state.schema.nodes.listItem
+          const ti = state.schema.nodes.taskItem
+          if (li && sinkListItem(li)(state, dispatch)) return true
+          if (ti && sinkListItem(ti)(state, dispatch)) return true
+
+          return true // consume Tab — no focus escape
+        },
+        "Shift-Tab": (state, dispatch) => {
+          const li = state.schema.nodes.listItem
+          const ti = state.schema.nodes.taskItem
+          if (li && liftListItem(li)(state, dispatch)) return true
+          if (ti && liftListItem(ti)(state, dispatch)) return true
           return true
-        }
-        if (editor.isActive("listItem")) return editor.commands.sinkListItem("listItem")
-        if (editor.isActive("taskItem")) return editor.commands.sinkListItem("taskItem")
-        return true // consume Tab everywhere else to prevent focus escape
-      },
-      "Shift-Tab": () => {
-        const { editor } = this
-        if (editor.isActive("listItem")) return editor.commands.liftListItem("listItem")
-        if (editor.isActive("taskItem")) return editor.commands.liftListItem("taskItem")
-        return true
-      },
-    }
+        },
+      }),
+    ]
   },
 })
 
