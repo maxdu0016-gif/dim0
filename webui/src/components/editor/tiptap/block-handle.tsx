@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react"
 import { DragHandle } from "@tiptap/extension-drag-handle-react"
+import { offset } from "@floating-ui/dom"
 import type { Editor } from "@tiptap/react"
 import type { Node } from "@tiptap/pm/model"
 import { DotsSixVertical, Plus, Trash, CopySimple } from "@phosphor-icons/react"
@@ -83,7 +84,12 @@ export function BlockHandle({ editor }: { editor: Editor }) {
   }
 
   return (
-    <DragHandle editor={editor} onNodeChange={handleNodeChange} nested>
+    <DragHandle
+      editor={editor}
+      onNodeChange={handleNodeChange}
+      nested
+      computePositionConfig={{ middleware: [offset({ crossAxis: 4 })] }}
+    >
       <div className="block-handle-wrap">
 
         {/* + : add new paragraph below this block */}
