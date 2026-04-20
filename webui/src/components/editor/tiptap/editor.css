@@ -427,6 +427,50 @@
   scrollbar-color: rgba(120, 120, 130, 0.4) transparent;
 }
 
+/* ── block drag handle ──────────────────────────────────────────────────── */
+
+.block-handle-wrap {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+}
+
+.block-handle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: transparent;
+  border-radius: 4px;
+  color: var(--muted-foreground);
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity 0.12s, background 0.12s, color 0.12s;
+  padding: 0;
+}
+
+/* Show when the DragHandle wrapper is visible (extension adds inline style/display) */
+.block-handle-wrap:hover .block-handle-btn,
+.block-handle-wrap:focus-within .block-handle-btn {
+  opacity: 0.5;
+}
+
+.block-handle-btn:hover {
+  opacity: 1 !important;
+  background: var(--muted);
+  color: var(--foreground);
+}
+
+.block-drag-btn {
+  cursor: grab;
+}
+
+.block-drag-btn:active {
+  cursor: grabbing;
+}
+
 /* ── responsive ─────────────────────────────────────────────────────────── */
 
 @media (max-width: 768px) {

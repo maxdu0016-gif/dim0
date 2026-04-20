@@ -5,6 +5,7 @@ import { getExtensions } from "./extensions"
 import { Toolbar } from "./toolbar"
 import { EditorBubbleMenu } from "./bubble-menu"
 import { TableMenu } from "./table-menu"
+import { BlockHandle } from "./block-handle"
 import { StatusBar } from "./status-bar"
 import { TocPanel } from "./toc"
 import "./editor.css"
@@ -63,6 +64,7 @@ export function TipTapEditor({ markdown, onSave, placeholder, className }: MdEdi
         <div ref={scrollRef} className="tiptap-editor editor-body scrollbar-thin flex-1">
           <EditorBubbleMenu editor={editor} />
           <TableMenu editor={editor} />
+          <BlockHandle editor={editor} />
           <EditorContent editor={editor} />
         </div>
         <TocPanel editor={editor} scrollRef={scrollRef} />
