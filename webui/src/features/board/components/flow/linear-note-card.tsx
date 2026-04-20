@@ -4,8 +4,7 @@ import type { NoteNode } from '../../types/flow'
 import { MarkdownView } from '@/components/markdown/markdown-view'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useGraphStore } from '../../store/graph-store'
-import { HugeiconsIcon } from '@hugeicons/react'
-import { Delete02Icon, PaintBoardIcon, PinIcon, PinOffIcon } from '@hugeicons/core-free-icons'
+import { DeleteIcon, PaintBoardIcon, PinIcon, PinOffIcon } from '@/components/icons'
 import clsx from 'clsx'
 import { TAILWIND_300 } from '../../lib/colors/tailwind'
 import { formatDistanceToNow } from '../../utils/date'
@@ -142,7 +141,7 @@ export function LinearNoteCard({ node }: Props) {
                 title='Change background color'
                 onClick={e => e.stopPropagation()}
               >
-                <HugeiconsIcon icon={PaintBoardIcon} className='size-4 shrink-0' strokeWidth={2} />
+                <PaintBoardIcon className='size-4 shrink-0' strokeWidth={2} />
               </button>
             </PopoverTrigger>
             <PopoverContent align='start' className='w-auto p-2'>
@@ -167,8 +166,8 @@ export function LinearNoteCard({ node }: Props) {
             title='Pin/Unpin'
           >
             {isPinned
-              ? <HugeiconsIcon icon={PinIcon} className='w-4 h-4 text-secondary-foreground' strokeWidth={2} />
-              : <HugeiconsIcon icon={PinOffIcon} className='w-4 h-4' strokeWidth={2} />
+              ? <PinIcon className='w-4 h-4 text-secondary-foreground' strokeWidth={2} />
+              : <PinOffIcon className='w-4 h-4' strokeWidth={2} />
             }
           </button>
           <button
@@ -177,7 +176,7 @@ export function LinearNoteCard({ node }: Props) {
             aria-label='Delete note'
             title='Delete'
           >
-            <HugeiconsIcon icon={Delete02Icon} className='w-4 h-4' strokeWidth={2} />
+            <DeleteIcon className='w-4 h-4' strokeWidth={2} />
           </button>
         </div>
       </div>

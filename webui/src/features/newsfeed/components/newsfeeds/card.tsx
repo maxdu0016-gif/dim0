@@ -9,8 +9,7 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger
 } from '@/components/ui/context-menu'
-import { HugeiconsIcon } from '@hugeicons/react'
-import { Delete02Icon, Folder02Icon } from '@hugeicons/core-free-icons'
+import { DeleteIcon, FolderIcon } from '@/components/icons'
 import { useDeleteNewsfeed } from '@/features/newsfeed/api/delete-newsfeed'
 import { dateToTailwindColor } from '../../utils/color'
 import { getLuminance, toBaseHex } from '@/features/board/lib/colors/tailwind'
@@ -139,7 +138,7 @@ export function NewsletterCard({
           onSelect={() => onClick?.()}
           disabled={!!generating}
         >
-          <HugeiconsIcon icon={Folder02Icon} className='mr-2 size-4' strokeWidth={2} />
+          <FolderIcon className='mr-2 size-4' strokeWidth={2} />
           Open
         </ContextMenuItem>
 
@@ -151,7 +150,7 @@ export function NewsletterCard({
           onSelect={handleDelete}
           disabled={!!generating || del.isPending}
         >
-          <HugeiconsIcon icon={Delete02Icon} className='mr-2 size-4' strokeWidth={2} />
+          <DeleteIcon className='mr-2 size-4' strokeWidth={2} />
           Delete
         </ContextMenuItem>
       </ContextMenuContent>

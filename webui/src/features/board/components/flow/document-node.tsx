@@ -1,7 +1,6 @@
 import { memo, useCallback, useEffect, useRef, useState } from "react"
 import { NodeResizeControl, type ControlPosition, type NodeProps } from "@xyflow/react"
-import { Pdf02Icon } from "@hugeicons/core-free-icons"
-import { HugeiconsIcon } from "@hugeicons/react"
+import { PdfIcon } from "@/components/icons"
 import type { NoteNode } from "../../types/flow"
 import type { DocumentProperties } from "../../types/document"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
@@ -98,8 +97,7 @@ export const DocumentNode = memo(function DocumentNode({ id, data, selected }: N
     <div className="relative w-full h-full">
       <div className={className}>
         <div className="flex h-full w-full items-center justify-center">
-          <HugeiconsIcon
-            icon={Pdf02Icon}
+          <PdfIcon
             className="h-full w-full"
             strokeWidth={1.8}
             color={displayTextColor}

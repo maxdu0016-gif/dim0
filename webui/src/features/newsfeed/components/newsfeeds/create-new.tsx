@@ -1,7 +1,6 @@
 import { Card, CardContent } from '@/components/ui/card'
+import { AddIcon } from '@/components/icons'
 import { cn } from '@/lib/utils'
-import { HugeiconsIcon } from '@hugeicons/react'
-import { PlusSignIcon } from '@hugeicons/core-free-icons'
 import { useCreateNewsfeed } from '@/features/newsfeed/api/create-newsfeed'
 import { generateUuid } from '@/lib/common'
 
@@ -41,7 +40,7 @@ export function CreateNewsfeedTile({
       >
         <CardContent className='h-full flex items-center justify-center'>
           <div className='flex items-center justify-center w-10 h-10 rounded-full bg-muted'>
-            <HugeiconsIcon icon={PlusSignIcon} className='size-5 text-secondary-foreground' strokeWidth={2} />
+            <AddIcon className='size-5 text-secondary-foreground' strokeWidth={2} />
           </div>
         </CardContent>
       </Card>

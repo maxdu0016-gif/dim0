@@ -1,7 +1,6 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { ToolsIcon } from "@hugeicons/core-free-icons"
-import { HugeiconsIcon } from "@hugeicons/react"
+import { ToolsMenuIcon } from "@/components/icons"
 import { clsx } from "clsx"
 import { CodeInterpreterChoiceMenu } from "./code-interpreter"
 import { ImageGenMenu } from "./image-gen"
@@ -31,7 +30,7 @@ export const ToolsMenu = ({ memorySearchAvailable = true }: ToolsMenuProps) => {
                 className={buttonClass}
                 aria-label="Open settings"
               >
-                <HugeiconsIcon icon={ToolsIcon} className="size-4 shrink-0" strokeWidth={2} />
+                <ToolsMenuIcon className="size-4 shrink-0" strokeWidth={2} />
               </button>
             </DialogTrigger>
           </TooltipTrigger>

@@ -10,8 +10,7 @@ import {
   LlmFamilyIcon,
   type LlmFamily,
 } from "@/features/agent/types/llm"
-import { SquareLock01Icon } from "@hugeicons/core-free-icons"
-import { HugeiconsIcon } from "@hugeicons/react"
+import { LockIcon } from "@/components/icons"
 import { clsx } from "clsx"
 import { useShallow } from "zustand/shallow"
 
@@ -161,8 +160,7 @@ export const ModelChoiceMenu = ({ display = "icon" }: ModelChoiceMenuProps) => {
                     >
                       <ModelCard model={model.name} available={model.available} />
                       {!model.available && (
-                        <HugeiconsIcon
-                          icon={SquareLock01Icon}
+                        <LockIcon
                           className="size-4 absolute right-2 top-1/2 -translate-y-1/2"
                           strokeWidth={2}
                         />

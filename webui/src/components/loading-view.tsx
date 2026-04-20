@@ -1,8 +1,6 @@
 import { ShinyText } from "./animations/shiny-text"
 import { Orbit } from "./animate-ui/icons/orbit"
-import { ListTree } from "lucide-react"
-import { HugeiconsIcon } from "@hugeicons/react"
-import { Alert02Icon } from "@hugeicons/core-free-icons"
+import { AlertIcon, ListTreeIcon } from "@/components/icons"
 import clsx from "clsx"
 
 /**
@@ -14,7 +12,7 @@ export const ThinkingDots = ({ message, isStopped = false }: { message: string, 
       {
         !isStopped ?
         <Orbit animate animation="path-loop" loop speed={2} className='size-4 text-foreground/50' strokeWidth={2} /> :
-        <ListTree
+        <ListTreeIcon
           className='size-4 text-accent-foreground'
           strokeWidth={2}
         />
@@ -85,7 +83,7 @@ export const ErrorWindow = ({ message, viewMode = "compact", className = undefin
     <>
       <div className={clName}>
         <div className="text-medium text-xs text-center text-destructive flex flex-row items-center gap-2">
-          <HugeiconsIcon icon={Alert02Icon} className='w-4 h-4' strokeWidth={2} />
+          <AlertIcon className='w-4 h-4' strokeWidth={2} />
           <span>{message}</span>
         </div>
       </div>

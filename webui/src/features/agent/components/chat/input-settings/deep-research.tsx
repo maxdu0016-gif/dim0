@@ -1,7 +1,6 @@
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { ResearchIcon } from "@/components/icons"
 import { useChatStore } from "@/features/agent/store/chat-store"
-import { MicroscopeIcon } from "@hugeicons/core-free-icons"
-import { HugeiconsIcon } from "@hugeicons/react"
 import { clsx } from "clsx"
 
 // Component that allows users to enable or disable the deep research tool
@@ -28,7 +27,7 @@ export const DeepResearchChoiceMenu = () => {
             className={buttonClass}
             onClick={handleToggle}
           >
-            <HugeiconsIcon icon={MicroscopeIcon} className='size-4 shrink-0' strokeWidth={2} />
+            <ResearchIcon className='size-4 shrink-0' strokeWidth={2} />
             <span className='sr-only'>Deep Research</span>
           </button>
         </TooltipTrigger>

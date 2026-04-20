@@ -1,14 +1,14 @@
 import { memo, useMemo } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import {
-  Analytics02Icon,
-  ComputerTerminal01Icon,
-  Delete02Icon,
-  Folder01Icon,
-  Note02Icon,
-  Pdf02Icon,
-} from '@hugeicons/core-free-icons'
-import { HugeiconsIcon } from '@hugeicons/react'
+  ConsoleIcon,
+  DeleteIcon,
+  FolderTreeIcon,
+  LearnWidgetIcon,
+  PdfIcon,
+  WriteNoteStarterIcon,
+  type AppIconComponent,
+} from '@/components/icons'
 
 import { useGraphStore } from '../../store/graph-store'
 import type { NoteNode } from '../../types/flow'
@@ -16,7 +16,7 @@ import { formatDistanceToNow } from '../../utils/date'
 
 
 type ListRowMeta = {
-  icon: typeof Note02Icon
+  icon: AppIconComponent
   label: string
   onOpen?: () => void
 }
@@ -63,7 +63,7 @@ function useListRowMeta(node: NoteNode): ListRowMeta {
 
   if (node.data?.style?.type === 'folder') {
     return {
-      icon: Folder01Icon,
+      icon: FolderTreeIcon,
       label: node.data.label?.markdown?.trim() || 'Untitled folder',
       onOpen: boardId
         ? () => {
@@ -79,14 +79,14 @@ function useListRowMeta(node: NoteNode): ListRowMeta {
 
   if (node.data?.type === 'document') {
     return {
-      icon: Pdf02Icon,
+      icon: PdfIcon,
       label: node.data.label?.markdown?.trim() || 'Untitled document',
     }
   }
 
   if (node.data?.style?.type === 'widget') {
     return {
-      icon: Analytics02Icon,
+      icon: LearnWidgetIcon,
       label: node.data.label?.markdown?.trim() || 'Untitled widget',
       onOpen: boardCanEdit ? () => openNodeSurface(node.id, 'widget') : undefined,
     }
@@ -94,14 +94,14 @@ function useListRowMeta(node: NoteNode): ListRowMeta {
 
   if (node.data?.style?.type === 'code-sandbox') {
     return {
-      icon: ComputerTerminal01Icon,
+      icon: ConsoleIcon,
       label: node.data.label?.markdown?.trim() || 'Untitled sandbox',
       onOpen: boardCanEdit ? () => openNodeSurface(node.id, 'code-sandbox') : undefined,
     }
   }
 
   return {
-    icon: Note02Icon,
+    icon: WriteNoteStarterIcon,
     label: node.data.label?.markdown?.trim() || 'Untitled note',
     onOpen: boardCanEdit ? () => openNodeSurface(node.id, 'sheet') : undefined,
   }
@@ -120,6 +120,7 @@ type ListRowProps = {
  */
 const ListRow = memo(function ListRow({ node, index, isLast }: ListRowProps) {
   const { icon, label, onOpen } = useListRowMeta(node)
+  const Icon = icon
   const setNodesPersist = useGraphStore(state => state.setNodesPersist)
   const setEdgesPersist = useGraphStore(state => state.setEdgesPersist)
   const boardCanEdit = useGraphStore(state => state.boardCanEdit)
@@ -147,7 +148,7 @@ const ListRow = memo(function ListRow({ node, index, isLast }: ListRowProps) {
         onDoubleClick={() => onOpen?.()}
         title={onOpen ? `Double-click to open ${label}` : label}
       >
-        <HugeiconsIcon icon={icon} className='size-5 shrink-0 text-muted-foreground' strokeWidth={1.9} />
+        <Icon className='size-5 shrink-0 text-muted-foreground' strokeWidth={1.9} />
         <span className='min-w-0 flex-1 truncate text-sm font-medium text-foreground'>
           {label}
         </span>
@@ -171,7 +172,7 @@ const ListRow = memo(function ListRow({ node, index, isLast }: ListRowProps) {
             aria-label={`Delete ${label}`}
             title='Delete'
           >
-            <HugeiconsIcon icon={Delete02Icon} className='size-4' strokeWidth={2} />
+            <DeleteIcon className='size-4' strokeWidth={2} />
           </button>
         ) : null}
       </div>

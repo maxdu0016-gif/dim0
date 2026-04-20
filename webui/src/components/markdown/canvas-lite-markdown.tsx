@@ -415,11 +415,11 @@ const getFontFamily = (type: InlineType, fontFamily: FontFamily): string => {
 /**
  * Resolves pixel font size for renderer layout and drawing.
  */
-const getFontSizePx = (fontSize: FontSize, _fontFamily: FontFamily): number =>
+const getFontSizePx = (fontSize: FontSize): number =>
   FONT_SIZE_MAP[fontSize]
 
 
-const getLineHeightPx = (fontSize: FontSize, _fontFamily: FontFamily): number =>
+const getLineHeightPx = (fontSize: FontSize): number =>
   LINE_HEIGHT_MAP[fontSize]
 
 
@@ -436,7 +436,7 @@ const getCanvasFont = ({
   fontFamily: FontFamily
   fontSize: FontSize
   textStyle: TextStyle
-}) => `${getFontStyle(type, textStyle)} ${getFontWeight(type, textStyle)} ${getFontSizePx(fontSize, fontFamily)}px ${getFontFamily(type, fontFamily)}`
+}) => `${getFontStyle(type, textStyle)} ${getFontWeight(type, textStyle)} ${getFontSizePx(fontSize)}px ${getFontFamily(type, fontFamily)}`
 
 
 /**
@@ -462,7 +462,7 @@ const measureText = ({
   const cached = widthCache.get(key)
   if (cached !== undefined) return cached
 
-  if (!measureCtx) return text.length * getFontSizePx(fontSize, fontFamily) * 0.55
+  if (!measureCtx) return text.length * getFontSizePx(fontSize) * 0.55
 
   measureCtx.font = font
   const width = measureCtx.measureText(text).width
@@ -719,7 +719,7 @@ export const estimateMarkdownContentHeight = ({
     textStyle,
   }
   const lines = layoutTokens(tokenize(text), layoutOpts)
-  const lineHeight = getLineHeightPx(fontSize, fontFamily)
+  const lineHeight = getLineHeightPx(fontSize)
   return getContentHeight(lines, lineHeight) + CONTENT_HEIGHT_BUFFER
 }
 
@@ -772,8 +772,8 @@ const drawToCanvas = (ctx: CanvasRenderingContext2D, opts: RenderOptions, lines:
   ctx.fillStyle = opts.textColor
   ctx.strokeStyle = opts.textColor
 
-  const fontSizePx = getFontSizePx(opts.fontSize, opts.fontFamily)
-  const lineHeight = getLineHeightPx(opts.fontSize, opts.fontFamily)
+  const fontSizePx = getFontSizePx(opts.fontSize)
+  const lineHeight = getLineHeightPx(opts.fontSize)
   const contentHeight = getContentHeight(lines, lineHeight)
   const availableHeight = Math.max(0, opts.height)
   const shouldCenterVertically = contentHeight <= availableHeight

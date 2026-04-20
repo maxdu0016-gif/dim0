@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import type { ChatMessage } from "../../types/chat"
-import { CopyIcon, CursorMagicSelection04Icon, Tick01Icon } from "@hugeicons/core-free-icons"
-import { HugeiconsIcon } from "@hugeicons/react"
+import { CheckIcon, CopyActionIcon, SelectionContextIcon } from "@/components/icons"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -64,7 +63,7 @@ export const UserMessage = ({ message, isLatest }: { message: ChatMessage, isLat
                   aria-label="Show message context"
                 >
                   <Badge variant="secondary" className="text-[10px] bg-muted text-muted-foreground flex items-center gap-1 px-1.5 py-0.5">
-                    <HugeiconsIcon icon={CursorMagicSelection04Icon} className="size-3 shrink-0" strokeWidth={2} />
+                    <SelectionContextIcon className="size-3 shrink-0" strokeWidth={2} />
                     <span>Context</span>
                   </Badge>
                 </button>
@@ -94,7 +93,7 @@ const CopyUserMessageButton = ({ text, className }: { text: string, className?: 
     })
   }
 
-  const icon = copied ? Tick01Icon : CopyIcon
+  const Icon = copied ? CheckIcon : CopyActionIcon
 
   return (
     <button
@@ -102,7 +101,7 @@ const CopyUserMessageButton = ({ text, className }: { text: string, className?: 
       onClick={handleCopy}
       type="button"
     >
-      <HugeiconsIcon icon={icon} className="size-4 shrink-0" strokeWidth={2} />
+      <Icon className="size-4 shrink-0" strokeWidth={2} />
       <span>Copy</span>
     </button>
   )

@@ -13,8 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu"
-import { HugeiconsIcon } from "@hugeicons/react"
-import { ChatAdd01Icon, Clock02Icon, Message02Icon, PlusSignIcon } from "@hugeicons/core-free-icons"
+import { AddIcon, ChatHistoryIcon, ChatNewIcon, ClockIcon } from "@/components/icons"
 import { useNavigate, useParams, useRouterState } from "@tanstack/react-router"
 import { useAppStore } from "@/store"
 
@@ -62,20 +61,20 @@ const HistoryList = ({
               size="icon"
               className="rounded-md border border-border shadow-sm bg-accent hover:bg-background transition-colors"
             >
-              <HugeiconsIcon icon={Message02Icon} className="size-4" strokeWidth={2} />
+              <ChatHistoryIcon className="size-4" strokeWidth={2} />
               <span className="sr-only">Open chat history</span>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-72 max-h-80 overflow-y-auto scrollbar-thin">
             <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wide flex flex-row items-center gap-0">
-              <HugeiconsIcon icon={Clock02Icon} className="size-4 mr-2 inline-block" strokeWidth={2} />
+              <ClockIcon className="size-4 mr-2 inline-block" strokeWidth={2} />
               <span>Chat History</span>
             </div>
             <DropdownMenuItem
               onSelect={onNewChat}
               className="text-sm font-medium text-primary cursor-pointer flex flex-row items-center gap-0"
             >
-              <HugeiconsIcon icon={PlusSignIcon} className="size-4 mr-2" strokeWidth={2} />
+              <AddIcon className="size-4 mr-2" strokeWidth={2} />
               <span>Create new chat</span>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
@@ -116,11 +115,11 @@ const HistoryList = ({
     <div className="w-full max-w-[900px] mx-auto p-2 sm:p-4">
       <div className="flex items-center justify-between mb-2">
         <div className="text-sm font-medium text-muted-foreground flex flex-row items-center gap-0">
-          <HugeiconsIcon icon={Clock02Icon} className="size-4 mr-2 inline-block" strokeWidth={2} />
+          <ClockIcon className="size-4 mr-2 inline-block" strokeWidth={2} />
           <span>Chat History</span>
         </div>
         <Button variant="ghost" size="sm" onClick={onNewChat} className="flex flex-row items-center gap-0">
-          <HugeiconsIcon icon={PlusSignIcon} className="size-4 mr-2" strokeWidth={2} />
+          <ChatNewIcon className="size-4 mr-2" strokeWidth={2} />
           <span>New Chat</span>
         </Button>
       </div>
@@ -240,7 +239,7 @@ const ChatBody = ({
           aria-label="Create new chat"
           title="Create new chat"
         >
-          <HugeiconsIcon icon={ChatAdd01Icon} className="size-4" strokeWidth={2} />
+          <ChatNewIcon className="size-4" strokeWidth={2} />
         </Button>
       </div>
 

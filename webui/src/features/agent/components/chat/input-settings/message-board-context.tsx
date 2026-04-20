@@ -1,7 +1,6 @@
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { SelectionContextIcon } from "@/components/icons"
 import { useChatStore } from "@/features/agent/store/chat-store"
-import { CursorMagicSelection04Icon } from "@hugeicons/core-free-icons"
-import { HugeiconsIcon } from "@hugeicons/react"
 import { clsx } from "clsx"
 
 
@@ -31,7 +30,7 @@ export const MessageBoardContextChoiceMenu = () => {
             onClick={handleToggle}
             aria-label="Toggle selected nodes context"
           >
-            <HugeiconsIcon icon={CursorMagicSelection04Icon} className="size-4 shrink-0" strokeWidth={2} />
+            <SelectionContextIcon className="size-4 shrink-0" strokeWidth={2} />
           </button>
         </TooltipTrigger>
       </div>

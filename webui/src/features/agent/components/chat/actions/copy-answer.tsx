@@ -1,5 +1,4 @@
-import { CopyIcon, Tick01Icon } from "@hugeicons/core-free-icons"
-import { HugeiconsIcon } from "@hugeicons/react"
+import { CheckIcon, CopyActionIcon } from "@/components/icons"
 import { useState } from "react"
 import { toast } from "sonner"
 
@@ -19,7 +18,7 @@ export const CopyAnswer = ({ answer }: { answer: string }) => {
     })
   }
 
-  const icon = copied ? Tick01Icon : CopyIcon
+  const Icon = copied ? CheckIcon : CopyActionIcon
 
   return (
     <button
@@ -28,7 +27,7 @@ export const CopyAnswer = ({ answer }: { answer: string }) => {
       aria-label={actionLabel}
       title={actionLabel}
     >
-      <HugeiconsIcon icon={icon} className='size-4 shrink-0' strokeWidth={2} />
+      <Icon className='size-4 shrink-0' strokeWidth={2} />
       <span>Copy</span>
     </button>
   )

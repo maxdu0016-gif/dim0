@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button"
+import { LoaderIcon, SendIcon } from "@/components/icons"
 import { cn } from "@/lib/utils"
-import { LoaderCircle, Send } from "lucide-react"
 import type React from "react"
 
 
@@ -22,8 +22,8 @@ export function SendButton({  className,
     >
       {
         loadingStatus === "loaded" ?
-        <Send className="size-4 shrink-0" strokeWidth={2} /> :
-        <LoaderCircle className="size-4 shrink-0 animate-spin" strokeWidth={2} />
+        <SendIcon className="size-4 shrink-0" strokeWidth={2} /> :
+        <LoaderIcon className="size-4 shrink-0 animate-spin" strokeWidth={2} />
       }
     </Button>
   )

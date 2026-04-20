@@ -11,8 +11,15 @@ import { useCreateBoard } from "@/features/board/api/create-board"
 import { useListBoards } from "@/features/board/api/list-boards"
 import { UNTITLED_LABEL } from "@/features/board/const"
 import { useGraphStore } from "@/features/board/store/graph-store"
-import { CancelIcon, ChartBubbleIcon, CheckmarkCircle03Icon, GitForkIcon, NotebookIcon, ReloadIcon } from "@hugeicons/core-free-icons"
-import { HugeiconsIcon } from "@hugeicons/react"
+import {
+  CancelStatusIcon,
+  CheckCircleStatusIcon,
+  LoaderRefreshIcon,
+  NotebookIcon,
+  SchemaMapIcon,
+  TreeMapIcon,
+  type AppIconComponent,
+} from "@/components/icons"
 import { useNavigate } from "@tanstack/react-router"
 import clsx from "clsx"
 import { useState } from "react"
@@ -21,23 +28,26 @@ import { useAppStore } from "@/store"
 
 
 // Spinner icon for loading state
-const LoadingIcon = () => <HugeiconsIcon
-  icon={ReloadIcon}
-  className="size-4 animate-spin [animation-duration:750ms]"
-  strokeWidth={2}
-/>
+const LoadingIcon = () => (
+  <LoaderRefreshIcon
+    className="size-4 animate-spin [animation-duration:750ms]"
+    strokeWidth={2}
+  />
+)
 
-const SuccessIcon = () => <HugeiconsIcon
-  icon={CheckmarkCircle03Icon}
-  className="text-foreground size-4"
-  strokeWidth={2}
-/>
+const SuccessIcon = () => (
+  <CheckCircleStatusIcon
+    className="text-foreground size-4"
+    strokeWidth={2}
+  />
+)
 
-const ErrorIcon = () => <HugeiconsIcon
-  icon={CancelIcon}
-  className="text-destructive size-4"
-  strokeWidth={2}
-/>
+const ErrorIcon = () => (
+  <CancelStatusIcon
+    className="text-destructive size-4"
+    strokeWidth={2}
+  />
+)
 
 
 export interface SaveAsNoteProps {
@@ -202,7 +212,11 @@ export const SaveAsNote = ({
   }
 
   const label = type === "notify" ? "Notify" : type === "mapify" ? "Mapify" : "Schemify"
-  const icon = type === "notify" ? NotebookIcon : type === "mapify" ? GitForkIcon : ChartBubbleIcon
+  const Icon: AppIconComponent = type === "notify"
+    ? NotebookIcon
+    : type === "mapify"
+      ? TreeMapIcon
+      : SchemaMapIcon
   const actionLabel = type === "notify"
     ? "Convert current answer to a sticky note"
     : type === "mapify"
@@ -216,7 +230,7 @@ export const SaveAsNote = ({
 
   const iconCpn = processing ?
     <LoadingIcon /> :
-    <HugeiconsIcon icon={icon} className="size-4" strokeWidth={2} />
+    <Icon className="size-4" strokeWidth={2} />
 
   return (
     <>

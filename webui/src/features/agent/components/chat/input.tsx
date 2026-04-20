@@ -25,9 +25,8 @@ import { buildContextTextFromNodes } from '@/features/board/utils/context-text'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
+import { AlertIcon } from '@/components/icons'
 import { toast } from 'sonner'
-import { HugeiconsIcon } from '@hugeicons/react'
-import { Alert02Icon } from '@hugeicons/core-free-icons'
 
 export interface InputBarProps {
   attachedBoardId?: string
@@ -376,7 +375,7 @@ export const InputBar = ({
         <DialogContent className="sm:max-w-[560px]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <HugeiconsIcon icon={Alert02Icon} className="size-5 shrink-0 text-secondary-foreground" strokeWidth={2} />
+              <AlertIcon className="size-5 shrink-0 text-secondary-foreground" strokeWidth={2} />
               <span>{limitDialogCopy?.title}</span>
             </DialogTitle>
             <DialogDescription className="text-sm leading-7 text-foreground/80">

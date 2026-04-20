@@ -8,8 +8,7 @@ import { matchPredefined, PREDEFINED_TOPICS, TOPIC_DISPLAY, TOPIC_EMOJI } from '
 import { useCreateSubscription } from '../api/create-subscription'
 import { useCreateNewsfeed } from '../api/create-newsfeed'
 import { generateUuid } from '@/lib/common'
-import { HugeiconsIcon } from '@hugeicons/react'
-import { Tick01Icon } from '@hugeicons/core-free-icons'
+import { CheckIcon } from '@/components/icons'
 
 type Step = 'editing' | 'creating'
 
@@ -90,6 +89,7 @@ export function CreateSubscriptionDialog({
                 {PREDEFINED_TOPICS.map(k => {
                   const label = TOPIC_DISPLAY[k]
                   const active = (matchPredefined(topic) === k)
+                  const TopicIcon = TOPIC_EMOJI[k]
                   return (
                     <Badge
                       key={k}
@@ -103,9 +103,9 @@ export function CreateSubscriptionDialog({
                       onClick={() => setTopic(k)}
                     >
                       <span className='inline-flex items-center gap-1'>
-                        {active
-                          ? <HugeiconsIcon icon={Tick01Icon} strokeWidth={2} className='w-4 h-4' />
-                          : <HugeiconsIcon icon={TOPIC_EMOJI[k]} strokeWidth={2} className='w-4 h-4' />
+                      {active
+                          ? <CheckIcon strokeWidth={2} className='w-4 h-4' />
+                          : <TopicIcon strokeWidth={2} className='w-4 h-4' />
                         }
                       </span>
                       {label}

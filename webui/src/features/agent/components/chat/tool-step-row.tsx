@@ -1,12 +1,11 @@
 import { useMemo, useState, type ReactNode } from "react"
+import { ExternalLinkIcon, LinkIcon, NoteIcon as ThoughtIcon } from "@/components/icons"
 import { Link, useSearch } from "@tanstack/react-router"
 import type { ToolCallStep } from "../../types/stream"
 import { ToolNameIcon } from "../../types/stream"
 import { extractStepDescription, getWebSearchUrls } from "../../utils/stream/build"
 import type { CodeInterpreterOutput, CreateNoteOutput, EditNoteOutput, WriteNoteOutput } from "../../types/tool-outputs"
 import type { ToolStepWidgetAttachment } from "./tool-step-widgets"
-import { HugeiconsIcon } from "@hugeicons/react"
-import { IdeaIcon, Search01Icon, Tick01Icon } from "@hugeicons/core-free-icons"
 import { MiniLinkCard } from "../link-preview"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
@@ -16,7 +15,6 @@ import ImageSearchStrip from "@/features/widgets/components/image-card"
 import { ImageGenView } from "./image-gen-view"
 import { NoteWidgetPreview } from "./note-widget-preview"
 import { useChat } from "../../hooks/chat-context"
-import { ArrowUpRightIcon } from "lucide-react"
 import { BoardUrl } from "@/routes"
 
 
@@ -29,7 +27,7 @@ const ReasoningMessage = ({
   return (
     <div className='text-muted-foreground p-0 space-y-1 italic'>
       <div className='flex items-center gap-2 font-medium cursor-pointer text-xs'>
-        <HugeiconsIcon icon={IdeaIcon} className='size-4' strokeWidth={2} />
+        <ThoughtIcon className='size-4' strokeWidth={2} />
         <span>Thought</span>
       </div>
       <span className='text-sm'>{reasoning}</span>
@@ -108,7 +106,7 @@ const NoteToolResult = ({
           title='Open on board'
           aria-label='Open on board'
         >
-          <ArrowUpRightIcon className='size-3.5' />
+          <ExternalLinkIcon className='size-3.5' />
         </Link>
       </div>
       <div className='mt-1 text-sm text-card-foreground whitespace-pre-line'>
@@ -218,13 +216,12 @@ export const ToolStepRow = ({
   const isLoading = isStreaming && step.state === "started"
   const messageClass = "transition-all w-full h-auto min-h-2 min-w-0 overflow-x-hidden overflow-y-auto scrollbar-thin py-2 rounded-xl"
   const spanMessageClass = "text-sm text-card-foreground whitespace-pre-line"
-  const stepIcon = ToolNameIcon[step.name]
-  const successIcon = stepIcon || Tick01Icon
+  const StepIcon = ToolNameIcon[step.name]
   const successDivClass = cn(
     "absolute rounded-full bg-primary z-20 flex items-center justify-center top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2",
-    stepIcon ? "w-4 h-4 bg-transparent text-muted-foreground" : "w-3 h-3 bg-primary text-primary-foreground"
+    "w-4 h-4 bg-transparent text-muted-foreground"
   )
-  const iconClass = stepIcon ? "size-4" : "size-3"
+  const iconClass = "size-4"
   const canExpand = !isStreaming && (
     reasoning !== "" ||
     !!input ||
@@ -249,7 +246,7 @@ export const ToolStepRow = ({
           )}
           {!isLoading && (
             <div className={successDivClass}>
-              <HugeiconsIcon icon={successIcon} className={iconClass} strokeWidth={2} />
+              <StepIcon className={iconClass} strokeWidth={2} />
             </div>
           )}
           {isLoading && (
@@ -283,7 +280,7 @@ export const ToolStepRow = ({
                 onClick={() => void handleInputCopy(input)}
                 title={input}
               >
-                <HugeiconsIcon icon={Search01Icon} strokeWidth={2} className='size-3 shrink-0' />
+                <LinkIcon strokeWidth={2} className='size-3 shrink-0' />
                 <span className='truncate min-w-0 text-left'>{input}</span>
                 {isInputCopied && <span className='text-xs text-primary shrink-0'>copied</span>}
               </button>

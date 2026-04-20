@@ -1,9 +1,8 @@
 import { useNavigate } from "@tanstack/react-router"
+import { AddIcon } from "@/components/icons"
 import { UNTITLED_LABEL } from "../const"
 import type { Graph } from "../types/board"
 import { useCreateBoard } from "../api/create-board"
-import { HugeiconsIcon } from "@hugeicons/react"
-import { PlusSignIcon } from "@hugeicons/core-free-icons"
 import { formatDateForUI } from "../utils/datetime"
 
 
@@ -100,11 +99,7 @@ export const NewBoardCard = () => {
       `}
       onClick={handleClick}
     >
-      <HugeiconsIcon
-        icon={PlusSignIcon}
-        className='shrink-0 size-6 text-secondary-foreground'
-        strokeWidth={2}
-      />
+      <AddIcon className='shrink-0 size-6 text-secondary-foreground' strokeWidth={2} />
       <span className='font-medium text-sm text-secondary-foreground'>New Board</span>
     </div>
   )
