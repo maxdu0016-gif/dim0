@@ -182,6 +182,229 @@
   outline: none;
 }
 
+/* ── shiki dual-theme ───────────────────────────────────────────────────── */
+
+.shiki,
+.shiki span {
+  color: var(--shiki-light) !important;
+  font-style: var(--shiki-light-font-style) !important;
+  font-weight: var(--shiki-light-font-weight) !important;
+}
+
+.shiki {
+  background-color: var(--shiki-light-bg) !important;
+}
+
+.dark .shiki,
+.dark .shiki span {
+  color: var(--shiki-dark) !important;
+  font-style: var(--shiki-dark-font-style) !important;
+  font-weight: var(--shiki-dark-font-weight) !important;
+}
+
+.dark .shiki {
+  background-color: var(--shiki-dark-bg) !important;
+}
+
+/* ── code block node view ───────────────────────────────────────────────── */
+
+.tiptap-editor .ProseMirror .code-block-node {
+  margin: 1rem 0;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+
+.code-block-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.25rem 0.5rem 0.25rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--muted);
+}
+
+.code-block-lang-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.code-block-lang-select {
+  appearance: none;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-family: var(--font-sans);
+  font-size: 0.7rem;
+  color: var(--muted-foreground);
+  padding-right: 1rem;
+  cursor: pointer;
+}
+
+.code-block-lang-select:hover { color: var(--foreground); }
+
+.code-block-lang-caret {
+  position: absolute;
+  right: 0.25rem;
+  pointer-events: none;
+  color: var(--muted-foreground);
+}
+
+.code-block-copy-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 4px;
+  border: none;
+  background: transparent;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+}
+
+.code-block-copy-btn:hover {
+  background: var(--border);
+  color: var(--foreground);
+}
+
+/* Stacked grid: Shiki layer behind, editable layer in front */
+.code-block-body {
+  display: grid;
+  overflow-x: auto;
+}
+
+.code-block-shiki-layer,
+.code-block-edit-pre {
+  grid-area: 1 / 1;
+}
+
+.code-block-shiki-layer {
+  pointer-events: none;
+  user-select: none;
+}
+
+.code-block-shiki-layer .shiki {
+  margin: 0 !important;
+  padding: 1rem 1.25rem !important;
+  border-radius: 0 !important;
+  font-family: var(--font-mono) !important;
+  font-size: 0.875rem !important;
+  line-height: 1.6 !important;
+  overflow: visible !important;
+}
+
+/* Override the general pre styles inside the node view */
+.tiptap-editor .ProseMirror .code-block-edit-pre {
+  margin: 0 !important;
+  padding: 1rem 1.25rem !important;
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  font-family: var(--font-mono) !important;
+  font-size: 0.875rem !important;
+  line-height: 1.6 !important;
+  overflow: visible !important;
+  position: relative;
+  z-index: 1;
+  tab-size: 2;
+}
+
+/* Transparent text once Shiki overlay is ready; caret stays visible */
+.code-block-edit-pre.shiki-loaded .code-block-editable {
+  color: transparent !important;
+  caret-color: var(--foreground);
+}
+
+.code-block-editable {
+  display: block;
+  outline: none;
+  background: transparent;
+  white-space: pre;
+  tab-size: 2;
+}
+
+.code-block-editable ::selection {
+  background: oklch(0.55 0.11 38 / 0.35) !important;
+}
+
+/* ── math (KaTeX) ───────────────────────────────────────────────────────── */
+
+.tiptap-editor .ProseMirror .Tiptap-mathematics-editor {
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  background: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.1em 0.35em;
+}
+
+.tiptap-editor .ProseMirror .Tiptap-mathematics-render {
+  cursor: pointer;
+  padding: 0.1em 0.2em;
+  border-radius: 3px;
+  transition: background 0.1s;
+}
+
+.tiptap-editor .ProseMirror .Tiptap-mathematics-render:hover {
+  background: var(--muted);
+}
+
+/* ── tables ─────────────────────────────────────────────────────────────── */
+
+.tiptap-editor .ProseMirror table {
+  border-collapse: collapse;
+  margin: 1rem 0;
+  width: 100%;
+  table-layout: fixed;
+  font-size: 0.9rem;
+  overflow: hidden;
+  border-radius: 6px;
+}
+
+.tiptap-editor .ProseMirror table td,
+.tiptap-editor .ProseMirror table th {
+  border: 1px solid var(--border);
+  padding: 0.4rem 0.65rem;
+  vertical-align: top;
+  position: relative;
+  min-width: 80px;
+}
+
+.tiptap-editor .ProseMirror table th {
+  background: var(--muted);
+  font-weight: 600;
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  text-align: left;
+}
+
+.tiptap-editor .ProseMirror table td > *,
+.tiptap-editor .ProseMirror table th > * {
+  margin: 0;
+}
+
+.tiptap-editor .ProseMirror table .selectedCell {
+  background: oklch(0.55 0.11 38 / 0.1);
+}
+
+.tiptap-editor .ProseMirror table .column-resize-handle {
+  position: absolute;
+  right: -2px;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: oklch(0.55 0.11 38 / 0.4);
+  cursor: col-resize;
+  pointer-events: all;
+}
+
 /* ── slash command menu ─────────────────────────────────────────────────── */
 
 .slash-menu {

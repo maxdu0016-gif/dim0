@@ -11,6 +11,8 @@ import {
   Quotes,
   Code,
   Minus,
+  MathOperationsIcon,
+  TableIcon,
 } from "@phosphor-icons/react"
 
 export interface SlashCommand {
@@ -93,7 +95,23 @@ export const SLASH_COMMANDS: SlashCommand[] = [
     icon: Code,
     group: "basic",
     action: (editor, range) =>
-      editor.chain().focus().deleteRange(range).toggleCodeBlock().run(),
+      editor.chain().focus().deleteRange(range).setCodeBlock({ language: "plaintext" }).run(),
+  },
+  {
+    title: "Math block",
+    keywords: ["math", "latex", "equation", "formula", "katex"],
+    icon: MathOperationsIcon,
+    group: "basic",
+    action: (editor, range) =>
+      editor.chain().focus().deleteRange(range).insertContent({ type: "blockMath", content: [{ type: "text", text: "" }] }).run(),
+  },
+  {
+    title: "Table",
+    keywords: ["table", "grid", "rows", "columns"],
+    icon: TableIcon,
+    group: "basic",
+    action: (editor, range) =>
+      editor.chain().focus().deleteRange(range).insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(),
   },
   {
     title: "Divider",
