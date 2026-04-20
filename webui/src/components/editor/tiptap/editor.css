@@ -528,21 +528,6 @@
   font-style: italic;
 }
 
-.tag-chip-key {
-  color: var(--muted-foreground);
-  font-size: 0.7rem;
-}
-
-.tag-chip-sep {
-  color: var(--muted-foreground);
-  font-size: 0.65rem;
-}
-
-.tag-chip-val {
-  color: var(--foreground);
-  font-weight: 500;
-}
-
 /* ── block drag handle ──────────────────────────────────────────────────── */
 
 .block-handle-wrap {

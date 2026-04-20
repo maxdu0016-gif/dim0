@@ -73,8 +73,8 @@ export function TipTapEditor({ markdown, onSave, placeholder, className }: MdEdi
           <EditorBubbleMenu editor={editor} />
           <TableMenu editor={editor} />
           <BlockHandle editor={editor} />
-          <EditorContent editor={editor} />
           <TagPanel tags={tags} />
+          <EditorContent editor={editor} />
         </div>
         <TocPanel editor={editor} scrollRef={scrollRef} />
       </div>
