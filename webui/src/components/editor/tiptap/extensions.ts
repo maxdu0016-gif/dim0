@@ -27,6 +27,28 @@ const SlashCommand = Extension.create({
   },
 })
 
+/** Traps Tab inside the editor: indents in code blocks, sinks list items elsewhere, and prevents focus escape everywhere. */
+const TabHandler = Extension.create({
+  name: "tabHandler",
+  addKeyboardShortcuts() {
+    return {
+      Tab: () => {
+        const { editor } = this
+        if (editor.isActive("codeBlock")) return editor.commands.insertContent("\t")
+        if (editor.isActive("listItem")) return editor.commands.sinkListItem("listItem")
+        if (editor.isActive("taskItem")) return editor.commands.sinkListItem("taskItem")
+        return true // consume Tab everywhere else to prevent focus escape
+      },
+      "Shift-Tab": () => {
+        const { editor } = this
+        if (editor.isActive("listItem")) return editor.commands.liftListItem("listItem")
+        if (editor.isActive("taskItem")) return editor.commands.liftListItem("taskItem")
+        return true
+      },
+    }
+  },
+})
+
 export function getExtensions(placeholder = "Start writing…") {
   return [
     StarterKit.configure({
@@ -52,5 +74,6 @@ export function getExtensions(placeholder = "Start writing…") {
       transformPastedText: true,
     }),
     SlashCommand,
+    TabHandler, // must be last — highest priority in TipTap's keymap chain
   ]
 }
