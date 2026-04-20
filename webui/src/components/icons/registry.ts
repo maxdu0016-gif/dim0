@@ -1,257 +1,238 @@
-import {
-  AiChipIcon,
-  AiLearningIcon,
-  AiImageIcon,
-  AiProgrammingIcon,
-  Alert02Icon,
-  AnalyticsUpIcon,
-  Album02Icon,
-  ArrowDown01Icon,
-  ArrowRight01Icon,
-  ArrowUp01Icon,
-  Award04Icon,
-  Cancel01Icon,
-  CancelCircleIcon,
-  CancelIcon,
-  ChatAdd01Icon,
-  ChatTranslateIcon as ChatTranslateGlyphIcon,
-  ChipIcon,
-  ChartBubble02Icon,
-  ChartBubbleIcon,
-  CheckmarkCircle03Icon,
-  Clock02Icon,
-  CodeIcon,
-  ComputerTerminal01Icon,
-  CopyIcon,
-  CursorMagicSelection04Icon,
-  DashboardCircleAddIcon,
-  DashboardSquare03Icon,
-  DashboardBrowsingIcon,
-  Delete02Icon,
-  DragDropIcon,
-  DocumentAttachmentIcon,
-  Download04Icon,
-  EarthIcon,
-  Edit01Icon,
-  Folder02Icon,
-  Folder01Icon,
-  GitForkIcon,
-  GlobalIcon,
-  GridViewIcon as GridViewGlyphIcon,
-  Home12Icon,
-  InformationCircleIcon,
-  Idea01Icon,
-  Image01Icon,
-  InternetIcon,
-  Layout01Icon,
-  LeftToRightListBulletIcon,
-  Link02Icon,
-  Link04Icon,
-  LinkSquare02Icon,
-  LogoutSquareIcon,
-  Mail01Icon,
-  Maximize01Icon,
-  Message02Icon,
-  MicroscopeIcon,
-  MinusSignIcon,
-  Note02Icon,
-  NoteAddIcon,
-  NoteEditIcon,
-  NoteIcon as NoteGlyphIcon,
-  NotebookIcon as NotebookGlyphIcon,
-  PencilEditIcon as PencilEditGlyphIcon,
-  PaintBoardIcon as PaintBoardGlyphIcon,
-  Pdf02Icon,
-  PinIcon as PinGlyphIcon,
-  PinOffIcon as PinOffGlyphIcon,
-  PlusSignIcon,
-  PlayIcon as PlayGlyphIcon,
-  PropertyNewIcon,
-  ReloadIcon,
-  SearchList01Icon,
-  SidebarLeft01Icon,
-  Stethoscope02Icon,
-  SquareLock01Icon,
-  SourceCodeIcon,
-  SparklesIcon as SparklesFeatureGlyphIcon,
-  ThermometerWarmIcon,
-  TextAlignLeftIcon,
-  Tick01Icon,
-  ToolsIcon,
-  UserSquareIcon as UserSquareGlyphIcon,
-  UserIcon,
-  ViewIcon as ViewGlyphIcon,
-  ViewOffSlashIcon,
-} from "@hugeicons/core-free-icons"
 import { Claude, DeepSeek, Exa, Gemini, Mistral, Moonshot, OpenAI, Perplexity, Qwen, Tavily, ZAI } from "@lobehub/icons"
 import {
-  ArrowUpRightIcon,
-  BotMessageSquare,
-  Clock,
-  Cloud,
-  CloudDrizzle,
-  CloudRain,
-  CloudSnow,
-  CloudSun,
-  Ellipsis,
-  EllipsisVertical,
-  Info,
-  ListTree,
-  Loader2,
-  LoaderCircle,
-  MailCheck,
-  MapPin,
-  Monitor,
-  Moon,
-  Send,
-  Share,
-  CircleIcon as CircleGlyphIcon,
-  Sun,
-  TrendingDown,
-  TrendingUp,
-  TriangleAlertIcon,
-  XIcon as CloseGlyphIcon,
-  ChevronDownIcon as ChevronDownGlyphIcon,
-  ChevronRightIcon as ChevronRightGlyphIcon,
-  ChevronUpIcon as ChevronUpGlyphIcon,
-  CheckIcon as CheckGlyphIcon,
-  Sparkles,
-} from "lucide-react"
-import { createHugeIcon, createLucideIcon, createReactIcon } from "./icon-base"
+  ArrowsClockwiseIcon,
+  ArrowsOutSimpleIcon,
+  ArrowSquareOutIcon,
+  BrainIcon,
+  CaretDownIcon,
+  CaretLeftIcon,
+  CaretRightIcon,
+  CaretUpIcon,
+  ChartLineIcon,
+  ChartLineUpIcon,
+  ChartScatterIcon,
+  ChatCenteredDotsIcon,
+  ChatsIcon,
+  CheckCircleIcon,
+  CheckIcon as CheckmarkGlyphIcon,
+  CircleIcon,
+  ClockIcon as ClockGlyphIcon,
+  CloudFogIcon,
+  CloudIcon,
+  CloudRainIcon,
+  CloudSnowIcon,
+  CloudSunIcon,
+  CodeIcon as CodeGlyphIcon,
+  CopyIcon,
+  DotsSixVerticalIcon,
+  DotsThreeIcon,
+  DotsThreeOutlineVerticalIcon,
+  EnvelopeIcon,
+  EyeIcon,
+  EyeSlashIcon,
+  FileCodeIcon,
+  FileDocIcon,
+  FilePdfIcon,
+  FolderIcon as FolderGlyphIcon,
+  FoldersIcon,
+  GitForkIcon,
+  GlobeHemisphereWestIcon,
+  GraduationCapIcon,
+  GraphIcon,
+  HouseIcon,
+  ImageSquareIcon,
+  ImagesIcon,
+  InfoIcon as InfoGlyphIcon,
+  LightbulbIcon,
+  LinkSimpleHorizontalIcon,
+  LinkSimpleIcon,
+  ListBulletsIcon,
+  ListMagnifyingGlassIcon,
+  LockIcon as LockGlyphIcon,
+  MapPinIcon as MapPinGlyphIcon,
+  MedalIcon,
+  MinusIcon as MinusGlyphIcon,
+  MonitorIcon as MonitorGlyphIcon,
+  MoonIcon as MoonGlyphIcon,
+  NotebookIcon as NotebookGlyphIcon,
+  NoteIcon as NoteGlyphIcon,
+  PaintBrushIcon,
+  PaperPlaneRightIcon,
+  PencilIcon,
+  PlusIcon as PlusGlyphIcon,
+  PresentationChartIcon,
+  PushPinIcon,
+  PushPinSlashIcon,
+  SelectionIcon,
+  ShareNetworkIcon,
+  SidebarSimpleIcon,
+  SignOutIcon,
+  SlidersIcon,
+  SparkleIcon,
+  SpinnerGapIcon,
+  SpinnerIcon,
+  SquaresFourIcon,
+  StackIcon,
+  StethoscopeIcon as StethoscopeGlyphIcon,
+  StopCircleIcon,
+  SunIcon as SunGlyphIcon,
+  TextAlignCenterIcon as TextAlignCenterGlyphIcon,
+  TextAlignLeftIcon as TextAlignLeftGlyphIcon,
+  TextAlignRightIcon as TextAlignRightGlyphIcon,
+  TranslateIcon,
+  TrashIcon,
+  TrendDownIcon as TrendDownGlyphIcon,
+  TrendUpIcon as TrendUpGlyphIcon,
+  TreeStructureIcon,
+  UserIcon as UserGlyphIcon,
+  UserSquareIcon as UserSquareGlyphIcon,
+  WarningCircleIcon,
+  XCircleIcon,
+  XIcon,
+} from "@phosphor-icons/react"
+import { createPhosphorIcon, createReactIcon } from "./icon-base"
 import type { AppIconComponent, AppIconName } from "./types"
 
-export const AddIcon = createHugeIcon(PlusSignIcon)
-export const AlertIcon = createHugeIcon(Alert02Icon)
-export const ArrowCollapseIcon = createHugeIcon(ArrowDown01Icon)
-export const ArrowExpandIcon = createHugeIcon(ArrowRight01Icon)
-export const ArrowRevealIcon = createHugeIcon(ArrowUp01Icon)
-export const AwardIcon = createHugeIcon(Award04Icon)
-export const BoardContextIcon = createHugeIcon(AiChipIcon)
-export const BrowserSearchIcon = createHugeIcon(EarthIcon)
-export const CancelPlainIcon = createHugeIcon(Cancel01Icon)
-export const CancelCircleStatusIcon = createHugeIcon(CancelCircleIcon)
-export const CancelStatusIcon = createHugeIcon(CancelIcon)
-export const ChatHistoryIcon = createHugeIcon(Message02Icon)
-export const ChatNewIcon = createHugeIcon(ChatAdd01Icon)
-export const ChatTranslateIcon = createHugeIcon(ChatTranslateGlyphIcon)
-export const CheckIcon = createHugeIcon(Tick01Icon)
-export const CheckCircleStatusIcon = createHugeIcon(CheckmarkCircle03Icon)
-export const CheckmarkIcon = createLucideIcon(CheckGlyphIcon)
-export const ClockIcon = createHugeIcon(Clock02Icon)
-export const ChevronDownIcon = createLucideIcon(ChevronDownGlyphIcon)
-export const ChevronRightIcon = createLucideIcon(ChevronRightGlyphIcon)
-export const ChevronUpIcon = createLucideIcon(ChevronUpGlyphIcon)
-export const CodeInterpreterIcon = createHugeIcon(CodeIcon)
-export const ConsoleIcon = createHugeIcon(ComputerTerminal01Icon)
-export const CodeStarterIcon = createHugeIcon(AiProgrammingIcon)
-export const CopyActionIcon = createHugeIcon(CopyIcon)
-export const CreateNoteIcon = createHugeIcon(NoteAddIcon)
-export const DashboardAddIcon = createHugeIcon(DashboardCircleAddIcon)
-export const DashboardIcon = createHugeIcon(DashboardSquare03Icon)
-export const DeleteIcon = createHugeIcon(Delete02Icon)
-export const Dim0Icon = createReactIcon(BotMessageSquare)
-export const DocumentIcon = createHugeIcon(DocumentAttachmentIcon)
-export const DownloadIcon = createHugeIcon(Download04Icon)
-export const DragHandleIcon = createHugeIcon(DragDropIcon)
-export const EditIcon = createHugeIcon(Edit01Icon)
-export const EditNoteIcon = createHugeIcon(NoteEditIcon)
-export const EllipsisIcon = createLucideIcon(Ellipsis)
+export const AddIcon = createPhosphorIcon(PlusGlyphIcon)
+export const AlertIcon = createPhosphorIcon(WarningCircleIcon)
+export const ArrowCollapseIcon = createPhosphorIcon(CaretDownIcon)
+export const ArrowExpandIcon = createPhosphorIcon(CaretRightIcon)
+export const ArrowRevealIcon = createPhosphorIcon(CaretUpIcon)
+export const AwardIcon = createPhosphorIcon(MedalIcon)
+export const BoardContextIcon = createPhosphorIcon(BrainIcon)
+export const BrowserSearchIcon = createPhosphorIcon(GlobeHemisphereWestIcon)
+export const CancelPlainIcon = createPhosphorIcon(XIcon)
+export const CancelCircleStatusIcon = createPhosphorIcon(XCircleIcon)
+export const CancelStatusIcon = createPhosphorIcon(XCircleIcon)
+export const ChatHistoryIcon = createPhosphorIcon(ChatsIcon)
+export const ChatNewIcon = createPhosphorIcon(PlusGlyphIcon)
+export const ChatTranslateIcon = createPhosphorIcon(TranslateIcon)
+export const CheckIcon = createPhosphorIcon(CheckmarkGlyphIcon)
+export const CheckCircleStatusIcon = createPhosphorIcon(CheckCircleIcon)
+export const CheckmarkIcon = createPhosphorIcon(CheckmarkGlyphIcon)
+export const ClockIcon = createPhosphorIcon(ClockGlyphIcon)
+export const ChevronDownIcon = createPhosphorIcon(CaretDownIcon)
+export const ChevronLeftIcon = createPhosphorIcon(CaretLeftIcon)
+export const ChevronRightIcon = createPhosphorIcon(CaretRightIcon)
+export const ChevronUpIcon = createPhosphorIcon(CaretUpIcon)
+export const CodeInterpreterIcon = createPhosphorIcon(CodeGlyphIcon)
+export const CodeBlockIcon = createPhosphorIcon(CodeGlyphIcon)
+export const ConsoleIcon = createPhosphorIcon(CodeGlyphIcon)
+export const CodeStarterIcon = createPhosphorIcon(FileCodeIcon)
+export const CopyActionIcon = createPhosphorIcon(CopyIcon)
+export const CreateNoteIcon = createPhosphorIcon(PencilIcon)
+export const DashboardAddIcon = createPhosphorIcon(SquaresFourIcon)
+export const DashboardIcon = createPhosphorIcon(SquaresFourIcon)
+export const DeleteIcon = createPhosphorIcon(TrashIcon)
+export const Dim0Icon = createPhosphorIcon(ChatCenteredDotsIcon)
+export const DocumentIcon = createPhosphorIcon(FileDocIcon)
+export const DownloadIcon = createPhosphorIcon(ArrowSquareOutIcon)
+export const DragHandleIcon = createPhosphorIcon(ArrowsOutSimpleIcon)
+export const DragGripIcon = createPhosphorIcon(DotsSixVerticalIcon)
+export const EditIcon = createPhosphorIcon(PencilIcon)
+export const EditNoteIcon = createPhosphorIcon(PencilIcon)
+export const EllipsisIcon = createPhosphorIcon(DotsThreeIcon)
 export const ExaBrandIcon = createReactIcon(Exa.Color)
-export const ExternalLinkIcon = createLucideIcon(ArrowUpRightIcon)
-export const FolderIcon = createHugeIcon(Folder02Icon)
-export const FolderTreeIcon = createHugeIcon(Folder01Icon)
+export const ExternalLinkIcon = createPhosphorIcon(ArrowSquareOutIcon)
+export const FolderIcon = createPhosphorIcon(FolderGlyphIcon)
+export const FolderTreeIcon = createPhosphorIcon(FoldersIcon)
 export const GeminiBrandIcon = createReactIcon(Gemini.Color)
-export const GlobeIcon = createHugeIcon(GlobalIcon)
-export const GridViewIcon = createHugeIcon(GridViewGlyphIcon)
-export const HomeIcon = createHugeIcon(Home12Icon)
-export const IdeaIcon = createHugeIcon(Idea01Icon)
-export const ImagePlaceholderIcon = createHugeIcon(Image01Icon)
-export const ImageGenerationIcon = createHugeIcon(AiImageIcon)
-export const ImageSearchWidgetIcon = createHugeIcon(Album02Icon)
-export const InfoCircleIcon = createHugeIcon(InformationCircleIcon)
-export const InfoIcon = createLucideIcon(Info)
-export const LoaderRefreshIcon = createHugeIcon(ReloadIcon)
-export const LearnStarterIcon = createHugeIcon(AiLearningIcon)
-export const LinkIcon = createHugeIcon(Link02Icon)
-export const LinksIcon = createHugeIcon(Link04Icon)
-export const ListTreeIcon = createLucideIcon(ListTree)
-export const Loader2Icon = createLucideIcon(Loader2)
-export const LoaderIcon = createLucideIcon(LoaderCircle)
-export const LockIcon = createHugeIcon(SquareLock01Icon)
-export const LogoutIcon = createHugeIcon(LogoutSquareIcon)
-export const LayoutIcon = createHugeIcon(Layout01Icon)
-export const MailCheckIcon = createLucideIcon(MailCheck)
-export const MailIcon = createHugeIcon(Mail01Icon)
-export const MapPinIcon = createLucideIcon(MapPin)
-export const MemorySearchIcon = createHugeIcon(ChipIcon)
+export const GlobeIcon = createPhosphorIcon(GlobeHemisphereWestIcon)
+export const GridViewIcon = createPhosphorIcon(SquaresFourIcon)
+export const HomeIcon = createPhosphorIcon(HouseIcon)
+export const IdeaIcon = createPhosphorIcon(LightbulbIcon)
+export const ImagePlaceholderIcon = createPhosphorIcon(ImageSquareIcon)
+export const ImageGenerationIcon = createPhosphorIcon(ImagesIcon)
+export const ImageSearchWidgetIcon = createPhosphorIcon(ImagesIcon)
+export const InfoCircleIcon = createPhosphorIcon(InfoGlyphIcon)
+export const InfoIcon = createPhosphorIcon(InfoGlyphIcon)
+export const LoaderRefreshIcon = createPhosphorIcon(ArrowsClockwiseIcon)
+export const LearnStarterIcon = createPhosphorIcon(GraduationCapIcon)
+export const LinkIcon = createPhosphorIcon(LinkSimpleIcon)
+export const LinksIcon = createPhosphorIcon(LinkSimpleHorizontalIcon)
+export const ListTreeIcon = createPhosphorIcon(TreeStructureIcon)
+export const Loader2Icon = createPhosphorIcon(SpinnerGapIcon)
+export const LoaderIcon = createPhosphorIcon(SpinnerIcon)
+export const LockIcon = createPhosphorIcon(LockGlyphIcon)
+export const LogoutIcon = createPhosphorIcon(SignOutIcon)
+export const LayoutIcon = createPhosphorIcon(SquaresFourIcon)
+export const MailCheckIcon = createPhosphorIcon(EnvelopeIcon)
+export const MailIcon = createPhosphorIcon(EnvelopeIcon)
+export const MapPinIcon = createPhosphorIcon(MapPinGlyphIcon)
+export const MemorySearchIcon = createPhosphorIcon(BrainIcon)
 export const MistralBrandIcon = createReactIcon(Mistral.Color)
-export const MinusIcon = createHugeIcon(MinusSignIcon)
-export const MonitorIcon = createLucideIcon(Monitor)
-export const MoonIcon = createLucideIcon(Moon)
+export const MinusIcon = createPhosphorIcon(MinusGlyphIcon)
+export const MonitorIcon = createPhosphorIcon(MonitorGlyphIcon)
+export const MoonIcon = createPhosphorIcon(MoonGlyphIcon)
 export const MoonshotBrandIcon = createReactIcon(Moonshot)
-export const NavigateIcon = createHugeIcon(EarthIcon)
-export const NotebookIcon = createHugeIcon(NotebookGlyphIcon)
-export const NoteIcon = createHugeIcon(NoteGlyphIcon)
+export const NavigateIcon = createPhosphorIcon(GlobeHemisphereWestIcon)
+export const NotebookIcon = createPhosphorIcon(NotebookGlyphIcon)
+export const NoteIcon = createPhosphorIcon(NoteGlyphIcon)
 export const OpenAIBrandIcon = createReactIcon(OpenAI)
-export const OutlineGeneratorIcon = createHugeIcon(SearchList01Icon)
-export const PencilEditIcon = createHugeIcon(PencilEditGlyphIcon)
-export const PaintBoardIcon = createHugeIcon(PaintBoardGlyphIcon)
+export const OutlineGeneratorIcon = createPhosphorIcon(ListMagnifyingGlassIcon)
+export const PencilEditIcon = createPhosphorIcon(PencilIcon)
+export const PaintBoardIcon = createPhosphorIcon(PaintBrushIcon)
 export const PerplexityBrandIcon = createReactIcon(Perplexity.Color)
-export const PdfIcon = createHugeIcon(Pdf02Icon)
-export const PinIcon = createHugeIcon(PinGlyphIcon)
-export const PinOffIcon = createHugeIcon(PinOffGlyphIcon)
-export const PlayIcon = createHugeIcon(PlayGlyphIcon)
-export const PlusIcon = createHugeIcon(PlusSignIcon)
-export const PropertyIcon = createHugeIcon(PropertyNewIcon)
+export const PdfIcon = createPhosphorIcon(FilePdfIcon)
+export const PinIcon = createPhosphorIcon(PushPinIcon)
+export const PinOffIcon = createPhosphorIcon(PushPinSlashIcon)
+export const PlayIcon = createPhosphorIcon(PlusGlyphIcon)
+export const PlusIcon = createPhosphorIcon(PlusGlyphIcon)
+export const PropertyIcon = createPhosphorIcon(SlidersIcon)
 export const QwenBrandIcon = createReactIcon(Qwen.Color)
-export const ReadNoteIcon = createHugeIcon(ViewGlyphIcon)
-export const ResearchIcon = createHugeIcon(MicroscopeIcon)
-export const RadioIndicatorIcon = createLucideIcon(CircleGlyphIcon)
-export const SchemaMapIcon = createHugeIcon(ChartBubbleIcon)
-export const SearchEngineIcon = createHugeIcon(InternetIcon)
-export const SelectionContextIcon = createHugeIcon(CursorMagicSelection04Icon)
-export const SendIcon = createLucideIcon(Send)
-export const ShareIcon = createLucideIcon(Share)
-export const SidebarMenuIcon = createLucideIcon(EllipsisVertical)
-export const SparklesFeatureIcon = createHugeIcon(SparklesFeatureGlyphIcon)
-export const SparklesIcon = createLucideIcon(Sparkles)
-export const StockWidgetIcon = createHugeIcon(DashboardBrowsingIcon)
-export const StethoscopeIcon = createHugeIcon(Stethoscope02Icon)
-export const SunIcon = createLucideIcon(Sun)
-export const SunnyIcon = createLucideIcon(Sun)
-export const SynthesizerIcon = createHugeIcon(NoteGlyphIcon)
+export const ReadNoteIcon = createPhosphorIcon(EyeIcon)
+export const ResearchIcon = createPhosphorIcon(ListMagnifyingGlassIcon)
+export const RadioIndicatorIcon = createPhosphorIcon(CircleIcon)
+export const SchemaMapIcon = createPhosphorIcon(GraphIcon)
+export const SearchEngineIcon = createPhosphorIcon(ListMagnifyingGlassIcon)
+export const SelectionContextIcon = createPhosphorIcon(SelectionIcon)
+export const SendIcon = createPhosphorIcon(PaperPlaneRightIcon)
+export const ShareIcon = createPhosphorIcon(ShareNetworkIcon)
+export const SidebarMenuIcon = createPhosphorIcon(DotsThreeOutlineVerticalIcon)
+export const SparklesFeatureIcon = createPhosphorIcon(SparkleIcon)
+export const SparklesIcon = createPhosphorIcon(SparkleIcon)
+export const StockWidgetIcon = createPhosphorIcon(ChartLineIcon)
+export const StethoscopeIcon = createPhosphorIcon(StethoscopeGlyphIcon)
+export const SunIcon = createPhosphorIcon(SunGlyphIcon)
+export const SunnyIcon = createPhosphorIcon(SunGlyphIcon)
+export const SynthesizerIcon = createPhosphorIcon(NoteGlyphIcon)
 export const TavilyBrandIcon = createReactIcon(Tavily.Color)
-export const TextListIcon = createHugeIcon(LeftToRightListBulletIcon)
-export const TextParagraphIcon = createHugeIcon(TextAlignLeftIcon)
-export const TimeClockIcon = createLucideIcon(Clock)
-export const ToolCodeIcon = createHugeIcon(SourceCodeIcon)
-export const ToolsMenuIcon = createHugeIcon(ToolsIcon)
-export const TreeMapIcon = createHugeIcon(GitForkIcon)
-export const TrendingDownIcon = createLucideIcon(TrendingDown)
-export const TrendingUpIcon = createLucideIcon(TrendingUp)
-export const UserProfileIcon = createHugeIcon(UserIcon)
-export const UserSquareIcon = createHugeIcon(UserSquareGlyphIcon)
-export const ViewIcon = createHugeIcon(ViewGlyphIcon)
-export const ViewOffIcon = createHugeIcon(ViewOffSlashIcon)
-export const ExpandIcon = createHugeIcon(Maximize01Icon)
-export const SidebarToggleIcon = createHugeIcon(SidebarLeft01Icon)
-export const SheetExternalLinkIcon = createHugeIcon(LinkSquare02Icon)
-export const CloseIcon = createLucideIcon(CloseGlyphIcon)
-export const WarningIcon = createLucideIcon(TriangleAlertIcon)
-export const WeatherCloudIcon = createLucideIcon(Cloud)
-export const WeatherCloudDrizzleIcon = createLucideIcon(CloudDrizzle)
-export const WeatherCloudRainIcon = createLucideIcon(CloudRain)
-export const WeatherCloudSnowIcon = createLucideIcon(CloudSnow)
-export const WeatherCloudSunIcon = createLucideIcon(CloudSun)
-export const VisualizeStarterIcon = createHugeIcon(ChartBubble02Icon)
-export const WeatherWidgetIcon = createHugeIcon(ThermometerWarmIcon)
-export const WebCollectorIcon = createHugeIcon(EarthIcon)
-export const WriteNoteStarterIcon = createHugeIcon(Note02Icon)
-export const WriteNoteToolIcon = createHugeIcon(NoteAddIcon)
+export const LayerStackIcon = createPhosphorIcon(StackIcon)
+export const TextListIcon = createPhosphorIcon(ListBulletsIcon)
+export const TextAlignCenterIcon = createPhosphorIcon(TextAlignCenterGlyphIcon)
+export const TextParagraphIcon = createPhosphorIcon(TextAlignLeftGlyphIcon)
+export const TextAlignRightIcon = createPhosphorIcon(TextAlignRightGlyphIcon)
+export const TimeClockIcon = createPhosphorIcon(ClockGlyphIcon)
+export const ToolCodeIcon = createPhosphorIcon(CodeGlyphIcon)
+export const ToolsMenuIcon = createPhosphorIcon(SlidersIcon)
+export const TreeMapIcon = createPhosphorIcon(GitForkIcon)
+export const TrendingDownIcon = createPhosphorIcon(TrendDownGlyphIcon)
+export const TrendingUpIcon = createPhosphorIcon(TrendUpGlyphIcon)
+export const UserProfileIcon = createPhosphorIcon(UserGlyphIcon)
+export const UserSquareIcon = createPhosphorIcon(UserSquareGlyphIcon)
+export const ViewIcon = createPhosphorIcon(EyeIcon)
+export const ViewOffIcon = createPhosphorIcon(EyeSlashIcon)
+export const ExpandIcon = createPhosphorIcon(ArrowsOutSimpleIcon)
+export const SidebarToggleIcon = createPhosphorIcon(SidebarSimpleIcon)
+export const SheetExternalLinkIcon = createPhosphorIcon(ArrowSquareOutIcon)
+export const CloseIcon = createPhosphorIcon(XIcon)
+export const PresentationIcon = createPhosphorIcon(PresentationChartIcon)
+export const StopPresentationIcon = createPhosphorIcon(StopCircleIcon)
+export const WarningIcon = createPhosphorIcon(WarningCircleIcon)
+export const WeatherCloudIcon = createPhosphorIcon(CloudIcon)
+export const WeatherCloudDrizzleIcon = createPhosphorIcon(CloudFogIcon)
+export const WeatherCloudRainIcon = createPhosphorIcon(CloudRainIcon)
+export const WeatherCloudSnowIcon = createPhosphorIcon(CloudSnowIcon)
+export const WeatherCloudSunIcon = createPhosphorIcon(CloudSunIcon)
+export const VisualizeStarterIcon = createPhosphorIcon(ChartScatterIcon)
+export const WeatherWidgetIcon = createPhosphorIcon(CloudSunIcon)
+export const WebCollectorIcon = createPhosphorIcon(GlobeHemisphereWestIcon)
+export const WriteNoteStarterIcon = createPhosphorIcon(PencilIcon)
+export const WriteNoteToolIcon = createPhosphorIcon(PencilIcon)
 export const ZAiBrandIcon = createReactIcon(ZAI)
 export const ClaudeBrandIcon = createReactIcon(Claude.Color)
 export const DeepSeekBrandIcon = createReactIcon(DeepSeek.Color)
-export const LearnWidgetIcon = createHugeIcon(AnalyticsUpIcon)
+export const LearnWidgetIcon = createPhosphorIcon(ChartLineUpIcon)
 
 
 export const iconRegistry: Record<AppIconName, AppIconComponent> = {

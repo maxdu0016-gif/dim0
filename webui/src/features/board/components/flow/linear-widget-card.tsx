@@ -1,8 +1,7 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import clsx from 'clsx'
 
-import { Analytics02Icon, Delete02Icon } from '@hugeicons/core-free-icons'
-import { HugeiconsIcon } from '@hugeicons/react'
+import { ChartBar, Trash } from '@phosphor-icons/react'
 
 import { useGraphStore } from '../../store/graph-store'
 import type { NoteNode } from '../../types/flow'
@@ -92,7 +91,7 @@ export const LinearWidgetCard = memo(function LinearWidgetCard({ node }: Props) 
         aria-label='Delete widget'
         title='Delete'
       >
-        <HugeiconsIcon icon={Delete02Icon} className='size-4' strokeWidth={2} />
+        <Trash className='size-4' />
       </button>
 
       <button
@@ -106,7 +105,7 @@ export const LinearWidgetCard = memo(function LinearWidgetCard({ node }: Props) 
         )}
       >
         <div className='flex w-full max-w-[92px] aspect-square items-center justify-center rounded-2xl border border-border/70 bg-background text-muted-foreground shadow-sm'>
-          <HugeiconsIcon icon={Analytics02Icon} className='size-12 shrink-0' strokeWidth={1.8} />
+          <ChartBar className='size-12 shrink-0' />
         </div>
       </button>
 

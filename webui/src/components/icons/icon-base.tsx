@@ -1,39 +1,26 @@
-import type { IconSvgElement } from "@hugeicons/react"
-import { HugeiconsIcon } from "@hugeicons/react"
-import type { LucideIcon } from "lucide-react"
+import type { Icon as PhosphorIcon } from "@phosphor-icons/react"
 import { createElement, type ComponentType } from "react"
 import type { AppIconComponent, AppIconProps } from "./types"
 
-/**
- * Wraps a Hugeicons glyph with the app's shared icon prop contract.
- */
-export const createHugeIcon = (icon: IconSvgElement): AppIconComponent => {
-  const HugeIcon = ({ size, strokeWidth = 2, ...props }: AppIconProps) => (
-    <HugeiconsIcon
-      icon={icon}
-      size={size}
-      strokeWidth={strokeWidth}
-      {...props}
-    />
-  )
-
-  return HugeIcon
-}
-
 
 /**
- * Wraps a Lucide component with the app's shared icon prop contract.
+ * Wraps a Phosphor component with the app's shared icon prop contract.
  */
-export const createLucideIcon = (icon: LucideIcon): AppIconComponent => {
-  const LucideWrappedIcon = ({ size, strokeWidth = 2, ...props }: AppIconProps) => (
+export const createPhosphorIcon = (icon: PhosphorIcon): AppIconComponent => {
+  const PhosphorWrappedIcon = ({
+    size,
+    strokeWidth = 2,
+    weight,
+    ...props
+  }: AppIconProps) => (
     createElement(icon, {
       size,
-      strokeWidth,
+      weight: weight ?? (strokeWidth >= 2.5 ? "bold" : strokeWidth <= 1.5 ? "light" : "regular"),
       ...props,
     })
   )
 
-  return LucideWrappedIcon
+  return PhosphorWrappedIcon
 }
 
 

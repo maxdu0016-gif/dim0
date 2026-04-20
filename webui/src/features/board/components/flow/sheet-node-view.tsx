@@ -1,7 +1,6 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { MouseEvent } from 'react'
-import { HugeiconsIcon } from '@hugeicons/react'
-import { Delete02Icon, PaintBoardIcon, PinIcon, PinOffIcon } from '@hugeicons/core-free-icons'
+import { PaintBrush, PushPin, PushPinSlash, Trash } from '@phosphor-icons/react'
 import clsx from 'clsx'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 
@@ -174,7 +173,7 @@ export const SheetNodeView = memo(function SheetNodeView({
                 aria-label='Background color'
                 title='Background color'
               >
-                <HugeiconsIcon icon={PaintBoardIcon} className='size-4 shrink-0' strokeWidth={2} />
+                <PaintBrush className='size-4 shrink-0' />
               </button>
             </PopoverTrigger>
             <PopoverContent align='end' className='w-auto p-2'>
@@ -200,8 +199,8 @@ export const SheetNodeView = memo(function SheetNodeView({
             title='Pin/Unpin'
           >
             {isPinned
-              ? <HugeiconsIcon icon={PinIcon} className='w-4 h-4 text-secondary-foreground' strokeWidth={2} />
-              : <HugeiconsIcon icon={PinOffIcon} className='w-4 h-4' strokeWidth={2} />
+              ? <PushPin className='w-4 h-4 text-secondary-foreground' />
+              : <PushPinSlash className='w-4 h-4' />
             }
           </button>
 
@@ -211,7 +210,7 @@ export const SheetNodeView = memo(function SheetNodeView({
             aria-label='Delete note'
             title='Delete'
           >
-            <HugeiconsIcon icon={Delete02Icon} className='w-4 h-4' strokeWidth={2} />
+            <Trash className='w-4 h-4' />
           </button>
         </div>
 

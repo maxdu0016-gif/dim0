@@ -15,11 +15,11 @@ import {
 import type { NoteNode, LinkEdge } from '../../types/flow'
 import { cn } from '@/lib/utils'
 import { useMemo, type ReactElement } from 'react'
+import { TextAlignCenterIcon, TextAlignRightIcon, TextParagraphIcon } from '@/components/icons'
 import { Card, CardContent } from '@/components/ui/card'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Label } from '@/components/ui/label'
 import { useGraphStore } from '../../store/graph-store'
-import { AlignCenter, AlignLeft, AlignRight } from 'lucide-react'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { ColorGrid } from './color-panel'
 import { useStyleDefaults } from '../../style-provider'
@@ -405,9 +405,9 @@ export function StylePanel<T extends StyleLike>({
     textAlign: (
       <Section title='Text align'>
         <ToggleGroup type='single' value={(s.textAlign as TextAlign) ?? 'left'} onValueChange={v => v && onStyleChange({ textAlign: v as T[keyof T] } as Partial<T>)} className='flex gap-2'>
-          <ToggleGroupItem value='left' className='h-9 w-9 items-center justify-center rounded-md border bg-muted data-[state=on]:bg-secondary-foreground/10 data-[state=on]:text-secondary-foreground'><AlignLeft className='h-4 w-4' /></ToggleGroupItem>
-          <ToggleGroupItem value='center' className='h-9 w-9 items-center justify-center rounded-md border bg-muted data-[state=on]:bg-secondary-foreground/10 data-[state=on]:text-secondary-foreground'><AlignCenter className='h-4 w-4' /></ToggleGroupItem>
-          <ToggleGroupItem value='right' className='h-9 w-9 items-center justify-center rounded-md border bg-muted data-[state=on]:bg-secondary-foreground/10 data-[state=on]:text-secondary-foreground'><AlignRight className='h-4 w-4' /></ToggleGroupItem>
+          <ToggleGroupItem value='left' className='h-9 w-9 items-center justify-center rounded-md border bg-muted data-[state=on]:bg-secondary-foreground/10 data-[state=on]:text-secondary-foreground'><TextParagraphIcon className='h-4 w-4' /></ToggleGroupItem>
+          <ToggleGroupItem value='center' className='h-9 w-9 items-center justify-center rounded-md border bg-muted data-[state=on]:bg-secondary-foreground/10 data-[state=on]:text-secondary-foreground'><TextAlignCenterIcon className='h-4 w-4' /></ToggleGroupItem>
+          <ToggleGroupItem value='right' className='h-9 w-9 items-center justify-center rounded-md border bg-muted data-[state=on]:bg-secondary-foreground/10 data-[state=on]:text-secondary-foreground'><TextAlignRightIcon className='h-4 w-4' /></ToggleGroupItem>
         </ToggleGroup>
       </Section>
     ),
@@ -504,7 +504,7 @@ export function StylePanel<T extends StyleLike>({
     strokeStyle: <LineGlyph width={2} dash={(s.strokeStyle as StrokeStyle) === 'dashed' ? [6, 4] : (s.strokeStyle as StrokeStyle) === 'dotted' ? [1, 5] : undefined} />,
     roughness: <WavyGlyph amount={(s.roughness ?? 0) * 4} />,
     roundness: <CornerGlyph r={(s.roundness ?? 0) === 2 ? 2 : 0} />,
-    textAlign: (s.textAlign as TextAlign) === 'center' ? <AlignCenter className='size-4' /> : (s.textAlign as TextAlign) === 'right' ? <AlignRight className='size-4' /> : <AlignLeft className='size-4' />,
+    textAlign: (s.textAlign as TextAlign) === 'center' ? <TextAlignCenterIcon className='size-4' /> : (s.textAlign as TextAlign) === 'right' ? <TextAlignRightIcon className='size-4' /> : <TextParagraphIcon className='size-4' />,
     fontFamily: <span className='inline-flex size-6 rounded-sm border border-border/60 items-center justify-center text-xs font-normal'>Aa</span>,
     fontSize: <span className='inline-flex size-6 rounded-sm border border-border/60 items-center justify-center text-[10px] font-normal'>{(s.fontSize as FontSize) ?? 'M'}</span>,
     textStyle: <span className='inline-flex size-6 rounded-sm border border-border/60 items-center justify-center text-[10px] font-normal'>T</span>,

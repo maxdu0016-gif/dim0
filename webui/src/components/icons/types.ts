@@ -1,8 +1,10 @@
+import type { IconWeight } from "@phosphor-icons/react"
 import type { ComponentType, SVGProps } from "react"
 
 export type AppIconProps = SVGProps<SVGSVGElement> & {
   size?: number | string
   strokeWidth?: number
+  weight?: IconWeight
 }
 
 

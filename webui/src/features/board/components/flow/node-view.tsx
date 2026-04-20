@@ -8,12 +8,12 @@ import type { NoteNode } from '../../types/flow'
 import { NodeCard } from './note-card'
 import { useGraphStore } from '../../store/graph-store'
 import clsx from 'clsx'
+import { DragGripIcon } from '@/components/icons'
 import { useTheme } from '@/components/theme-provider'
 import { darkModeDisplayHex } from '../../lib/colors/dark-variants'
 import { useContentMinHeight } from '../../hooks/use-content-min-height'
 import { ShapeChrome } from './shape-chrome'
 import { getShapeContentScale } from '../../utils/shape-content-scale'
-import { Grip } from 'lucide-react'
 import { FolderNode } from './folder-node'
 import { DEFAULT_STICKY_NOTE_HEIGHT, DEFAULT_STICKY_NOTE_WIDTH } from '../../types/note'
 
@@ -106,7 +106,7 @@ const SlideFrame = memo(function SlideFrame({ slideName }: SlideFrameProps) {
     <div className='w-full h-full relative'>
       <div className='absolute -top-7 left-1/2 -translate-x-1/2 flex items-center gap-2 text-xs font-medium text-muted-foreground slide-handle cursor-grab active:cursor-grabbing'>
         <span className='inline-flex items-center justify-center w-6 h-6 rounded-md border border-border bg-card shadow-sm'>
-          <Grip className='size-3' />
+          <DragGripIcon className='size-3' />
         </span>
         {slideName}
       </div>

@@ -1,7 +1,6 @@
 import { memo } from 'react'
+import { ArrowClockwise, ArrowCounterClockwise, DotsNine, GridFour, LockSimple, LockSimpleOpen } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
-import { HugeiconsIcon } from '@hugeicons/react'
-import { GridIcon, More01Icon, Redo03Icon, SquareLock02Icon, SquareUnlock02Icon, Undo03Icon } from '@hugeicons/core-free-icons'
 import clsx from 'clsx'
 import type { Viewport } from '@xyflow/react'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -107,7 +106,7 @@ export const ViewportControls = memo(function ViewportControls({
               aria-label='Undo'
               disabled={!canUndo}
             >
-              <HugeiconsIcon icon={Undo03Icon} className='size-4 shrink-0' strokeWidth={2} />
+              <ArrowCounterClockwise className='size-4 shrink-0' />
             </Button>
           </TooltipTrigger>
           <TooltipContent side='right' sideOffset={10}>
@@ -124,7 +123,7 @@ export const ViewportControls = memo(function ViewportControls({
               aria-label='Redo'
               disabled={!canRedo}
             >
-              <HugeiconsIcon icon={Redo03Icon} className='size-4 shrink-0' strokeWidth={2} />
+              <ArrowClockwise className='size-4 shrink-0' />
             </Button>
           </TooltipTrigger>
           <TooltipContent side='right' sideOffset={10}>
@@ -141,9 +140,9 @@ export const ViewportControls = memo(function ViewportControls({
               aria-label={isLocked ? 'Unlock canvas' : 'Lock canvas'}
             >
               {isLocked ? (
-                <HugeiconsIcon icon={SquareLock02Icon} className='size-4 shrink-0' strokeWidth={2} />
+                <LockSimple className='size-4 shrink-0' />
               ) : (
-                <HugeiconsIcon icon={SquareUnlock02Icon} className='size-4 shrink-0' strokeWidth={2} />
+                <LockSimpleOpen className='size-4 shrink-0' />
               )}
             </Button>
           </TooltipTrigger>
@@ -222,9 +221,9 @@ export const ViewportControls = memo(function ViewportControls({
                   aria-label={option.label}
                 >
                   {option.value === 'lines' ? (
-                    <HugeiconsIcon icon={GridIcon} className='size-4' strokeWidth={2} />
+                    <GridFour className='size-4' />
                   ) : option.value === 'dots' ? (
-                    <HugeiconsIcon icon={More01Icon} className='size-4' strokeWidth={2} />
+                    <DotsNine className='size-4' />
                   ) : (
                     'None'
                   )}
