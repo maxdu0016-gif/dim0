@@ -13,6 +13,7 @@ import {
   Minus,
   MathOperationsIcon,
   TableIcon,
+  CaretRightIcon,
 } from "@phosphor-icons/react"
 
 export interface SlashCommand {
@@ -88,6 +89,25 @@ export const SLASH_COMMANDS: SlashCommand[] = [
     group: "basic",
     action: (editor, range) =>
       editor.chain().focus().deleteRange(range).toggleBlockquote().run(),
+  },
+  {
+    title: "Toggle",
+    keywords: ["toggle", "details", "collapse", "expand", "disclosure"],
+    icon: CaretRightIcon,
+    group: "basic",
+    action: (editor, range) =>
+      editor
+        .chain()
+        .focus()
+        .deleteRange(range)
+        .insertContent({
+          type: "details",
+          content: [
+            { type: "detailsSummary", content: [{ type: "text", text: "" }] },
+            { type: "detailsContent", content: [{ type: "paragraph" }] },
+          ],
+        })
+        .run(),
   },
   {
     title: "Code block",

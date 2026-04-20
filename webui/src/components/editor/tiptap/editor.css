@@ -528,6 +528,63 @@
   font-style: italic;
 }
 
+/* ── toggle (details) ───────────────────────────────────────────────────── */
+
+.tiptap-editor .ProseMirror [data-type="details"] {
+  margin: 0.5rem 0;
+}
+
+.tiptap-editor .ProseMirror [data-type="details"] > button {
+  display: none; /* we use the summary's ::before arrow instead */
+}
+
+/* The toggle arrow + summary row */
+.tiptap-editor .ProseMirror details > summary,
+.tiptap-editor .ProseMirror [data-type="detailsSummary"] {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.35rem;
+  list-style: none;
+  cursor: pointer;
+  font-weight: 500;
+  outline: none;
+  user-select: none;
+}
+
+/* Hide default browser triangle */
+.tiptap-editor .ProseMirror details > summary::-webkit-details-marker,
+.tiptap-editor .ProseMirror details > summary::marker { display: none; content: ""; }
+
+/* Arrow pseudo-element */
+.tiptap-editor .ProseMirror [data-type="detailsSummary"]::before {
+  content: "▶";
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.1em;
+  height: 1.1em;
+  font-size: 0.65em;
+  flex-shrink: 0;
+  margin-top: 0.3em;
+  color: var(--muted-foreground);
+  transition: transform 0.15s ease;
+}
+
+/* Rotate when open */
+.tiptap-editor .ProseMirror [data-type="details"].is-open > [data-type="detailsSummary"]::before {
+  transform: rotate(90deg);
+}
+
+/* Content area */
+.tiptap-editor .ProseMirror [data-type="detailsContent"] {
+  padding-left: 1.45rem;
+  margin-top: 0.25rem;
+}
+
+.tiptap-editor .ProseMirror [data-type="detailsContent"] > * {
+  margin-top: 0;
+}
+
 /* ── block drag handle ──────────────────────────────────────────────────── */
 
 .block-handle-wrap {

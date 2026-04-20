@@ -12,6 +12,7 @@ import Suggestion from "@tiptap/suggestion"
 import { keymap } from "@tiptap/pm/keymap"
 import { sinkListItem, liftListItem } from "@tiptap/pm/schema-list"
 import Highlight from "@tiptap/extension-highlight"
+import { DetailsMarkdown, DetailsSummaryMarkdown, DetailsContentMarkdown } from "./toggle/toggle-extensions"
 import { TableKit } from "@tiptap/extension-table"
 import { ShikiCodeBlock } from "./code-block/code-block-extension"
 import { InlineMathMarkdown, BlockMathMarkdown } from "./math/math-extensions"
@@ -78,6 +79,9 @@ export function getExtensions(placeholder = "Start writing…") {
     InlineMathMarkdown,
     BlockMathMarkdown,
     Highlight.configure({ multicolor: false }),
+    DetailsMarkdown,
+    DetailsSummaryMarkdown,
+    DetailsContentMarkdown,
     TagDecoration,
     TableKit,
     Placeholder.configure({ placeholder }),
