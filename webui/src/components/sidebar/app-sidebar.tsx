@@ -19,7 +19,7 @@ import { ChatMenuItem, NewChatItem } from './chat'
 import { BoardItem, DashboardMenuItem, NewBoardItem } from './board'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { Chat } from '@/features/agent/types/chat'
-import { AwardIcon, ChatHistoryIcon, DownloadIcon, LogoutIcon, MinusIcon, PlusIcon, UserProfileIcon } from '@/components/icons'
+import { AwardIcon, ChatHistoryIcon, InstallAppIcon, LogoutIcon, MinusIcon, PlusIcon, UserProfileIcon } from '@/components/icons'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
   DropdownMenu,
@@ -132,7 +132,7 @@ export function AppSidebar({ onLogout }: AppSidebarProps) {
                     aria-label="Install app"
                     title="Install app"
                   >
-                    <DownloadIcon className="size-4" strokeWidth={2} />
+                    <InstallAppIcon className="size-4" strokeWidth={2} />
                   </button>
                 </div>
               </SidebarMenuItem>

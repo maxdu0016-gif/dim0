@@ -27,6 +27,7 @@ import {
   DotsSixVerticalIcon,
   DotsThreeIcon,
   DotsThreeOutlineVerticalIcon,
+  DownloadSimpleIcon,
   EnvelopeIcon,
   EyeIcon,
   EyeSlashIcon,
@@ -132,6 +133,7 @@ export const DeleteIcon = createPhosphorIcon(TrashIcon)
 export const Dim0Icon = createPhosphorIcon(TreeIcon)
 export const DocumentIcon = createPhosphorIcon(FileDocIcon)
 export const DownloadIcon = createPhosphorIcon(ArrowSquareOutIcon)
+export const InstallAppIcon = createPhosphorIcon(DownloadSimpleIcon)
 export const DragHandleIcon = createPhosphorIcon(ArrowsOutSimpleIcon)
 export const DragGripIcon = createPhosphorIcon(DotsSixVerticalIcon)
 export const DrawIcon = createPhosphorIcon(PentagramIcon)

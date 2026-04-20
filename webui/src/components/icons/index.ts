@@ -58,6 +58,7 @@ export {
   ImageSearchWidgetIcon,
   InfoCircleIcon,
   InfoIcon,
+  InstallAppIcon,
   LearnStarterIcon,
   LearnWidgetIcon,
   LinkIcon,
