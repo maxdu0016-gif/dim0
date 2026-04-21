@@ -224,7 +224,6 @@
   justify-content: space-between;
   gap: 0.5rem;
   padding: 0.25rem 0.5rem 0.25rem 0.75rem;
-  border-bottom: 1px solid var(--border);
   background: var(--muted);
 }
 
@@ -274,10 +273,17 @@
   color: var(--foreground);
 }
 
-/* Stacked grid: Shiki layer behind, editable layer in front */
+/* Stacked grid: Shiki layer behind, editable layer in front.
+   Background matches the Shiki theme so trailing empty lines (which Shiki trims)
+   and the 80ms debounce window don't expose the page behind the shorter shiki pre. */
 .code-block-body {
   display: grid;
   overflow-x: auto;
+  background: #faf4ed; /* rose-pine-dawn base */
+}
+
+.dark .code-block-body {
+  background: #191724; /* rose-pine base */
 }
 
 .code-block-shiki-layer,
@@ -293,6 +299,7 @@
 .code-block-shiki-layer .shiki {
   margin: 0 !important;
   padding: 1rem 1.25rem !important;
+  border: none !important;
   border-radius: 0 !important;
   font-family: var(--font-mono) !important;
   font-size: 0.875rem !important;
