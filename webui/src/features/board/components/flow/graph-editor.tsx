@@ -44,6 +44,7 @@ import { useAddMindMapToBoard } from '../../api/add-mindmap-to-board'
 import { useCopyPasteNodes } from '../../hooks/use-copy-paste'
 import { useCenterAroundParam } from '../../hooks/use-center-around'
 import { useBoardShortcuts } from '../../hooks/use-board-shortcuts'
+import { useDropImageUpload } from '../../hooks/use-drop-image-upload'
 import { PresentationControls } from './presentation-controls'
 import { useTheme } from '@/components/theme-provider'
 import { useIsMobile } from '@/hooks/use-mobile'
@@ -430,6 +431,11 @@ export default function GraphEditor() {
     [viewMode, screenToFlowPosition, setLastCursorPosition],
   )
 
+  const { onDragOver: handleImageDragOver, onDrop: handleImageDrop } = useDropImageUpload({
+    enabled: viewMode === 'graph' && boardCanEdit && !effectiveIsLocked,
+    screenToFlowPosition,
+  })
+
   const handleNodeDoubleClick = useCallback<NonNullable<ReactFlowProps<NoteNode, LinkEdge>['onNodeDoubleClick']>>(
     (event, node) => {
       if (!boardId) return
@@ -720,6 +726,8 @@ export default function GraphEditor() {
         style={{ backgroundColor: displayBoardBackground }}
         onDoubleClick={handlePaneDoubleClick}
         onMouseMove={handlePaneMouseMove}
+        onDragOver={handleImageDragOver}
+        onDrop={handleImageDrop}
       >
         {viewMode === 'graph' ? (
           <GraphContextMenu nodes={nodes} setNodesPersist={setNodesPersist}>

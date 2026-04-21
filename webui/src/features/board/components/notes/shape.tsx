@@ -11,6 +11,7 @@ import { useGraphStore } from '../../store/graph-store'
 import { useTheme } from '@/components/theme-provider'
 
 
+
 type TextAlign = 'left' | 'center' | 'right'
 const MARKDOWN_RENDER_SCALE = 1
 const hasMathSyntax = (value: string) => value.includes('$$')
@@ -89,122 +90,35 @@ const TextareaInput = memo(function TextareaInput({
 
 
 /**
- * Props for rendering image node content with optional caption overlay.
+ * Props for rendering image node content.
  */
 type ImageNodeViewProps = {
   imageUrl?: string
-  value: string
-  labelEditing: boolean
-  isResizingNode: boolean
-  onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void
-  onKeyDown: (event: ReactKeyboardEvent<HTMLTextAreaElement>) => void
-  placeholder: string
-  textareaRef?: RefObject<HTMLTextAreaElement | null>
-  renderWidth?: number
-  renderHeight?: number
-  renderTextColor?: string
-  renderFontFamily: FontFamily
-  renderFontSize: FontSize
-  renderTextStyle: TextStyle
-  zoom: number
-  isMoving: boolean
   onCanvasRenderReadyChange?: (ready: boolean) => void
 }
 
 
 /**
- * Image node renderer that overlays editable markdown caption content.
+ * Image node renderer. The caption lives outside this component as a separate
+ * overlay in NodeCard so it is not mixed with the image surface.
  */
 const ImageNodeView = memo(function ImageNodeView({
   imageUrl,
-  value,
-  labelEditing,
-  isResizingNode,
-  onChange,
-  onKeyDown,
-  placeholder,
-  textareaRef,
-  renderWidth,
-  renderHeight,
-  renderTextColor,
-  renderFontFamily,
-  renderFontSize,
-  renderTextStyle,
-  zoom,
-  isMoving,
   onCanvasRenderReadyChange,
 }: ImageNodeViewProps) {
-  const { resolvedTheme } = useTheme()
-  const hasLabel = value.trim().length > 0
-  const renderMathWithDom = hasMathSyntax(value)
-  const usesCanvas = !labelEditing && !isResizingNode && hasLabel && !renderMathWithDom
-
-  // Non-canvas branches should not block min-height flow in parent.
   useEffect(() => {
-    if (!usesCanvas) {
-      onCanvasRenderReadyChange?.(true)
-    }
-  }, [usesCanvas, onCanvasRenderReadyChange])
+    onCanvasRenderReadyChange?.(true)
+  }, [onCanvasRenderReadyChange])
 
   return (
     <div className='relative w-full h-full rounded-md'>
-      <div className='absolute inset-0 flex items-center justify-center'>
-        {imageUrl ? (
-          <ImageShape imageUrl={imageUrl} className="w-full h-full" />
-        ) : (
-          <div className='w-full h-full flex items-center justify-center text-sm text-muted-foreground/60'>
-            No image selected
-          </div>
-        )}
-      </div>
-
-      <div className={`absolute left-3 right-3 -bottom-4 transform translate-y-1/2 flex justify-center z-10 ${labelEditing ? '' : 'pointer-events-none'}`}>
-        {labelEditing ? (
-          <TextareaInput
-            className='nodrag nopan nowheel w-full border border-border rounded-md bg-background/90 text-sm text-center shadow-sm px-3 py-2'
-            value={value}
-            onChange={onChange}
-            onKeyDown={onKeyDown}
-            placeholder={placeholder}
-            textareaRef={textareaRef}
-            minRows={1}
-            readOnly={false}
-          />
-        ) : isResizingNode && hasLabel ? (
-          <LiteMarkdown
-            text={value}
-            className='px-3 py-1 rounded-md text-sm text-center bg-background/70 backdrop-blur shadow-sm text-card-foreground'
-          />
-        ) : hasLabel ? (
-          renderMathWithDom ? (
-            <LiteMarkdown
-              text={value}
-              className='px-3 py-1 rounded-md text-sm text-center bg-background/70 backdrop-blur shadow-sm text-card-foreground'
-            />
-          ) : (
-          <CanvasLiteMarkdown
-            text={value}
-            className='px-3 py-1 rounded-md text-sm text-center bg-background/70 backdrop-blur shadow-sm text-card-foreground'
-            width={renderWidth ? Math.max(60, renderWidth - 24) : 280}
-            height={renderHeight ? Math.max(40, Math.floor(renderHeight * 0.35)) : 90}
-            renderScale={MARKDOWN_RENDER_SCALE}
-            zoom={zoom}
-            isMoving={isMoving}
-            align='center'
-            textColor={renderTextColor}
-            fontFamily={renderFontFamily}
-            fontSize={renderFontSize}
-            textStyle={renderTextStyle}
-            resolvedTheme={resolvedTheme}
-            onRenderReadyChange={onCanvasRenderReadyChange}
-          />
-          )
-        ) : (
-          <div className='px-3 py-1 rounded-md text-sm text-center bg-background/70 backdrop-blur shadow-sm text-muted-foreground/70'>
-            {placeholder}
-          </div>
-        )}
-      </div>
+      {imageUrl ? (
+        <ImageShape imageUrl={imageUrl} className="w-full h-full" />
+      ) : (
+        <div className='w-full h-full flex items-center justify-center text-sm text-muted-foreground/60'>
+          No image selected
+        </div>
+      )}
     </div>
   )
 })
@@ -427,21 +341,6 @@ export const Shape = memo(function Shape({
     return (
       <ImageNodeView
         imageUrl={imageUrl}
-        value={value}
-        labelEditing={labelEditing}
-        isResizingNode={isResizingNode}
-        onChange={onChange}
-        onKeyDown={handleTextareaKeyDown}
-        placeholder={placeHolder}
-        textareaRef={textareaRef}
-        renderWidth={renderWidth}
-        renderHeight={renderHeight}
-        renderTextColor={renderTextColor}
-        renderFontFamily={renderFontFamily}
-        renderFontSize={renderFontSize}
-        renderTextStyle={renderTextStyle}
-        zoom={zoom}
-        isMoving={isMoving}
         onCanvasRenderReadyChange={onCanvasRenderReadyChange}
       />
     )

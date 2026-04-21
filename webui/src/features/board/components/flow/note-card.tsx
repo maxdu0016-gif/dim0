@@ -5,6 +5,7 @@ import { Shape } from "../notes/shape"
 import { DocumentCardView } from "./document-card-view"
 import { CodeSandboxNode } from "./code-sandbox-node"
 import { WidgetNode } from "./widget-node"
+import { NodeTitleCaption } from "./node-title-caption"
 import { useGraphStore } from "../../store/graph-store"
 import { darkModeDisplayHex } from "../../lib/colors/dark-variants"
 import { fontFamilyToTwClass, fontSizeToTwClass, textStyleToTwClass } from "../../types/style"
@@ -141,6 +142,7 @@ export const NodeCard = memo(function NodeCard({
   const isCodeSandbox = note.style.type === "code-sandbox"
   const isWidget = note.style.type === "widget"
   const isText = note.style.type === "text"
+  const isImage = note.style.type === "image"
   const nonSheetDisplayValue = note.content?.markdown || note.label?.markdown || ""
 
   const setNodesPersist = useGraphStore((state) => state.setNodesPersist)
@@ -332,6 +334,33 @@ export const NodeCard = memo(function NodeCard({
       )
     }
 
+    if (isImage) {
+      return (
+        <LabelContainer
+          className={labelClass}
+          textColor={textColor}
+          onDoubleClick={handleLabelDoubleClick}
+          onPointerDown={stopDragging}
+        >
+          <div className="group relative flex h-full w-full items-center justify-center overflow-visible">
+            <NoteDisplayContent
+              note={note}
+              labelEditing={labelEditing}
+              labelDraft={labelDraft}
+              textareaRef={textareaRef}
+              onLabelChange={handleLabelChange}
+              contentRef={contentRef}
+              textColor={textColor}
+              nodeWidth={nodeWidth}
+              nodeHeight={nodeHeight}
+              onCanvasRenderReadyChange={onCanvasRenderReadyChange}
+            />
+            <ImageCaptionOverlay note={note} selected={selected} />
+          </div>
+        </LabelContainer>
+      )
+    }
+
     return (
       <LabelContainer
         className={labelClass}
@@ -374,5 +403,36 @@ export const NodeCard = memo(function NodeCard({
         onOpen={handleOpenSheet}
       />
     </LabelContainer>
+  )
+})
+
+
+type ImageCaptionOverlayProps = {
+  note: Note
+  selected: boolean
+}
+
+
+/**
+ * Caption rendered below an image node. Hidden by default; revealed on hover,
+ * when the node is selected, or while the caption is being edited.
+ */
+const ImageCaptionOverlay = memo(function ImageCaptionOverlay({
+  note,
+  selected,
+}: ImageCaptionOverlayProps) {
+  const [editing, setEditing] = useState(false)
+  const reveal = selected || editing
+
+  return (
+    <NodeTitleCaption
+      note={note}
+      placeholder="Add caption…"
+      onEditingChange={setEditing}
+      className={clsx(
+        "pointer-events-auto absolute left-1/2 top-full z-20 mt-2 w-full max-w-[220px] -translate-x-1/2 transition-opacity",
+        reveal ? "opacity-100" : "opacity-0 group-hover:opacity-100",
+      )}
+    />
   )
 })
