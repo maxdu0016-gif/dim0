@@ -38,7 +38,7 @@ def create_write_note_tool(
         perform a major restructure, or change the note type. For localized updates to an
         existing note, use `edit_note` instead. Always identify an existing note by `note_id`,
         never by label, because labels are descriptive and may change. If the user asks for a
-        sticky note or post-it, use `note_type="sheet"`.
+        rich-text document or long-form note, use `note_type="sheet"`.
 
         Args:
             content (str): The complete note body after this write, such as prose, markdown, code, or widget source.
@@ -124,7 +124,7 @@ def create_create_note_tool(
         Keep content short and concise, with only light markdown when helpful.
         DEPRECATED: prefer `write_note` for new integrations. This tool remains for
         backward compatibility.
-        If the user asks for a sticky note or post-it, use `note_type="sheet"`.
+        If the user asks for a rich-text document or long-form note, use `note_type="sheet"`.
         If the user asks for a code note or runnable snippet, use `code-sandbox` and put the code in `content`.
         If the user asks for an HTML widget, first use `learn_generate_html_widget`
             and then store the full HTML in `content` with `note_type="widget"`.
