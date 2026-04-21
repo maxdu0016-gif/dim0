@@ -55,7 +55,7 @@ export function NewChatItem({
         className='text-xs text-secondary-foreground font-medium truncate cursor-pointer'
         isActive={isActive}
       >
-        <ChatNewIcon className='text-xs shrink-0 text-sidebar-icon-4' strokeWidth={2} />
+        <ChatNewIcon className='text-xs shrink-0 text-sidebar-icon-4' weight={isActive ? 'fill' : undefined} strokeWidth={2} />
         <span>New Chat</span>
       </SidebarMenuButton>
     </SidebarMenuItem>

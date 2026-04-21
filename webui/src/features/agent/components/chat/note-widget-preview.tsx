@@ -82,7 +82,7 @@ export const NoteWidgetPreview = ({
         html={note.content.markdown}
         title={note.label?.markdown || "Widget preview"}
         autoHeight
-        maxHeight={800}
+        maxHeight={1200}
         minHeight={260}
         className='w-full border-0 bg-transparent rounded-sm'
       />

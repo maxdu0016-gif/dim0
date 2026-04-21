@@ -73,6 +73,7 @@ import {
   PresentationChartIcon,
   ProjectorScreenChartIcon,
   PushPinIcon,
+  ScrollIcon as ScrollGlyphIcon,
   PushPinSlashIcon,
   PuzzlePieceIcon as PuzzlePieceGlyphIcon,
   SelectionIcon,
@@ -275,6 +276,7 @@ export const ZAiBrandIcon = createReactIcon(ZAI)
 export const ClaudeBrandIcon = createReactIcon(Claude.Color)
 export const DeepSeekBrandIcon = createReactIcon(DeepSeek.Color)
 export const LearnWidgetIcon = createPhosphorIcon(ChartPieSliceIcon)
+export const ScrollIcon = createPhosphorIcon(ScrollGlyphIcon)
 
 
 export const iconRegistry: Record<AppIconName, AppIconComponent> = {

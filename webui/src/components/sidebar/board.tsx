@@ -36,7 +36,7 @@ export function DashboardMenuItem() {
         className="text-xs font-medium truncate"
         isActive={isActive}
       >
-        <DashboardAddIcon className="shrink-0 size-4 text-sidebar-icon-2" strokeWidth={2} />
+        <DashboardAddIcon className="shrink-0 size-4 text-sidebar-icon-2" weight={isActive ? 'fill' : undefined} strokeWidth={2} />
         <span>Dashboard</span>
       </SidebarMenuButton>
     </SidebarMenuItem>
@@ -164,7 +164,7 @@ export function BoardItem({ boardId, label }: { boardId: string, label?: string 
                 className="text-xs font-medium truncate"
                 isActive={isActive}
               >
-                  <BoardContextIcon className="shrink-0 size-4" />
+                  <BoardContextIcon className="shrink-0 size-4" weight={isActive ? 'fill' : undefined} />
                   <span>{boardDisplayLabel}</span>
                 </SidebarMenuButton>
               </ContextMenuTrigger>

@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from "react"
-import { ExternalLinkIcon, NoteIcon as ThoughtIcon } from "@/components/icons"
+import { ChevronDownIcon, ExternalLinkIcon, Loader2Icon, NoteIcon as ThoughtIcon } from "@/components/icons"
 import { Link, useSearch } from "@tanstack/react-router"
 import type { ToolCallStep } from "../../types/stream"
 import { ToolNameIcon } from "../../types/stream"
@@ -291,16 +291,14 @@ export const ToolStepRow = ({
         <div className='rounded-lg border border-sidebar-border overflow-hidden flex flex-col'>
           <div className='bg-muted px-3 py-2 flex flex-row items-start gap-3'>
             <div className='relative flex-shrink-0 w-6 h-6'>
-              {isLoading && (
-                <div className='absolute animate-ping w-3 h-3 rounded-full bg-accent-foreground/75 z-20 top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2' />
-              )}
-              {!isLoading && (
+              {isLoading ? (
+                <div className={cn(successDivClass, 'text-wiki-link')}>
+                  <Loader2Icon className={cn(iconClass, 'animate-spin')} strokeWidth={2} />
+                </div>
+              ) : (
                 <div className={successDivClass}>
                   <StepIcon className={iconClass} strokeWidth={2} />
                 </div>
-              )}
-              {isLoading && (
-                <div className='absolute w-2 h-2 rounded-full bg-accent-foreground z-20 top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2' />
               )}
             </div>
             <div className='flex-1 min-w-0 flex flex-col gap-1'>
@@ -310,15 +308,20 @@ export const ToolStepRow = ({
                   {message}
                 </span>
               )}
-              {canExpand && !viewMore && (
-                <button
-                  className='text-xs text-muted-foreground font-sans hover:underline self-start'
-                  onClick={() => setViewMore(true)}
-                >
-                  Show details
-                </button>
-              )}
             </div>
+            {canExpand && (
+              <button
+                className='flex-shrink-0 text-muted-foreground hover:text-foreground transition-colors p-1 -mr-1'
+                onClick={() => setViewMore((v) => !v)}
+                aria-label={viewMore ? 'Collapse details' : 'Expand details'}
+                aria-expanded={viewMore}
+              >
+                <ChevronDownIcon
+                  className={cn('size-4 transition-transform', viewMore && 'rotate-180')}
+                  strokeWidth={2}
+                />
+              </button>
+            )}
           </div>
           {canExpand && viewMore && (
             <div className='bg-sidebar px-3 py-3 flex flex-col gap-2 w-full min-w-0'>
@@ -346,12 +349,6 @@ export const ToolStepRow = ({
                   {sources.map((source, index) => <MiniLinkCard key={index} annotation={source} />)}
                 </div>
               )}
-              <button
-                className='text-xs text-muted-foreground font-sans hover:underline self-start'
-                onClick={() => setViewMore(false)}
-              >
-                Show less
-              </button>
             </div>
           )}
         </div>

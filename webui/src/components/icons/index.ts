@@ -115,6 +115,7 @@ export {
   ReadNoteIcon,
   ResearchIcon,
   SchemaMapIcon,
+  ScrollIcon,
   SearchEngineIcon,
   SelectionContextIcon,
   SendIcon,

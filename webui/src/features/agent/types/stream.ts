@@ -5,11 +5,11 @@ import {
   EditNoteIcon,
   ImageGenerationIcon,
   ImageSearchWidgetIcon,
-  LearnWidgetIcon,
   MemorySearchIcon,
   NoteIcon,
   OutlineGeneratorIcon,
   ReadNoteIcon,
+  ScrollIcon,
   StockWidgetIcon,
   ToolCodeIcon,
   WeatherWidgetIcon,
@@ -165,7 +165,7 @@ export const ToolNameIcon: Record<string, AppIconComponent> = {
   display_weather_widget: WeatherWidgetIcon,
   display_stock_widget: StockWidgetIcon,
   display_image_search_widget: ImageSearchWidgetIcon,
-  learn_generate_html_widget: LearnWidgetIcon,
+  learn_generate_html_widget: ScrollIcon,
 }
 
 

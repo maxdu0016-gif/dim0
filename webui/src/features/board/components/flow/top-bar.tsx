@@ -194,10 +194,10 @@ export const TopBar = memo(function TopBar({
             <DropdownMenuTrigger asChild>
               <Button variant={null} size='default' className={activeButtonClass}>
                 {viewMode === 'graph'
-                  ? <GraphViewIcon className='size-4 shrink-0' />
+                  ? <GraphViewIcon className='size-4 shrink-0' weight='fill' />
                   : viewMode === 'linear'
-                    ? <GridViewIcon className='size-4 shrink-0' />
-                    : <ListViewIcon className='size-4 shrink-0' />
+                    ? <GridViewIcon className='size-4 shrink-0' weight='fill' />
+                    : <ListViewIcon className='size-4 shrink-0' weight='fill' />
                 }
                 <span className='sr-only md:not-sr-only text-[10px]'>{currentViewLabel}</span>
                 <ChevronDownIcon className='hidden size-3 shrink-0 text-muted-foreground md:block' />
@@ -232,7 +232,7 @@ export const TopBar = memo(function TopBar({
                 <div className='relative'>
                   {enableSelection
                     ? <HandPanIcon className='size-4 shrink-0' />
-                    : <HandGrabIcon className='size-4 shrink-0' />
+                    : <HandGrabIcon className='size-4 shrink-0' weight='fill' />
                   }
                   {renderButtonShortcut('P')}
                 </div>
@@ -244,7 +244,7 @@ export const TopBar = memo(function TopBar({
             <TooltipTrigger asChild>
               <Button variant={null} size='icon' onClick={() => setEnableSelection(!enableSelection)} className={enableSelection ? activeButtonClass : normalButtonClass} aria-label='Selection mode'>
                 <div className='relative'>
-                  <CursorSelectIcon className='size-4 shrink-0' />
+                  <CursorSelectIcon className='size-4 shrink-0' weight={enableSelection ? 'fill' : undefined} />
                   {renderButtonShortcut('V')}
                 </div>
               </Button>
@@ -335,7 +335,7 @@ export const TopBar = memo(function TopBar({
                 disabled={!boardId}
               >
                 <div className='relative'>
-                  <PresentationIcon className='size-4 shrink-0' />
+                  <PresentationIcon className='size-4 shrink-0' weight={slidesPanelOpen ? 'fill' : undefined} />
                   {renderButtonShortcut('M')}
                 </div>
               </Button>
@@ -491,7 +491,7 @@ export const TopBar = memo(function TopBar({
             disabled={!boardId}
           >
             <div className='relative'>
-              <ChatHistoryIcon className='size-4 shrink-0 text-sidebar-icon-4' />
+              <ChatHistoryIcon className='size-4 shrink-0 text-sidebar-icon-4' weight={chatOpen ? 'fill' : undefined} />
               {renderButtonShortcut('C')}
             </div>
           </Button>
@@ -511,7 +511,7 @@ export const TopBar = memo(function TopBar({
             aria-label='Share board'
             disabled={!boardId}
           >
-            <ShareIcon className='size-4 shrink-0' />
+            <ShareIcon className='size-4 shrink-0' weight={isPublicShared ? 'fill' : undefined} />
           </Button>
         </TooltipTrigger>
         <TooltipContent side='bottom' sideOffset={10}>{tooltipCopy.share}</TooltipContent>
