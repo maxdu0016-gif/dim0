@@ -74,6 +74,7 @@ export const EdgeView = memo(function EdgeView({
   const { resolvedTheme } = useTheme()
   const isDark = resolvedTheme === 'dark'
   const { screenToFlowPosition } = useReactFlow()
+  const isMoving = useGraphStore(state => state.isMoving)
 
   const sourceNodeSlice = useGraphStore(useShallow(selectEdgeNodeSlice(source)))
   const targetNodeSlice = useGraphStore(useShallow(selectEdgeNodeSlice(target)))
@@ -163,7 +164,7 @@ export const EdgeView = memo(function EdgeView({
   })
 
   const roughSeed = useMemo(() => hashSeed(id ?? `${source}->${target}`), [id, source, target])
-  const roughDisabled = Boolean(edgeData.labelEditing)
+  const roughDisabled = isMoving || Boolean(edgeData.labelEditing)
   const isSolidStroke = (linkStyle?.strokeStyle ?? 'solid') === 'solid'
   const freehandDisabled = roughDisabled || !isSolidStroke
   const roughMainPath = useRoughPath(pathData?.path ?? null, {
