@@ -76,7 +76,7 @@ def get_default_note_size(note_type: NodeType) -> tuple[int, int]:  # noqa: C901
     if note_type == NodeType.CODE_SANDBOX:
         return 320, 320
     if note_type == NodeType.WIDGET:
-        return 360, 260
+        return 800, 500
     if note_type == NodeType.ELLIPSE:
         return 320, 320
     if note_type == NodeType.LAYERED_CIRCLE:
