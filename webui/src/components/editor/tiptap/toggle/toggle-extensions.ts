@@ -11,7 +11,7 @@ import type MarkdownIt from "markdown-it"
  */
 export const DetailsMarkdown = Details.extend({
   addOptions() {
-    return { ...this.parent?.(), persist: true }
+    return { ...this.parent!(), persist: true }
   },
 
   addStorage() {
