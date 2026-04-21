@@ -14,12 +14,13 @@ import { useGraphStore } from "@/features/board/store/graph-store"
 import {
   CancelStatusIcon,
   CheckCircleStatusIcon,
-  LoaderRefreshIcon,
+  CircleNotchIcon,
   NotebookIcon,
   SchemaMapIcon,
   TreeMapIcon,
   type AppIconComponent,
 } from "@/components/icons"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { useNavigate } from "@tanstack/react-router"
 import clsx from "clsx"
 import { useState } from "react"
@@ -29,7 +30,7 @@ import { useAppStore } from "@/store"
 
 // Spinner icon for loading state
 const LoadingIcon = () => (
-  <LoaderRefreshIcon
+  <CircleNotchIcon
     className="size-4 animate-spin [animation-duration:750ms]"
     strokeWidth={2}
   />
@@ -56,6 +57,7 @@ export interface SaveAsNoteProps {
   saveAsIs?: boolean
   boardId?: string
   useAnchors?: boolean
+  compact?: boolean
 }
 
 
@@ -66,6 +68,7 @@ export const SaveAsNote = ({
   saveAsIs = false,
   boardId,
   useAnchors = false,
+  compact = false,
 }: SaveAsNoteProps) => {
   const [processing, setProcessing] = useState<boolean>(false)
   const userId = useAppStore(s => s.userId)
@@ -224,7 +227,8 @@ export const SaveAsNote = ({
     : "Convert current answer to a schema"
 
   const buttonClass = clsx(
-    "transition-all text-xs text-muted-foreground hover:text-foreground flex flex-row items-center gap-2 p-1 rounded-md",
+    "transition-all text-muted-foreground hover:text-foreground flex flex-row items-center rounded-md",
+    compact ? "justify-center size-8" : "text-xs gap-2 p-1",
     processing && "opacity-75 pointer-events-none"
   )
 
@@ -232,20 +236,48 @@ export const SaveAsNote = ({
     <LoadingIcon /> :
     <Icon className="size-4" strokeWidth={2} />
 
+  const dropdownTrigger = (
+    <DropdownMenuTrigger asChild>
+      <button
+        className={buttonClass}
+        aria-label={actionLabel}
+        title={actionLabel}
+      >
+        {iconCpn}
+        {!compact && <span>{label}</span>}
+      </button>
+    </DropdownMenuTrigger>
+  )
+
+  const contextTrigger = (
+    <ContextMenuTrigger asChild>
+      <button
+        className={buttonClass}
+        onClick={() => boardId && launchGeneration(boardId)}
+        aria-label={actionLabel}
+        title={actionLabel}
+      >
+        {iconCpn}
+        {!compact && <span>{label}</span>}
+      </button>
+    </ContextMenuTrigger>
+  )
+
+  const withTooltip = (trigger: React.ReactNode) =>
+    compact ? (
+      <Tooltip>
+        <TooltipTrigger asChild>{trigger}</TooltipTrigger>
+        <TooltipContent side='left'>{label}</TooltipContent>
+      </Tooltip>
+    ) : (
+      trigger
+    )
+
   return (
     <>
       {!boardId ? (
         <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              className={buttonClass}
-              aria-label={actionLabel}
-              title={actionLabel}
-            >
-              {iconCpn}
-              <span>{label}</span>
-            </button>
-          </DropdownMenuTrigger>
+          {withTooltip(dropdownTrigger)}
           <DropdownMenuContent className="w-48">
             <DropdownMenuLabel>Boards</DropdownMenuLabel>
             <DropdownMenuSeparator />
@@ -261,17 +293,7 @@ export const SaveAsNote = ({
         </DropdownMenu>
       ) : (
         <ContextMenu>
-          <ContextMenuTrigger asChild>
-            <button
-              className={buttonClass}
-              onClick={() => launchGeneration(boardId)}
-              aria-label={actionLabel}
-              title={actionLabel}
-            >
-              {iconCpn}
-              <span>{label}</span>
-            </button>
-          </ContextMenuTrigger>
+          {withTooltip(contextTrigger)}
           <ContextMenuContent className="w-48">
             <ContextMenuLabel>Select a different board</ContextMenuLabel>
             <ContextMenuSeparator />

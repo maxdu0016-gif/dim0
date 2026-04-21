@@ -38,8 +38,8 @@ export function CopilotSheet({
         </SheetHeader>
         <div className="px-4 py-3 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 text-sm font-medium">
-            <div className="flex items-center justify-center rounded-full bg-secondary-foreground size-6">
-              <SparklesIcon className="size-3.5 text-white" weight="fill" />
+            <div className="flex items-center justify-center rounded-md bg-gradient-to-br from-wiki-link to-secondary-foreground size-6 shadow-sm">
+              <SparklesIcon className="size-3.5 text-primary-foreground" weight="fill" />
             </div>
             Board Assistant
           </div>

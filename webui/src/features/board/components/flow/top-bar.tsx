@@ -478,13 +478,11 @@ export const TopBar = memo(function TopBar({
         </>
       )}
 
-      <Separator orientation="vertical" className='md:!h-6 hidden md:block' />
-
       <Tooltip>
         <TooltipTrigger asChild>
           <Button
             variant={null}
-            className={chatOpen ? activeButtonClass : normalButtonClass}
+            className={clsx(chatOpen ? activeButtonClass : normalButtonClass, 'md:hidden')}
             size='icon'
             onClick={() => setOpenChatDialog(!chatOpen)}
             aria-label='Open assistant'
