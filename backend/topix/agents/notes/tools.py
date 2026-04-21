@@ -9,7 +9,12 @@ from agents import FunctionTool, RunContextWrapper
 from topix.agents.datatypes.context import Context
 from topix.agents.datatypes.outputs import CreateNoteOutput, EditNoteOutput, GetNoteOutput, WriteNoteOutput
 from topix.agents.datatypes.tools import AgentToolName
-from topix.agents.notes.service import build_note, get_default_note_size
+from topix.agents.notes.service import (
+    SHEET_MIN_HEIGHT,
+    SHEET_MIN_WIDTH,
+    build_note,
+    get_default_note_size,
+)
 from topix.agents.tool_handler import ToolHandler
 from topix.datatypes.note.style import NodeType
 from topix.datatypes.property import SizeProperty
@@ -81,10 +86,17 @@ def create_write_note_tool(
             "style": {"type": note_type},
         }
         if note_type != existing_note.style.type and note_type == NodeType.SHEET:
-            width, height = get_default_note_size(note_type)
-            patch.setdefault("properties", {})["node_size"] = SizeProperty(
-                size=SizeProperty.Size(width=width, height=height)
-            ).model_dump()
+            existing_size = existing_note.properties.node_size.size
+            needs_seed = (
+                existing_size is None
+                or existing_size.width < SHEET_MIN_WIDTH
+                or existing_size.height < SHEET_MIN_HEIGHT
+            )
+            if needs_seed:
+                width, height = get_default_note_size(note_type)
+                patch.setdefault("properties", {})["node_size"] = SizeProperty(
+                    size=SizeProperty.Size(width=width, height=height)
+                ).model_dump()
 
         updated_note = await graph_store.patch_note(note_id, patch)
         if updated_note is None:

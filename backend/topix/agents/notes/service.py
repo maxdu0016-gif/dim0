@@ -13,6 +13,8 @@ from topix.store.graph import GraphStore
 DEFAULT_NOTE_GAP = 80
 DEFAULT_CHILD_OFFSET_X = 40
 DEFAULT_CHILD_OFFSET_Y = 80
+SHEET_MIN_WIDTH = 200
+SHEET_MIN_HEIGHT = 120
 DEFAULT_NOTE_COLORS_HEX = [
     "#d2bfb4",
     "#f1bd85",
@@ -64,7 +66,7 @@ def build_default_note_style(note_type: NodeType) -> Style:
 def get_default_note_size(note_type: NodeType) -> tuple[int, int]:  # noqa: C901
     """Mirror the frontend default note sizes for the supported node types."""
     if note_type == NodeType.SHEET:
-        return 368, 360
+        return 320, 200
     if note_type == NodeType.TEXT:
         return 300, 20
     if note_type == NodeType.SLIDE:
