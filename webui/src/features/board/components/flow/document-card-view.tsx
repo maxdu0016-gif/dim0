@@ -54,6 +54,7 @@ type DocumentCardContentProps = {
   isDark: boolean
   textColor?: string
   suspendContent?: boolean
+  hideBadge?: boolean
 }
 
 
@@ -64,6 +65,7 @@ type DocumentCardContentProps = {
 export const DocumentCardContent = memo(function DocumentCardContent({
   note,
   textColor,
+  hideBadge = false,
 }: DocumentCardContentProps) {
   const title = note.label?.markdown?.trim() || ""
   const body = useMemo(
@@ -71,18 +73,28 @@ export const DocumentCardContent = memo(function DocumentCardContent({
     [note.content?.markdown],
   )
 
+  const paddingTop = hideBadge ? 30 : CARD_PADDING_Y
+
   return (
     <div
       className="relative z-10 flex flex-col h-full w-full min-w-0"
-      style={{ padding: `${CARD_PADDING_Y}px ${CARD_PADDING_X}px`, color: textColor }}
+      style={{
+        paddingTop,
+        paddingRight: CARD_PADDING_X,
+        paddingBottom: CARD_PADDING_Y,
+        paddingLeft: CARD_PADDING_X,
+        color: textColor,
+      }}
     >
-      <div
-        className="flex items-center gap-1 font-handwriting text-foreground/50"
-        style={{ fontSize: 12, marginBottom: BADGE_GAP }}
-      >
-        <NotepadIcon className="size-3.5 shrink-0" strokeWidth={2} />
-        <span className="leading-none">Sheet</span>
-      </div>
+      {!hideBadge && (
+        <div
+          className="flex items-center gap-1 font-handwriting text-foreground/50"
+          style={{ fontSize: 12, marginBottom: BADGE_GAP }}
+        >
+          <NotepadIcon className="size-3.5 shrink-0" strokeWidth={2} />
+          <span className="leading-none">Sheet</span>
+        </div>
+      )}
 
       <div
         className="font-handwriting font-bold leading-tight truncate"
@@ -119,6 +131,7 @@ type DocumentCardViewProps = {
   isDark: boolean
   isPinned: boolean
   textColor?: string
+  hideBadge?: boolean
   onTogglePin: (event: MouseEvent<HTMLButtonElement>) => void
   onDelete: (event: MouseEvent<HTMLButtonElement>) => void
   onOpen: () => void
@@ -136,6 +149,7 @@ export const DocumentCardView = memo(function DocumentCardView({
   isDark,
   isPinned,
   textColor,
+  hideBadge,
   onTogglePin,
   onDelete,
   onOpen,
@@ -201,6 +215,7 @@ export const DocumentCardView = memo(function DocumentCardView({
         isDark={isDark}
         textColor={textColor}
         suspendContent={suspendContent}
+        hideBadge={hideBadge}
       />
     </div>
   )

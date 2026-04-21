@@ -10,7 +10,7 @@ import { TAILWIND_300 } from '../../lib/colors/tailwind'
 import { formatDistanceToNow } from '../../utils/date'
 import { useTheme } from '@/components/theme-provider'
 import { darkModeDisplayHex } from '../../lib/colors/dark-variants'
-import { DocumentCardContent } from './document-card-view'
+import { DocumentCardView } from './document-card-view'
 import type { NoteWithPin } from './note-card'
 
 
@@ -114,32 +114,36 @@ export function LinearNoteCard({ node }: Props) {
   }, [boardCanEdit, isCodeSandbox, isWidget, node.id, openNodeSurface])
 
   const cardClass = clsx(
-    'transition rounded-lg relative bg-background overflow-hidden transition-all duration-200 group sticky-note-shadow paper-note-texture p-0.5',
+    'transition rounded-lg relative transition-all duration-200 group',
     usesHostedSurface && boardCanEdit && 'cursor-pointer',
-    isPinned
-      ? 'ring-2 ring-secondary-foreground/60'
-      : 'hover:ring-2 hover:ring-secondary-foreground/40'
+    isSheet
+      ? null
+      : clsx(
+        'overflow-hidden bg-background sticky-note-shadow paper-note-texture p-0.5',
+        isPinned
+          ? 'ring-2 ring-secondary-foreground/60'
+          : 'hover:ring-2 hover:ring-secondary-foreground/40',
+      ),
   )
 
   const cardBackground = isSheet ? undefined : color
   const CardBody = useMemo(() => (
     <div className={cardClass} style={cardBackground ? { backgroundColor: cardBackground } : undefined}>
-      {/* hover toolbar */}
-      <div
-        className='absolute top-0 inset-x-0 z-20 rounded-t-sm border-b border-foreground/60 pointer-events-none transition-opacity opacity-0 group-hover:opacity-100 group-hover:pointer-events-auto'
-        style={cardBackground ? { backgroundColor: cardBackground } : undefined}
-      >
-        <div className='px-1.5 py-1 w-full h-full flex items-center justify-end gap-1'>
-          <div className='flex flex-row items-center gap-2 px-1'>
-            {timeAgo && fullDate && (
-              <div className=''>
-                <span title={fullDate} className='text-xs text-muted-foreground select-none'>
-                  {timeAgo}
-                </span>
-              </div>
-            )}
-          </div>
-          {!isSheet && (
+      {!isSheet && (
+        <div
+          className='absolute top-0 inset-x-0 z-20 rounded-t-sm border-b border-foreground/60 pointer-events-none transition-opacity opacity-0 group-hover:opacity-100 group-hover:pointer-events-auto'
+          style={cardBackground ? { backgroundColor: cardBackground } : undefined}
+        >
+          <div className='px-1.5 py-1 w-full h-full flex items-center justify-end gap-1'>
+            <div className='flex flex-row items-center gap-2 px-1'>
+              {timeAgo && fullDate && (
+                <div className=''>
+                  <span title={fullDate} className='text-xs text-muted-foreground select-none'>
+                    {timeAgo}
+                  </span>
+                </div>
+              )}
+            </div>
             <Popover>
               <PopoverTrigger asChild>
                 <button
@@ -166,48 +170,55 @@ export function LinearNoteCard({ node }: Props) {
                 </div>
               </PopoverContent>
             </Popover>
-          )}
-          <button
-            className='p-1 text-foreground/80 hover:text-foreground transition-colors'
-            onClick={onTogglePin}
-            aria-label='Toggle pin'
-            title='Pin/Unpin'
-          >
-            {isPinned
-              ? <PinIcon className='w-4 h-4 text-secondary-foreground' strokeWidth={2} />
-              : <PinOffIcon className='w-4 h-4' strokeWidth={2} />
-            }
-          </button>
-          <button
-            className='p-1 text-foreground/80 hover:text-destructive transition-colors'
-            onClick={onDelete}
-            aria-label='Delete note'
-            title='Delete'
-          >
-            <DeleteIcon className='w-4 h-4' strokeWidth={2} />
-          </button>
+            <button
+              className='p-1 text-foreground/80 hover:text-foreground transition-colors'
+              onClick={onTogglePin}
+              aria-label='Toggle pin'
+              title='Pin/Unpin'
+            >
+              {isPinned
+                ? <PinIcon className='w-4 h-4 text-secondary-foreground' strokeWidth={2} />
+                : <PinOffIcon className='w-4 h-4' strokeWidth={2} />
+              }
+            </button>
+            <button
+              className='p-1 text-foreground/80 hover:text-destructive transition-colors'
+              onClick={onDelete}
+              aria-label='Delete note'
+              title='Delete'
+            >
+              <DeleteIcon className='w-4 h-4' strokeWidth={2} />
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* content area */}
       <div
         className={clsx(
-          'relative z-10 text-foreground overflow-x-hidden',
+          'relative z-10 text-foreground',
           isSheet
             ? 'h-[220px]'
-            : 'p-2 pt-8 min-h-[100px] max-h-[300px] overflow-y-auto scrollbar-thin space-y-1',
+            : 'p-2 pt-8 min-h-[100px] max-h-[300px] overflow-x-hidden overflow-y-auto scrollbar-thin space-y-1',
         )}
         onClick={() => {
+          if (isSheet) return
           if (usesHostedSurface) {
             handleOpenSurface()
           }
         }}
       >
         {isSheet ? (
-          <DocumentCardContent
+          <DocumentCardView
             note={node.data as NoteWithPin}
+            selected={false}
             isDark={isDark}
+            isPinned={Boolean(isPinned)}
             textColor={textColor}
+            onTogglePin={onTogglePin}
+            onDelete={onDelete}
+            onOpen={handleOpenSurface}
+            hideBadge
           />
         ) : isCodeSandbox ? (
           <pre className='whitespace-pre-wrap break-all font-mono text-sm leading-5 text-foreground/90'>
