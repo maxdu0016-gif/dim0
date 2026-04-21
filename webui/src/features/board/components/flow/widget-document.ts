@@ -87,10 +87,12 @@ const renderThemeTokenBlock = (tokens: WidgetThemeTokens) =>
 
 const WIDGET_BASE_STYLE = `
   <style>
+    @import url('https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:ital,wght@0,200..800;1,200..800&family=Inconsolata:wght@200..900&display=swap');
+
     :root {
       ${renderThemeTokenBlock(DEFAULT_WIDGET_TOKENS)}
       color-scheme: light dark;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-family: "Atkinson Hyperlegible Next", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
 
     html, body {
