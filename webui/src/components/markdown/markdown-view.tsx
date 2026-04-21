@@ -6,7 +6,10 @@ import { CustomTable } from "./custom-table"
 import { Pre } from "./custom-pre"
 import { MarkdownLink } from "./markdown-link"
 import { Streamdown } from "streamdown"
-import { code } from "@streamdown/code"
+import { createCodePlugin } from "./streamdown-code-plugin"
+
+
+const code = createCodePlugin(["rose-pine-dawn", "rose-pine-moon"])
 
 import remarkGfm from "remark-gfm"
 import remarkMath from "remark-math"
