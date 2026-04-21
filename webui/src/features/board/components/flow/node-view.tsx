@@ -208,7 +208,7 @@ function NodeViewBase({ id, data, selected, width, height, dragging }: NodeProps
 
   if (nodeType === 'sheet') {
     return (
-      <div className='border-none relative bg-transparent overflow-visible w-full h-full p-0'>
+      <div className='group border-none relative bg-transparent overflow-visible w-full h-full p-0'>
         <div
           className='absolute inset-0'
           style={{
@@ -236,6 +236,17 @@ function NodeViewBase({ id, data, selected, width, height, dragging }: NodeProps
           >
             {content}
           </ShapeChrome>
+        </div>
+
+        <div
+          className={clsx(
+            'absolute -top-7 left-1/2 -translate-x-1/2 z-20 inline-flex h-6 w-6 items-center justify-center rounded-md border border-border bg-card text-muted-foreground shadow-sm cursor-grab active:cursor-grabbing transition-opacity',
+            selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
+          )}
+          aria-label='Drag to move note'
+          title='Drag to move'
+        >
+          <DragGripIcon className='size-3' />
         </div>
 
         <ResizeHandles

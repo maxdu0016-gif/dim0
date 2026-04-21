@@ -165,7 +165,7 @@ export const DocumentCardView = memo(function DocumentCardView({
   return (
     <div
       className={clsx(
-        "group relative w-full h-full cursor-pointer select-none",
+        "nodrag group relative w-full h-full cursor-pointer select-none",
         "rounded-lg overflow-hidden",
         "bg-card paper-note-texture",
         !suspendContent && "sticky-note-shadow",
