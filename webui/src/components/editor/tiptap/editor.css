@@ -539,8 +539,7 @@
 }
 
 /* The toggle arrow + summary row */
-.tiptap-editor .ProseMirror details > summary,
-.tiptap-editor .ProseMirror [data-type="detailsSummary"] {
+.tiptap-editor .ProseMirror summary {
   display: flex;
   align-items: flex-start;
   gap: 0.35rem;
@@ -551,9 +550,9 @@
   user-select: none;
 }
 
-/* Hide default browser triangle */
-.tiptap-editor .ProseMirror details > summary::-webkit-details-marker,
-.tiptap-editor .ProseMirror details > summary::marker { display: none; content: ""; }
+/* Hide default browser triangle (list-item marker) */
+.tiptap-editor .ProseMirror summary::-webkit-details-marker,
+.tiptap-editor .ProseMirror summary::marker { display: none; content: ""; }
 
 /* Arrow pseudo-element */
 .tiptap-editor .ProseMirror [data-type="detailsSummary"]::before {
