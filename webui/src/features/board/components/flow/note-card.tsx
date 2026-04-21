@@ -2,13 +2,12 @@ import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useStat
 import { clsx } from "clsx"
 
 import { Shape } from "../notes/shape"
-import { SheetNodeView } from "./sheet-node-view"
+import { DocumentCardView } from "./document-card-view"
 import { CodeSandboxNode } from "./code-sandbox-node"
 import { WidgetNode } from "./widget-node"
 import { useGraphStore } from "../../store/graph-store"
 import { darkModeDisplayHex } from "../../lib/colors/dark-variants"
 import { fontFamilyToTwClass, fontSizeToTwClass, textStyleToTwClass } from "../../types/style"
-import type { NoteNode } from "../../types/flow"
 import type { Note, NoteProperties } from "../../types/note"
 
 
@@ -87,7 +86,7 @@ const NoteDisplayContent = memo(function NoteDisplayContent({
   nodeHeight,
   onCanvasRenderReadyChange,
 }: NoteDisplayContentProps) {
-  const fontFamily = note.style.type === "sheet" ? "sans-serif" : note.style.fontFamily
+  const fontFamily = note.style.fontFamily
   const icon =
     note.properties.iconData?.type === "icon" && note.properties.iconData.icon?.type === "icon"
       ? note.properties.iconData.icon.icon
@@ -157,24 +156,19 @@ export const NodeCard = memo(function NodeCard({
   const selRef = useRef<{ start: number; end: number } | null>(null)
 
   const textColor = isDark ? darkModeDisplayHex(note.style.textColor) || undefined : note.style.textColor
-  const sheetBackgroundColor = isDark
-    ? darkModeDisplayHex(note.style.backgroundColor) || note.style.backgroundColor
-    : note.style.backgroundColor
   const isPinned = note.properties.pinned.boolean === true
-  const fontFamily = note.style.type === "sheet" ? "sans-serif" : note.style.fontFamily
-  const displayTitle = note.label?.markdown?.trim() || "Untitled note"
 
   const labelClass = useMemo(
     () =>
       clsx(
         "relative bg-transparent overflow-visible flex items-center justify-center",
         isSheet
-          ? `w-[360px] ${fontFamilyToTwClass(fontFamily)}`
+          ? "w-full h-full"
           : isText
             ? "w-full h-full p-0"
             : "w-full h-full p-1",
       ),
-    [fontFamily, isSheet, isText],
+    [isSheet, isText],
   )
 
   useEffect(() => {
@@ -271,22 +265,6 @@ export const NodeCard = memo(function NodeCard({
     setLabelDraft(next)
   }, [])
 
-  const updateStyle = useCallback((next: Partial<Note["style"]>) => {
-    updateNodeByIdPersist(note.id, (node) => {
-      const data = node.data as NoteNode["data"]
-      return {
-        ...node,
-        data: {
-          ...data,
-          style: {
-            ...data.style,
-            ...next,
-          },
-        },
-      }
-    })
-  }, [note.id, updateNodeByIdPersist])
-
   const stopDragging = useCallback((event: React.PointerEvent) => {
     if (labelEditing) {
       event.stopPropagation()
@@ -321,10 +299,6 @@ export const NodeCard = memo(function NodeCard({
     setNodesPersist((nodes) => nodes.filter((node) => node.id !== note.id))
     setEdgesPersist((edges) => edges.filter((edge) => edge.source !== note.id && edge.target !== note.id))
   }, [note.id, setEdgesPersist, setNodesPersist])
-
-  const handlePickPalette = useCallback((hex: string) => {
-    updateStyle({ backgroundColor: hex })
-  }, [updateStyle])
 
   const handleOpenSheet = useCallback(() => {
     if (!boardCanEdit) return
@@ -388,31 +362,17 @@ export const NodeCard = memo(function NodeCard({
       onDoubleClick={handleLabelDoubleClick}
       onPointerDown={stopDragging}
     >
-      <div className="relative w-full h-full">
-        <SheetNodeView
-          note={note}
-          selected={selected}
-          dragging={dragging}
-          isDark={isDark}
-          isPinned={isPinned}
-          backgroundColor={sheetBackgroundColor}
-          onPickPalette={handlePickPalette}
-          onTogglePin={handleTogglePin}
-          onDelete={handleDelete}
-          onOpenSticky={handleOpenSheet}
-        />
-        <div className="absolute left-1/2 top-full mt-4 w-full -translate-x-1/2 px-2">
-          <button
-            type="button"
-            onMouseDown={(event) => event.stopPropagation()}
-            onClick={handleOpenSheet}
-            className="block w-full truncate text-center text-sm font-semibold text-card-foreground hover:underline"
-            title={displayTitle}
-          >
-            {displayTitle}
-          </button>
-        </div>
-      </div>
+      <DocumentCardView
+        note={note}
+        selected={selected}
+        dragging={dragging}
+        isDark={isDark}
+        isPinned={isPinned}
+        textColor={textColor}
+        onTogglePin={handleTogglePin}
+        onDelete={handleDelete}
+        onOpen={handleOpenSheet}
+      />
     </LabelContainer>
   )
 })

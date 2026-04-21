@@ -142,7 +142,7 @@ export const TopBar = memo(function TopBar({
     list: 'List view',
     pan: 'Pan mode',
     select: 'Selection mode',
-    note: 'Sticky note',
+    note: 'Note',
     folder: isAtMaxFolderDepth
       ? `Max Sub-board depth reached (${maxFolderDepth})`
       : 'Sub-board',
@@ -311,7 +311,7 @@ export const TopBar = memo(function TopBar({
                 className={normalButtonClass}
                 size='icon'
                 onClick={() => onAddNode({ nodeType: 'sheet' })}
-                aria-label='Add sticky note'
+                aria-label='Add note'
               >
                 <div className='relative'>
                   <NotepadIcon className='size-4 shrink-0' />
@@ -407,7 +407,7 @@ export const TopBar = memo(function TopBar({
                 className={normalButtonClass}
                 size='icon'
                 onClick={() => onAddNode({ nodeType: 'sheet' })}
-                aria-label='Add sticky note'
+                aria-label='Add note'
               >
                 <NotepadIcon className='size-4 shrink-0' />
               </Button>

@@ -10,6 +10,8 @@ import { TAILWIND_300 } from '../../lib/colors/tailwind'
 import { formatDistanceToNow } from '../../utils/date'
 import { useTheme } from '@/components/theme-provider'
 import { darkModeDisplayHex } from '../../lib/colors/dark-variants'
+import { DocumentCardContent } from './document-card-view'
+import type { NoteWithPin } from './note-card'
 
 
 type Props = { node: NoteNode }
@@ -32,6 +34,9 @@ export function LinearNoteCard({ node }: Props) {
   const isDark = resolvedTheme === 'dark'
 
   const color = isDark ? darkModeDisplayHex(node.data.style.backgroundColor) ?? '#a5c9ff' : node.data.style.backgroundColor
+  const textColor = isDark
+    ? darkModeDisplayHex(node.data.style.textColor) ?? undefined
+    : node.data.style.textColor
   const isPinned = node.data.properties.pinned.boolean
   const isSheet = node.data.style.type === 'sheet'
   const isCodeSandbox = node.data.style.type === 'code-sandbox'
@@ -116,12 +121,13 @@ export function LinearNoteCard({ node }: Props) {
       : 'hover:ring-2 hover:ring-secondary-foreground/40'
   )
 
+  const cardBackground = isSheet ? undefined : color
   const CardBody = useMemo(() => (
-    <div className={cardClass} style={{ backgroundColor: color }}>
+    <div className={cardClass} style={cardBackground ? { backgroundColor: cardBackground } : undefined}>
       {/* hover toolbar */}
       <div
         className='absolute top-0 inset-x-0 z-20 rounded-t-sm border-b border-foreground/60 pointer-events-none transition-opacity opacity-0 group-hover:opacity-100 group-hover:pointer-events-auto'
-        style={{ backgroundColor: color }}
+        style={cardBackground ? { backgroundColor: cardBackground } : undefined}
       >
         <div className='px-1.5 py-1 w-full h-full flex items-center justify-end gap-1'>
           <div className='flex flex-row items-center gap-2 px-1'>
@@ -133,32 +139,34 @@ export function LinearNoteCard({ node }: Props) {
               </div>
             )}
           </div>
-          <Popover>
-            <PopoverTrigger asChild>
-              <button
-                className='p-1 text-foreground/80 hover:text-foreground transition-colors'
-                aria-label='Change background color'
-                title='Change background color'
-                onClick={e => e.stopPropagation()}
-              >
-                <PaintBoardIcon className='size-4 shrink-0' strokeWidth={2} />
-              </button>
-            </PopoverTrigger>
-            <PopoverContent align='start' className='w-auto p-2'>
-              <div className='grid grid-cols-6 gap-2'>
-                {[{ name: 'white', hex: '#ffffff' }, ...TAILWIND_300].map(c => (
-                  <button
-                    key={c.name}
-                    className='h-6 w-6 rounded-md border border-border hover:brightness-95'
-                    style={{ backgroundColor: isDark ? darkModeDisplayHex(c.hex) || c.hex : c.hex }}
-                    title={`${c.name}-100`}
-                    aria-label={`${c.name}-100`}
-                    onClick={() => onPickColor(c.hex)}
-                  />
-                ))}
-              </div>
-            </PopoverContent>
-          </Popover>
+          {!isSheet && (
+            <Popover>
+              <PopoverTrigger asChild>
+                <button
+                  className='p-1 text-foreground/80 hover:text-foreground transition-colors'
+                  aria-label='Change background color'
+                  title='Change background color'
+                  onClick={e => e.stopPropagation()}
+                >
+                  <PaintBoardIcon className='size-4 shrink-0' strokeWidth={2} />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align='start' className='w-auto p-2'>
+                <div className='grid grid-cols-6 gap-2'>
+                  {[{ name: 'white', hex: '#ffffff' }, ...TAILWIND_300].map(c => (
+                    <button
+                      key={c.name}
+                      className='h-6 w-6 rounded-md border border-border hover:brightness-95'
+                      style={{ backgroundColor: isDark ? darkModeDisplayHex(c.hex) || c.hex : c.hex }}
+                      title={`${c.name}-100`}
+                      aria-label={`${c.name}-100`}
+                      onClick={() => onPickColor(c.hex)}
+                    />
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
+          )}
           <button
             className='p-1 text-foreground/80 hover:text-foreground transition-colors'
             onClick={onTogglePin}
@@ -183,14 +191,25 @@ export function LinearNoteCard({ node }: Props) {
 
       {/* content area */}
       <div
-        className='p-2 pt-8 min-h-[100px] max-h-[300px] overflow-x-hidden overflow-y-auto scrollbar-thin text-foreground relative z-10 space-y-1'
+        className={clsx(
+          'relative z-10 text-foreground overflow-x-hidden',
+          isSheet
+            ? 'h-[220px]'
+            : 'p-2 pt-8 min-h-[100px] max-h-[300px] overflow-y-auto scrollbar-thin space-y-1',
+        )}
         onClick={() => {
           if (usesHostedSurface) {
             handleOpenSurface()
           }
         }}
       >
-        {isCodeSandbox ? (
+        {isSheet ? (
+          <DocumentCardContent
+            note={node.data as NoteWithPin}
+            isDark={isDark}
+            textColor={textColor}
+          />
+        ) : isCodeSandbox ? (
           <pre className='whitespace-pre-wrap break-all font-mono text-sm leading-5 text-foreground/90'>
             {node.data.content?.markdown || '# Write Python here'}
           </pre>
@@ -213,17 +232,19 @@ export function LinearNoteCard({ node }: Props) {
       </div>
     </div>
   ), [
+    cardBackground,
     cardClass,
-    color,
     fullDate,
     isDark,
     isCodeSandbox,
     isPinned,
+    isSheet,
     handleOpenSurface,
-    node.data.content?.markdown,
+    node.data,
     onDelete,
     onPickColor,
     onTogglePin,
+    textColor,
     timeAgo,
     usesHostedSurface,
     isWidget,
