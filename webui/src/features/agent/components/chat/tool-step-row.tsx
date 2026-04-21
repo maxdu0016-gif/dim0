@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from "react"
-import { ChevronDownIcon, ExternalLinkIcon, Loader2Icon, NoteIcon as ThoughtIcon } from "@/components/icons"
+import { ChevronDownIcon, CircleNotchIcon, ExternalLinkIcon, NoteIcon as ThoughtIcon } from "@/components/icons"
 import { Link, useSearch } from "@tanstack/react-router"
 import type { ToolCallStep } from "../../types/stream"
 import { ToolNameIcon } from "../../types/stream"
@@ -293,7 +293,7 @@ export const ToolStepRow = ({
             <div className='relative flex-shrink-0 w-6 h-6'>
               {isLoading ? (
                 <div className={cn(successDivClass, 'text-wiki-link')}>
-                  <Loader2Icon className={cn(iconClass, 'animate-spin')} strokeWidth={2} />
+                  <CircleNotchIcon className={cn(iconClass, 'animate-spin')} strokeWidth={2} />
                 </div>
               ) : (
                 <div className={successDivClass}>
@@ -302,7 +302,7 @@ export const ToolStepRow = ({
               )}
             </div>
             <div className='flex-1 min-w-0 flex flex-col gap-1'>
-              <h4 className='text-sm font-medium text-foreground font-mono leading-6'>{title}</h4>
+              <h4 className={cn('text-sm font-medium font-mono leading-6 transition-colors', isLoading ? 'text-muted-foreground' : 'text-foreground')}>{title}</h4>
               {message !== "" && (
                 <span className={spanMessageClass}>
                   {message}

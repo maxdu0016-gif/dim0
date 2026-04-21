@@ -15,6 +15,7 @@ import {
   CheckCircleIcon,
   CheckIcon as CheckmarkGlyphIcon,
   CircleIcon as CircleGlyphIcon,
+  CircleNotchIcon as CircleNotchGlyphIcon,
   CirclesFourIcon as CirclesFourGlyphIcon,
   CircuitryIcon,
   ClockIcon as ClockGlyphIcon,
@@ -132,6 +133,7 @@ export const CheckIcon = createPhosphorIcon(CheckmarkGlyphIcon)
 export const CheckCircleStatusIcon = createPhosphorIcon(CheckCircleIcon)
 export const CheckmarkIcon = createPhosphorIcon(CheckmarkGlyphIcon)
 export const CircleShapeIcon = createPhosphorIcon(CircleGlyphIcon)
+export const CircleNotchIcon = createPhosphorIcon(CircleNotchGlyphIcon)
 export const CircleClusterIcon = createPhosphorIcon(CirclesFourGlyphIcon)
 export const ClockIcon = createPhosphorIcon(ClockGlyphIcon)
 export const ChevronDownIcon = createPhosphorIcon(CaretDownIcon)

@@ -18,6 +18,7 @@ export {
   CheckCircleStatusIcon,
   CheckIcon,
   CircleClusterIcon,
+  CircleNotchIcon,
   CircleShapeIcon,
   ChevronDownIcon,
   ChevronLeftIcon,
