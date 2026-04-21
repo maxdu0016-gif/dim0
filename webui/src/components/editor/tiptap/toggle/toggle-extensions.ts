@@ -1,6 +1,5 @@
 import { Details, DetailsSummary, DetailsContent } from "@tiptap/extension-details"
 import type MarkdownIt from "markdown-it"
-import type Token from "markdown-it/lib/token.mjs"
 
 
 /**
@@ -62,15 +61,9 @@ export const DetailsMarkdown = Details.extend({
                   .slice(startLine + 1, closeLine)
                   .join("\n")
 
-                const innerTokens: Token[] = []
-                state.md.block.tokenize(
-                  { ...state, src: contentSrc, tokens: innerTokens, bMarks: [], eMarks: [], tShift: [], sCount: [], bsCount: [], lineMax: 0, line: 0 } as never,
-                  0,
-                  contentSrc.split("\n").length,
-                )
-
-                // Emit a raw HTML block that TipTap's parseHTML rules pick up
-                const innerHtml = state.md.renderer.render(innerTokens, state.md.options, {})
+                // Use md.parse() to avoid mutating StateBlock (prototype methods like skipEmptyLines would break on spread)
+                const innerTokens = state.md.parse(contentSrc, state.env)
+                const innerHtml = state.md.renderer.render(innerTokens, state.md.options, state.env)
                 const token = state.push("html_block", "", 0)
                 token.map = [startLine, closeLine + 1]
                 token.content = `<details open><summary>${escapeHtml(summary)}</summary><div>${innerHtml}</div></details>\n`
