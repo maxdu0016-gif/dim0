@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,700;1,400;1,700&family=Lora:ital,wght@0,400..700;1,400..700&family=Plus+Jakarta+Sans:ital,wght@0,300..700;1,300..700&family=Architects+Daughter&family=Shantell+Sans:ital,wght@0,400..700;1,400..700&display=swap&font-display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inconsolata:wght@200..900&family=Lora:ital,wght@0,400..700;1,400..700&family=Architects+Daughter&family=Shantell+Sans:ital,wght@0,400..700;1,400..700&display=swap&font-display=swap');
 @import "tailwindcss";
 @import "tw-animate-css";
 @source "../node_modules/streamdown/dist/index.js";
@@ -136,14 +136,14 @@
   --chart-5: oklch(0.66 0.11 330);
 
   /* ── typography ─────────────────────────────────────────── */
-  /* UI chrome — Plus Jakarta Sans */
-  --font-sans: 'Plus Jakarta Sans', system-ui, ui-sans-serif, -apple-system,
-    BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif,
+  /* UI chrome — system-ui (native per OS: SF Pro / Segoe UI / Cantarell) */
+  --font-sans: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, 'Noto Sans', ui-sans-serif, sans-serif,
     'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
   /* Editor body text — Lora. Source Serif 4 loaded on-demand if user switches body font. */
   --font-serif: 'Lora', ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif;
-  /* Code blocks — IBM Plex Mono (warm, editorial, true italics, 8 weights) */
-  --font-mono: 'IBM Plex Mono', 'Fira Code', ui-monospace, SFMono-Regular,
+  /* Code blocks & metadata — Inconsolata (humanist mono, warm, variable 200–900) */
+  --font-mono: 'Inconsolata', ui-monospace, SFMono-Regular,
     Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
   /* Canvas annotations, diagram labels — structured handwriting */
   --font-handwriting: 'Architects Daughter', cursive;
@@ -376,7 +376,7 @@
     line-height: 1.75;
   }
 
-  /* sans body override — when user switches to Plus Jakarta Sans */
+  /* sans body override — when user switches body font to system-ui sans */
   .editor-body-sans {
     font-family: var(--font-sans);
     font-size: 1rem;
