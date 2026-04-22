@@ -59,21 +59,24 @@ export const slashSuggestion: Omit<SuggestionOptions, "editor"> = {
         host.appendChild(container)
         positionContainer(rect)
 
-        // Capture-phase Escape listener — Radix DismissableLayer listens
-        // on document in capture phase, so we must intercept earlier.
+        // Radix DismissableLayer registers an Escape listener on `document`
+        // in capture phase; on same-element same-phase, registration order
+        // wins, and the Dialog was mounted first. Attach to `window` capture
+        // instead — it fires before `document` capture in the DOM flow, so
+        // stopImmediatePropagation reliably blocks Radix from seeing Escape.
         escCapture = (e: KeyboardEvent) => {
           if (e.key !== "Escape") return
           e.preventDefault()
-          e.stopPropagation()
+          e.stopImmediatePropagation()
           root?.unmount()
           container?.remove()
-          escCapture && document.removeEventListener("keydown", escCapture, true)
+          if (escCapture) window.removeEventListener("keydown", escCapture, true)
           root = null
           container = null
           host = null
           escCapture = null
         }
-        document.addEventListener("keydown", escCapture, true)
+        window.addEventListener("keydown", escCapture, true)
         root = createRoot(container)
         root.render(
           createElement(SlashMenu, {
@@ -105,7 +108,7 @@ export const slashSuggestion: Omit<SuggestionOptions, "editor"> = {
       onExit() {
         root?.unmount()
         container?.remove()
-        if (escCapture) document.removeEventListener("keydown", escCapture, true)
+        if (escCapture) window.removeEventListener("keydown", escCapture, true)
         root = null
         container = null
         host = null
