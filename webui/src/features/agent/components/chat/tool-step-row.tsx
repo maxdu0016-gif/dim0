@@ -263,10 +263,6 @@ export const ToolStepRow = ({
   const isLoading = isStreaming && step.state === "started"
   const spanMessageClass = "text-sm text-card-foreground whitespace-pre-line"
   const StepIcon = ToolNameIcon[step.name]
-  const successDivClass = cn(
-    "absolute rounded-full bg-primary z-20 flex items-center justify-center top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2",
-    "w-4 h-4 bg-transparent text-muted-foreground"
-  )
   const iconClass = "size-4"
   const rawArgs = step.arguments?.input
   const hasArgs = rawArgs !== undefined && rawArgs !== null && rawArgs !== ""
@@ -287,28 +283,22 @@ export const ToolStepRow = ({
 
   return (
     <div className='w-full flex flex-col'>
-      <div className='w-full p-2'>
+      <div className='w-full p-1'>
         <div className='rounded-lg border border-sidebar-border overflow-hidden flex flex-col'>
-          <div className='bg-muted px-3 py-2 flex flex-row items-start gap-3'>
-            <div className='relative flex-shrink-0 w-6 h-6'>
-              {isLoading ? (
-                <div className={cn(successDivClass, 'text-wiki-link')}>
-                  <CircleNotchIcon className={cn(iconClass, 'animate-spin')} strokeWidth={2} />
-                </div>
-              ) : (
-                <div className={successDivClass}>
-                  <StepIcon className={iconClass} strokeWidth={2} />
-                </div>
-              )}
-            </div>
-            <div className='flex-1 min-w-0 flex flex-col gap-1'>
-              <h4 className={cn('text-sm font-medium font-mono leading-6 transition-colors', isLoading ? 'text-muted-foreground' : 'text-foreground')}>{title}</h4>
-              {message !== "" && (
-                <span className={spanMessageClass}>
-                  {message}
-                </span>
-              )}
-            </div>
+          <div className='bg-muted px-2 py-1 flex flex-row items-center gap-2'>
+            {isLoading ? (
+              <CircleNotchIcon className={cn(iconClass, 'shrink-0 text-muted-foreground animate-spin')} strokeWidth={2} />
+            ) : (
+              <StepIcon className={cn(iconClass, 'shrink-0 text-muted-foreground')} strokeWidth={2} />
+            )}
+            {message !== "" ? (
+              <div className='flex-1 min-w-0 flex flex-col'>
+                <h4 className={cn('text-sm font-medium font-mono leading-5 transition-colors', isLoading ? 'text-muted-foreground' : 'text-foreground')}>{title}</h4>
+                <span className={spanMessageClass}>{message}</span>
+              </div>
+            ) : (
+              <h4 className={cn('flex-1 min-w-0 truncate text-sm font-medium font-mono leading-5 transition-colors', isLoading ? 'text-muted-foreground' : 'text-foreground')}>{title}</h4>
+            )}
             {canExpand && (
               <button
                 className='flex-shrink-0 text-muted-foreground hover:text-foreground transition-colors p-1 -mr-1'
