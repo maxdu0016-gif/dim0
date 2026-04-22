@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react"
+import { useState, useCallback, useMemo } from "react"
 import { DragHandle } from "@tiptap/extension-drag-handle-react"
 import { offset } from "@floating-ui/dom"
 import type { Editor } from "@tiptap/react"
@@ -50,6 +50,14 @@ export function BlockHandle({ editor }: { editor: Editor }) {
     [],
   )
 
+  // Stable object refs — `DragHandle` re-registers its PM plugin whenever these
+  // change, and every register/unregister dispatches a transaction that makes
+  // the slash-command Suggestion plugin exit.
+  const computePositionConfig = useMemo(
+    () => ({ middleware: [offset({ crossAxis: 4 })] }),
+    [],
+  )
+
   function addBlockBelow() {
     if (!currentNode) return
     const endPos = currentNode.pos + currentNode.node.nodeSize
@@ -88,7 +96,7 @@ export function BlockHandle({ editor }: { editor: Editor }) {
       editor={editor}
       onNodeChange={handleNodeChange}
       nested
-      computePositionConfig={{ middleware: [offset({ crossAxis: 4 })] }}
+      computePositionConfig={computePositionConfig}
     >
       <div className="block-handle-wrap">
 
