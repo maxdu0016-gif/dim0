@@ -1,47 +1,57 @@
-import { useCallback, useEffect, useRef, useState } from "react"
+import { memo, useCallback, useEffect, useRef, useState } from "react"
 import clsx from "clsx"
 
 import { useGraphStore } from "../../store/graph-store"
-import type { Note } from "../../types/note"
 
 
 type NodeTitleCaptionProps = {
-  note: Note
+  nodeId: string
+  label?: string
   placeholder?: string
   className?: string
-  inputClassName?: string
-  buttonClassName?: string
+  textClassName?: string
+  emptyTextClassName?: string
+  textStyle?: React.CSSProperties
+  maxLines?: number
   onEditingChange?: (editing: boolean) => void
 }
 
 
+const INPUT_BASE_CLS = "nodrag w-full bg-transparent border-0 border-b border-foreground/30 focus:border-secondary-foreground focus:outline-none px-0 py-0.5"
+const BUTTON_BASE_CLS = "nodrag block w-full whitespace-normal break-words hover:underline"
+
+
 /**
- * Click-to-edit title/caption rendered beneath a node. Reads and writes
- * `note.label.markdown`, matching the title pattern used by widget/sheet nodes.
- * Visibility is controlled by the caller via the wrapping element's className.
+ * Shared click-to-edit title/caption for canvas nodes. Reads/writes
+ * `note.label.markdown`. Layout and text styling are owned by the caller via
+ * `className` and `textClassName`. Display mode wraps to `maxLines` lines
+ * (clamps with ellipsis); edit mode is always a single-line input.
  */
-export function NodeTitleCaption({
-  note,
+export const NodeTitleCaption = memo(function NodeTitleCaption({
+  nodeId,
+  label,
   placeholder = "Untitled",
   className,
-  inputClassName,
-  buttonClassName,
+  textClassName,
+  emptyTextClassName,
+  textStyle,
+  maxLines = 3,
   onEditingChange,
 }: NodeTitleCaptionProps) {
   const boardCanEdit = useGraphStore((state) => state.boardCanEdit)
   const updateNodeByIdPersist = useGraphStore((state) => state.updateNodeByIdPersist)
 
   const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState(note.label?.markdown || "")
+  const [draft, setDraft] = useState(label || "")
   const inputRef = useRef<HTMLInputElement | null>(null)
 
-  const storedTitle = note.label?.markdown?.trim() || ""
+  const storedTitle = label?.trim() || ""
   const displayTitle = storedTitle || placeholder
 
   useEffect(() => {
     if (editing) return
-    setDraft(note.label?.markdown || "")
-  }, [note.label?.markdown, editing])
+    setDraft(label || "")
+  }, [label, editing])
 
   useEffect(() => {
     if (!editing) return
@@ -58,23 +68,32 @@ export function NodeTitleCaption({
 
   const commitTitle = useCallback((nextRaw: string) => {
     const next = nextRaw.trim()
-    const prev = note.label?.markdown?.trim() || ""
+    const prev = label?.trim() || ""
     if (next === prev) return
 
-    updateNodeByIdPersist(note.id, (node) => ({
+    updateNodeByIdPersist(nodeId, (node) => ({
       ...node,
       data: {
         ...node.data,
         label: next ? { markdown: next } : undefined,
       },
     }))
-  }, [note.id, note.label?.markdown, updateNodeByIdPersist])
+  }, [nodeId, label, updateNodeByIdPersist])
 
   const stopEdit = useCallback((save: boolean) => {
     if (save) commitTitle(draft)
-    else setDraft(note.label?.markdown || "")
+    else setDraft(label || "")
     setEditing(false)
-  }, [commitTitle, draft, note.label?.markdown])
+  }, [commitTitle, draft, label])
+
+  const displayClamp: React.CSSProperties | undefined = maxLines && maxLines > 1
+    ? {
+      display: "-webkit-box",
+      WebkitLineClamp: maxLines,
+      WebkitBoxOrient: "vertical",
+      overflow: "hidden",
+    }
+    : undefined
 
   return (
     <div className={className}>
@@ -95,10 +114,11 @@ export function NodeTitleCaption({
             }
           }}
           onPointerDown={(event) => event.stopPropagation()}
-          className={clsx(
-            "nodrag w-full bg-transparent border-0 border-b border-foreground/30 focus:border-secondary-foreground focus:outline-none px-0 py-0.5 text-center text-sm font-medium text-foreground",
-            inputClassName,
-          )}
+          onMouseDown={(event) => event.stopPropagation()}
+          onClick={(event) => event.stopPropagation()}
+          onDoubleClick={(event) => event.stopPropagation()}
+          className={clsx(INPUT_BASE_CLS, textClassName)}
+          style={textStyle}
           placeholder={placeholder}
         />
       ) : (
@@ -109,11 +129,13 @@ export function NodeTitleCaption({
             if (!boardCanEdit) return
             setEditing(true)
           }}
+          onDoubleClick={(event) => event.stopPropagation()}
           className={clsx(
-            "nodrag block w-full truncate text-center text-sm font-medium hover:underline",
-            storedTitle ? "text-foreground" : "text-muted-foreground italic",
-            buttonClassName,
+            BUTTON_BASE_CLS,
+            maxLines === 1 && "truncate",
+            storedTitle ? textClassName : (emptyTextClassName ?? textClassName),
           )}
+          style={{ ...textStyle, ...displayClamp }}
           title={displayTitle}
         >
           {displayTitle}
@@ -121,4 +143,4 @@ export function NodeTitleCaption({
       )}
     </div>
   )
-}
+})

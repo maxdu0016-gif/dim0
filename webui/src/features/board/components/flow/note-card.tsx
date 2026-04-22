@@ -426,11 +426,15 @@ const ImageCaptionOverlay = memo(function ImageCaptionOverlay({
 
   return (
     <NodeTitleCaption
-      note={note}
+      nodeId={note.id}
+      label={note.label?.markdown}
       placeholder="Add caption…"
       onEditingChange={setEditing}
+      textClassName="text-center text-sm font-medium text-foreground"
+      emptyTextClassName="text-center text-sm text-muted-foreground italic"
+      maxLines={3}
       className={clsx(
-        "pointer-events-auto absolute left-1/2 top-full z-20 mt-2 w-full max-w-[220px] -translate-x-1/2 transition-opacity",
+        "pointer-events-auto absolute left-1/2 top-full z-20 mt-2 w-full -translate-x-1/2 transition-opacity",
         reveal ? "opacity-100" : "opacity-0 group-hover:opacity-100",
       )}
     />
