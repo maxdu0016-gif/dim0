@@ -70,6 +70,7 @@ import {
   PaperPlaneRightIcon,
   PencilIcon,
   PentagramIcon,
+  PlayIcon as PlayGlyphIcon,
   PlusIcon as PlusGlyphIcon,
   PresentationChartIcon,
   ProjectorScreenChartIcon,
@@ -215,7 +216,7 @@ export const PerplexityBrandIcon = createReactIcon(Perplexity.Color)
 export const PdfIcon = createPhosphorIcon(FilePdfIcon)
 export const PinIcon = createPhosphorIcon(PushPinIcon)
 export const PinOffIcon = createPhosphorIcon(PushPinSlashIcon)
-export const PlayIcon = createPhosphorIcon(PlusGlyphIcon)
+export const PlayIcon = createPhosphorIcon(PlayGlyphIcon)
 export const PlusIcon = createPhosphorIcon(PlusGlyphIcon)
 export const PuzzlePieceIcon = createPhosphorIcon(PuzzlePieceGlyphIcon)
 export const PropertyIcon = createPhosphorIcon(SlidersIcon)
