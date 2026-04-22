@@ -37,11 +37,12 @@ export const AnswerCard = ({ onOpenFullSheet }: AnswerCardProps) => {
   }, [chatId])
 
   const { assistantMessage, precedingUserPrompt } = useMemo(() => {
-    if (!messages?.length) return { assistantMessage: null, precedingUserPrompt: null }
+    if (!messages?.length || !chatId) return { assistantMessage: null, precedingUserPrompt: null }
     for (let i = messages.length - 1; i >= 0; i -= 1) {
       const m = messages[i]
+      if (m.chatUid !== chatId) continue
       if (m.role === "assistant" && !m.streaming) {
-        const userMsg = [...messages.slice(0, i)].reverse().find((x) => x.role === "user")
+        const userMsg = [...messages.slice(0, i)].reverse().find((x) => x.role === "user" && x.chatUid === chatId)
         return {
           assistantMessage: m,
           precedingUserPrompt: userMsg?.content?.markdown ?? null,
@@ -49,7 +50,7 @@ export const AnswerCard = ({ onOpenFullSheet }: AnswerCardProps) => {
       }
     }
     return { assistantMessage: null, precedingUserPrompt: null }
-  }, [messages])
+  }, [messages, chatId])
 
   if (isStreaming) return null
   if (!assistantMessage) return null
