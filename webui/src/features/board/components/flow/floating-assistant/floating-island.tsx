@@ -1,7 +1,8 @@
 import { useState, type KeyboardEvent } from "react"
 import TextareaAutosize from "react-textarea-autosize"
 import { toast } from "sonner"
-import { ChatHistoryIcon, CircleNotchIcon, SparklesIcon } from "@/components/icons"
+import { ChatHistoryIcon, SparklesIcon } from "@/components/icons"
+import { ThinkingIndicator } from "@/components/animations/thinking-indicator"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { SendMessageError } from "@/features/agent/api/send-message"
@@ -50,7 +51,7 @@ export const FloatingIsland = ({ boardId, onOpenFullSheet }: FloatingIslandProps
   }
 
   return (
-    <div className='absolute bottom-10 left-1/2 -translate-x-1/2 z-40 w-[min(720px,calc(100vw-4rem))] pointer-events-auto hidden md:flex flex-col gap-1.5'>
+    <div className='absolute bottom-5 left-1/2 -translate-x-1/2 z-40 w-[min(580px,calc(100vw-4rem))] pointer-events-auto hidden md:flex flex-col gap-1.5'>
       <div className={cn(
         "bg-gradient-to-r from-secondary/40 via-sidebar/60 to-sidebar/60",
         "backdrop-blur-md backdrop-saturate-150 supports-[backdrop-filter]:from-secondary/35",
@@ -62,13 +63,13 @@ export const FloatingIsland = ({ boardId, onOpenFullSheet }: FloatingIslandProps
       )}>
         <ProgressLine />
         <div className='flex items-center gap-3 pl-3 pr-2 py-2.5'>
-          <div className='flex items-center justify-center rounded-md bg-gradient-to-br from-wiki-link to-secondary-foreground size-7 shrink-0 shadow-sm'>
-            {isStreaming ? (
-              <CircleNotchIcon className='size-3.5 text-primary-foreground animate-spin' strokeWidth={2} />
-            ) : (
+          {isStreaming ? (
+            <ThinkingIndicator className='text-xs text-foreground/70 shrink-0' iconSize={14} />
+          ) : (
+            <div className='flex items-center justify-center rounded-md bg-gradient-to-br from-wiki-link to-secondary-foreground size-7 shrink-0 shadow-sm'>
               <SparklesIcon className='size-3.5 text-primary-foreground' weight='fill' />
-            )}
-          </div>
+            </div>
+          )}
           <span className='text-xs font-mono px-2 py-0.5 rounded bg-secondary text-secondary-foreground shrink-0'>
             @board
           </span>
@@ -82,7 +83,7 @@ export const FloatingIsland = ({ boardId, onOpenFullSheet }: FloatingIslandProps
             disabled={isStreaming}
             className='flex-1 min-w-0 bg-transparent text-sm outline-none resize-none py-1 placeholder:text-muted-foreground scrollbar-thin'
           />
-          <span className='shrink-0 text-[10px] text-muted-foreground/70 font-mono px-1 select-none hidden sm:inline'>
+          <span className='shrink-0 text-sm text-muted-foreground/70 font-mono px-1 select-none hidden sm:inline'>
             ⌘↵
           </span>
           <Button
