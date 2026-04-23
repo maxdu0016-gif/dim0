@@ -1,22 +1,24 @@
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useAppStore } from "@/store"
+import { CheckIcon, ChevronDownIcon } from "@/components/icons"
 import { ThinkingDots } from "@/components/animations/thinking-indicator"
+import { Popover, PopoverAnchor, PopoverTrigger } from "@/components/ui/popover"
+import { cn } from "@/lib/utils"
 import { useChat } from "@/features/agent/hooks/chat-context"
 import { useListMessages } from "@/features/agent/api/list-messages"
 import { isReasoningTextStep, isToolCallStep, ToolNameIcon } from "@/features/agent/types/stream"
 import type { ToolCallStep } from "@/features/agent/types/stream"
 import { getToolTitle } from "@/features/agent/utils/stream/build"
-
-
-const DWELL_MS = 4000
+import { StepsPopoverContent } from "./steps-popover-content"
 
 
 /**
- * Adaptive progress strip under the island input. Shows a "Thinking" shimmer
- * when streaming without an active tool, the current tool's icon + title while
- * a tool runs, and lingers on the last tool for a short dwell after the turn
- * ends. Scoped to the current chatId so cache bleed from other chats is
- * discarded on switch.
+ * Adaptive progress strip under the island input. While streaming it shows
+ * the active tool, a live reasoning preview, or a "Thinking" fallback. Once
+ * the turn ends with at least one tool call, it collapses into a persistent
+ * summary ("✓ N steps · names…") with a trailing Steps button that opens the
+ * full tool trace in a popover. Scoped to the current chatId so cache bleed
+ * from other chats is discarded on switch.
  */
 export const ProgressLine = () => {
   const { chatId } = useChat()
@@ -65,37 +67,25 @@ export const ProgressLine = () => {
     return ""
   }, [currentReasoning])
 
-  const lastToolInTurn = useMemo<ToolCallStep | null>(() => {
-    for (let i = currentReasoning.length - 1; i >= 0; i -= 1) {
-      const step = currentReasoning[i]
-      if (isToolCallStep(step)) return step
-    }
-    return null
-  }, [currentReasoning])
+  const toolSteps = useMemo<ToolCallStep[]>(
+    () => currentReasoning.filter(isToolCallStep) as ToolCallStep[],
+    [currentReasoning]
+  )
 
-  const [dwelledTool, setDwelledTool] = useState<ToolCallStep | null>(null)
-  const prevStreaming = useRef(isThisChatStreaming)
+  const summaryText = useMemo(
+    () => toolSteps.map((s) => getToolTitle(s.name)).join(", "),
+    [toolSteps]
+  )
+
+  const [popoverOpen, setPopoverOpen] = useState(false)
 
   useEffect(() => {
-    setDwelledTool(null)
-    prevStreaming.current = false
+    setPopoverOpen(false)
   }, [chatId])
 
   useEffect(() => {
-    const wasStreaming = prevStreaming.current
-    prevStreaming.current = isThisChatStreaming
-
-    if (isThisChatStreaming && !wasStreaming) {
-      setDwelledTool(null)
-      return
-    }
-
-    if (wasStreaming && !isThisChatStreaming && lastToolInTurn) {
-      setDwelledTool(lastToolInTurn)
-      const timer = setTimeout(() => setDwelledTool(null), DWELL_MS)
-      return () => clearTimeout(timer)
-    }
-  }, [isThisChatStreaming, lastToolInTurn])
+    if (isThisChatStreaming) setPopoverOpen(false)
+  }, [isThisChatStreaming])
 
   if (isThisChatStreaming && activeTool) {
     const Icon = ToolNameIcon[activeTool.name]
@@ -113,7 +103,10 @@ export const ProgressLine = () => {
     return (
       <div className='flex items-center gap-2 px-4 py-2 border-b border-sidebar-border/60 bg-muted/60 overflow-hidden'>
         <span className='shrink-0 font-mono text-xs text-muted-foreground select-none'>…</span>
-        <span className='flex-1 min-w-0 truncate font-mono text-xs text-muted-foreground' title={latestReasoningLine}>
+        <span
+          className='flex-1 min-w-0 truncate font-mono text-xs text-muted-foreground'
+          title={latestReasoningLine}
+        >
           {latestReasoningLine}
         </span>
       </div>
@@ -131,15 +124,39 @@ export const ProgressLine = () => {
     )
   }
 
-  if (dwelledTool) {
-    const Icon = ToolNameIcon[dwelledTool.name]
+  if (toolSteps.length > 0) {
     return (
-      <div className='flex items-center gap-2 px-4 py-2 border-b border-sidebar-border/60 bg-muted/60 transition-opacity'>
-        <Icon className='size-3.5 text-muted-foreground shrink-0' strokeWidth={2} />
-        <span className='truncate font-mono text-xs text-muted-foreground'>
-          {getToolTitle(dwelledTool.name)}
-        </span>
-      </div>
+      <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+        <PopoverAnchor asChild>
+          <div className='flex items-center gap-2 px-4 py-2 border-b border-sidebar-border/60 bg-muted/60'>
+            <CheckIcon className='size-3.5 text-secondary-foreground shrink-0' strokeWidth={2} />
+            <span className='flex-1 min-w-0 truncate font-mono text-xs text-muted-foreground'>
+              <span className='text-foreground font-medium'>{toolSteps.length} steps</span>
+              {summaryText ? ` · ${summaryText}` : null}
+            </span>
+            <PopoverTrigger asChild>
+              <button
+                type='button'
+                className={cn(
+                  "shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded",
+                  "text-xs font-mono transition-colors",
+                  "hover:bg-secondary-foreground/10",
+                  popoverOpen ? "text-foreground" : "text-muted-foreground"
+                )}
+                aria-expanded={popoverOpen}
+                aria-label={popoverOpen ? "Hide steps" : "Show steps"}
+              >
+                Steps
+                <ChevronDownIcon
+                  className={cn("size-3 transition-transform", popoverOpen && "rotate-180")}
+                  strokeWidth={2}
+                />
+              </button>
+            </PopoverTrigger>
+          </div>
+        </PopoverAnchor>
+        <StepsPopoverContent toolSteps={toolSteps} />
+      </Popover>
     )
   }
 
