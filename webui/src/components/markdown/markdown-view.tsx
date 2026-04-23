@@ -7,6 +7,7 @@ import { Pre } from "./custom-pre"
 import { MarkdownLink } from "./markdown-link"
 import { Streamdown } from "streamdown"
 import { createCodePlugin } from "./streamdown-code-plugin"
+import { sanitizeMathDelimiters } from "./sanitize-math"
 
 
 const code = createCodePlugin(["rose-pine-dawn", "rose-pine-moon"])
@@ -211,7 +212,7 @@ const components = {
  * Renderer: GFM + math override + mermaid
  * ------------------------------------------------------*/
 const Renderer: React.FC<{ content: string; isStreaming?: boolean }> = ({ content, isStreaming }) => {
-  const normalized = normalizeMathDelimiters(content)
+  const normalized = normalizeMathDelimiters(sanitizeMathDelimiters(content))
   return (
     <div>
       <Streamdown
