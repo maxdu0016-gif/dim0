@@ -7,8 +7,8 @@ import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { SendMessageError } from "@/features/agent/api/send-message"
 import { useSubmitPrompt } from "@/features/agent/hooks/use-submit-prompt"
-import { useChatStore } from "@/features/agent/store/chat-store"
 import { ProgressLine } from "./progress-line"
+import { useCurrentAssistantMessage } from "./use-current-assistant-message"
 
 
 export interface FloatingIslandProps {
@@ -23,7 +23,8 @@ export interface FloatingIslandProps {
  */
 export const FloatingIsland = ({ boardId, onOpenFullSheet }: FloatingIslandProps) => {
   const [input, setInput] = useState("")
-  const isStreaming = useChatStore((s) => s.isStreaming)
+  const latestAssistantMessage = useCurrentAssistantMessage()
+  const isStreaming = latestAssistantMessage?.streaming === true
   const submit = useSubmitPrompt()
 
   const handleSubmit = async () => {
@@ -55,11 +56,12 @@ export const FloatingIsland = ({ boardId, onOpenFullSheet }: FloatingIslandProps
       <div className={cn(
         "bg-gradient-to-r from-secondary/40 via-sidebar/60 to-sidebar/60",
         "backdrop-blur-md backdrop-saturate-150 supports-[backdrop-filter]:from-secondary/35",
-        "border border-sidebar-border rounded-xl overflow-hidden flex flex-col",
+        "border border-secondary-foreground/40 rounded-xl overflow-hidden flex flex-col",
         "shadow-[0_12px_32px_-4px_rgba(0,0,0,0.28),0_2px_8px_-2px_rgba(0,0,0,0.12)]",
         "dark:shadow-[0_16px_36px_-4px_rgba(0,0,0,0.55),0_2px_8px_-2px_rgba(0,0,0,0.3)]",
-        "transition-[box-shadow,border-color] focus-within:border-secondary-foreground/40",
-        "focus-within:ring-2 focus-within:ring-secondary-foreground/30",
+        "transition-[box-shadow,border-color] focus-within:border-secondary-foreground/70",
+        "focus-within:ring-2 focus-within:ring-secondary-foreground/20",
+        isStreaming && "animate-ring-pulse-soft",
       )}>
         <ProgressLine />
         <div className='flex items-center gap-3 pl-3 pr-2 py-2.5'>
