@@ -186,7 +186,7 @@ export const ThinkingIndicator = ({
 /**
  * Three pulsing dots, phase-offset so they look like an ellipsis breathing.
  */
-const ThinkingDots = () => (
+export const ThinkingDots = () => (
   <span aria-hidden className="inline-flex font-mono text-muted-foreground">
     {[0, 1, 2].map(i => (
       <motion.span

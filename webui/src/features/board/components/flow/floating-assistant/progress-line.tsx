@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useAppStore } from "@/store"
-import { ShinyText } from "@/components/animations/shiny-text"
+import { ThinkingDots } from "@/components/animations/thinking-indicator"
 import { useChat } from "@/features/agent/hooks/chat-context"
 import { useListMessages } from "@/features/agent/api/list-messages"
-import { isToolCallStep, ToolNameIcon } from "@/features/agent/types/stream"
+import { isReasoningTextStep, isToolCallStep, ToolNameIcon } from "@/features/agent/types/stream"
 import type { ToolCallStep } from "@/features/agent/types/stream"
 import { getToolTitle } from "@/features/agent/utils/stream/build"
 
@@ -52,6 +52,19 @@ export const ProgressLine = () => {
     return null
   }, [isThisChatStreaming, currentReasoning])
 
+  const latestReasoningLine = useMemo<string>(() => {
+    for (let i = currentReasoning.length - 1; i >= 0; i -= 1) {
+      const step = currentReasoning[i]
+      if (!isReasoningTextStep(step)) continue
+      const message = step.message?.trim()
+      if (!message) continue
+      const lines = message.split("\n").map((line) => line.trim()).filter((line) => line !== "")
+      const last = lines[lines.length - 1] ?? ""
+      return last.replace(/[*_`#~>]+/g, "").trim()
+    }
+    return ""
+  }, [currentReasoning])
+
   const lastToolInTurn = useMemo<ToolCallStep | null>(() => {
     for (let i = currentReasoning.length - 1; i >= 0; i -= 1) {
       const step = currentReasoning[i]
@@ -96,10 +109,24 @@ export const ProgressLine = () => {
     )
   }
 
+  if (isThisChatStreaming && latestReasoningLine) {
+    return (
+      <div className='flex items-center gap-2 px-4 py-2 border-b border-sidebar-border/60 bg-muted/60 overflow-hidden'>
+        <span className='shrink-0 font-mono text-xs text-muted-foreground select-none'>…</span>
+        <span className='flex-1 min-w-0 truncate font-mono text-xs text-muted-foreground' title={latestReasoningLine}>
+          {latestReasoningLine}
+        </span>
+      </div>
+    )
+  }
+
   if (isThisChatStreaming) {
     return (
       <div className='flex items-center gap-2 px-4 py-2 border-b border-sidebar-border/60 bg-muted/60'>
-        <ShinyText text='Thinking' speed={3} className='text-xs text-foreground/50' />
+        <span className='inline-flex items-center gap-1 font-mono text-xs font-medium text-muted-foreground'>
+          Thinking
+          <ThinkingDots />
+        </span>
       </div>
     )
   }
