@@ -1,3 +1,4 @@
+// eslint-disable-next-line no-control-regex
 const CONTROL_CHARS_RE = /[\x00-\x08\x0B\x0C\x0E-\x1F]/g
 const ESCAPED_MATH_DELIM_RE = /\\\\([()[\]])/g
 
