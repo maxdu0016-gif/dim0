@@ -51,10 +51,10 @@ export const FloatingIsland = ({ boardId, onOpenFullSheet }: FloatingIslandProps
   }
 
   return (
-    <div className='absolute bottom-5 left-1/2 -translate-x-1/2 z-40 w-[min(580px,calc(100vw-4rem))] pointer-events-auto hidden md:flex flex-col gap-1.5'>
+    <div className='absolute bottom-1 left-1/2 -translate-x-1/2 z-40 w-[min(580px,calc(100vw-4rem))] pointer-events-auto hidden md:flex flex-col gap-1.5'>
       <div className={cn(
         "bg-sidebar/80 backdrop-blur-md backdrop-saturate-150",
-        "border border-border rounded-xl flex flex-col",
+        "border border-border rounded-2xl flex flex-col",
         "shadow-[0_12px_32px_-4px_rgba(0,0,0,0.28),0_2px_8px_-2px_rgba(0,0,0,0.12)]",
         "dark:shadow-[0_16px_36px_-4px_rgba(0,0,0,0.55),0_2px_8px_-2px_rgba(0,0,0,0.3)]",
         "transition-[box-shadow,border-color] focus-within:border-secondary-foreground/50",

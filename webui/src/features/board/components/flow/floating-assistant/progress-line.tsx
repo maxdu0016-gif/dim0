@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react"
 import { useAppStore } from "@/store"
-import { CheckIcon, ChevronDownIcon } from "@/components/icons"
+import { CheckCircleStatusIcon, ChevronDownIcon } from "@/components/icons"
 import { ThinkingDots } from "@/components/animations/thinking-indicator"
 import { Popover, PopoverAnchor, PopoverTrigger } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
@@ -137,7 +137,7 @@ export const ProgressLine = () => {
         <PopoverAnchor asChild>
           <div className='w-full px-4 pt-4'>
             <div className='inline-flex max-w-full items-center gap-1.5 rounded-full bg-secondary/40 px-3 py-1.5'>
-              <CheckIcon className='size-3.5 text-secondary-foreground shrink-0' strokeWidth={2} />
+              <CheckCircleStatusIcon className='size-4 text-secondary-foreground/70 shrink-0' weight='fill' />
               <span className='min-w-0 truncate font-mono text-xs text-muted-foreground'>
                 <span className='text-foreground font-medium'>
                   {toolSteps.length} {stepNoun}
