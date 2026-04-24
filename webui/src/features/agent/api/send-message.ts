@@ -262,7 +262,7 @@ export const useSendMessage = () => {
           } = useGraphStore.getState()
 
           if (activeBoardId) {
-            let lastCreatedNoteId: string | null = null
+            const createdNoteIds: string[] = []
             for (const output of noteToolOutputs) {
               if (output.graphUid !== activeBoardId || !output.noteId) continue
 
@@ -277,7 +277,7 @@ export const useSendMessage = () => {
                 { persist: false })
 
                 if (isNewlyCreated) {
-                  lastCreatedNoteId = output.noteId
+                  createdNoteIds.push(output.noteId)
                 }
               } catch (error) {
                 console.error("Failed to apply remote note update locally:", error)
@@ -300,13 +300,13 @@ export const useSendMessage = () => {
               }
             }
 
-            if (lastCreatedNoteId && router.state.location.pathname.startsWith(`/boards/${activeBoardId}`)) {
-              const noteIdToCenter = lastCreatedNoteId
+            if (createdNoteIds.length > 0 && router.state.location.pathname.startsWith(`/boards/${activeBoardId}`)) {
+              const centerAround = createdNoteIds.join(",")
               navigate({
                 to: "/boards/$id",
                 params: { id: activeBoardId },
                 replace: true,
-                search: (prev: Record<string, unknown>) => ({ ...prev, center_around: noteIdToCenter }),
+                search: (prev: Record<string, unknown>) => ({ ...prev, center_around: centerAround }),
               })
             }
           }
