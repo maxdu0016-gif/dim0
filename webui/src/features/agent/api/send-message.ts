@@ -12,10 +12,15 @@ import { fetchWithAuthRaw } from "@/api"
 import type { ToolOutput } from "../types/tool-outputs"
 import { trimResponseAnnotations } from "../utils/annotations"
 import { useGraphStore } from "@/features/board/store/graph-store"
-import { getBoardNote } from "@/features/board/api/get-board"
-import { convertNoteToNode } from "@/features/board/utils/graph"
-import type { NoteNode } from "@/features/board/types/flow"
-import type { CreateNoteOutput, EditNoteOutput, WriteNoteOutput } from "../types/tool-outputs"
+import { getBoardLink, getBoardNote } from "@/features/board/api/get-board"
+import { convertLinkToEdgeWithPoints, convertNoteToNode } from "@/features/board/utils/graph"
+import type { LinkEdge, NoteNode } from "@/features/board/types/flow"
+import type {
+  CreateNoteOutput,
+  EditNoteOutput,
+  LinkNotesOutput,
+  WriteNoteOutput,
+} from "../types/tool-outputs"
 import { isReasoningTextStep, isToolCallStep, normalizeReasoningSteps } from "../types/stream"
 
 export class SendMessageError extends Error {
@@ -244,14 +249,16 @@ export const useSendMessage = () => {
           ? messages.slice(userMessageIndex + 1).find((message) => message.role === "assistant")
           : undefined
 
-        const noteToolOutputs = collectNoteToolOutputs(
-          completedMessage?.properties.reasoning?.reasoning ?? [],
-        )
+        const reasoningSteps = completedMessage?.properties.reasoning?.reasoning ?? []
+        const noteToolOutputs = collectNoteToolOutputs(reasoningSteps)
+        const linkToolOutputs = collectLinkToolOutputs(reasoningSteps)
 
-        if (noteToolOutputs.length > 0) {
+        if (noteToolOutputs.length > 0 || linkToolOutputs.length > 0) {
           const {
             boardId: activeBoardId,
+            setNodes,
             setNodesPersist,
+            setEdges,
           } = useGraphStore.getState()
 
           if (activeBoardId) {
@@ -274,6 +281,22 @@ export const useSendMessage = () => {
                 }
               } catch (error) {
                 console.error("Failed to apply remote note update locally:", error)
+              }
+            }
+
+            for (const output of linkToolOutputs) {
+              if (output.graphUid !== activeBoardId || !output.linkId) continue
+
+              try {
+                const link = await getBoardLink(activeBoardId, output.linkId)
+                const nodesById = useGraphStore.getState().nodesById
+                const { edge, points } = convertLinkToEdgeWithPoints(link, nodesById)
+                if (points.length) {
+                  setNodes((prevNodes) => [...prevNodes, ...points])
+                }
+                setEdges((prevEdges) => applyRemoteEdge(prevEdges, edge))
+              } catch (error) {
+                console.error("Failed to apply remote link update locally:", error)
               }
             }
 
@@ -365,6 +388,29 @@ const collectNoteToolOutputs = (steps: ReasoningStep[]): Array<WriteNoteOutput |
     }
     return []
   })
+
+
+const collectLinkToolOutputs = (steps: ReasoningStep[]): LinkNotesOutput[] =>
+  steps.flatMap((step) => {
+    if (!isToolCallStep(step)) return []
+    if (step.name === "link_notes" && typeof step.output !== "string") {
+      return [step.output as LinkNotesOutput]
+    }
+    return []
+  })
+
+const applyRemoteEdge = (prevEdges: LinkEdge[], nextEdge: LinkEdge): LinkEdge[] => {
+  const existing = prevEdges.find((edge) => edge.id === nextEdge.id)
+  if (existing) {
+    return prevEdges.map((edge) =>
+      edge.id === nextEdge.id
+        ? { ...nextEdge, selected: existing.selected, animated: existing.animated }
+        : edge,
+    )
+  }
+  return [...prevEdges, nextEdge]
+}
+
 
 const applyRemoteNoteNode = (
   prevNodes: NoteNode[],

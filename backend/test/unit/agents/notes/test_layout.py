@@ -56,6 +56,10 @@ class _FakeGraphStore:
     async def get_nodes(self, note_ids: list[str]) -> list[Note]:
         return [self.notes[nid] for nid in note_ids if nid in self.notes]
 
+    async def get_links(self, link_ids: list[str]) -> list[Link]:
+        requested = set(link_ids)
+        return [link for link in self.links if link.id in requested]
+
     async def get_graph(self, graph_uid: str, root_id: str | None = None) -> _FakeGraph:
         scoped_nodes = [n for n in self.notes.values() if n.graph_uid == graph_uid]
         scoped_links = [link for link in self.links if link.graph_uid == graph_uid]
@@ -221,19 +225,19 @@ async def test_rearrange_layouts_tree_component_as_one_tile() -> None:
     """A tree component is laid out internally, then treated as one tile for flex-wrap."""
     # Three-node tree with two singletons; expect the tree to occupy one tile to the left,
     # singletons to flex-wrap after it along the same row.
+    link_a = Link(source="root", target="a", graph_uid="graph-1")
+    link_b = Link(source="root", target="b", graph_uid="graph-1")
     store = _FakeGraphStore(
         notes={
             nid: _make_note(nid, width=200.0, height=100.0)
             for nid in ["root", "a", "b", "solo1", "solo2"]
         },
-        links=[
-            Link(source="root", target="a", graph_uid="graph-1"),
-            Link(source="root", target="b", graph_uid="graph-1"),
-        ],
+        links=[link_a, link_b],
     )
 
     moved = await rearrange_created_notes(
         store, "graph-1", ["root", "a", "b", "solo1", "solo2"],
+        created_link_ids=[link_a.id, link_b.id],
         max_row_width=10000.0, h_gap=H_GAP, v_gap=V_GAP,
     )
 
@@ -255,18 +259,20 @@ async def test_rearrange_layouts_tree_component_as_one_tile() -> None:
 async def test_rearrange_falls_back_to_horizontal_row_for_dag_component() -> None:
     """Multi-parent components use the simple horizontal-row fallback for now."""
     # a and b both point to c -> multi-parent DAG, not a tree.
+    link_ac = Link(source="a", target="c", graph_uid="graph-1")
+    link_bc = Link(source="b", target="c", graph_uid="graph-1")
     store = _FakeGraphStore(
         notes={
             nid: _make_note(nid, width=200.0, height=100.0)
             for nid in ["a", "b", "c"]
         },
-        links=[
-            Link(source="a", target="c", graph_uid="graph-1"),
-            Link(source="b", target="c", graph_uid="graph-1"),
-        ],
+        links=[link_ac, link_bc],
     )
 
-    await rearrange_created_notes(store, "graph-1", ["a", "b", "c"])
+    await rearrange_created_notes(
+        store, "graph-1", ["a", "b", "c"],
+        created_link_ids=[link_ac.id, link_bc.id],
+    )
 
     by_id = {nid: data["properties"]["node_position"]["position"] for nid, data in store.patches}
     ys = {by_id["a"]["y"], by_id["b"]["y"], by_id["c"]["y"]}
@@ -274,6 +280,30 @@ async def test_rearrange_falls_back_to_horizontal_row_for_dag_component() -> Non
     xs = sorted([by_id["a"]["x"], by_id["b"]["x"], by_id["c"]["x"]])
     assert xs[1] - xs[0] == pytest.approx(200.0 + H_GAP)
     assert xs[2] - xs[1] == pytest.approx(200.0 + H_GAP)
+
+
+@pytest.mark.asyncio
+async def test_rearrange_ignores_links_not_in_created_link_ids() -> None:
+    """Links that weren't explicitly passed as created must not form components.
+
+    Guards against the old behavior of scrolling the graph for edges, which could return
+    stale data right after write or pull in links from a prior turn.
+    """
+    existing_link = Link(source="a", target="b", graph_uid="graph-1")
+    store = _FakeGraphStore(
+        notes={
+            nid: _make_note(nid, width=200.0, height=100.0)
+            for nid in ["a", "b"]
+        },
+        links=[existing_link],  # present on the board, but NOT passed as created
+    )
+
+    await rearrange_created_notes(store, "graph-1", ["a", "b"])  # no created_link_ids
+
+    by_id = {nid: data["properties"]["node_position"]["position"] for nid, data in store.patches}
+    # Two singletons side by side, not a 2-node connected component.
+    assert by_id["a"]["y"] == by_id["b"]["y"]
+    assert abs(by_id["a"]["x"] - by_id["b"]["x"]) == pytest.approx(200.0 + H_GAP)
 
 
 @pytest.mark.asyncio

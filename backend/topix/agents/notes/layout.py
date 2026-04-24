@@ -215,6 +215,7 @@ async def rearrange_created_notes(  # noqa: C901
     graph_store: GraphStore,
     graph_uid: str,
     created_ids: list[str],
+    created_link_ids: list[str] | None = None,
     max_row_width: float = MAX_ROW_WIDTH,
     h_gap: float = H_GAP,
     v_gap: float = V_GAP,
@@ -225,6 +226,9 @@ async def rearrange_created_notes(  # noqa: C901
         graph_store: Store used to read notes/links and patch positions.
         graph_uid: Board scope. Notes or links belonging to a different board are ignored.
         created_ids: Ids of notes created in the current turn. Only these are moved.
+        created_link_ids: Ids of links created in the current turn. Fetched directly by id
+            (consistent) rather than via scroll (eventually consistent) so components form
+            correctly immediately after writes.
         max_row_width: Width budget for a row before wrapping to the next.
         h_gap: Horizontal gap between component tiles in the same row.
         v_gap: Vertical gap between rows.
@@ -254,11 +258,18 @@ async def rearrange_created_notes(  # noqa: C901
     if len(scoped_ids) < 2:
         return []
 
-    graph = await graph_store.get_graph(graph_uid)
     scoped_set = set(scoped_ids)
     relevant_links: list[Link] = []
-    if graph is not None:
-        for link in graph.edges:
+    if created_link_ids:
+        seen_link_ids: set[str] = set()
+        unique_link_ids = [
+            lid for lid in created_link_ids
+            if not (lid in seen_link_ids or seen_link_ids.add(lid))
+        ]
+        fetched_links = await graph_store.get_links(unique_link_ids)
+        for link in fetched_links:
+            if link.graph_uid != graph_uid:
+                continue
             if link.deleted_at is not None:
                 continue
             if link.source in scoped_set and link.target in scoped_set:

@@ -11,7 +11,7 @@ from topix.agents.assistant.plan import Plan
 from topix.agents.config import AssistantManagerConfig
 from topix.agents.datatypes.context import ReasoningContext
 from topix.agents.datatypes.model_enum import ModelEnum
-from topix.agents.datatypes.outputs import CreateNoteOutput, WriteNoteOutput
+from topix.agents.datatypes.outputs import CreateNoteOutput, LinkNotesOutput, WriteNoteOutput
 from topix.agents.datatypes.reasoning_step import ReasoningStep
 from topix.agents.datatypes.stream import (
     AgentStreamMessage,
@@ -155,6 +155,27 @@ class AssistantManager:
             created.append(output.note_id)
         return created
 
+    def _collect_created_link_ids(self, context: ReasoningContext) -> list[str]:
+        """Pick link ids that this turn just created, in first-seen order."""
+        if self.graph_uid is None:
+            return []
+
+        created: list[str] = []
+        seen: set[str] = set()
+        for call in context.tool_calls:
+            if call.state != ToolCallState.COMPLETED:
+                continue
+            output = call.output
+            if not isinstance(output, LinkNotesOutput):
+                continue
+            if output.graph_uid != self.graph_uid:
+                continue
+            if output.link_id in seen:
+                continue
+            seen.add(output.link_id)
+            created.append(output.link_id)
+        return created
+
     async def _rearrange_turn_notes(self, context: ReasoningContext) -> None:
         """Flex-wrap any notes the planner created this turn. Non-fatal on error."""
         if self.graph_store is None or self.graph_uid is None:
@@ -162,8 +183,14 @@ class AssistantManager:
         created_ids = self._collect_created_note_ids(context)
         if len(created_ids) < 2:
             return
+        created_link_ids = self._collect_created_link_ids(context)
         try:
-            await rearrange_created_notes(self.graph_store, self.graph_uid, created_ids)
+            await rearrange_created_notes(
+                self.graph_store,
+                self.graph_uid,
+                created_ids,
+                created_link_ids=created_link_ids,
+            )
         except Exception:
             logger.exception(
                 "rearrange_created_notes failed; notes left at their creation positions"
