@@ -62,7 +62,7 @@ export const FloatingIsland = ({ boardId, onOpenFullSheet }: FloatingIslandProps
         isStreaming && "animate-ring-pulse-soft",
       )}>
         <ProgressLine />
-        <div className='flex items-center gap-3 p-4'>
+        <div className='flex items-center gap-2 p-3'>
           {isStreaming ? (
             <ThinkingIndicator className='text-xs text-foreground/70 shrink-0' iconSize={14} />
           ) : (
@@ -94,7 +94,7 @@ export const FloatingIsland = ({ boardId, onOpenFullSheet }: FloatingIslandProps
           </span>
         </div>
       </div>
-      <p className='text-center text-[11px] text-muted-foreground/70 px-4'>
+      <p className='text-center text-[11px] text-muted-foreground/70 px-3'>
         AI can make mistakes. Verify important details carefully.
       </p>
     </div>

@@ -90,7 +90,7 @@ export const ProgressLine = () => {
   if (isThisChatStreaming && activeTool) {
     const Icon = ToolNameIcon[activeTool.name]
     return (
-      <div className='w-full px-4 pt-4'>
+      <div className='w-full px-3 pt-3'>
         <div className='inline-flex max-w-full items-center gap-1.5 rounded-full bg-secondary/40 px-3 py-1.5'>
           <Icon className='size-3.5 text-wiki-link shrink-0' strokeWidth={2} />
           <span className='truncate font-mono text-xs text-muted-foreground'>
@@ -103,7 +103,7 @@ export const ProgressLine = () => {
 
   if (isThisChatStreaming && latestReasoningLine) {
     return (
-      <div className='w-full px-4 pt-4'>
+      <div className='w-full px-3 pt-3'>
         <div className='inline-flex max-w-full items-center gap-1.5 rounded-full bg-secondary/40 px-3 py-1.5'>
           <span className='shrink-0 font-mono text-xs text-muted-foreground select-none'>…</span>
           <span
@@ -119,7 +119,7 @@ export const ProgressLine = () => {
 
   if (isThisChatStreaming) {
     return (
-      <div className='w-full px-4 pt-4'>
+      <div className='w-full px-3 pt-3'>
         <div className='inline-flex items-center gap-1.5 rounded-full bg-secondary/40 px-3 py-1.5'>
           <span className='inline-flex items-center gap-1 font-mono text-xs font-medium text-muted-foreground'>
             Thinking
@@ -135,7 +135,7 @@ export const ProgressLine = () => {
     return (
       <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
         <PopoverAnchor asChild>
-          <div className='w-full px-4 pt-4'>
+          <div className='w-full px-3 pt-3'>
             <div className='inline-flex max-w-full items-center gap-1.5 rounded-full bg-secondary/40 px-3 py-1.5'>
               <CheckCircleStatusIcon className='size-4 text-secondary-foreground/70 shrink-0' weight='fill' />
               <span className='min-w-0 truncate font-mono text-xs text-muted-foreground'>
