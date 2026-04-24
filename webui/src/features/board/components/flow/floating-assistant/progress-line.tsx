@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react"
 import { useAppStore } from "@/store"
-import { CheckIcon, ChevronDownIcon } from "@/components/icons"
+import { CheckCircleStatusIcon, ChevronDownIcon } from "@/components/icons"
 import { ThinkingDots } from "@/components/animations/thinking-indicator"
 import { Popover, PopoverAnchor, PopoverTrigger } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
@@ -13,12 +13,12 @@ import { StepsPopoverContent } from "./steps-popover-content"
 
 
 /**
- * Adaptive progress strip under the island input. While streaming it shows
+ * Adaptive progress pill above the island input. While streaming it surfaces
  * the active tool, a live reasoning preview, or a "Thinking" fallback. Once
  * the turn ends with at least one tool call, it collapses into a persistent
- * summary ("✓ N steps · names…") with a trailing Steps button that opens the
- * full tool trace in a popover. Scoped to the current chatId so cache bleed
- * from other chats is discarded on switch.
+ * summary pill ("✓ N step(s) · names…") with an inline `steps` chevron that
+ * opens the full tool trace in a popover. Scoped to the current chatId so
+ * cache bleed from other chats is discarded on switch.
  */
 export const ProgressLine = () => {
   const { chatId } = useChat()
@@ -90,69 +90,79 @@ export const ProgressLine = () => {
   if (isThisChatStreaming && activeTool) {
     const Icon = ToolNameIcon[activeTool.name]
     return (
-      <div className='flex items-center gap-2 px-4 py-2 border-b border-sidebar-border/60 bg-muted/60'>
-        <Icon className='size-3.5 text-wiki-link shrink-0' strokeWidth={2} />
-        <span className='truncate font-mono text-xs text-muted-foreground'>
-          {getToolTitle(activeTool.name)}
-        </span>
+      <div className='w-full px-4 pt-4'>
+        <div className='inline-flex max-w-full items-center gap-1.5 rounded-full bg-secondary/40 px-3 py-1.5'>
+          <Icon className='size-3.5 text-wiki-link shrink-0' strokeWidth={2} />
+          <span className='truncate font-mono text-xs text-muted-foreground'>
+            {getToolTitle(activeTool.name)}
+          </span>
+        </div>
       </div>
     )
   }
 
   if (isThisChatStreaming && latestReasoningLine) {
     return (
-      <div className='flex items-center gap-2 px-4 py-2 border-b border-sidebar-border/60 bg-muted/60 overflow-hidden'>
-        <span className='shrink-0 font-mono text-xs text-muted-foreground select-none'>…</span>
-        <span
-          className='flex-1 min-w-0 truncate font-mono text-xs text-muted-foreground'
-          title={latestReasoningLine}
-        >
-          {latestReasoningLine}
-        </span>
+      <div className='w-full px-4 pt-4'>
+        <div className='inline-flex max-w-full items-center gap-1.5 rounded-full bg-secondary/40 px-3 py-1.5'>
+          <span className='shrink-0 font-mono text-xs text-muted-foreground select-none'>…</span>
+          <span
+            className='min-w-0 truncate font-mono text-xs text-muted-foreground'
+            title={latestReasoningLine}
+          >
+            {latestReasoningLine}
+          </span>
+        </div>
       </div>
     )
   }
 
   if (isThisChatStreaming) {
     return (
-      <div className='flex items-center gap-2 px-4 py-2 border-b border-sidebar-border/60 bg-muted/60'>
-        <span className='inline-flex items-center gap-1 font-mono text-xs font-medium text-muted-foreground'>
-          Thinking
-          <ThinkingDots />
-        </span>
+      <div className='w-full px-4 pt-4'>
+        <div className='inline-flex items-center gap-1.5 rounded-full bg-secondary/40 px-3 py-1.5'>
+          <span className='inline-flex items-center gap-1 font-mono text-xs font-medium text-muted-foreground'>
+            Thinking
+            <ThinkingDots />
+          </span>
+        </div>
       </div>
     )
   }
 
   if (toolSteps.length > 0) {
+    const stepNoun = toolSteps.length === 1 ? "step" : "steps"
     return (
       <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
         <PopoverAnchor asChild>
-          <div className='flex items-center gap-2 px-4 py-2 border-b border-sidebar-border/60 bg-muted/60'>
-            <CheckIcon className='size-3.5 text-secondary-foreground shrink-0' strokeWidth={2} />
-            <span className='flex-1 min-w-0 truncate font-mono text-xs text-muted-foreground'>
-              <span className='text-foreground font-medium'>{toolSteps.length} steps</span>
-              {summaryText ? ` · ${summaryText}` : null}
-            </span>
-            <PopoverTrigger asChild>
-              <button
-                type='button'
-                className={cn(
-                  "shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded",
-                  "text-xs font-mono transition-colors",
-                  "hover:bg-secondary-foreground/10",
-                  popoverOpen ? "text-foreground" : "text-muted-foreground"
-                )}
-                aria-expanded={popoverOpen}
-                aria-label={popoverOpen ? "Hide steps" : "Show steps"}
-              >
-                Steps
-                <ChevronDownIcon
-                  className={cn("size-3 transition-transform", popoverOpen && "rotate-180")}
-                  strokeWidth={2}
-                />
-              </button>
-            </PopoverTrigger>
+          <div className='w-full px-4 pt-4'>
+            <div className='inline-flex max-w-full items-center gap-1.5 rounded-full bg-secondary/40 px-3 py-1.5'>
+              <CheckCircleStatusIcon className='size-4 text-secondary-foreground/70 shrink-0' weight='fill' />
+              <span className='min-w-0 truncate font-mono text-xs text-muted-foreground'>
+                <span className='text-foreground font-medium'>
+                  {toolSteps.length} {stepNoun}
+                </span>
+                {summaryText ? ` · ${summaryText}` : null}
+              </span>
+              <PopoverTrigger asChild>
+                <button
+                  type='button'
+                  className={cn(
+                    "shrink-0 inline-flex items-center gap-0.5 font-mono text-xs transition-colors",
+                    "focus-visible:outline-none",
+                    popoverOpen ? "text-foreground" : "text-muted-foreground/70 hover:text-foreground"
+                  )}
+                  aria-expanded={popoverOpen}
+                  aria-label={popoverOpen ? "Hide steps" : "Show steps"}
+                >
+                  steps
+                  <ChevronDownIcon
+                    className={cn("size-3 transition-transform", popoverOpen && "rotate-180")}
+                    strokeWidth={2}
+                  />
+                </button>
+              </PopoverTrigger>
+            </div>
           </div>
         </PopoverAnchor>
         <StepsPopoverContent toolSteps={toolSteps} />

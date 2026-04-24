@@ -17,10 +17,10 @@ export const StepsPopoverContent = ({ toolSteps }: { toolSteps: ToolCallStep[] }
       sideOffset={8}
       className={
         "w-[min(580px,calc(100vw-4rem))] max-h-[50vh] overflow-y-auto scrollbar-thin " +
-        "bg-sidebar border border-border rounded-xl " +
+        "bg-sidebar border border-border rounded-2xl " +
         "shadow-[0_6px_16px_-4px_rgba(0,0,0,0.18),0_1px_4px_-2px_rgba(0,0,0,0.08)] " +
         "dark:shadow-[0_8px_20px_-4px_rgba(0,0,0,0.4),0_1px_4px_-2px_rgba(0,0,0,0.2)] " +
-        "p-3"
+        "p-4"
       }
     >
       <div className='flex items-center justify-between mb-2 px-0.5'>
