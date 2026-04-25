@@ -219,11 +219,10 @@ export const InputBar = ({
   )
 
   const inboxClass = clsx(
-    'rounded-xl relative flex flex-col text-card-foreground text-base p-2 border transition-colors transition-shadow',
-    chatId ? 'bg-accent backdrop-blur-lg supports-[backdrop-filter]:bg-accent/70 dark:border dark:border-border/50 shadow-lg' :
-      'bg-accent text-base shadow-xl',
-    'border-transparent hover:border-secondary-foreground/50',
-    'focus-within:border-secondary-foreground/50 focus-within:ring-2 focus-within:ring-secondary-foreground/10'
+    'rounded-2xl relative flex flex-col text-card-foreground text-base p-2 border transition-[box-shadow,border-color]',
+    'bg-card backdrop-blur-md backdrop-saturate-150 supports-[backdrop-filter]:bg-card/70 shadow-md',
+    'border-border hover:border-secondary-foreground/50',
+    'focus-within:border-secondary-foreground/50 focus-within:ring-2 focus-within:ring-secondary-foreground/10',
   )
   const showStarterPrompts = !chatId && !isStreaming && Boolean(attachedBoardId)
 
@@ -241,7 +240,12 @@ export const InputBar = ({
       )}>
         <div className="relative w-full max-w-[800px] mx-auto">
           <div className={inboxClass}>
-            <div className="flex-1 p-2">
+            <div className="flex items-start gap-2 p-2">
+              {attachedBoardId && (
+                <span className="mt-1 shrink-0 rounded bg-secondary px-2 py-0.5 font-mono text-xs text-secondary-foreground">
+                  @board
+                </span>
+              )}
               <TextareaAutosize
                 onKeyDown={handleKeyDown}
                 onChange={(e) => setInput(e.target.value)}
@@ -249,7 +253,7 @@ export const InputBar = ({
                 minRows={1}
                 maxRows={15}
                 placeholder="Ask anything..."
-                className="w-full h-full resize-none border-none outline-none bg-transparent text-base"
+                className="flex-1 min-w-0 resize-none border-none outline-none bg-transparent text-base"
                 autoFocus
               />
             </div>
@@ -262,12 +266,17 @@ export const InputBar = ({
                 />
               </div>
 
-              <SendButton
-                loadingStatus={isStreaming ? 'loading' : 'loaded'}
-                disabled={isStreaming}
-                onClick={handlePrimarySend}
-                className={commandIconClass}
-              />
+              <div className="flex items-center gap-2">
+                <span className="hidden select-none px-1 font-mono text-sm text-muted-foreground/70 sm:inline">
+                  ⌘↵
+                </span>
+                <SendButton
+                  loadingStatus={isStreaming ? 'loading' : 'loaded'}
+                  disabled={isStreaming}
+                  onClick={handlePrimarySend}
+                  className={commandIconClass}
+                />
+              </div>
             </div>
           </div>
 
