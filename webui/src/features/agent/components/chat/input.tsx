@@ -219,7 +219,7 @@ export const InputBar = ({
   )
 
   const inboxClass = clsx(
-    'rounded-2xl relative flex flex-col text-card-foreground text-base p-2 border transition-[box-shadow,border-color]',
+    'rounded-2xl relative flex flex-col text-card-foreground text-base p-3 gap-2 border transition-[box-shadow,border-color]',
     'bg-card backdrop-blur-md backdrop-saturate-150 supports-[backdrop-filter]:bg-card/70 shadow-md',
     'border-border hover:border-secondary-foreground/50',
     'focus-within:border-secondary-foreground/50 focus-within:ring-2 focus-within:ring-secondary-foreground/10',
@@ -240,7 +240,7 @@ export const InputBar = ({
       )}>
         <div className="relative w-full max-w-[800px] mx-auto">
           <div className={inboxClass}>
-            <div className="flex items-start gap-2 p-2">
+            <div className="flex items-start gap-2 p-0">
               {attachedBoardId && (
                 <span className="mt-1 shrink-0 rounded bg-secondary px-2 py-0.5 font-mono text-xs text-secondary-foreground">
                   @board
