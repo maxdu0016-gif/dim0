@@ -29,6 +29,8 @@ export interface InputBarProps {
   layout?: "floating" | "docked"
   preferChatRoute?: boolean
   enableSelectionContext?: boolean
+  /** When true (e.g. on home), submitting creates a fresh board and routes to it. */
+  autoCreateBoard?: boolean
 }
 
 
@@ -80,6 +82,7 @@ export const InputBar = ({
   layout = "floating",
   preferChatRoute = false,
   enableSelectionContext = false,
+  autoCreateBoard = false,
 }: InputBarProps) => {
   const { chatId } = useChat()
 
@@ -142,6 +145,7 @@ export const InputBar = ({
         attachedBoardId,
         preferChatRoute,
         messageContext,
+        autoCreateBoard,
       })
     } catch (error) {
       if (error instanceof SendMessageError && error.status === 429) {

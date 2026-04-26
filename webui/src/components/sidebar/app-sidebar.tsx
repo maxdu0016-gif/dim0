@@ -70,7 +70,7 @@ export function AppSidebar({ onLogout }: AppSidebarProps) {
 
   const { data: chatPagesData, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteChats({
     pageSize: CHAT_HISTORY_PAGE_SIZE,
-    graphUid: "none",
+    graphUid: "any",
     userId
   })
   const { data: boards = [] } = useListBoards(userId)
