@@ -69,6 +69,38 @@ async def update_graph(
     return await store.update_graph(graph_uid=graph_id, data=body.data)
 
 
+@router.get("/{graph_id}/contents/", include_in_schema=False)
+@router.get("/{graph_id}/contents")
+@with_standard_response
+async def list_board_contents(
+    response: Response,
+    request: Request,
+    graph_id: Annotated[str, Path(description="Graph ID")],
+    user_id: Annotated[str, Depends(get_current_user_uid)],
+    _: Annotated[None, Depends(verify_board_read_access)],
+    parent_id: Annotated[str | None, Query(description="Folder ID to list children of; omit for top level")] = None,
+):
+    """List a board's surface-kind nodes (sheet/folder/code-sandbox/widget) at one level."""
+    store: GraphStore = request.app.graph_store
+    graph = await store.get_graph(graph_uid=graph_id, root_id=parent_id)
+    if not graph:
+        return {"items": []}
+
+    surface_kinds = {"sheet", "folder", "code-sandbox", "widget"}
+    items = []
+    for node in graph.nodes:
+        kind = node.style.type if node.style else None
+        if kind not in surface_kinds:
+            continue
+        items.append({
+            "id": node.id,
+            "label": node.label.markdown if node.label else None,
+            "kind": kind,
+            "parent_id": node.parent_id,
+        })
+    return {"items": items}
+
+
 @router.post("/{graph_id}:describe/", include_in_schema=False)
 @router.post("/{graph_id}:describe")
 @with_standard_response
