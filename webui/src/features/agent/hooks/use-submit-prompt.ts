@@ -9,6 +9,7 @@ import { useUpdateChat } from "../api/update-chat"
 import { useSendMessage } from "../api/send-message"
 import { useDescribeChat } from "../api/describe-chat"
 import { useCreateBoard } from "@/features/board/api/create-board"
+import { useDescribeBoard } from "@/features/board/api/describe-board"
 import { ChatUrl } from "@/routes"
 import { generateUuid, trimText } from "@/lib/common"
 import type { SendMessageRequestPayload } from "../api/types"
@@ -47,6 +48,7 @@ export const useSubmitPrompt = () => {
   const { sendMessageAsync } = useSendMessage()
   const { describeChatAsync } = useDescribeChat()
   const { createBoardAsync } = useCreateBoard()
+  const { describeBoardAsync } = useDescribeBoard()
 
   const navigate = useNavigate()
   const routerLocation = useRouterState({ select: (s) => s.location })
@@ -126,6 +128,9 @@ export const useSubmitPrompt = () => {
 
       if (createNewChat) {
         void describeChatAsync({ chatId: id, userId }).catch(() => {})
+        if (settingsBoardId) {
+          void describeBoardAsync({ boardId: settingsBoardId, chatId: id }).catch(() => {})
+        }
       }
     },
     [
@@ -145,6 +150,7 @@ export const useSubmitPrompt = () => {
       sendMessageAsync,
       describeChatAsync,
       createBoardAsync,
+      describeBoardAsync,
       navigate,
     ]
   )
