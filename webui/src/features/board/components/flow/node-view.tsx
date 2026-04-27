@@ -13,9 +13,9 @@ import { useTheme } from '@/components/theme-provider'
 import { darkModeDisplayHex } from '../../lib/colors/dark-variants'
 import { useContentMinHeight } from '../../hooks/use-content-min-height'
 import { ShapeChrome } from './shape-chrome'
-import { getShapeContentScale } from '../../utils/shape-content-scale'
 import { FolderNode } from './folder-node'
 import { SHEET_MIN_HEIGHT, SHEET_MIN_WIDTH } from '../../types/note'
+import { nodeUsesContentMinHeight } from '../../utils/note-box'
 
 const CONNECTOR_GAP = 0
 type ResizeHandle = {
@@ -120,13 +120,7 @@ function NodeViewBase({ id, data, selected, width, height, dragging }: NodeProps
 
   const nodeType = data.style.type
   const isVisualNode = nodeType === 'image' || nodeType === 'icon' || nodeType === 'slide'
-  const shouldMeasureMinHeight = !isVisualNode && (isEditing || isResizingLocal)
-
-  // Measure content with ResizeObserver only while editing/resizing.
-  const contentScale = getShapeContentScale(nodeType)
-  const { contentRef, computedMinH } = useContentMinHeight(id, 0, 20, contentScale, {
-    enabled: shouldMeasureMinHeight,
-  })
+  const usesContentMinHeight = nodeUsesContentMinHeight(nodeType)
 
   const persistedHeight = data.properties.nodeSize?.size?.height
   const persistedWidth = data.properties.nodeSize?.size?.width
@@ -135,11 +129,23 @@ function NodeViewBase({ id, data, selected, width, height, dragging }: NodeProps
   const currentNodeHeight = liveHeight ?? persistedHeight
   const currentNodeWidth = liveWidth ?? persistedWidth
 
+  const noteText = data.content?.markdown ?? data.label?.markdown ?? ''
+  const { computedMinH } = useContentMinHeight(id, {
+    text: noteText,
+    nodeWidth: currentNodeWidth,
+    nodeType,
+    fontFamily: data.style.fontFamily,
+    fontSize: data.style.fontSize,
+    textStyle: data.style.textStyle,
+    editing: isEditing || isResizingLocal,
+    enabled: usesContentMinHeight,
+  })
+
   const baseMinH = isVisualNode
     ? 50
-    : shouldMeasureMinHeight
-    ? computedMinH
-    : Math.max(20, currentNodeHeight ?? 20)
+    : usesContentMinHeight
+      ? computedMinH
+      : 20
   const innerMinH = Math.max(20, baseMinH)
 
   const isPinned = data.properties.pinned.boolean
@@ -192,7 +198,6 @@ function NodeViewBase({ id, data, selected, width, height, dragging }: NodeProps
         selected={selected}
         dragging={dragging}
         isDark={isDark}
-        contentRef={contentRef}
         onLabelEditingChange={setIsEditing}
         nodeWidth={width}
         nodeHeight={height}
