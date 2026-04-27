@@ -308,6 +308,7 @@
   overflow: visible !important;
 }
 
+
 /* Override the general pre styles inside the node view */
 .tiptap-editor .ProseMirror .code-block-edit-pre {
   margin: 0 !important;
@@ -329,6 +330,7 @@
   color: transparent !important;
   caret-color: var(--foreground);
 }
+
 
 .code-block-editable {
   display: block;
@@ -660,6 +662,12 @@
   display: flex;
   align-items: center;
   gap: 1px;
+}
+
+/* For list items, shift the handle further left to clear the bullet/number
+   that lives inside the parent <ul>/<ol>'s padding. */
+.block-handle-wrap--list {
+  margin-left: -1.6rem;
 }
 
 .block-handle-btn {

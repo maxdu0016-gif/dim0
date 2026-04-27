@@ -34,17 +34,21 @@ export function MathEditPopover({ editor }: { editor: Editor }) {
     }
   }, [])
 
-  // Live update: dispatch each keystroke as `addToHistory: false` so the math
-  // node re-renders in place without polluting the undo stack. The final
-  // committing transaction in close() is the only history entry.
+  // Live update (debounced): dispatch each draft change after a short pause
+  // so KaTeX rendering doesn't fire on every keystroke. The transaction is
+  // marked `addToHistory: false` so the undo stack stays clean — only the
+  // final transaction in close() is kept as a history entry.
   useEffect(() => {
     if (!state) return
-    const tr = editor.state.tr.setNodeMarkup(state.pos, null, {
-      ...editor.state.doc.nodeAt(state.pos)?.attrs,
-      latex: draft,
-    })
-    tr.setMeta("addToHistory", false)
-    editor.view.dispatch(tr)
+    const timer = setTimeout(() => {
+      const tr = editor.state.tr.setNodeMarkup(state.pos, null, {
+        ...editor.state.doc.nodeAt(state.pos)?.attrs,
+        latex: draft,
+      })
+      tr.setMeta("addToHistory", false)
+      editor.view.dispatch(tr)
+    }, 70)
+    return () => clearTimeout(timer)
   }, [draft, state, editor])
 
   const close = useCallback(() => {
