@@ -44,10 +44,26 @@ export const ImageWithDrop = Image.extend({
           node: { attrs: { src?: string; alt?: string; title?: string } },
         ) {
           const alt = (node.attrs.alt ?? "").replace(/[\r\n]+/g, " ")
-          const src = node.attrs.src ?? ""
+          // Normalize before encoding so serialization is idempotent across
+          // save/parse cycles. Decode iteratively (capped) — a single pass
+          // only unwinds one layer (e.g. %2520 → %20 still leaves an encoded
+          // '%'). After fully decoding, encodeURI produces one canonical
+          // encoded form regardless of how many times the doc has been saved.
+          const rawSrc = node.attrs.src ?? ""
+          let literal = rawSrc
+          for (let i = 0; i < 5; i++) {
+            try {
+              const next = decodeURI(literal)
+              if (next === literal) break
+              literal = next
+            } catch {
+              break
+            }
+          }
+          const src = encodeURI(literal)
           const title = node.attrs.title
           state.write(
-            `![${state.esc(alt)}](${state.esc(src)}${title ? ` "${state.esc(title)}"` : ""})`,
+            `![${state.esc(alt)}](${src}${title ? ` "${state.esc(title)}"` : ""})`,
           )
           state.closeBlock(node)
         },
