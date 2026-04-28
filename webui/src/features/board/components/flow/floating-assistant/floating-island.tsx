@@ -58,7 +58,7 @@ export const FloatingIsland = ({ boardId, onOpenFullSheet }: FloatingIslandProps
         "shadow-[0_12px_32px_-4px_rgba(0,0,0,0.28),0_2px_8px_-2px_rgba(0,0,0,0.12)]",
         "dark:shadow-[0_16px_36px_-4px_rgba(0,0,0,0.55),0_2px_8px_-2px_rgba(0,0,0,0.3)]",
         "transition-[box-shadow,border-color] focus-within:border-secondary-foreground/50",
-        "focus-within:ring-4 focus-within:ring-secondary-foreground/50",
+        "focus-within:ring-4 focus-within:ring-secondary-foreground/20",
         isStreaming ? "border-secondary-foreground/50 animate-ring-pulse-soft" : "border-border",
       )}>
         <ProgressLine />
