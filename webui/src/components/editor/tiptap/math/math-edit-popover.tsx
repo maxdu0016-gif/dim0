@@ -1,22 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 import type { Editor } from "@tiptap/react"
-
-
-export type MathEditOpts = {
-  pos: number
-  latex: string
-  isInline: boolean
-}
-
-
-let _openFn: ((opts: MathEditOpts) => void) | null = null
-
-
-/** Trigger the floating math editor for the math node at `pos`. */
-export function openMathEditor(opts: MathEditOpts): void {
-  _openFn?.(opts)
-}
+import { registerMathEditorOpener, type MathEditOpts } from "./math-edit-trigger"
 
 
 export function MathEditPopover({ editor }: { editor: Editor }) {
@@ -25,13 +10,10 @@ export function MathEditPopover({ editor }: { editor: Editor }) {
   const containerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    _openFn = (opts) => {
+    return registerMathEditorOpener((opts) => {
       setState(opts)
       setDraft(opts.latex)
-    }
-    return () => {
-      _openFn = null
-    }
+    })
   }, [])
 
   // Live update (debounced): dispatch each draft change after a short pause

@@ -16,7 +16,7 @@ import { DetailsMarkdown, DetailsSummaryMarkdown, DetailsContentMarkdown } from 
 import { TableKit } from "@tiptap/extension-table"
 import { ShikiCodeBlock } from "./code-block/code-block-extension"
 import { InlineMathMarkdown, BlockMathMarkdown } from "./math/math-extensions"
-import { openMathEditor } from "./math/math-edit-popover"
+import { openMathEditor } from "./math/math-edit-trigger"
 import { ImageWithDrop } from "./image/image-extension"
 import { TagDecoration } from "./tag/tag-decoration"
 import { slashSuggestion } from "./slash-command/suggestion"

@@ -1,6 +1,6 @@
 import type { Editor, Range } from "@tiptap/core"
 import type { Icon } from "@phosphor-icons/react"
-import { openMathEditor } from "../math/math-edit-popover"
+import { openMathEditor } from "../math/math-edit-trigger"
 import {
   TextT,
   TextHOne,
