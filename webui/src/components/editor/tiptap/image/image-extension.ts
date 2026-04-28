@@ -31,6 +31,26 @@ export const ImageWithDrop = Image.extend({
   addStorage() {
     return {
       markdown: {
+        // The default prosemirror-markdown image serializer assumes the image
+        // sits inside a paragraph and so omits closeBlock. Our image is
+        // block-level; without closeBlock the next block (e.g. a code fence)
+        // glues onto the same line and the doc breaks on reload.
+        serialize(
+          state: {
+            write: (s: string) => void
+            esc: (s: string) => string
+            closeBlock: (node: unknown) => void
+          },
+          node: { attrs: { src?: string; alt?: string; title?: string } },
+        ) {
+          const alt = (node.attrs.alt ?? "").replace(/[\r\n]+/g, " ")
+          const src = node.attrs.src ?? ""
+          const title = node.attrs.title
+          state.write(
+            `![${state.esc(alt)}](${state.esc(src)}${title ? ` "${state.esc(title)}"` : ""})`,
+          )
+          state.closeBlock(node)
+        },
         parse: {
           setup(md: MarkdownIt) {
             // Markdown-it's default validateLink rejects `file:` URLs, so a
