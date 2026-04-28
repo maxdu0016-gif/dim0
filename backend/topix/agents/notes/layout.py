@@ -16,6 +16,8 @@ backend's stacked-column default rather than breaking the turn.
 
 from __future__ import annotations
 
+import statistics
+
 from collections import defaultdict
 
 from topix.agents.notes.service import DEFAULT_NOTE_GAP
@@ -25,12 +27,113 @@ from topix.datatypes.property import PositionProperty
 from topix.store.graph import GraphStore
 from topix.utils.graph.layout import LayoutDirection, layout_directed
 
-# Defaults tuned to match the frontend dagre feel and the document parsing pipeline.
-H_GAP = 75.0
-V_GAP = 150.0
+# Within-component layout: igraph's Sugiyama treats nodes as dimensionless points,
+# so its hgap/vgap are point-to-point distances, not gaps between rendered rectangles.
+# We compute pitch from actual node dimensions at call-time. For sibling spacing we
+# use the *median* height (robust to outliers — one tall sheet does not push every
+# other sibling apart) plus SIBLING_PAD. For rank spacing we use the max width plus
+# RANK_PAD so columns never overlap. A node taller than the median may overlap its
+# immediate neighbors by a small amount; this looks visually intentional, not broken.
+SIBLING_PAD = 30.0
+RANK_PAD = 150.0
+
+# Between-component flex-wrap: gap between tiles in the same row, and between rows.
 TILE_GAP_X = 80.0
 TILE_GAP_Y = 120.0
 MAX_ROW_WIDTH = 3500.0
+
+
+def _classify_tree(
+    component_ids: list[str],
+    component_edges: list[tuple[str, str]],
+) -> tuple[bool, str | None, dict[str, list[str]]]:
+    """Detect a tree-shaped component: single root, no multi-parents, no cycles.
+
+    Returns (is_tree, root_id, children_of). Used to gate mindmap-style
+    bidirectional layout, which only makes sense for trees.
+    """
+    id_set = set(component_ids)
+    children: dict[str, list[str]] = defaultdict(list)
+    parent_of: dict[str, str] = {}
+    for source, target in component_edges:
+        if source in id_set and target in id_set:
+            if target in parent_of:
+                return False, None, {}
+            parent_of[target] = source
+            children[source].append(target)
+
+    roots = [nid for nid in component_ids if nid not in parent_of]
+    if len(roots) != 1:
+        return False, None, {}
+
+    root = roots[0]
+    seen = {root}
+    stack = [root]
+    while stack:
+        cur = stack.pop()
+        for child in children.get(cur, []):
+            if child in seen:
+                return False, None, {}
+            seen.add(child)
+            stack.append(child)
+
+    if seen != id_set:
+        return False, None, {}
+
+    return True, root, dict(children)
+
+
+def _subtree_descendants(root: str, children: dict[str, list[str]]) -> list[str]:
+    """Return the BFS-order list of descendants of `root`, excluding `root` itself."""
+    descendants: list[str] = []
+    queue: list[str] = list(children.get(root, []))
+    while queue:
+        cur = queue.pop(0)
+        descendants.append(cur)
+        queue.extend(children.get(cur, []))
+    return descendants
+
+
+def _partition_children(
+    root: str,
+    children: dict[str, list[str]],
+) -> tuple[list[str], list[str]]:
+    """Greedy-balance the root's direct children into two flat descendant lists.
+
+    Sorts root's direct children by subtree node count (descending) and assigns
+    each to whichever side currently has the smaller running total. Ties prefer
+    the right side so single-child outcomes are stable. Returns the full
+    descendant lists for the right and left halves (each excluding `root`).
+    """
+    direct_children = children.get(root, [])
+    sized = sorted(
+        ((child, 1 + len(_subtree_descendants(child, children))) for child in direct_children),
+        key=lambda pair: pair[1],
+        reverse=True,
+    )
+
+    right_branches: list[str] = []
+    left_branches: list[str] = []
+    right_size = 0
+    left_size = 0
+    for child, size in sized:
+        if right_size <= left_size:
+            right_branches.append(child)
+            right_size += size
+        else:
+            left_branches.append(child)
+            left_size += size
+
+    right_descendants: list[str] = []
+    for branch in right_branches:
+        right_descendants.append(branch)
+        right_descendants.extend(_subtree_descendants(branch, children))
+    left_descendants: list[str] = []
+    for branch in left_branches:
+        left_descendants.append(branch)
+        left_descendants.extend(_subtree_descendants(branch, children))
+
+    return right_descendants, left_descendants
 
 
 def _connected_components(
@@ -117,31 +220,98 @@ async def _board_tail_origin(
     return min_x, max_y + DEFAULT_NOTE_GAP
 
 
-def _component_layout(
+def _component_layout(  # noqa: C901
     component_ids: list[str],
     component_edges: list[tuple[str, str]],
     sizes: dict[str, tuple[float, float]],
-    h_gap: float = H_GAP,
-    v_gap: float = V_GAP,
+    anchor_ids: set[str] | None = None,
+    sibling_pad: float = SIBLING_PAD,
+    rank_pad: float = RANK_PAD,
 ) -> tuple[dict[str, tuple[float, float]], float, float]:
     """Run Sugiyama on a connected component and return positions + bbox.
 
     Returns (positions_by_id, width, height). Positions are normalized so the
     component's top-left corner sits at (0, 0). Cycles and DAGs are handled by
     igraph's feedback-arc-set step.
+
+    Layout strategy:
+    - Singleton component → no layout.
+    - Tree component with a non-anchor root that has >=2 children → bidirectional
+      Sugiyama (mindmap mode): root in the middle, branches split left/right by
+      greedy subtree-size balance. Tiebreaker prefers the right side.
+    - Anything else (DAG, cycle, anchor present, root with one child) → single
+      LR Sugiyama, same as before.
+
+    igraph treats nodes as points, so we compute hgap/vgap from the component's
+    actual node dimensions (median height for siblings, max width for ranks).
     """
     if len(component_ids) == 1:
         nid = component_ids[0]
         w, h = sizes[nid]
         return {nid: (0.0, 0.0)}, w, h
 
-    raw = layout_directed(
-        nodes=component_ids,
-        edges=[[s, t] for s, t in component_edges],
-        direction=LayoutDirection.LEFT_RIGHT,
-        hgap=h_gap,
-        vgap=v_gap,
-    )
+    max_w = max(sizes[nid][0] for nid in component_ids)
+    median_h = statistics.median(sizes[nid][1] for nid in component_ids)
+    hgap = median_h + sibling_pad
+    vgap = max_w + rank_pad
+
+    has_anchor = bool(anchor_ids and anchor_ids.intersection(component_ids))
+
+    raw: dict[str, tuple[float, float]] = {}
+    used_bidirectional = False
+    if not has_anchor:
+        is_tree, root, tree_children = _classify_tree(component_ids, component_edges)
+        if is_tree and root is not None and len(tree_children.get(root, [])) >= 2:
+            used_bidirectional = True
+            right_descendants, left_descendants = _partition_children(root, tree_children)
+
+            right_nodes = [root, *right_descendants]
+            right_set = set(right_nodes)
+            right_edges = [
+                [s, t] for s, t in component_edges
+                if s in right_set and t in right_set
+            ]
+            right_pos = layout_directed(
+                nodes=right_nodes,
+                edges=right_edges,
+                direction=LayoutDirection.LEFT_RIGHT,
+                hgap=hgap,
+                vgap=vgap,
+            )
+
+            left_nodes = [root, *left_descendants]
+            left_set = set(left_nodes)
+            left_edges = [
+                [s, t] for s, t in component_edges
+                if s in left_set and t in left_set
+            ]
+            left_pos = layout_directed(
+                nodes=left_nodes,
+                edges=left_edges,
+                direction=LayoutDirection.RIGHT_LEFT,
+                hgap=hgap,
+                vgap=vgap,
+            )
+
+            # Stitch: right side's root wins, left side translated to coincide.
+            rx, ry = right_pos[root]
+            lx, ly = left_pos[root]
+            dx = rx - lx
+            dy = ry - ly
+            raw.update(right_pos)
+            for nid, (x, y) in left_pos.items():
+                if nid == root:
+                    continue
+                raw[nid] = (x + dx, y + dy)
+
+    if not used_bidirectional:
+        raw = layout_directed(
+            nodes=component_ids,
+            edges=[[s, t] for s, t in component_edges],
+            direction=LayoutDirection.LEFT_RIGHT,
+            hgap=hgap,
+            vgap=vgap,
+        )
 
     min_x = min(x for x, _ in raw.values())
     min_y = min(y for _, y in raw.values())
@@ -248,6 +418,7 @@ async def rearrange_created_notes(  # noqa: C901
         sizes[nid] = _size_of(note)
 
     components = _connected_components(all_ids, component_edges)
+    anchor_id_set = set(anchors_by_id.keys())
 
     final_positions: dict[str, tuple[float, float]] = {}
     free_tiles: list[tuple[dict[str, tuple[float, float]], float, float]] = []
@@ -264,6 +435,7 @@ async def rearrange_created_notes(  # noqa: C901
             component_ids=comp_ids,
             component_edges=edges_in_comp,
             sizes=sizes,
+            anchor_ids=anchor_id_set,
         )
 
         if comp_anchors:

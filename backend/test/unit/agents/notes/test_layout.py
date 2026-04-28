@@ -165,8 +165,8 @@ async def test_rearrange_never_moves_notes_outside_created_ids() -> None:
 
 
 @pytest.mark.asyncio
-async def test_rearrange_layouts_tree_component_as_one_tile() -> None:
-    """A linked tree component is laid out together, then placed alongside singletons."""
+async def test_rearrange_layouts_two_child_tree_bidirectionally() -> None:
+    """A tree with >=2 children of root splits left/right of the center node."""
     link_a = Link(source="root", target="a", graph_uid="graph-1")
     link_b = Link(source="root", target="b", graph_uid="graph-1")
     store = _FakeGraphStore(
@@ -185,14 +185,70 @@ async def test_rearrange_layouts_tree_component_as_one_tile() -> None:
 
     assert set(moved) == {"root", "a", "b", "solo1", "solo2"}
     by_id = {nid: _patched_position(store, nid) for nid in moved}
-    # In an LR Sugiyama tree, root sits left of its children.
-    assert by_id["root"]["x"] < by_id["a"]["x"]
-    assert by_id["root"]["x"] < by_id["b"]["x"]
-    # Children share a column to the right of the root.
-    assert by_id["a"]["x"] == pytest.approx(by_id["b"]["x"])
-    # Singletons land to the right of the tree tile.
-    tree_right = max(by_id["a"]["x"], by_id["b"]["x"]) + 200.0
-    assert by_id["solo1"]["x"] >= tree_right
+    # Bidirectional: one child sits to the right of root, the other to the left.
+    sides = {nid: by_id[nid]["x"] - by_id["root"]["x"] for nid in ("a", "b")}
+    assert (sides["a"] > 0 and sides["b"] < 0) or (sides["a"] < 0 and sides["b"] > 0)
+
+
+@pytest.mark.asyncio
+async def test_rearrange_balances_subtrees_across_sides() -> None:
+    """Greedy balance: a 4-child root with one heavy + three light subtrees splits ~evenly."""
+    # Root → big_branch → big_a, big_b (subtree size 3); root → c, d, e (each size 1).
+    links = [
+        Link(source="root", target="big_branch", graph_uid="graph-1"),
+        Link(source="big_branch", target="big_a", graph_uid="graph-1"),
+        Link(source="big_branch", target="big_b", graph_uid="graph-1"),
+        Link(source="root", target="c", graph_uid="graph-1"),
+        Link(source="root", target="d", graph_uid="graph-1"),
+        Link(source="root", target="e", graph_uid="graph-1"),
+    ]
+    store = _FakeGraphStore(
+        notes={
+            nid: _make_note(nid, width=200.0, height=100.0)
+            for nid in ["root", "big_branch", "big_a", "big_b", "c", "d", "e"]
+        },
+        links=links,
+    )
+
+    await rearrange_created_notes(
+        store, "graph-1",
+        ["root", "big_branch", "big_a", "big_b", "c", "d", "e"],
+        created_link_ids=[link.id for link in links],
+    )
+
+    by_id = {nid: _patched_position(store, nid)["x"] for nid in ["root", "big_branch", "c", "d", "e"]}
+    # Big branch (size 3) takes one side; the three singletons share the other.
+    big_side = "right" if by_id["big_branch"] > by_id["root"] else "left"
+    singleton_xs = [by_id["c"], by_id["d"], by_id["e"]]
+    if big_side == "right":
+        assert all(x < by_id["root"] for x in singleton_xs)
+    else:
+        assert all(x > by_id["root"] for x in singleton_xs)
+
+
+@pytest.mark.asyncio
+async def test_rearrange_keeps_lr_for_single_child_chain() -> None:
+    """A chain (root → a → b) stays in single-direction LR; mindmap mode is gated on >=2 children."""
+    links = [
+        Link(source="root", target="a", graph_uid="graph-1"),
+        Link(source="a", target="b", graph_uid="graph-1"),
+    ]
+    store = _FakeGraphStore(
+        notes={
+            nid: _make_note(nid, width=200.0, height=100.0)
+            for nid in ["root", "a", "b"]
+        },
+        links=links,
+    )
+
+    await rearrange_created_notes(
+        store, "graph-1", ["root", "a", "b"],
+        created_link_ids=[link.id for link in links],
+    )
+
+    by_id = {nid: _patched_position(store, nid)["x"] for nid in ["root", "a", "b"]}
+    # All three flow strictly rightward.
+    assert by_id["root"] < by_id["a"] < by_id["b"]
 
 
 @pytest.mark.asyncio
