@@ -1,4 +1,4 @@
-import { memo, useState } from 'react'
+import { memo } from 'react'
 import {
   type ControlPosition,
   type NodeProps,
@@ -112,8 +112,6 @@ const SlideFrame = memo(function SlideFrame({ slideName }: SlideFrameProps) {
 function NodeViewBase({ id, data, selected, width, height, dragging }: NodeProps<NoteNode>) {
   const { resolvedTheme } = useTheme()
   const isDark = resolvedTheme === 'dark'
-  const [isEditing, setIsEditing] = useState(false)
-  const [isResizingLocal, setIsResizingLocal] = useState(false)
 
   const setIsResizingNode = useGraphStore(state => state.setIsResizingNode)
   const viewSlides = useGraphStore(state => state.viewSlides)
@@ -137,7 +135,6 @@ function NodeViewBase({ id, data, selected, width, height, dragging }: NodeProps
     fontFamily: data.style.fontFamily,
     fontSize: data.style.fontSize,
     textStyle: data.style.textStyle,
-    editing: isEditing || isResizingLocal,
     enabled: usesContentMinHeight,
   })
 
@@ -162,11 +159,9 @@ function NodeViewBase({ id, data, selected, width, height, dragging }: NodeProps
   const textColor = isDark ? darkModeDisplayHex(data.style.textColor) || undefined : data.style.textColor
 
   const handleResizeStart = () => {
-    setIsResizingLocal(true)
     setIsResizingNode(true)
   }
   const handleResizeEnd = () => {
-    setIsResizingLocal(false)
     setIsResizingNode(false)
   }
   const resizeMinWidth = isVisualNode ? 80 : 20
@@ -198,7 +193,6 @@ function NodeViewBase({ id, data, selected, width, height, dragging }: NodeProps
         selected={selected}
         dragging={dragging}
         isDark={isDark}
-        onLabelEditingChange={setIsEditing}
         nodeWidth={width}
         nodeHeight={height}
       />

@@ -1,9 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useUpdateNodeInternals } from '@xyflow/react'
-import {
-  getMarkdownLineHeightPx,
-  subscribeMarkdownFontEpoch,
-} from '@/components/markdown/canvas-lite-markdown'
+import { subscribeMarkdownFontEpoch } from '@/components/markdown/canvas-lite-markdown'
 import type { FontFamily, FontSize, NodeType, TextStyle } from '../types/style'
 import { contentWidthFromNode, nodeHeightFromContent } from '../utils/note-box'
 import { estimateNoteContentHeight } from '../utils/markdown-height-estimate'
@@ -16,7 +13,6 @@ type UseNoteMinHeightOptions = {
   fontFamily: FontFamily
   fontSize: FontSize
   textStyle: TextStyle
-  editing?: boolean
   floor?: number
   // When false, the hook is a no-op — used for node types that render custom UI
   // (sheets, folders, sandboxes, widgets, etc.) and don't want a text-driven floor.
@@ -48,7 +44,6 @@ export function useContentMinHeight(nodeId: string, options: UseNoteMinHeightOpt
     fontFamily,
     fontSize,
     textStyle,
-    editing = false,
     floor = DEFAULT_FLOOR,
     enabled = true,
   } = options
@@ -76,18 +71,11 @@ export function useContentMinHeight(nodeId: string, options: UseNoteMinHeightOpt
     })
     if (contentHeight <= 0) return floor
 
-    // While editing, the textarea uses DOM font metrics that can disagree with
-    // canvas measureText by a few px on tricky glyphs — give one line of slack
-    // so the textarea always fits inside the node.
-    const slack = editing ? getMarkdownLineHeightPx(fontSize) : 0
-    const required = nodeHeightFromContent({
-      nodeType,
-      contentHeight: contentHeight + slack,
-    })
+    const required = nodeHeightFromContent({ nodeType, contentHeight })
     return Math.max(floor, required)
     // fontEpoch participates as an invalidation key only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, text, nodeWidth, nodeType, fontFamily, fontSize, textStyle, editing, floor, fontEpoch])
+  }, [enabled, text, nodeWidth, nodeType, fontFamily, fontSize, textStyle, floor, fontEpoch])
 
   useLayoutEffect(() => {
     if (!enabled) {
