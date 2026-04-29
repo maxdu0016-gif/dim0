@@ -357,33 +357,51 @@
   background: var(--muted);
 }
 
-/* Block math wrapper: full-width so the drag handle's mousemove can target it */
+/* Block math wrapper: bordered card on the wrapper itself so it survives all
+   three NodeView states — success (wrapper > inner > KaTeX), empty
+   (wrapper > inner empty), and error (KaTeX overwrites wrapper.textContent
+   with the raw LaTeX, deleting inner). */
 .tiptap-editor .ProseMirror [data-type="block-math"] {
-  display: block;
-  margin: 1rem 0;
-  cursor: pointer;
-}
-
-/* Inner box: bordered card, centered content, accent stripe */
-.tiptap-editor .ProseMirror [data-type="block-math"] .block-math-inner {
   display: flex;
   align-items: center;
   justify-content: center;
+  margin: 1rem 0;
   padding: 1rem 1.25rem;
   border: 1px solid var(--border);
   border-left: 3px solid var(--secondary-foreground);
   border-radius: 8px;
   background: var(--muted);
   min-height: 2.5rem;
+  cursor: pointer;
 }
 
-/* Empty block math: show a faded placeholder inside the bordered box */
-.tiptap-editor .ProseMirror [data-type="block-math"][data-latex=""] .block-math-inner::before {
+/* Empty: faded placeholder, accent stripe stays muted-foreground tone */
+.tiptap-editor .ProseMirror [data-type="block-math"][data-latex=""] {
+  border-left-color: var(--muted-foreground);
+}
+
+.tiptap-editor .ProseMirror [data-type="block-math"][data-latex=""]::before {
   content: "Click to edit equation";
   color: var(--muted-foreground);
   font-family: var(--font-sans);
   font-size: 0.875rem;
   font-style: italic;
+}
+
+/* Error (invalid LaTeX): KaTeX has set wrapper.textContent = raw latex.
+   Show that raw text in red within the same bordered card, with a red
+   accent stripe so the state is clearly distinguishable. Skip when latex
+   is empty — that's the placeholder state, not an error to highlight. */
+.tiptap-editor .ProseMirror [data-type="block-math"].block-math-error:not([data-latex=""]) {
+  color: oklch(0.55 0.20 25);
+  border-left-color: oklch(0.55 0.20 25);
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+}
+
+.dark .tiptap-editor .ProseMirror [data-type="block-math"].block-math-error:not([data-latex=""]) {
+  color: oklch(0.72 0.18 25);
+  border-left-color: oklch(0.72 0.18 25);
 }
 
 /* ── math edit popover ─────────────────────────────────────────────────── */
