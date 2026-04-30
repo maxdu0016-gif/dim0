@@ -94,19 +94,24 @@
   margin: 0.5rem 0;
 }
 
+/* Notion-style nested bullet variants by depth: disc → circle → square */
+.tiptap-editor .ProseMirror ul ul { list-style-type: circle; }
+.tiptap-editor .ProseMirror ul ul ul { list-style-type: square; }
+
 .tiptap-editor .ProseMirror ol {
   list-style-type: decimal;
   padding-left: 1.5rem;
   margin: 0.5rem 0;
 }
 
+/* Nested ordered variants: 1. → a. → i. */
+.tiptap-editor .ProseMirror ol ol { list-style-type: lower-alpha; }
+.tiptap-editor .ProseMirror ol ol ol { list-style-type: lower-roman; }
+
 .tiptap-editor .ProseMirror li {
   margin: 0.2rem 0;
 }
 
-.tiptap-editor .ProseMirror li > p {
-  margin: 0;
-}
 
 /* ── task list ──────────────────────────────────────────────────────────── */
 
@@ -634,7 +639,7 @@
 
 .tiptap-editor .ProseMirror [data-type="details"] > button::before {
   content: "▶";
-  font-size: 0.55rem;
+  font-size: 0.75rem;
 }
 
 .tiptap-editor .ProseMirror [data-type="details"].is-open > button {
@@ -659,9 +664,10 @@
 .tiptap-editor .ProseMirror summary::-webkit-details-marker,
 .tiptap-editor .ProseMirror summary::marker { display: none; content: ""; }
 
-/* Content area indentation */
+/* Content area: align with the summary text (same column), like a bullet's
+   continuation paragraph aligns with its bullet text. */
 .tiptap-editor .ProseMirror [data-type="detailsContent"] {
-  padding-left: 0.25rem;
+  padding-left: 0;
   margin-top: 0.25rem;
 }
 
@@ -669,9 +675,13 @@
   margin-top: 0;
 }
 
-/* Ensure [hidden] hides content (NodeView toggles this attribute) */
-.tiptap-editor .ProseMirror [data-type="detailsContent"][hidden] {
-  display: none !important;
+/* Hide content when the parent toggle is closed. Drive visibility from the
+   wrapper's `is-open` class (which mirrors the schema's `open` attribute)
+   rather than the NodeView-managed `hidden` attribute on detailsContent —
+   that way programmatic open (e.g. Mod-Enter) makes the content actually
+   visible so the caret can land inside it. */
+.tiptap-editor .ProseMirror [data-type="details"]:not(.is-open) [data-type="detailsContent"] {
+  display: none;
 }
 
 /* ── images ─────────────────────────────────────────────────────────────── */
