@@ -2,6 +2,7 @@ import type { Page, PageProvider } from "@/components/editor/tiptap/page/types"
 import { listBoardContents } from "../api/list-board-contents"
 import { getNote } from "../api/get-note"
 import { addNotes } from "../api/add-notes"
+import { invalidateBoardContents } from "../api/invalidate-board-contents"
 import { createDefaultNote } from "../types/note"
 
 
@@ -77,6 +78,9 @@ export function createBoardPageProvider(
       note.label = { markdown: opts.title || "Untitled" }
       if (opts.parentId) note.parentId = opts.parentId
       await addNotes(boardId, [note])
+      // The new sheet is now visible in the parent's contents listing —
+      // refresh any sidebar / picker query that's looking at the board.
+      invalidateBoardContents(boardId)
       return {
         id: note.id,
         title: opts.title || "Untitled",

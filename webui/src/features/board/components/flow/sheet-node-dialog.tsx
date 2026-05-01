@@ -10,8 +10,10 @@ import { useGraphStore } from "../../store/graph-store"
 import { SheetEditor } from "../sheet/sheet-editor"
 import { createBoardPageProvider } from "../../providers/board-page-provider"
 import { useGetNote } from "../../api/get-note"
+import { useGetNotePath } from "../../api/get-note-path"
 import { useUpdateNote } from "../../api/update-note"
 import type { Note } from "../../types/note"
+import { SheetBreadcrumb } from "../sheet/sheet-breadcrumb"
 
 
 type SheetNodeDialogProps = {
@@ -44,6 +46,16 @@ export const SheetNodeDialog = memo(function SheetNodeDialog({
   })
   const note: Note | undefined = localNote ?? fetchedNote
   const boardId = note?.graphUid ?? activeBoardId
+
+  // Ancestor chain for the breadcrumb. The path query is shared across the
+  // dialog and full-page view; React Query caches per (boardId, noteId) so
+  // jumping to an ancestor is instant after the first load.
+  const { data: notePath = [] } = useGetNotePath({
+    boardId,
+    noteId: nodeId,
+    enabled: !!boardId,
+  })
+  const ancestors = notePath.slice(0, -1)
 
   const { mutate: updateNoteMutate } = useUpdateNote()
   const persistRemote = useCallback(
@@ -202,7 +214,11 @@ export const SheetNodeDialog = memo(function SheetNodeDialog({
     <Dialog open onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-4xl h-3/4 flex flex-col items-center text-left p-2" showCloseButton={false}>
         <div className="w-full flex items-center justify-between gap-2 px-2 pt-1">
-          <div className="min-w-0 flex-1 pr-2">
+          <div className="min-w-0 flex-1 pr-2 flex flex-col gap-0.5">
+            <SheetBreadcrumb
+              ancestors={ancestors}
+              onSegmentClick={(id) => openNodeSurface(id, "sheet")}
+            />
             {titleEditing ? (
               <input
                 ref={titleInputRef}

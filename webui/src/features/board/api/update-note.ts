@@ -2,6 +2,7 @@ import type { Note } from "../types/note"
 import snakecaseKeys from "snakecase-keys"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiFetch } from "@/api"
+import { invalidateBoardContents } from "./invalidate-board-contents"
 
 
 /**
@@ -71,6 +72,13 @@ export const useUpdateNote = () => {
     onSettled: (_data, _error, variables, ctx) => {
       const key = ctx?.key ?? ["note", variables.boardId, variables.noteId]
       queryClient.invalidateQueries({ queryKey: key })
+      // Title may have changed → the board's contents tree (sidebar) and
+      // any path query that includes this note both need to refresh. The
+      // path query is keyed by id and stale-revalidated by React Query;
+      // we just invalidate the contents listings here.
+      if (variables.noteData.label !== undefined) {
+        invalidateBoardContents(variables.boardId, undefined, queryClient)
+      }
     },
   })
 
