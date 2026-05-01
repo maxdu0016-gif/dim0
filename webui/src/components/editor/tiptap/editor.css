@@ -780,6 +780,110 @@
 }
 
 
+/* ── page reference chip ────────────────────────────────────────────────── */
+
+.tiptap-editor .ProseMirror .page-ref-wrap {
+  display: inline;
+  white-space: nowrap;
+}
+
+.tiptap-editor .ProseMirror .page-ref {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.05em 0.4em;
+  margin: 0 0.05em;
+  border: none;
+  background: transparent;
+  border-bottom: 1px solid var(--muted-foreground);
+  border-radius: 3px;
+  color: var(--foreground);
+  font-family: inherit;
+  font-size: inherit;
+  cursor: pointer;
+  transition: background 0.1s, border-color 0.1s;
+}
+
+.tiptap-editor .ProseMirror .page-ref:hover {
+  background: var(--muted);
+  border-bottom-color: var(--secondary-foreground);
+}
+
+.page-ref-icon {
+  flex-shrink: 0;
+  color: var(--muted-foreground);
+}
+
+
+/* ── @-mention search menu ──────────────────────────────────────────────── */
+
+.page-search-menu {
+  min-width: 240px;
+  max-width: 320px;
+  max-height: 320px;
+  overflow-y: auto;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--card);
+  padding: 4px;
+  box-shadow: var(--shadow-lg);
+  font-family: var(--font-sans);
+}
+
+.page-search-section {
+  margin: 0;
+  padding: 0.4rem 0.6rem 0.2rem;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+.page-search-empty {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.85rem;
+  font-style: italic;
+  color: var(--muted-foreground);
+}
+
+.page-search-divider {
+  margin: 0.25rem 0.25rem;
+  height: 1px;
+  background: var(--border);
+}
+
+.page-search-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.4rem 0.6rem;
+  border: none;
+  background: transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  color: var(--foreground);
+  text-align: left;
+}
+
+.page-search-item:hover {
+  background: var(--muted);
+}
+
+.page-search-item--active {
+  background: var(--secondary);
+  color: var(--secondary-foreground);
+}
+
+.page-search-item-icon {
+  color: var(--muted-foreground);
+  flex-shrink: 0;
+}
+
+
 /* ── images ─────────────────────────────────────────────────────────────── */
 
 .tiptap-editor .ProseMirror .editor-image-wrap {

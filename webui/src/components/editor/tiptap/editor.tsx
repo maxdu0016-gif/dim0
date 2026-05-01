@@ -11,6 +11,8 @@ import { TagPanel } from "./tag/tag-panel"
 import { scanTags } from "./tag/tag-utils"
 import type { TagGroup } from "./tag/tag-utils"
 import { MathEditPopover } from "./math/math-edit-popover"
+import type { PageProvider } from "./page/types"
+import { createStubPageProvider } from "./page/stub-page-provider"
 import { sanitizeMathDelimiters } from "@/components/markdown/sanitize-math"
 import "./editor.css"
 
@@ -19,9 +21,14 @@ export interface MdEditorProps {
   onSave: (markdown: string) => void
   placeholder?: string
   className?: string
+  /**
+   * Host adapter for page CRUD (used by `@`-mention and the page-ref chip).
+   * Falls back to an in-memory stub for development.
+   */
+  pageProvider?: PageProvider | null
 }
 
-export function TipTapEditor({ markdown, onSave, placeholder, className }: MdEditorProps) {
+export function TipTapEditor({ markdown, onSave, placeholder, className, pageProvider }: MdEditorProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const onSaveRef = useRef(onSave)
   useEffect(() => { onSaveRef.current = onSave }, [onSave])
@@ -35,8 +42,16 @@ export function TipTapEditor({ markdown, onSave, placeholder, className }: MdEdi
 
   const initialContent = useMemo(() => sanitizeMathDelimiters(markdown), [markdown])
 
+  // Stable provider reference: host-supplied wins, otherwise an in-memory
+  // stub created once per editor instance so the @-mention is functional
+  // out of the box during development.
+  const resolvedPageProvider = useMemo(
+    () => pageProvider ?? createStubPageProvider(),
+    [pageProvider],
+  )
+
   const editor = useEditor({
-    extensions: getExtensions(placeholder),
+    extensions: getExtensions({ placeholder, pageProvider: resolvedPageProvider }),
     content: initialContent,
     immediatelyRender: false,
     onUpdate({ editor }) {

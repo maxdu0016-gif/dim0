@@ -11,6 +11,7 @@ import { Extension } from "@tiptap/core"
 import { Blockquote } from "@tiptap/extension-blockquote"
 import Suggestion from "@tiptap/suggestion"
 import { keymap } from "@tiptap/pm/keymap"
+import { PluginKey } from "@tiptap/pm/state"
 import { sinkListItem, liftListItem } from "@tiptap/pm/schema-list"
 import type { EditorState } from "@tiptap/pm/state"
 import type { Node as PMNode } from "@tiptap/pm/model"
@@ -22,9 +23,16 @@ import { InlineMathMarkdown, BlockMathMarkdown } from "./math/math-extensions"
 import { openMathEditor } from "./math/math-edit-trigger"
 import { ImageWithDrop } from "./image/image-extension"
 import { TocBlock } from "./toc/toc-block-extension"
+import { PageProviderExtension } from "./page/page-extension"
+import { PageRef } from "./page/page-ref-extension"
+import { PageMention } from "./page/page-mention-extension"
+import type { PageProvider } from "./page/types"
 import { TagDecoration } from "./tag/tag-decoration"
 import { slashSuggestion } from "./slash-command/suggestion"
 import "katex/dist/katex.min.css"
+
+const slashSuggestionKey = new PluginKey("slashSuggestion")
+
 
 const SlashCommand = Extension.create({
   name: "slashCommand",
@@ -32,6 +40,7 @@ const SlashCommand = Extension.create({
     return [
       Suggestion({
         editor: this.editor,
+        pluginKey: slashSuggestionKey,
         ...slashSuggestion,
       }),
     ]
@@ -156,7 +165,14 @@ const TabHandler = Extension.create({
   },
 })
 
-export function getExtensions(placeholder = "Start writing…") {
+export interface GetExtensionsOptions {
+  placeholder?: string
+  pageProvider?: PageProvider | null
+}
+
+
+export function getExtensions(options: GetExtensionsOptions = {}) {
+  const { placeholder = "Start writing…", pageProvider = null } = options
   return [
     StarterKit.configure({
       // Phase 1: undo/redo enabled. When adding Yjs: set undoRedo: false and add @tiptap/extension-collaboration
@@ -175,6 +191,9 @@ export function getExtensions(placeholder = "Start writing…") {
     }),
     ImageWithDrop,
     TocBlock,
+    PageProviderExtension.configure({ provider: pageProvider }),
+    PageRef,
+    PageMention,
     HighlightMarkdown.configure({ multicolor: true }),
     DetailsMarkdown,
     DetailsSummaryMarkdown,
