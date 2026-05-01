@@ -14,7 +14,7 @@ import { keymap } from "@tiptap/pm/keymap"
 import { sinkListItem, liftListItem } from "@tiptap/pm/schema-list"
 import type { EditorState } from "@tiptap/pm/state"
 import type { Node as PMNode } from "@tiptap/pm/model"
-import Highlight from "@tiptap/extension-highlight"
+import { HighlightMarkdown } from "./highlight/highlight-extension"
 import { DetailsMarkdown, DetailsSummaryMarkdown, DetailsContentMarkdown } from "./toggle/toggle-extensions"
 import { TableKit } from "@tiptap/extension-table"
 import { ShikiCodeBlock } from "./code-block/code-block-extension"
@@ -173,7 +173,7 @@ export function getExtensions(placeholder = "Start writing…") {
         openMathEditor({ pos, latex: node.attrs.latex ?? "", isInline: false }),
     }),
     ImageWithDrop,
-    Highlight.configure({ multicolor: false }),
+    HighlightMarkdown.configure({ multicolor: false }),
     DetailsMarkdown,
     DetailsSummaryMarkdown,
     DetailsContentMarkdown,
