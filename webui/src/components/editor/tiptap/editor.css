@@ -814,6 +814,90 @@
   color: var(--muted-foreground);
 }
 
+.page-ref--deleted {
+  color: var(--muted-foreground);
+  text-decoration: line-through;
+  cursor: not-allowed;
+}
+
+.page-ref--deleted:hover {
+  background: transparent;
+  border-bottom-color: var(--muted-foreground);
+}
+
+.page-ref-suffix {
+  font-size: 0.75em;
+  color: var(--muted-foreground);
+  font-style: italic;
+}
+
+
+/* ── subpage card (block-level page embed) ─────────────────────────────── */
+
+.tiptap-editor .ProseMirror .subpage-card-wrap {
+  display: block;
+  margin: 0.75rem 0;
+}
+
+.tiptap-editor .ProseMirror .subpage-card {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--secondary-foreground);
+  border-radius: 8px;
+  background: var(--muted);
+  color: var(--foreground);
+  font-family: inherit;
+  font-size: 0.95rem;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.1s, border-color 0.1s;
+}
+
+.tiptap-editor .ProseMirror .subpage-card:hover {
+  background: var(--secondary);
+  border-color: var(--secondary-foreground);
+}
+
+.subpage-card-icon {
+  flex-shrink: 0;
+  color: var(--muted-foreground);
+}
+
+.subpage-card-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.subpage-card-suffix {
+  font-size: 0.85em;
+  color: var(--muted-foreground);
+  font-style: italic;
+}
+
+.subpage-card-chevron {
+  flex-shrink: 0;
+  color: var(--muted-foreground);
+}
+
+.subpage-card--deleted {
+  cursor: not-allowed;
+  text-decoration: line-through;
+  color: var(--muted-foreground);
+}
+
+.subpage-card--deleted:hover {
+  background: var(--muted);
+  border-color: var(--border);
+}
+
 
 /* ── @-mention search menu ──────────────────────────────────────────────── */
 

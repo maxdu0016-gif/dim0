@@ -26,9 +26,18 @@ export interface MdEditorProps {
    * Falls back to an in-memory stub for development.
    */
   pageProvider?: PageProvider | null
+  /** Id of the note this editor is editing — used by `/subpage` to nest. */
+  parentNoteId?: string | null
 }
 
-export function TipTapEditor({ markdown, onSave, placeholder, className, pageProvider }: MdEditorProps) {
+export function TipTapEditor({
+  markdown,
+  onSave,
+  placeholder,
+  className,
+  pageProvider,
+  parentNoteId,
+}: MdEditorProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const onSaveRef = useRef(onSave)
   useEffect(() => { onSaveRef.current = onSave }, [onSave])
@@ -51,7 +60,11 @@ export function TipTapEditor({ markdown, onSave, placeholder, className, pagePro
   )
 
   const editor = useEditor({
-    extensions: getExtensions({ placeholder, pageProvider: resolvedPageProvider }),
+    extensions: getExtensions({
+      placeholder,
+      pageProvider: resolvedPageProvider,
+      parentNoteId,
+    }),
     content: initialContent,
     immediatelyRender: false,
     onUpdate({ editor }) {

@@ -4,6 +4,7 @@ import type { SuggestionOptions } from "@tiptap/suggestion"
 import type { Editor, Range } from "@tiptap/core"
 import { PageSearchMenu, type PageSearchMenuHandle, type PageSearchSelection } from "./page-search-menu"
 import type { Page, PageProvider } from "./types"
+import { primePageCache } from "./page-cache"
 
 
 function getProvider(editor: Editor): PageProvider | null {
@@ -42,20 +43,26 @@ export const pageSuggestion: Omit<SuggestionOptions<Page, PageSearchSelection>, 
   }) {
     const provider = getProvider(editor)
 
-    async function insertRef(pageId: string, title: string) {
+    async function insertRef(page: Page) {
+      // Pre-fill the cache so the chip shows the live title immediately,
+      // not just the snapshot we wrote into the markdown.
+      primePageCache(page)
       editor
         .chain()
         .focus()
         .deleteRange(range)
         .insertContent([
-          { type: "pageRef", attrs: { pageId, title } },
+          {
+            type: "pageRef",
+            attrs: { pageId: page.id, title: page.title || "Untitled" },
+          },
           { type: "text", text: " " },
         ])
         .run()
     }
 
     if (props.kind === "existing") {
-      void insertRef(props.page.id, props.page.title || "Untitled")
+      void insertRef(props.page)
       return
     }
 
@@ -64,7 +71,10 @@ export const pageSuggestion: Omit<SuggestionOptions<Page, PageSearchSelection>, 
     void (async () => {
       try {
         const page = await provider.create({ title: props.title })
-        await insertRef(page.id, page.title || props.title || "Untitled")
+        await insertRef({
+          id: page.id,
+          title: page.title || props.title || "Untitled",
+        })
       } catch (err) {
         console.error("[pageSuggestion] create failed", err)
       }

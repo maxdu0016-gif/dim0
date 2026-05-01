@@ -26,6 +26,7 @@ import { TocBlock } from "./toc/toc-block-extension"
 import { PageProviderExtension } from "./page/page-extension"
 import { PageRef } from "./page/page-ref-extension"
 import { PageMention } from "./page/page-mention-extension"
+import { Subpage } from "./page/subpage-extension"
 import type { PageProvider } from "./page/types"
 import { TagDecoration } from "./tag/tag-decoration"
 import { slashSuggestion } from "./slash-command/suggestion"
@@ -168,11 +169,17 @@ const TabHandler = Extension.create({
 export interface GetExtensionsOptions {
   placeholder?: string
   pageProvider?: PageProvider | null
+  /** Id of the note the editor is currently editing — used by /subpage. */
+  parentNoteId?: string | null
 }
 
 
 export function getExtensions(options: GetExtensionsOptions = {}) {
-  const { placeholder = "Start writing…", pageProvider = null } = options
+  const {
+    placeholder = "Start writing…",
+    pageProvider = null,
+    parentNoteId = null,
+  } = options
   return [
     StarterKit.configure({
       // Phase 1: undo/redo enabled. When adding Yjs: set undoRedo: false and add @tiptap/extension-collaboration
@@ -191,9 +198,10 @@ export function getExtensions(options: GetExtensionsOptions = {}) {
     }),
     ImageWithDrop,
     TocBlock,
-    PageProviderExtension.configure({ provider: pageProvider }),
+    PageProviderExtension.configure({ provider: pageProvider, parentNoteId }),
     PageRef,
     PageMention,
+    Subpage,
     HighlightMarkdown.configure({ multicolor: true }),
     DetailsMarkdown,
     DetailsSummaryMarkdown,

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 import { NodeViewWrapper } from "@tiptap/react"
 import type { NodeViewProps } from "@tiptap/react"
-import { FileText } from "@phosphor-icons/react"
+import { FileText, CaretRightIcon } from "@phosphor-icons/react"
 import type { Page, PageProvider } from "./types"
 import { readCachedPage, resolvePage, subscribePage } from "./page-cache"
 
@@ -14,12 +14,12 @@ function getProvider(editor: NodeViewProps["editor"]): PageProvider | null {
 
 
 /**
- * Inline page-reference chip. Resolves the *live* page title through the
- * provider so renames propagate everywhere — the markdown's link text is
- * just a fallback used while resolution is in flight or when the page is
- * deleted / inaccessible.
+ * Block-level subpage card. Shows a full-width "page inside a page" tile
+ * (icon + live title) and navigates via the host's PageProvider on click.
+ * Title is resolved live through the page cache; the markdown's snapshot
+ * is only used as a fallback for offline / deleted pages.
  */
-export function PageRefView({ node, editor }: NodeViewProps) {
+export function SubpageView({ node, editor }: NodeViewProps) {
   const pageId = (node.attrs.pageId as string) || ""
   const fallbackTitle = (node.attrs.title as string) || "Untitled"
 
@@ -42,31 +42,32 @@ export function PageRefView({ node, editor }: NodeViewProps) {
     }
   }, [pageId, editor])
 
-  // cached === undefined → still resolving; show fallback.
-  // cached === null      → backend says missing/forbidden; show "(deleted)".
-  // cached === Page      → use its current title.
   const isDeleted = cached === null
   const liveTitle = cached?.title?.trim()
   const displayTitle = liveTitle || fallbackTitle
 
   function navigate() {
     if (isDeleted) return
-    const provider = getProvider(editor)
-    provider?.onNavigate?.(pageId)
+    getProvider(editor)?.onNavigate?.(pageId)
   }
 
   return (
-    <NodeViewWrapper as="span" className="page-ref-wrap">
+    <NodeViewWrapper
+      as="div"
+      className="subpage-card-wrap"
+      contentEditable={false}
+    >
       <button
         type="button"
-        className={isDeleted ? "page-ref page-ref--deleted" : "page-ref"}
         onClick={navigate}
-        title={isDeleted ? `${displayTitle} (deleted)` : displayTitle}
         disabled={isDeleted}
+        className={isDeleted ? "subpage-card subpage-card--deleted" : "subpage-card"}
+        title={isDeleted ? `${displayTitle} (deleted)` : displayTitle}
       >
-        <FileText size={12} className="page-ref-icon" />
-        <span className="page-ref-title">{displayTitle}</span>
-        {isDeleted && <span className="page-ref-suffix">(deleted)</span>}
+        <FileText size={16} className="subpage-card-icon" />
+        <span className="subpage-card-title">{displayTitle}</span>
+        {isDeleted && <span className="subpage-card-suffix">(deleted)</span>}
+        <CaretRightIcon size={14} className="subpage-card-chevron" />
       </button>
     </NodeViewWrapper>
   )
