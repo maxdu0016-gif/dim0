@@ -714,6 +714,72 @@
   display: none;
 }
 
+/* ── table of contents block ────────────────────────────────────────────── */
+
+.tiptap-editor .ProseMirror .toc-block {
+  display: block;
+  margin: 1rem 0;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--secondary-foreground);
+  border-radius: 8px;
+  background: var(--muted);
+  user-select: none;
+}
+
+.toc-block-title {
+  margin: 0 0 0.4rem;
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+.toc-block-empty {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  font-style: italic;
+  color: var(--muted-foreground);
+}
+
+.toc-block-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.toc-block-item {
+  margin: 0;
+  padding: 0;
+}
+
+.toc-block-item--h2 .toc-block-link { padding-left: 1.25rem; }
+.toc-block-item--h3 .toc-block-link { padding-left: 2.25rem; }
+
+.toc-block-link {
+  display: block;
+  width: 100%;
+  background: transparent;
+  border: none;
+  padding: 0.2rem 0.25rem;
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  text-align: left;
+  color: var(--foreground);
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background 0.1s, color 0.1s;
+}
+
+.toc-block-link:hover {
+  background: var(--background);
+  color: var(--secondary-foreground);
+}
+
+
 /* ── images ─────────────────────────────────────────────────────────────── */
 
 .tiptap-editor .ProseMirror .editor-image-wrap {

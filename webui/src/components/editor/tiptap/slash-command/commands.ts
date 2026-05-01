@@ -16,6 +16,7 @@ import {
   TableIcon,
   CaretRightIcon,
   ImageIcon,
+  ListDashes,
 } from "@phosphor-icons/react"
 import { pickAndInsertImage } from "../image/insert-image"
 
@@ -149,6 +150,14 @@ export const SLASH_COMMANDS: SlashCommand[] = [
       editor.chain().focus().deleteRange(range).run()
       pickAndInsertImage(editor)
     },
+  },
+  {
+    title: "Table of contents",
+    keywords: ["toc", "outline", "headings", "contents", "summary"],
+    icon: ListDashes,
+    group: "basic",
+    action: (editor, range) =>
+      editor.chain().focus().deleteRange(range).insertContent({ type: "tableOfContents" }).run(),
   },
 ]
 

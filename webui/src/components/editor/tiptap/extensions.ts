@@ -21,6 +21,7 @@ import { ShikiCodeBlock } from "./code-block/code-block-extension"
 import { InlineMathMarkdown, BlockMathMarkdown } from "./math/math-extensions"
 import { openMathEditor } from "./math/math-edit-trigger"
 import { ImageWithDrop } from "./image/image-extension"
+import { TocBlock } from "./toc/toc-block-extension"
 import { TagDecoration } from "./tag/tag-decoration"
 import { slashSuggestion } from "./slash-command/suggestion"
 import "katex/dist/katex.min.css"
@@ -173,6 +174,7 @@ export function getExtensions(placeholder = "Start writing…") {
         openMathEditor({ pos, latex: node.attrs.latex ?? "", isInline: false }),
     }),
     ImageWithDrop,
+    TocBlock,
     HighlightMarkdown.configure({ multicolor: true }),
     DetailsMarkdown,
     DetailsSummaryMarkdown,
