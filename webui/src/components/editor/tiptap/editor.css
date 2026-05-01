@@ -512,16 +512,51 @@
 
 /* ── highlight mark ─────────────────────────────────────────────────────── */
 
+/* Highlight palette — vars on :root / .dark (not editor-scoped) so they're
+   also reachable from portaled UI like the bubble-menu color picker that
+   renders outside .tiptap-editor. The Highlight extension emits
+   `data-color="<name>"` only for named colors (no inline style); CSS
+   below paints from the variable, so theme-awareness is implicit.
+   Hex colors keep their own inline style and bypass these vars. */
+:root {
+  --hl-yellow: #fef08a;
+  --hl-green:  #bbf7d0;
+  --hl-blue:   #bfdbfe;
+  --hl-red:    #fecaca;
+  --hl-pink:   #fbcfe8;
+  --hl-purple: #e9d5ff;
+  --hl-orange: #fed7aa;
+  --hl-gray:   #e5e7eb;
+}
+
+.dark {
+  --hl-yellow: rgba(133, 77, 14, 0.55);
+  --hl-green:  rgba(20, 83, 45, 0.55);
+  --hl-blue:   rgba(30, 58, 138, 0.55);
+  --hl-red:    rgba(127, 29, 29, 0.55);
+  --hl-pink:   rgba(131, 24, 67, 0.55);
+  --hl-purple: rgba(88, 28, 135, 0.55);
+  --hl-orange: rgba(124, 45, 18, 0.55);
+  --hl-gray:   rgba(55, 65, 81, 0.55);
+}
+
+/* Default highlight (no color attribute) uses the yellow var, so the same
+   variable indirection drives both default and explicit yellow. */
 .tiptap-editor .ProseMirror mark {
-  background: oklch(0.93 0.12 95 / 0.6);
+  background: var(--hl-yellow);
   color: inherit;
   border-radius: 2px;
   padding: 0.05em 0.1em;
 }
 
-.dark .tiptap-editor .ProseMirror mark {
-  background: oklch(0.75 0.15 85 / 0.3);
-}
+.tiptap-editor .ProseMirror mark[data-color="yellow"] { background: var(--hl-yellow); }
+.tiptap-editor .ProseMirror mark[data-color="green"]  { background: var(--hl-green); }
+.tiptap-editor .ProseMirror mark[data-color="blue"]   { background: var(--hl-blue); }
+.tiptap-editor .ProseMirror mark[data-color="red"]    { background: var(--hl-red); }
+.tiptap-editor .ProseMirror mark[data-color="pink"]   { background: var(--hl-pink); }
+.tiptap-editor .ProseMirror mark[data-color="purple"] { background: var(--hl-purple); }
+.tiptap-editor .ProseMirror mark[data-color="orange"] { background: var(--hl-orange); }
+.tiptap-editor .ProseMirror mark[data-color="gray"]   { background: var(--hl-gray); }
 
 /* ── inline tag chips (decoration) ─────────────────────────────────────── */
 

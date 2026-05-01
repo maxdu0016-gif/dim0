@@ -173,7 +173,7 @@ export function getExtensions(placeholder = "Start writing…") {
         openMathEditor({ pos, latex: node.attrs.latex ?? "", isInline: false }),
     }),
     ImageWithDrop,
-    HighlightMarkdown.configure({ multicolor: false }),
+    HighlightMarkdown.configure({ multicolor: true }),
     DetailsMarkdown,
     DetailsSummaryMarkdown,
     DetailsContentMarkdown,
