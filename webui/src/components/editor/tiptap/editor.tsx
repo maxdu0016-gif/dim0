@@ -69,7 +69,7 @@ export function TipTapEditor({ markdown, onSave, placeholder, className }: MdEdi
 
   return (
     <div className={`flex h-full flex-col overflow-hidden${className ? ` ${className}` : ""}`}>
-      <div className="flex min-h-0 flex-1 overflow-hidden">
+      <div className="relative flex min-h-0 flex-1 overflow-hidden">
         <div ref={scrollRef} className="tiptap-editor editor-body scrollbar-thin flex-1">
           <EditorBubbleMenu editor={editor} />
           <TableMenu editor={editor} />
@@ -78,7 +78,12 @@ export function TipTapEditor({ markdown, onSave, placeholder, className }: MdEdi
           <TagPanel tags={tags} />
           <EditorContent editor={editor} />
         </div>
-        <TocPanel editor={editor} scrollRef={scrollRef} />
+        {/* Floating TOC: overlays the right gutter without taking layout
+            space; subtle by default, full on hover; hidden below 900px so
+            it never overlaps the centered ProseMirror text column. */}
+        <div className="pointer-events-auto absolute right-2 top-4 z-10 opacity-30 transition-opacity duration-200 hover:opacity-100 max-[900px]:hidden">
+          <TocPanel editor={editor} scrollRef={scrollRef} />
+        </div>
       </div>
 
       <StatusBar editor={editor} />
