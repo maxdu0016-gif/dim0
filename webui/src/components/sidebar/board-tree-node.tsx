@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils"
 import {
   ChevronRightIcon,
   FolderIcon,
-  DocumentIcon,
+  NotepadIcon,
   CodeFileIcon,
   StockWidgetIcon,
   type AppIconComponent,
@@ -22,7 +22,7 @@ const BASE_PADDING_PX = 8
 
 const ICON_BY_KIND: Record<BoardContentKind, AppIconComponent> = {
   folder: FolderIcon,
-  sheet: DocumentIcon,
+  sheet: NotepadIcon,
   "code-sandbox": CodeFileIcon,
   widget: StockWidgetIcon,
 }

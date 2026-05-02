@@ -791,22 +791,26 @@
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
-  padding: 0.05em 0.4em;
-  margin: 0 0.05em;
+  padding: 0.05em 0.25rem;
+  margin: 0 -0.1em; /* hover bg bleeds slightly past the icon/text */
   border: none;
   background: transparent;
-  border-bottom: 1px solid var(--muted-foreground);
   border-radius: 3px;
   color: var(--foreground);
   font-family: inherit;
   font-size: inherit;
   cursor: pointer;
-  transition: background 0.1s, border-color 0.1s;
+  transition: background 0.1s;
 }
 
 .tiptap-editor .ProseMirror .page-ref:hover {
   background: var(--muted);
-  border-bottom-color: var(--secondary-foreground);
+}
+
+.page-ref-prefix {
+  flex-shrink: 0;
+  color: var(--muted-foreground);
+  font-weight: 500;
 }
 
 .page-ref-icon {
@@ -814,15 +818,25 @@
   color: var(--muted-foreground);
 }
 
+.page-ref-title {
+  text-decoration: underline;
+  text-decoration-color: var(--muted-foreground);
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+}
+
 .page-ref--deleted {
   color: var(--muted-foreground);
-  text-decoration: line-through;
   cursor: not-allowed;
+}
+
+.page-ref--deleted .page-ref-title {
+  text-decoration: line-through;
+  text-decoration-color: var(--muted-foreground);
 }
 
 .page-ref--deleted:hover {
   background: transparent;
-  border-bottom-color: var(--muted-foreground);
 }
 
 .page-ref-suffix {
@@ -832,34 +846,33 @@
 }
 
 
-/* ── subpage card (block-level page embed) ─────────────────────────────── */
+/* ── subpage link (block-level page embed, Notion-style) ────────────────── */
 
 .tiptap-editor .ProseMirror .subpage-card-wrap {
   display: block;
-  margin: 0.75rem 0;
+  margin: 0.25rem 0;
 }
 
 .tiptap-editor .ProseMirror .subpage-card {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 0.6rem;
-  width: 100%;
-  padding: 0.65rem 0.85rem;
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--secondary-foreground);
-  border-radius: 8px;
-  background: var(--muted);
+  gap: 0.45rem;
+  max-width: 100%;
+  padding: 0.2rem 0.35rem;
+  margin: 0 -0.35rem; /* hover bg bleeds slightly past the icon/text */
+  border: none;
+  background: transparent;
   color: var(--foreground);
   font-family: inherit;
-  font-size: 0.95rem;
+  font-size: inherit;
   text-align: left;
   cursor: pointer;
-  transition: background 0.1s, border-color 0.1s;
+  border-radius: 4px;
+  transition: background 0.1s;
 }
 
 .tiptap-editor .ProseMirror .subpage-card:hover {
-  background: var(--secondary);
-  border-color: var(--secondary-foreground);
+  background: var(--muted);
 }
 
 .subpage-card-icon {
@@ -868,12 +881,15 @@
 }
 
 .subpage-card-title {
-  flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-weight: 500;
+  text-decoration: underline;
+  text-decoration-color: var(--muted-foreground);
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
 }
 
 .subpage-card-suffix {
@@ -882,20 +898,18 @@
   font-style: italic;
 }
 
-.subpage-card-chevron {
-  flex-shrink: 0;
+.subpage-card--deleted {
+  cursor: not-allowed;
   color: var(--muted-foreground);
 }
 
-.subpage-card--deleted {
-  cursor: not-allowed;
+.subpage-card--deleted .subpage-card-title {
   text-decoration: line-through;
-  color: var(--muted-foreground);
+  text-decoration-color: var(--muted-foreground);
 }
 
 .subpage-card--deleted:hover {
-  background: var(--muted);
-  border-color: var(--border);
+  background: transparent;
 }
 
 

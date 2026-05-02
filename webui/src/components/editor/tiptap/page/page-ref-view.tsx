@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 import { NodeViewWrapper } from "@tiptap/react"
 import type { NodeViewProps } from "@tiptap/react"
-import { FileText } from "@phosphor-icons/react"
+import { Notepad } from "@phosphor-icons/react"
 import type { Page, PageProvider } from "./types"
 import { readCachedPage, resolvePage, subscribePage } from "./page-cache"
 
@@ -34,7 +34,13 @@ export function PageRefView({ node, editor }: NodeViewProps) {
 
     setCached(readCachedPage(pageId))
     const unsubscribe = subscribePage(pageId, () => {
-      setCached(readCachedPage(pageId))
+      const next = readCachedPage(pageId)
+      setCached(next)
+      // External invalidation (e.g. the page was renamed elsewhere) wipes
+      // the entry; refetch so the chip's title stays in sync.
+      if (next === undefined) {
+        void resolvePage(provider, pageId)
+      }
     })
     void resolvePage(provider, pageId)
     return () => {
@@ -64,7 +70,8 @@ export function PageRefView({ node, editor }: NodeViewProps) {
         title={isDeleted ? `${displayTitle} (deleted)` : displayTitle}
         disabled={isDeleted}
       >
-        <FileText size={12} className="page-ref-icon" />
+        <span className="page-ref-prefix" aria-hidden="true">@</span>
+        <Notepad size={16} weight="duotone" className="page-ref-icon" />
         <span className="page-ref-title">{displayTitle}</span>
         {isDeleted && <span className="page-ref-suffix">(deleted)</span>}
       </button>

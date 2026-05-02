@@ -17,7 +17,7 @@ import {
   CaretRightIcon,
   ImageIcon,
   ListDashes,
-  FileText,
+  Notepad,
 } from "@phosphor-icons/react"
 import { pickAndInsertImage } from "../image/insert-image"
 import { primePageCache } from "../page/page-cache"
@@ -165,7 +165,7 @@ export const SLASH_COMMANDS: SlashCommand[] = [
   {
     title: "Sub-page",
     keywords: ["subpage", "sub-page", "page", "child", "embed"],
-    icon: FileText,
+    icon: Notepad,
     group: "basic",
     action: (editor, range) => {
       // Read provider + the host note id from the editor's storage and

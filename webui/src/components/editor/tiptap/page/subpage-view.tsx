@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 import { NodeViewWrapper } from "@tiptap/react"
 import type { NodeViewProps } from "@tiptap/react"
-import { FileText, CaretRightIcon } from "@phosphor-icons/react"
+import { Notepad } from "@phosphor-icons/react"
 import type { Page, PageProvider } from "./types"
 import { readCachedPage, resolvePage, subscribePage } from "./page-cache"
 
@@ -34,7 +34,13 @@ export function SubpageView({ node, editor }: NodeViewProps) {
 
     setCached(readCachedPage(pageId))
     const unsubscribe = subscribePage(pageId, () => {
-      setCached(readCachedPage(pageId))
+      const next = readCachedPage(pageId)
+      setCached(next)
+      // Cache was invalidated externally (e.g. parent renamed the page);
+      // trigger a fresh resolve so the chip updates without a reload.
+      if (next === undefined) {
+        void resolvePage(provider, pageId)
+      }
     })
     void resolvePage(provider, pageId)
     return () => {
@@ -64,10 +70,9 @@ export function SubpageView({ node, editor }: NodeViewProps) {
         className={isDeleted ? "subpage-card subpage-card--deleted" : "subpage-card"}
         title={isDeleted ? `${displayTitle} (deleted)` : displayTitle}
       >
-        <FileText size={16} className="subpage-card-icon" />
+        <Notepad size={16} weight="duotone" className="subpage-card-icon" />
         <span className="subpage-card-title">{displayTitle}</span>
         {isDeleted && <span className="subpage-card-suffix">(deleted)</span>}
-        <CaretRightIcon size={14} className="subpage-card-chevron" />
       </button>
     </NodeViewWrapper>
   )
