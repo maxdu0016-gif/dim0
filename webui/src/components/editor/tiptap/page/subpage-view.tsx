@@ -4,6 +4,7 @@ import type { NodeViewProps } from "@tiptap/react"
 import { Notepad } from "@phosphor-icons/react"
 import type { Page, PageProvider } from "./types"
 import { readCachedPage, resolvePage, subscribePage } from "./page-cache"
+import { PageHoverCard } from "./page-hover-card"
 
 
 function getProvider(editor: NodeViewProps["editor"]): PageProvider | null {
@@ -63,17 +64,18 @@ export function SubpageView({ node, editor }: NodeViewProps) {
       className="subpage-card-wrap"
       contentEditable={false}
     >
-      <button
-        type="button"
-        onClick={navigate}
-        disabled={isDeleted}
-        className={isDeleted ? "subpage-card subpage-card--deleted" : "subpage-card"}
-        title={isDeleted ? `${displayTitle} (deleted)` : displayTitle}
-      >
-        <Notepad size={16} weight="duotone" className="subpage-card-icon" />
-        <span className="subpage-card-title">{displayTitle}</span>
-        {isDeleted && <span className="subpage-card-suffix">(deleted)</span>}
-      </button>
+      <PageHoverCard cached={cached} fallbackTitle={fallbackTitle}>
+        <button
+          type="button"
+          onClick={navigate}
+          disabled={isDeleted}
+          className={isDeleted ? "subpage-card subpage-card--deleted" : "subpage-card"}
+        >
+          <Notepad size={16} weight="duotone" className="subpage-card-icon" />
+          <span className="subpage-card-title">{displayTitle}</span>
+          {isDeleted && <span className="subpage-card-suffix">(deleted)</span>}
+        </button>
+      </PageHoverCard>
     </NodeViewWrapper>
   )
 }

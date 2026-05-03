@@ -4,6 +4,7 @@ import type { NodeViewProps } from "@tiptap/react"
 import { Notepad } from "@phosphor-icons/react"
 import type { Page, PageProvider } from "./types"
 import { readCachedPage, resolvePage, subscribePage } from "./page-cache"
+import { PageHoverCard } from "./page-hover-card"
 
 
 function getProvider(editor: NodeViewProps["editor"]): PageProvider | null {
@@ -63,18 +64,19 @@ export function PageRefView({ node, editor }: NodeViewProps) {
 
   return (
     <NodeViewWrapper as="span" className="page-ref-wrap">
-      <button
-        type="button"
-        className={isDeleted ? "page-ref page-ref--deleted" : "page-ref"}
-        onClick={navigate}
-        title={isDeleted ? `${displayTitle} (deleted)` : displayTitle}
-        disabled={isDeleted}
-      >
-        <span className="page-ref-prefix" aria-hidden="true">@</span>
-        <Notepad size={16} weight="duotone" className="page-ref-icon" />
-        <span className="page-ref-title">{displayTitle}</span>
-        {isDeleted && <span className="page-ref-suffix">(deleted)</span>}
-      </button>
+      <PageHoverCard cached={cached} fallbackTitle={fallbackTitle}>
+        <button
+          type="button"
+          className={isDeleted ? "page-ref page-ref--deleted" : "page-ref"}
+          onClick={navigate}
+          disabled={isDeleted}
+        >
+          <span className="page-ref-prefix" aria-hidden="true">@</span>
+          <Notepad size={16} weight="duotone" className="page-ref-icon" />
+          <span className="page-ref-title">{displayTitle}</span>
+          {isDeleted && <span className="page-ref-suffix">(deleted)</span>}
+        </button>
+      </PageHoverCard>
     </NodeViewWrapper>
   )
 }
