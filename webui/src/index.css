@@ -162,6 +162,10 @@
 
   --tracking-normal: 0rem;
   --spacing: 0.25rem;
+
+  /* shape fill misregistration — print-style offset between fill and stroke. */
+  --shape-misregister-x: -3px;
+  --shape-misregister-y: -2px;
 }
 
 /* ============================================================
