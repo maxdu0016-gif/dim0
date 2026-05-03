@@ -14,6 +14,7 @@ import { useGetNotePath } from "../../api/get-note-path"
 import { useUpdateNote } from "../../api/update-note"
 import type { Note } from "../../types/note"
 import { SheetBreadcrumb } from "../sheet/sheet-breadcrumb"
+import { SheetStackBackground } from "../sheet/sheet-stack-background"
 
 
 type SheetNodeDialogProps = {
@@ -210,9 +211,15 @@ export const SheetNodeDialog = memo(function SheetNodeDialog({
 
   const displayTitle = note.label?.markdown?.trim() || "Untitled note"
 
+  const stackDepth = Math.max(0, ancestors.length)
+
   return (
     <Dialog open onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-4xl h-3/4 flex flex-col items-center text-left p-2" showCloseButton={false}>
+      <DialogContent
+        className="sm:max-w-4xl h-3/4 flex flex-col items-center text-left p-2 overflow-visible"
+        showCloseButton={false}
+      >
+        <SheetStackBackground depth={stackDepth} />
         <div className="w-full flex items-center justify-between gap-2 px-2 pt-1">
           <div className="min-w-0 flex-1 pr-2 flex flex-col gap-0.5">
             <SheetBreadcrumb
