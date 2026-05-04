@@ -5,8 +5,7 @@ import type { StrokeStyle } from '@/features/board/types/style'
 import { getCachedCanvas, serializeCacheKey } from './cache'
 import { excalidrawRoundedRectPath, rectPath } from './paths'
 import { FillLayer } from './fill-layer'
-import { darkerDisplayHex, lighterDisplayHex } from '@/features/board/lib/colors/dark-variants'
-import { isTransparent } from '@/features/board/lib/colors/tailwind'
+import { resolveEdgeRender } from './derived-edge'
 import { useTheme } from '@/components/theme-provider'
 import { useGraphStore } from '@/features/board/store/graph-store'
 
@@ -42,9 +41,9 @@ type DrawConfig = {
 
 type SimplifiedRectOverlayProps = {
   rounded: RoundedClass
-  stroke?: string
-  strokeStyle?: StrokeStyle
-  strokeWidth?: number
+  edgeColor: string
+  edgeWidth: number
+  edgeStyle: StrokeStyle
   fillInset: number
   widthPx?: number
   heightPx?: number
@@ -52,14 +51,14 @@ type SimplifiedRectOverlayProps = {
 
 const SimplifiedRectOverlay = memo(function SimplifiedRectOverlay({
   rounded,
-  stroke,
-  strokeStyle,
-  strokeWidth,
+  edgeColor,
+  edgeWidth,
+  edgeStyle,
   fillInset,
   widthPx,
   heightPx
 }: SimplifiedRectOverlayProps) {
-  const { strokeLineDash, lineCap } = mapStrokeStyle(strokeStyle, strokeWidth)
+  const { strokeLineDash, lineCap } = mapStrokeStyle(edgeStyle, edgeWidth)
   const dashArray = strokeLineDash ? strokeLineDash.join(' ') : undefined
   const svgWidth = Math.max(1, widthPx ?? 1)
   const svgHeight = Math.max(1, heightPx ?? 1)
@@ -83,8 +82,8 @@ const SimplifiedRectOverlay = memo(function SimplifiedRectOverlay({
         rx={cornerRadius}
         ry={cornerRadius}
         fill='transparent'
-        stroke={stroke || 'transparent'}
-        strokeWidth={strokeWidth ?? 1}
+        stroke={edgeWidth > 0 ? edgeColor : 'transparent'}
+        strokeWidth={edgeWidth}
         strokeDasharray={dashArray}
         strokeLinecap={lineCap}
         vectorEffect='non-scaling-stroke'
@@ -207,14 +206,12 @@ export const RoughRect: React.FC<RoughRectProps> = ({
     // oversample backing store for zoom-in, clamped to avoid runaway buffers
     const oversample = oversampleForZoom(effectiveZoom)
 
-    const hasFill = !!fill && !isTransparent(fill)
-    const strokeIsTransparent = isTransparent(stroke)
-    const isDerivedEdge = strokeIsTransparent && hasFill
-    const effectiveStrokeWidth = isDerivedEdge
-      ? 1.5
-      : (strokeIsTransparent ? 0 : (strokeWidth ?? 1))
+    const edge = resolveEdgeRender(stroke, fill, isDark, strokeStyle, strokeWidth, roughness)
+    const effectiveStrokeWidth = edge.width
+    const effectiveStrokeStyle = edge.style
+    const effectiveRoughness = edge.roughness
     // add a bleed in CSS units (display px), enough for stroke + jitter
-    const bleed = Math.ceil(effectiveStrokeWidth / 2 + (roughness ?? 1.2) * 1.5 + 2)
+    const bleed = Math.ceil(effectiveStrokeWidth / 2 + effectiveRoughness * 1.5 + 2)
 
     const paddedWidth = cssW + bleed * 2
     const paddedHeight = cssH + bleed * 2
@@ -241,9 +238,9 @@ export const RoughRect: React.FC<RoughRectProps> = ({
       cssH,
       zoom: effectiveZoom,
       rounded,
-      roughness,
-      stroke,
-      strokeStyle,
+      roughness: effectiveRoughness,
+      stroke: edge.color,
+      strokeStyle: effectiveStrokeStyle,
       strokeWidth: effectiveStrokeWidth,
       seed,
       dpr,
@@ -254,12 +251,7 @@ export const RoughRect: React.FC<RoughRectProps> = ({
       return
     }
 
-    const derivedEdgeColor = isDerivedEdge
-      ? (isDark ? lighterDisplayHex(fill) ?? fill : darkerDisplayHex(fill) ?? fill)
-      : null
-    const visibleStroke = isDerivedEdge
-      ? (derivedEdgeColor ?? stroke)
-      : (strokeIsTransparent && !hasFill ? '#222' : stroke)
+    const visibleStroke = edge.color
 
     // hairline crispness without eating tiny boxes; include half stroke so outer edge aligns
     const insetBase = Math.min(0.5, cssW / 4, cssH / 4)
@@ -274,16 +266,16 @@ export const RoughRect: React.FC<RoughRectProps> = ({
       ? excalidrawRoundedRectPath(inset, inset, w, h, radius)
       : rectPath(inset, inset, w, h)
 
-    const { strokeLineDash, lineCap } = mapStrokeStyle(strokeStyle, effectiveStrokeWidth)
+    const { strokeLineDash, lineCap } = mapStrokeStyle(effectiveStrokeStyle, effectiveStrokeWidth)
     const apparentSize = Math.max(cssW, cssH) * Math.min(1, effectiveZoom)
     const { curveStepCount, maxRandomnessOffset } = detailForSize(apparentSize)
 
     const cacheKey = serializeCacheKey([
       'rect',
       rounded,
-      roughness,
+      effectiveRoughness,
       visibleStroke,
-      strokeStyle,
+      effectiveStrokeStyle,
       effectiveStrokeWidth,
       seed,
       effectiveZoom,
@@ -303,7 +295,7 @@ export const RoughRect: React.FC<RoughRectProps> = ({
 
       const rc = new RoughCanvas(target)
       const drawable = rc.generator.path(pathData, {
-        roughness,
+        roughness: effectiveRoughness,
         stroke: visibleStroke,
         strokeWidth: effectiveStrokeWidth,
         bowing: 2,
@@ -381,11 +373,8 @@ export const RoughRect: React.FC<RoughRectProps> = ({
 
   const mainDivClass = clsx('relative', className || '')
   const fillKind = rounded === 'rounded-2xl' ? 'rect-rounded' : 'rect-sharp'
-  const renderHasFill = !!fill && !isTransparent(fill)
-  const renderEffectiveStrokeWidth = isTransparent(stroke)
-    ? (renderHasFill ? 1.5 : 0)
-    : (strokeWidth ?? 1)
-  const fillInset = 0.5 + renderEffectiveStrokeWidth / 2
+  const renderEdge = resolveEdgeRender(stroke, fill, isDark, strokeStyle, strokeWidth, roughness)
+  const fillInset = 0.5 + renderEdge.width / 2
 
   if (isSimplified) {
     return (
@@ -400,9 +389,9 @@ export const RoughRect: React.FC<RoughRectProps> = ({
         />
         <SimplifiedRectOverlay
           rounded={rounded}
-          stroke={stroke}
-          strokeStyle={strokeStyle}
-          strokeWidth={strokeWidth}
+          edgeColor={renderEdge.color}
+          edgeWidth={renderEdge.width}
+          edgeStyle={renderEdge.style}
           fillInset={fillInset}
           widthPx={widthPx}
           heightPx={heightPx}

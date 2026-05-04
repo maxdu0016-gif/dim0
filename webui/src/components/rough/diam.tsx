@@ -5,8 +5,7 @@ import type { StrokeStyle } from '@/features/board/types/style'
 import { getCachedCanvas, serializeCacheKey } from './cache'
 import { roundedDiamondPath, sharpDiamondPath } from './paths'
 import { FillLayer } from './fill-layer'
-import { darkerDisplayHex, lighterDisplayHex } from '@/features/board/lib/colors/dark-variants'
-import { isTransparent } from '@/features/board/lib/colors/tailwind'
+import { resolveEdgeRender } from './derived-edge'
 import { useTheme } from '@/components/theme-provider'
 import { useGraphStore } from '@/features/board/store/graph-store'
 
@@ -45,9 +44,9 @@ type DrawConfig = {
 
 type SimplifiedDiamondOverlayProps = {
   rounded: RoundedClass
-  stroke?: string
-  strokeStyle?: StrokeStyle
-  strokeWidth?: number
+  edgeColor: string
+  edgeWidth: number
+  edgeStyle: StrokeStyle
   fillInset: number
   widthPx: number
   heightPx: number
@@ -55,14 +54,14 @@ type SimplifiedDiamondOverlayProps = {
 
 const SimplifiedDiamondOverlay = memo(function SimplifiedDiamondOverlay({
   rounded,
-  stroke,
-  strokeStyle,
-  strokeWidth,
+  edgeColor,
+  edgeWidth,
+  edgeStyle,
   fillInset,
   widthPx,
   heightPx,
 }: SimplifiedDiamondOverlayProps) {
-  const { strokeLineDash, lineCap } = mapStrokeStyle(strokeStyle, strokeWidth)
+  const { strokeLineDash, lineCap } = mapStrokeStyle(edgeStyle, edgeWidth)
   const dashArray = strokeLineDash ? strokeLineDash.join(' ') : undefined
   const viewW = Math.max(1, widthPx)
   const viewH = Math.max(1, heightPx)
@@ -86,8 +85,8 @@ const SimplifiedDiamondOverlay = memo(function SimplifiedDiamondOverlay({
       <path
         d={pathData}
         fill='transparent'
-        stroke={stroke || 'transparent'}
-        strokeWidth={strokeWidth ?? 1}
+        stroke={edgeWidth > 0 ? edgeColor : 'transparent'}
+        strokeWidth={edgeWidth}
         strokeDasharray={dashArray}
         strokeLinecap={lineCap}
         strokeLinejoin="round"
@@ -198,15 +197,13 @@ export const RoughDiamond: React.FC<RoughDiamondProps> = ({
     const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1
     const oversample = oversampleForZoom(effectiveZoom)
 
-    const hasFill = !!fill && !isTransparent(fill)
-    const strokeIsTransparent = isTransparent(stroke)
-    const isDerivedEdge = strokeIsTransparent && hasFill
-    const effectiveStrokeWidth = isDerivedEdge
-      ? 1.5
-      : (strokeIsTransparent ? 0 : (strokeWidth ?? 1))
+    const edge = resolveEdgeRender(stroke, fill, isDark, strokeStyle, strokeWidth, roughness)
+    const effectiveStrokeWidth = edge.width
+    const effectiveStrokeStyle = edge.style
+    const effectiveRoughness = edge.roughness
 
     // bleed for stroke + jitter
-    const bleed = Math.ceil(effectiveStrokeWidth / 2 + (roughness ?? 1.2) * 1.5 + 2)
+    const bleed = Math.ceil(effectiveStrokeWidth / 2 + effectiveRoughness * 1.5 + 2)
 
     const paddedWidth = cssW + bleed * 2
     const paddedHeight = cssH + bleed * 2
@@ -233,9 +230,9 @@ export const RoughDiamond: React.FC<RoughDiamondProps> = ({
       cssH,
       zoom: effectiveZoom,
       rounded,
-      roughness,
-      stroke,
-      strokeStyle,
+      roughness: effectiveRoughness,
+      stroke: edge.color,
+      strokeStyle: effectiveStrokeStyle,
       strokeWidth: effectiveStrokeWidth,
       seed,
       dpr,
@@ -246,12 +243,7 @@ export const RoughDiamond: React.FC<RoughDiamondProps> = ({
       return
     }
 
-    const derivedEdgeColor = isDerivedEdge
-      ? (isDark ? lighterDisplayHex(fill) ?? fill : darkerDisplayHex(fill) ?? fill)
-      : null
-    const visibleStroke = isDerivedEdge
-      ? (derivedEdgeColor ?? stroke)
-      : (strokeIsTransparent && !hasFill ? '#222' : stroke)
+    const visibleStroke = edge.color
 
     const inset = effectiveStrokeWidth <= 1.5 ? Math.min(0.5, cssW / 4, cssH / 4) : 0
     const x0 = inset
@@ -265,16 +257,16 @@ export const RoughDiamond: React.FC<RoughDiamondProps> = ({
         ? roundedDiamondPath(x0, y0, x1, y1, baseRadius)
         : sharpDiamondPath(x0, y0, x1, y1)
 
-    const { strokeLineDash, lineCap } = mapStrokeStyle(strokeStyle, effectiveStrokeWidth)
+    const { strokeLineDash, lineCap } = mapStrokeStyle(effectiveStrokeStyle, effectiveStrokeWidth)
     const apparentSize = Math.max(cssW, cssH) * Math.min(1, effectiveZoom)
     const { curveStepCount, maxRandomnessOffset } = detailForSize(apparentSize)
 
     const cacheKey = serializeCacheKey([
       'diamond',
       rounded,
-      roughness,
+      effectiveRoughness,
       visibleStroke,
-      strokeStyle,
+      effectiveStrokeStyle,
       effectiveStrokeWidth,
       seed,
       effectiveZoom,
@@ -294,7 +286,7 @@ export const RoughDiamond: React.FC<RoughDiamondProps> = ({
 
       const rc = new RoughCanvas(target)
       const drawable = rc.generator.path(pathData, {
-        roughness,
+        roughness: effectiveRoughness,
         stroke: visibleStroke,
         strokeWidth: effectiveStrokeWidth,
         bowing: 2,
@@ -366,11 +358,8 @@ export const RoughDiamond: React.FC<RoughDiamondProps> = ({
   }, [])
 
   const fillKind = rounded === 'rounded-2xl' ? 'diamond-rounded' : 'diamond-sharp'
-  const renderHasFill = !!fill && !isTransparent(fill)
-  const renderEffectiveStrokeWidth = isTransparent(stroke)
-    ? (renderHasFill ? 1.5 : 0)
-    : (strokeWidth ?? 1)
-  const fillInset = renderEffectiveStrokeWidth <= 1.5 ? 0.5 + renderEffectiveStrokeWidth / 2 : renderEffectiveStrokeWidth / 2
+  const renderEdge = resolveEdgeRender(stroke, fill, isDark, strokeStyle, strokeWidth, roughness)
+  const fillInset = renderEdge.width <= 1.5 ? 0.5 + renderEdge.width / 2 : renderEdge.width / 2
 
   return (
     <div ref={wrapperRef} className={mainDivClass}>
@@ -385,9 +374,9 @@ export const RoughDiamond: React.FC<RoughDiamondProps> = ({
       {isSimplified && (
         <SimplifiedDiamondOverlay
           rounded={rounded}
-          stroke={stroke}
-          strokeStyle={strokeStyle}
-          strokeWidth={strokeWidth}
+          edgeColor={renderEdge.color}
+          edgeWidth={renderEdge.width}
+          edgeStyle={renderEdge.style}
           fillInset={fillInset}
           widthPx={resolvedWidth}
           heightPx={resolvedHeight}
