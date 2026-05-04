@@ -76,6 +76,7 @@ def create_write_note_tool(
                 note_id=note.id,
                 graph_uid=graph_uid,
                 label=label,
+                content=note.content.markdown if note.content else "",
                 note_type=note_type,
                 parent_id=root_id,
             )
@@ -115,6 +116,7 @@ def create_write_note_tool(
             note_id=updated_note.id,
             graph_uid=graph_uid,
             label=updated_note.label.markdown if updated_note.label else None,
+            content=updated_note.content.markdown if updated_note.content else "",
             note_type=updated_note.style.type,
             parent_id=updated_note.parent_id,
         )
@@ -260,6 +262,7 @@ def create_edit_note_tool(
             note_id=updated_note.id,
             graph_uid=graph_uid,
             label=updated_note.label.markdown if updated_note.label else None,
+            content=updated_note.content.markdown if updated_note.content else "",
             note_type=updated_note.style.type,
             parent_id=updated_note.parent_id,
         )

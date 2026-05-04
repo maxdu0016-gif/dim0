@@ -166,6 +166,7 @@ def test_write_note_output_to_compact_repr_uses_metadata_only():
         note_id="note-1",
         graph_uid="graph-1",
         label="Revenue chart",
+        content="<div>chart</div>",
         note_type="widget",
     )
 
@@ -208,6 +209,7 @@ def test_tool_call_to_compact_step_description_summarizes_content_heavy_inputs()
             action="rewritten",
             note_id="note-1",
             graph_uid="graph-1",
+            content="<div>chart</div>",
             note_type="widget",
         ),
         arguments={

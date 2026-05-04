@@ -251,6 +251,7 @@ class WriteNoteOutput(BaseModel):
     note_id: Annotated[str, "The unique id of the created or rewritten note."]
     graph_uid: Annotated[str, "The board id where the note belongs."]
     label: Annotated[str | None, "Optional short title stored separately from the note body."] = None
+    content: Annotated[str, "The canonical markdown body of the note after the write."]
     note_type: Annotated[NodeType, "The final node type used for the note."]
     parent_id: Annotated[
         str | None,
@@ -270,6 +271,7 @@ class EditNoteOutput(BaseModel):
     note_id: Annotated[str, "The unique id of the edited note."]
     graph_uid: Annotated[str, "The board id where the note belongs."]
     label: Annotated[str | None, "Optional short title after the edit is applied."] = None
+    content: Annotated[str, "The canonical markdown body of the note after the edit."]
     note_type: Annotated[NodeType, "The final node type after the edit."]
     parent_id: Annotated[
         str | None,
