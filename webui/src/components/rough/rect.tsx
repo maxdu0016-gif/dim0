@@ -5,6 +5,9 @@ import type { StrokeStyle } from '@/features/board/types/style'
 import { getCachedCanvas, serializeCacheKey } from './cache'
 import { excalidrawRoundedRectPath, rectPath } from './paths'
 import { FillLayer } from './fill-layer'
+import { darkerDisplayHex, lighterDisplayHex } from '@/features/board/lib/colors/dark-variants'
+import { isTransparent } from '@/features/board/lib/colors/tailwind'
+import { useTheme } from '@/components/theme-provider'
 import { useGraphStore } from '@/features/board/store/graph-store'
 
 type RoundedClass = 'none' | 'rounded-2xl'
@@ -190,6 +193,8 @@ export const RoughRect: React.FC<RoughRectProps> = ({
   const isMoving = useGraphStore(state => state.isMoving)
   const isResizing = useGraphStore(state => state.isResizingNode)
   const effectiveZoom = quantizeZoom(viewportZoom || 1)
+  const { resolvedTheme } = useTheme()
+  const isDark = resolvedTheme === 'dark'
 
   const draw = useCallback((wrapper: HTMLDivElement, canvas: HTMLCanvasElement) => {
     const rect = wrapper.getBoundingClientRect()
@@ -202,7 +207,12 @@ export const RoughRect: React.FC<RoughRectProps> = ({
     // oversample backing store for zoom-in, clamped to avoid runaway buffers
     const oversample = oversampleForZoom(effectiveZoom)
 
-    const effectiveStrokeWidth = stroke === 'transparent' ? 0 : (strokeWidth ?? 1)
+    const hasFill = !!fill && !isTransparent(fill)
+    const strokeIsTransparent = isTransparent(stroke)
+    const isDerivedEdge = strokeIsTransparent && hasFill
+    const effectiveStrokeWidth = isDerivedEdge
+      ? 1.5
+      : (strokeIsTransparent ? 0 : (strokeWidth ?? 1))
     // add a bleed in CSS units (display px), enough for stroke + jitter
     const bleed = Math.ceil(effectiveStrokeWidth / 2 + (roughness ?? 1.2) * 1.5 + 2)
 
@@ -244,7 +254,12 @@ export const RoughRect: React.FC<RoughRectProps> = ({
       return
     }
 
-    const visibleStroke = stroke === 'transparent' && !fill ? '#222' : stroke
+    const derivedEdgeColor = isDerivedEdge
+      ? (isDark ? lighterDisplayHex(fill) ?? fill : darkerDisplayHex(fill) ?? fill)
+      : null
+    const visibleStroke = isDerivedEdge
+      ? (derivedEdgeColor ?? stroke)
+      : (strokeIsTransparent && !hasFill ? '#222' : stroke)
 
     // hairline crispness without eating tiny boxes; include half stroke so outer edge aligns
     const insetBase = Math.min(0.5, cssW / 4, cssH / 4)
@@ -326,7 +341,7 @@ export const RoughRect: React.FC<RoughRectProps> = ({
     ctx.drawImage(offscreen, 0, 0)
 
     lastConfigRef.current = config
-  }, [rounded, roughness, stroke, strokeWidth, fill, effectiveZoom, seed, strokeStyle, widthPx, heightPx])
+  }, [rounded, roughness, stroke, strokeWidth, fill, isDark, effectiveZoom, seed, strokeStyle, widthPx, heightPx])
 
   const scheduleRedraw = useCallback(() => {
     if (isMoving) return
@@ -366,7 +381,10 @@ export const RoughRect: React.FC<RoughRectProps> = ({
 
   const mainDivClass = clsx('relative', className || '')
   const fillKind = rounded === 'rounded-2xl' ? 'rect-rounded' : 'rect-sharp'
-  const renderEffectiveStrokeWidth = stroke === 'transparent' ? 0 : (strokeWidth ?? 1)
+  const renderHasFill = !!fill && !isTransparent(fill)
+  const renderEffectiveStrokeWidth = isTransparent(stroke)
+    ? (renderHasFill ? 1.5 : 0)
+    : (strokeWidth ?? 1)
   const fillInset = 0.5 + renderEffectiveStrokeWidth / 2
 
   if (isSimplified) {

@@ -5,6 +5,9 @@ import type { StrokeStyle } from '@/features/board/types/style'
 import { getCachedCanvas, serializeCacheKey } from './cache'
 import { roundedDiamondPath, sharpDiamondPath } from './paths'
 import { FillLayer } from './fill-layer'
+import { darkerDisplayHex, lighterDisplayHex } from '@/features/board/lib/colors/dark-variants'
+import { isTransparent } from '@/features/board/lib/colors/tailwind'
+import { useTheme } from '@/components/theme-provider'
 import { useGraphStore } from '@/features/board/store/graph-store'
 
 type RoundedClass = 'none' | 'rounded-2xl'
@@ -182,6 +185,8 @@ export const RoughDiamond: React.FC<RoughDiamondProps> = ({
   const effectiveZoom = quantizeZoom(viewportZoom || 1)
   const resolvedWidth = Math.max(1, Math.floor(widthPx ?? 1))
   const resolvedHeight = Math.max(1, Math.floor(heightPx ?? 1))
+  const { resolvedTheme } = useTheme()
+  const isDark = resolvedTheme === 'dark'
 
   const draw = useCallback((wrapper: HTMLDivElement, canvas: HTMLCanvasElement) => {
     if (isMoving && !isResizing) return
@@ -193,8 +198,15 @@ export const RoughDiamond: React.FC<RoughDiamondProps> = ({
     const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1
     const oversample = oversampleForZoom(effectiveZoom)
 
+    const hasFill = !!fill && !isTransparent(fill)
+    const strokeIsTransparent = isTransparent(stroke)
+    const isDerivedEdge = strokeIsTransparent && hasFill
+    const effectiveStrokeWidth = isDerivedEdge
+      ? 1.5
+      : (strokeIsTransparent ? 0 : (strokeWidth ?? 1))
+
     // bleed for stroke + jitter
-    const bleed = Math.ceil((strokeWidth ?? 1) / 2 + (roughness ?? 1.2) * 1.5 + 2)
+    const bleed = Math.ceil(effectiveStrokeWidth / 2 + (roughness ?? 1.2) * 1.5 + 2)
 
     const paddedWidth = cssW + bleed * 2
     const paddedHeight = cssH + bleed * 2
@@ -224,7 +236,7 @@ export const RoughDiamond: React.FC<RoughDiamondProps> = ({
       roughness,
       stroke,
       strokeStyle,
-      strokeWidth,
+      strokeWidth: effectiveStrokeWidth,
       seed,
       dpr,
       renderScale
@@ -234,9 +246,14 @@ export const RoughDiamond: React.FC<RoughDiamondProps> = ({
       return
     }
 
-    const visibleStroke = stroke === 'transparent' && !fill ? '#222' : stroke
+    const derivedEdgeColor = isDerivedEdge
+      ? (isDark ? lighterDisplayHex(fill) ?? fill : darkerDisplayHex(fill) ?? fill)
+      : null
+    const visibleStroke = isDerivedEdge
+      ? (derivedEdgeColor ?? stroke)
+      : (strokeIsTransparent && !hasFill ? '#222' : stroke)
 
-    const inset = (strokeWidth ?? 1) <= 1.5 ? Math.min(0.5, cssW / 4, cssH / 4) : 0
+    const inset = effectiveStrokeWidth <= 1.5 ? Math.min(0.5, cssW / 4, cssH / 4) : 0
     const x0 = inset
     const y0 = inset
     const x1 = inset + Math.max(0, cssW - inset * 2)
@@ -248,7 +265,7 @@ export const RoughDiamond: React.FC<RoughDiamondProps> = ({
         ? roundedDiamondPath(x0, y0, x1, y1, baseRadius)
         : sharpDiamondPath(x0, y0, x1, y1)
 
-    const { strokeLineDash, lineCap } = mapStrokeStyle(strokeStyle, strokeWidth)
+    const { strokeLineDash, lineCap } = mapStrokeStyle(strokeStyle, effectiveStrokeWidth)
     const apparentSize = Math.max(cssW, cssH) * Math.min(1, effectiveZoom)
     const { curveStepCount, maxRandomnessOffset } = detailForSize(apparentSize)
 
@@ -258,7 +275,7 @@ export const RoughDiamond: React.FC<RoughDiamondProps> = ({
       roughness,
       visibleStroke,
       strokeStyle,
-      strokeWidth,
+      effectiveStrokeWidth,
       seed,
       effectiveZoom,
       renderScale,
@@ -279,7 +296,7 @@ export const RoughDiamond: React.FC<RoughDiamondProps> = ({
       const drawable = rc.generator.path(pathData, {
         roughness,
         stroke: visibleStroke,
-        strokeWidth: strokeWidth ?? 1,
+        strokeWidth: effectiveStrokeWidth,
         bowing: 2,
         curveStepCount,
         maxRandomnessOffset,
@@ -315,7 +332,7 @@ export const RoughDiamond: React.FC<RoughDiamondProps> = ({
     ctx.drawImage(offscreen, 0, 0)
 
     lastConfigRef.current = config
-  }, [rounded, roughness, stroke, strokeWidth, fill, effectiveZoom, seed, strokeStyle, isMoving, isResizing, widthPx, heightPx])
+  }, [rounded, roughness, stroke, strokeWidth, fill, isDark, effectiveZoom, seed, strokeStyle, isMoving, isResizing, widthPx, heightPx])
 
   const scheduleRedraw = useCallback(() => {
     if (rafRef.current !== null) return
@@ -349,7 +366,10 @@ export const RoughDiamond: React.FC<RoughDiamondProps> = ({
   }, [])
 
   const fillKind = rounded === 'rounded-2xl' ? 'diamond-rounded' : 'diamond-sharp'
-  const renderEffectiveStrokeWidth = stroke === 'transparent' ? 0 : (strokeWidth ?? 1)
+  const renderHasFill = !!fill && !isTransparent(fill)
+  const renderEffectiveStrokeWidth = isTransparent(stroke)
+    ? (renderHasFill ? 1.5 : 0)
+    : (strokeWidth ?? 1)
   const fillInset = renderEffectiveStrokeWidth <= 1.5 ? 0.5 + renderEffectiveStrokeWidth / 2 : renderEffectiveStrokeWidth / 2
 
   return (

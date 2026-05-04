@@ -4,6 +4,9 @@ import clsx from 'clsx'
 import type { StrokeStyle } from '@/features/board/types/style'
 import { getCachedCanvas, serializeCacheKey } from './cache'
 import { FillLayer } from './fill-layer'
+import { darkerDisplayHex, lighterDisplayHex } from '@/features/board/lib/colors/dark-variants'
+import { isTransparent } from '@/features/board/lib/colors/tailwind'
+import { useTheme } from '@/components/theme-provider'
 import { useGraphStore } from '@/features/board/store/graph-store'
 
 type RoughShapeProps = {
@@ -166,6 +169,8 @@ export const RoughCircle: React.FC<RoughShapeProps> = ({
   const isResizing = useGraphStore(state => state.isResizingNode)
   const effectiveZoom = quantizeZoom(viewportZoom || 1)
   const isSimplified = isMoving && !isResizing
+  const { resolvedTheme } = useTheme()
+  const isDark = resolvedTheme === 'dark'
 
   const draw = useCallback((wrapper: HTMLDivElement, canvas: HTMLCanvasElement) => {
     const rect = wrapper.getBoundingClientRect()
@@ -176,7 +181,12 @@ export const RoughCircle: React.FC<RoughShapeProps> = ({
     const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1
     const oversample = oversampleForZoom(effectiveZoom)
 
-    const effectiveStrokeWidth = stroke === 'transparent' ? 0 : (strokeWidth ?? 1)
+    const hasFill = !!fill && !isTransparent(fill)
+    const strokeIsTransparent = isTransparent(stroke)
+    const isDerivedEdge = strokeIsTransparent && hasFill
+    const effectiveStrokeWidth = isDerivedEdge
+      ? 1.5
+      : (strokeIsTransparent ? 0 : (strokeWidth ?? 1))
     // bleed so jitter/stroke won't clip
     // add a tiny extra margin to avoid clipping at seams
     const bleed = Math.ceil(effectiveStrokeWidth / 2 + (roughness ?? 1.2) * 1.5 + 3)
@@ -218,7 +228,12 @@ export const RoughCircle: React.FC<RoughShapeProps> = ({
       return
     }
 
-    const visibleStroke = stroke === 'transparent' && !fill ? '#222' : stroke
+    const derivedEdgeColor = isDerivedEdge
+      ? (isDark ? lighterDisplayHex(fill) ?? fill : darkerDisplayHex(fill) ?? fill)
+      : null
+    const visibleStroke = isDerivedEdge
+      ? (derivedEdgeColor ?? stroke)
+      : (strokeIsTransparent && !hasFill ? '#222' : stroke)
 
     const innerW = cssW
     const innerH = cssH
@@ -294,7 +309,7 @@ export const RoughCircle: React.FC<RoughShapeProps> = ({
     ctx.drawImage(offscreen, 0, 0)
 
     lastConfigRef.current = config
-  }, [roughness, stroke, strokeWidth, fill, effectiveZoom, seed, strokeStyle, widthPx, heightPx])
+  }, [roughness, stroke, strokeWidth, fill, isDark, effectiveZoom, seed, strokeStyle, widthPx, heightPx])
 
   const scheduleRedraw = useCallback(() => {
     if (isMoving) return
@@ -331,7 +346,10 @@ export const RoughCircle: React.FC<RoughShapeProps> = ({
   }, [])
 
   const mainDivClass = clsx('relative', className || '')
-  const renderEffectiveStrokeWidth = stroke === 'transparent' ? 0 : (strokeWidth ?? 1)
+  const renderHasFill = !!fill && !isTransparent(fill)
+  const renderEffectiveStrokeWidth = isTransparent(stroke)
+    ? (renderHasFill ? 1.5 : 0)
+    : (strokeWidth ?? 1)
   const fillInset = 0.5 + renderEffectiveStrokeWidth / 2
 
   if (isSimplified) {

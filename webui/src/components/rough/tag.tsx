@@ -5,6 +5,9 @@ import type { StrokeStyle } from '@/features/board/types/style'
 import { getCachedCanvas, serializeCacheKey } from './cache'
 import { tagPath } from './paths'
 import { FillLayer } from './fill-layer'
+import { darkerDisplayHex, lighterDisplayHex } from '@/features/board/lib/colors/dark-variants'
+import { isTransparent } from '@/features/board/lib/colors/tailwind'
+import { useTheme } from '@/components/theme-provider'
 import { useGraphStore } from '@/features/board/store/graph-store'
 
 type RoughShapeProps = {
@@ -163,6 +166,8 @@ export const RoughTag: React.FC<RoughShapeProps> = ({
   const effectiveZoom = quantizeZoom(viewportZoom || 1)
   const resolvedWidth = Math.max(1, Math.floor(widthPx ?? 1))
   const resolvedHeight = Math.max(1, Math.floor(heightPx ?? 1))
+  const { resolvedTheme } = useTheme()
+  const isDark = resolvedTheme === 'dark'
 
   const draw = useCallback((wrapper: HTMLDivElement, canvas: HTMLCanvasElement) => {
     if (isMoving && !isResizing) return
@@ -174,7 +179,14 @@ export const RoughTag: React.FC<RoughShapeProps> = ({
     const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1
     const oversample = oversampleForZoom(effectiveZoom)
 
-    const bleed = Math.ceil((strokeWidth ?? 1) / 2 + (roughness ?? 1.2) * 1.5 + 2)
+    const hasFill = !!fill && !isTransparent(fill)
+    const strokeIsTransparent = isTransparent(stroke)
+    const isDerivedEdge = strokeIsTransparent && hasFill
+    const effectiveStrokeWidth = isDerivedEdge
+      ? 1.5
+      : (strokeIsTransparent ? 0 : (strokeWidth ?? 1))
+
+    const bleed = Math.ceil(effectiveStrokeWidth / 2 + (roughness ?? 1.2) * 1.5 + 2)
     const paddedWidth = cssW + bleed * 2
     const paddedHeight = cssH + bleed * 2
     const baseScale = dpr * oversample * RENDER_SCALE_FACTOR
@@ -202,7 +214,7 @@ export const RoughTag: React.FC<RoughShapeProps> = ({
       roughness,
       stroke,
       strokeStyle,
-      strokeWidth,
+      strokeWidth: effectiveStrokeWidth,
       seed,
       dpr,
       renderScale
@@ -212,12 +224,17 @@ export const RoughTag: React.FC<RoughShapeProps> = ({
       return
     }
 
-    const visibleStroke = stroke === 'transparent' && !fill ? '#222' : stroke
+    const derivedEdgeColor = isDerivedEdge
+      ? (isDark ? lighterDisplayHex(fill) ?? fill : darkerDisplayHex(fill) ?? fill)
+      : null
+    const visibleStroke = isDerivedEdge
+      ? (derivedEdgeColor ?? stroke)
+      : (strokeIsTransparent && !hasFill ? '#222' : stroke)
     const notch = Math.min(cssH * 0.45, cssW * 0.3)
     const radius = Math.min(cssH / 2, cssW / 4, 18)
     const pathData = tagPath(cssW, cssH, notch, radius)
 
-    const { strokeLineDash, lineCap } = mapStrokeStyle(strokeStyle, strokeWidth)
+    const { strokeLineDash, lineCap } = mapStrokeStyle(strokeStyle, effectiveStrokeWidth)
     const apparentSize = Math.max(cssW, cssH) * Math.min(1, effectiveZoom)
     const { curveStepCount, maxRandomnessOffset } = detailForSize(apparentSize)
 
@@ -226,7 +243,7 @@ export const RoughTag: React.FC<RoughShapeProps> = ({
       roughness,
       visibleStroke,
       strokeStyle,
-      strokeWidth,
+      effectiveStrokeWidth,
       seed,
       effectiveZoom,
       renderScale,
@@ -247,7 +264,7 @@ export const RoughTag: React.FC<RoughShapeProps> = ({
       const drawable = rc.generator.path(pathData, {
         roughness,
         stroke: visibleStroke,
-        strokeWidth: strokeWidth ?? 1,
+        strokeWidth: effectiveStrokeWidth,
         bowing: 2,
         curveStepCount,
         maxRandomnessOffset,
@@ -283,7 +300,7 @@ export const RoughTag: React.FC<RoughShapeProps> = ({
     ctx.drawImage(offscreen, 0, 0)
 
     lastConfigRef.current = config
-  }, [roughness, stroke, strokeWidth, fill, effectiveZoom, seed, strokeStyle, isMoving, isResizing, widthPx, heightPx])
+  }, [roughness, stroke, strokeWidth, fill, isDark, effectiveZoom, seed, strokeStyle, isMoving, isResizing, widthPx, heightPx])
 
   const scheduleRedraw = useCallback(() => {
     if (rafRef.current !== null) return
@@ -299,7 +316,10 @@ export const RoughTag: React.FC<RoughShapeProps> = ({
 
   const mainDivClass = clsx('relative', className || '')
   const isSimplified = isMoving && !isResizing
-  const renderEffectiveStrokeWidth = stroke === 'transparent' ? 0 : (strokeWidth ?? 1)
+  const renderHasFill = !!fill && !isTransparent(fill)
+  const renderEffectiveStrokeWidth = isTransparent(stroke)
+    ? (renderHasFill ? 1.5 : 0)
+    : (strokeWidth ?? 1)
   // Tag path runs to wrapper edges; fill stays at wrapper edges, stroke center at wrapper edge.
   const fillInset = renderEffectiveStrokeWidth / 2
 
