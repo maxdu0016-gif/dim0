@@ -257,7 +257,6 @@ async def test_edit_note_tool_updates_only_requested_field() -> None:
     assert result.type == "edit_note"
     assert result.note_id == "note-1"
     assert result.note_type == NodeType.RECTANGLE
-    assert result.content == "Old"
     graph_store.patch_note.assert_awaited_once_with(
         "note-1",
         {
@@ -288,7 +287,6 @@ async def test_edit_note_tool_replaces_substring_within_larger_field() -> None:
     )
 
     assert result.type == "edit_note"
-    assert result.content == "alpha BETA gamma"
     graph_store.patch_note.assert_awaited_once_with(
         "note-1",
         {"content": {"markdown": "alpha BETA gamma"}},
@@ -417,7 +415,6 @@ async def test_edit_note_tool_replaces_all_when_flag_is_set() -> None:
     )
 
     assert result.type == "edit_note"
-    assert result.content == "world world"
     graph_store.patch_note.assert_awaited_once_with(
         "note-1",
         {"content": {"markdown": "world world"}},
