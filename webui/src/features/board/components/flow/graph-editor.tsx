@@ -1,16 +1,7 @@
 import {
-  ReactFlow,
-  MarkerType,
-  Background,
-  BackgroundVariant,
   useReactFlow,
-  SelectionMode,
   useOnViewportChange,
   type ReactFlowInstance,
-  type OnNodesChange,
-  type OnEdgesChange,
-  type OnNodesDelete,
-  type OnEdgesDelete,
   type ReactFlowProps,
 } from '@xyflow/react'
 import '@xyflow/react/dist/base.css'
@@ -18,19 +9,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useShallow } from 'zustand/shallow'
 
-import { NodeView } from './node-view'
-import { PointNode } from './point-node'
-import { DocumentNode } from './document-node'
-import { EdgeView } from './edge/edge-view'
-import { EdgeMarkerDefs } from './edge/edge-markers'
 import { GraphSidebar } from '../style-panel/panel'
 import { ActionPanel } from './action-panel'
 import { DefaultBoardView } from '../default-view'
 import { NodePlacementOverlay } from './node-placement-overlay'
 import { LinePlacementOverlay } from './line-placement-overlay'
-import { GraphContextMenu } from './graph-context-menu'
 import { ViewportControls } from './viewport-controls'
 import { NodeSurfaceHost } from './node-surface-host'
+import { GraphCanvas } from './graph-canvas'
 
 import { useGraphStore } from '../../store/graph-store'
 import { setLastCursorPosition } from '../../store/cursor-ref'
@@ -38,7 +24,6 @@ import type { LinkEdge, NoteNode } from '../../types/flow'
 import type { NodeType } from '../../types/style'
 
 import { useAddNoteNode, type AddNoteNodeOptions } from '../../hooks/use-add-node'
-import { useEdgeLabelEdit } from '../../hooks/use-edge-label-edit'
 import { usePlaceLine } from '../../hooks/use-place-line'
 import { useMindMapStore } from '@/features/agent/store/mindmap-store'
 import { useAddMindMapToBoard } from '../../api/add-mindmap-to-board'
@@ -49,35 +34,12 @@ import { useDropImageUpload } from '../../hooks/use-drop-image-upload'
 import { PresentationControls } from './presentation-controls'
 import { useTheme } from '@/components/theme-provider'
 import { useIsMobile } from '@/hooks/use-mobile'
-import { StackedCardsIllustration } from '@/components/illustrations/stacked-cards-illustration'
 import { darkModeDisplayHex } from '../../lib/colors/dark-variants'
-import { applyBackgroundAlpha, type BoardBackgroundTexture } from '../../utils/board-background'
+import { applyBackgroundAlpha } from '../../utils/board-background'
 
 import './graph-styles.css'
 import { useThumbnailCapture } from '../../hooks/use-thumbnail-capture'
 import { ListView } from './list-view'
-
-const proOptions = { hideAttribution: true }
-
-const nodeTypes = { default: NodeView, point: PointNode, document: DocumentNode }
-const edgeTypes = { default: EdgeView }
-
-const defaultEdgeOptions = {
-  type: 'default',
-  zIndex: 1000,
-  style: {
-    stroke: 'var(--secondary-foreground)',
-    strokeWidth: 2,
-    strokeDasharray: '8 6',
-    strokeLinecap: 'round' as const,
-  },
-  markerEnd: {
-    type: MarkerType.ArrowClosed,
-    color: 'var(--secondary-foreground)',
-    width: 22,
-    height: 22,
-  },
-}
 
 const FLOATING_UI_REAPPEAR_DELAY = 400
 
@@ -99,36 +61,6 @@ const isDrawableNodeType = (nodeType: NodeType) => drawableNodeTypes.includes(no
 
 type ViewMode = 'graph' | 'linear' | 'list'
 
-type EmptyGraphHintProps = {
-  isMobile: boolean
-}
-
-
-/**
- * Show a centered empty-state illustration with a short onboarding hint.
- */
-function EmptyGraphHint({ isMobile }: EmptyGraphHintProps) {
-  const assistantLocationLabel = isMobile ? "right bar" : "top bar"
-
-  return (
-    <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center px-6 py-10">
-      <div className="flex w-full max-w-[760px] flex-col items-center rounded-xl bg-sidebar px-8 py-10 text-center">
-        <StackedCardsIllustration
-          className="h-auto w-full max-w-[520px]"
-          shadowColor="color-mix(in oklab, var(--accent-foreground) 10%, transparent)"
-          cardColor="var(--accent)"
-          strokeColor="color-mix(in oklab, var(--accent-foreground) 40%, transparent)"
-          aria-hidden="true"
-        />
-        <p className="mt-4 max-w-[32rem] text-balance text-lg leading-relaxed text-sidebar-foreground/50">
-          Start adding components and open assistant from{" "}
-          <span className="font-semibold text-sidebar-foreground">{assistantLocationLabel}</span>
-        </p>
-      </div>
-    </div>
-  )
-}
-
 
 /**
  * Show a persistent zoom hint at the bottom center of the graph area.
@@ -140,98 +72,6 @@ function GraphZoomHint() {
         Use Ctrl + mouse scroll or Ctrl + / Ctrl - to zoom in and out
       </p>
     </div>
-  )
-}
-
-type GraphViewProps = {
-  nodes: NoteNode[]
-  edges: LinkEdge[]
-  onNodesChange: OnNodesChange<NoteNode>
-  onEdgesChange: OnEdgesChange<LinkEdge>
-  onNodesDelete: OnNodesDelete<NoteNode>
-  onEdgesDelete: OnEdgesDelete<LinkEdge>
-  enableSelection: boolean
-  isLocked: boolean
-  onNodeDragStart: () => void
-  onNodeDragStop: () => void
-  onSelectionStart: () => void
-  onSelectionEnd: () => void
-  onSelectionDragStart: () => void
-  onSelectionDragStop: () => void
-  onInit: (instance: ReactFlowInstance<NoteNode, LinkEdge>) => void
-  onPaneContextMenu?: ReactFlowProps<NoteNode, LinkEdge>['onPaneContextMenu']
-  onNodeContextMenu?: ReactFlowProps<NoteNode, LinkEdge>['onNodeContextMenu']
-  onEdgeDoubleClick?: ReactFlowProps<NoteNode, LinkEdge>['onEdgeDoubleClick']
-  onNodeDoubleClick?: ReactFlowProps<NoteNode, LinkEdge>['onNodeDoubleClick']
-  children?: React.ReactNode
-}
-
-/**
- * Pure graph view (React Flow)
- */
-function GraphView({
-  nodes,
-  edges,
-  onNodesChange,
-  onEdgesChange,
-  onNodesDelete,
-  onEdgesDelete,
-  enableSelection,
-  isLocked,
-  onNodeDragStart,
-  onNodeDragStop,
-  onSelectionStart,
-  onSelectionEnd,
-  onSelectionDragStart,
-  onSelectionDragStop,
-  onInit,
-  onPaneContextMenu,
-  onNodeContextMenu,
-  onEdgeDoubleClick,
-  onNodeDoubleClick,
-  children,
-}: GraphViewProps) {
-  return (
-    <ReactFlow
-      nodes={nodes}
-      edges={edges}
-      onNodesChange={onNodesChange}
-      onEdgesChange={onEdgesChange}
-      onNodesDelete={onNodesDelete}
-      onEdgesDelete={onEdgesDelete}
-      proOptions={proOptions}
-      nodeTypes={nodeTypes}
-      edgeTypes={edgeTypes}
-      defaultEdgeOptions={defaultEdgeOptions}
-      selectionOnDrag={enableSelection}
-      selectionMode={SelectionMode.Full}
-      panOnDrag={!isLocked && !enableSelection}
-      selectionKeyCode={null}
-      onNodeDragStart={onNodeDragStart}
-      onNodeDragStop={onNodeDragStop}
-      onSelectionStart={onSelectionStart}
-      onSelectionEnd={onSelectionEnd}
-      onSelectionDragStart={onSelectionDragStart}
-      onSelectionDragStop={onSelectionDragStop}
-      onPaneContextMenu={onPaneContextMenu}
-      onNodeContextMenu={onNodeContextMenu}
-      onEdgeDoubleClick={onEdgeDoubleClick}
-      onNodeDoubleClick={onNodeDoubleClick}
-      nodesDraggable={!isLocked}
-      nodesConnectable={false}
-      elementsSelectable={!isLocked}
-      zoomOnScroll={!isLocked}
-      zoomOnPinch={!isLocked}
-      zoomOnDoubleClick={false}
-      panOnScroll={!isLocked}
-      minZoom={0.32}
-      onlyRenderVisibleElements
-      onInit={onInit}
-      elevateNodesOnSelect={false}
-      elevateEdgesOnSelect={true}
-    >
-      {children}
-    </ReactFlow>
   )
 }
 
@@ -280,24 +120,18 @@ export default function GraphEditor() {
   const scopeViewportKey = boardId ? `${boardId}:${rootId ?? 'root'}` : undefined
   const navigate = useNavigate()
 
+  // Lightweight subs for parent-only concerns. Heavy subs (nodes/edges/change
+  // handlers/background variant) live inside <GraphCanvas>; floating-UI motion
+  // flags live inside <GraphFloatingChrome> (extracted in a follow-up step).
   const nodes = useGraphStore(useShallow(state => state.nodes))
-  const edges = useGraphStore(useShallow(state => state.edges))
-
-  const onNodesChange = useGraphStore(state => state.onNodesChange)
-  const onEdgesChange = useGraphStore(state => state.onEdgesChange)
-  const onNodesDelete = useGraphStore(state => state.onNodesDelete)
-  const onEdgesDelete = useGraphStore(state => state.onEdgesDelete)
-  const setNodesPersist = useGraphStore(state => state.setNodesPersist)
   const undo = useGraphStore(state => state.undo)
   const redo = useGraphStore(state => state.redo)
   const canUndo = useGraphStore(state => state.historyPast.length > 0)
   const canRedo = useGraphStore(state => state.historyFuture.length > 0)
   const zoom = useGraphStore(state => state.zoom ?? 1)
-  const isEmptyGraph = nodes.length === 0 && edges.length === 0
 
   const isResizingNode = useGraphStore(state => state.isResizingNode)
   const isDragging = useGraphStore(state => state.isDragging)
-  const setIsDragging = useGraphStore(state => state.setIsDragging)
   const isMoving = useGraphStore(state => state.isMoving)
   const setIsMoving = useGraphStore(state => state.setIsMoving)
   const setRendererSize = useGraphStore(state => state.setRendererSize)
@@ -320,21 +154,6 @@ export default function GraphEditor() {
     isDark ? darkModeDisplayHex(boardBackground) || boardBackground : boardBackground,
     0.5
   ) || undefined
-  const backgroundVariant = useMemo(() => {
-    const texture = boardBackgroundTexture
-    if (!texture) return null
-    const variants: Record<BoardBackgroundTexture, BackgroundVariant> = {
-      dots: BackgroundVariant.Dots,
-      lines: BackgroundVariant.Lines,
-    }
-    return variants[texture]
-  }, [boardBackgroundTexture])
-  const backgroundColor = useMemo(() => {
-    if (!boardBackgroundTexture) return undefined
-    return boardBackgroundTexture === 'lines'
-      ? 'var(--muted)'
-      : 'var(--muted-foreground)'
-  }, [boardBackgroundTexture])
 
   useEffect(() => {
     const renderer = document.querySelector('.react-flow__renderer') as HTMLElement | null
@@ -470,14 +289,6 @@ export default function GraphEditor() {
     beginLinePlacement()
   }, [beginLinePlacement])
 
-  const {
-    edgesForRender,
-    handleEdgeDoubleClick,
-  } = useEdgeLabelEdit({
-    edges,
-    isGraphView: viewMode === 'graph',
-  })
-
   const rfInstanceRef = useRef<ReactFlowInstance<NoteNode, LinkEdge> | null>(null)
   const slides = useMemo(
     () => (nodes as NoteNode[])
@@ -543,8 +354,6 @@ export default function GraphEditor() {
   )
 
 
-  const handleDragStart = useCallback(() => setIsDragging(true), [setIsDragging])
-  const handleDragStop = useCallback(() => setIsDragging(false), [setIsDragging])
   const handleSelectionStart = useCallback(() => setIsSelecting(true), [])
   const handleSelectionDragStart = useCallback(() => setIsSelecting(true), [])
   const handleSelectionEnd = useCallback(() => setIsSelecting(false), [])
@@ -690,85 +499,59 @@ export default function GraphEditor() {
       >
         <div className="board-paper-grain" aria-hidden="true" />
         {viewMode === 'graph' ? (
-          <GraphContextMenu nodes={nodes} setNodesPersist={setNodesPersist}>
-            {({ onPaneContextMenu, onNodeContextMenu }) => (
-              <>
-                {isEmptyGraph && !presentationMode && (
-                  <EmptyGraphHint isMobile={isMobile} />
-                )}
-
-                <GraphView
+          <>
+            <GraphCanvas
+              isLocked={effectiveIsLocked}
+              isMobile={isMobile}
+              presentationMode={presentationMode}
+              onInit={handleInit}
+              onNodeDoubleClick={handleNodeDoubleClick}
+              onSelectionStart={handleSelectionStart}
+              onSelectionEnd={handleSelectionEnd}
+              onSelectionDragStart={handleSelectionDragStart}
+              onSelectionDragStop={handleSelectionDragStop}
+              isGraphView={viewMode === 'graph'}
+            >
+              {showMiniMap &&
+                !presentationMode &&
+                !moving &&
+                !isDragging &&
+                !isResizingNode &&
+                !isSelecting && (
+                <ViewportControls
                   nodes={nodes}
-                  edges={edgesForRender}
-                  onNodesChange={onNodesChange}
-                  onEdgesChange={onEdgesChange}
-                  onNodesDelete={onNodesDelete}
-                  onEdgesDelete={onEdgesDelete}
-                  enableSelection={enableSelection}
+                  onResetZoom={handleResetZoom}
+                  zoom={zoom}
+                  undo={undo}
+                  redo={redo}
+                  canUndo={canUndo}
+                  canRedo={canRedo}
                   isLocked={effectiveIsLocked}
-                  onNodeDragStart={handleDragStart}
-                  onNodeDragStop={handleDragStop}
-                  onSelectionStart={handleSelectionStart}
-                  onSelectionEnd={handleSelectionEnd}
-                  onSelectionDragStart={handleSelectionDragStart}
-                  onSelectionDragStop={handleSelectionDragStop}
-                  onInit={handleInit}
-                  onPaneContextMenu={onPaneContextMenu}
-                  onNodeContextMenu={onNodeContextMenu}
-                  onEdgeDoubleClick={handleEdgeDoubleClick}
-                  onNodeDoubleClick={handleNodeDoubleClick}
-                >
-                  {backgroundVariant && (
-                    <Background
-                      variant={backgroundVariant}
-                      gap={25}
-                      size={1}
-                      color={backgroundColor}
-                    />
-                  )}
-                  <EdgeMarkerDefs edges={edges} />
-                  {showMiniMap &&
-                    !presentationMode &&
-                    !moving &&
-                    !isDragging &&
-                    !isResizingNode &&
-                    !isSelecting && (
-                    <ViewportControls
-                      nodes={nodes}
-                      onResetZoom={handleResetZoom}
-                      zoom={zoom}
-                      undo={undo}
-                      redo={redo}
-                      canUndo={canUndo}
-                      canRedo={canRedo}
-                      isLocked={effectiveIsLocked}
-                      toggleLock={handleToggleLock}
-                      boardBackground={boardBackground}
-                      boardBackgroundTexture={boardBackgroundTexture}
-                      onBoardBackgroundChange={setBoardBackground}
-                      onBoardBackgroundReset={() => setBoardBackground(null)}
-                      onBoardBackgroundTextureChange={setBoardBackgroundTexture}
-                      onNavigate={handleMiniMapNavigate}
-                      getCurrentViewport={getCurrentViewport}
-                    />
-                  )}
-                </GraphView>
+                  toggleLock={handleToggleLock}
+                  boardBackground={boardBackground}
+                  boardBackgroundTexture={boardBackgroundTexture}
+                  onBoardBackgroundChange={setBoardBackground}
+                  onBoardBackgroundReset={() => setBoardBackground(null)}
+                  onBoardBackgroundTextureChange={setBoardBackgroundTexture}
+                  onNavigate={handleMiniMapNavigate}
+                  getCurrentViewport={getCurrentViewport}
+                />
+              )}
+            </GraphCanvas>
 
-                <NodePlacementOverlay
-                  pendingPlacement={pendingPlacement}
-                  onPlace={handlePlacementComplete}
-                  onCancel={cancelPlacement}
-                  screenToFlowPosition={screenToFlowPosition}
-                />
-                <LinePlacementOverlay
-                  pending={pendingLinePlacement}
-                  onPlace={handlePlaceLine}
-                  onCancel={cancelLinePlacement}
-                  screenToFlowPosition={screenToFlowPosition}
-                />
-              </>
-            )}
-          </GraphContextMenu>
+            <NodePlacementOverlay
+              pendingPlacement={pendingPlacement}
+              onPlace={handlePlacementComplete}
+              onCancel={cancelPlacement}
+              screenToFlowPosition={screenToFlowPosition}
+            />
+            <LinePlacementOverlay
+              pending={pendingLinePlacement}
+              onPlace={handlePlaceLine}
+              onCancel={cancelLinePlacement}
+              screenToFlowPosition={screenToFlowPosition}
+            />
+          </>
         ) : viewMode === 'linear' ? (
           <LinearView />
         ) : (
