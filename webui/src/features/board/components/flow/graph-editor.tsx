@@ -9,14 +9,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useShallow } from 'zustand/shallow'
 
-import { GraphSidebar } from '../style-panel/panel'
 import { ActionPanel } from './action-panel'
 import { DefaultBoardView } from '../default-view'
 import { NodePlacementOverlay } from './node-placement-overlay'
 import { LinePlacementOverlay } from './line-placement-overlay'
-import { ViewportControls } from './viewport-controls'
 import { NodeSurfaceHost } from './node-surface-host'
 import { GraphCanvas } from './graph-canvas'
+import { GraphFloatingChrome } from './graph-floating-chrome'
 
 import { useGraphStore } from '../../store/graph-store'
 import { setLastCursorPosition } from '../../store/cursor-ref'
@@ -41,8 +40,6 @@ import './graph-styles.css'
 import { useThumbnailCapture } from '../../hooks/use-thumbnail-capture'
 import { ListView } from './list-view'
 
-const FLOATING_UI_REAPPEAR_DELAY = 400
-
 const drawableNodeTypes: NodeType[] = [
   'rectangle',
   'ellipse',
@@ -61,19 +58,6 @@ const isDrawableNodeType = (nodeType: NodeType) => drawableNodeTypes.includes(no
 
 type ViewMode = 'graph' | 'linear' | 'list'
 
-
-/**
- * Show a persistent zoom hint at the bottom center of the graph area.
- */
-function GraphZoomHint() {
-  return (
-    <div className="pointer-events-none absolute inset-x-0 top-14 z-10 flex justify-center px-4 hidden md:block">
-      <p className="text-center text-xs leading-relaxed text-sidebar-foreground/60">
-        Use Ctrl + mouse scroll or Ctrl + / Ctrl - to zoom in and out
-      </p>
-    </div>
-  )
-}
 
 /**
  * Files view (card-based board list)
@@ -101,8 +85,6 @@ export default function GraphEditor() {
     cancel: cancelLinePlacement,
     place: handlePlaceLine,
   } = usePlaceLine()
-  const [showMiniMap, setShowMiniMap] = useState<boolean>(true)
-  const [showStylePanel, setShowStylePanel] = useState<boolean>(true)
 
   const {
     zoomIn,
@@ -120,19 +102,11 @@ export default function GraphEditor() {
   const scopeViewportKey = boardId ? `${boardId}:${rootId ?? 'root'}` : undefined
   const navigate = useNavigate()
 
-  // Lightweight subs for parent-only concerns. Heavy subs (nodes/edges/change
-  // handlers/background variant) live inside <GraphCanvas>; floating-UI motion
-  // flags live inside <GraphFloatingChrome> (extracted in a follow-up step).
+  // Parent-only subs. Heavy data lives in <GraphCanvas>; motion flags +
+  // chrome state live in <GraphFloatingChrome>.
   const nodes = useGraphStore(useShallow(state => state.nodes))
   const undo = useGraphStore(state => state.undo)
   const redo = useGraphStore(state => state.redo)
-  const canUndo = useGraphStore(state => state.historyPast.length > 0)
-  const canRedo = useGraphStore(state => state.historyFuture.length > 0)
-  const zoom = useGraphStore(state => state.zoom ?? 1)
-
-  const isResizingNode = useGraphStore(state => state.isResizingNode)
-  const isDragging = useGraphStore(state => state.isDragging)
-  const isMoving = useGraphStore(state => state.isMoving)
   const setIsMoving = useGraphStore(state => state.setIsMoving)
   const setRendererSize = useGraphStore(state => state.setRendererSize)
   const setZoom = useGraphStore(state => state.setZoom)
@@ -143,9 +117,6 @@ export default function GraphEditor() {
   const activeSlideId = useGraphStore(state => state.activeSlideId)
   const setActiveSlideId = useGraphStore(state => state.setActiveSlideId)
   const boardBackground = useGraphStore(state => state.boardBackground)
-  const setBoardBackground = useGraphStore(state => state.setBoardBackground)
-  const boardBackgroundTexture = useGraphStore(state => state.boardBackgroundTexture)
-  const setBoardBackgroundTexture = useGraphStore(state => state.setBoardBackgroundTexture)
   const effectiveIsLocked = isLocked || !boardCanEdit
 
   const { resolvedTheme } = useTheme()
@@ -340,20 +311,6 @@ export default function GraphEditor() {
     }
   }, [boardCanEdit])
 
-  const getCurrentViewport = useCallback(() => {
-    return rfInstanceRef.current?.getViewport?.() ?? null
-  }, [])
-
-  const handleMiniMapNavigate = useCallback(
-    ({ x, y }: { x: number; y: number }, zoom: number) => {
-      const instance = rfInstanceRef.current
-      if (!instance?.setCenter) return
-      instance.setCenter(x, y, { zoom, duration: 150 })
-    },
-    [],
-  )
-
-
   const handleSelectionStart = useCallback(() => setIsSelecting(true), [])
   const handleSelectionDragStart = useCallback(() => setIsSelecting(true), [])
   const handleSelectionEnd = useCallback(() => setIsSelecting(false), [])
@@ -405,45 +362,6 @@ export default function GraphEditor() {
     },
   })
 
-  const moving = isMoving
-  const shouldHideFloatingUi = viewMode !== 'graph' || moving || isDragging || isResizingNode || isSelecting
-  const miniMapTimeoutRef = useRef<number | null>(null)
-  const stylePanelTimeoutRef = useRef<number | null>(null)
-
-  const clearDeferredUiTimeouts = useCallback(() => {
-    if (miniMapTimeoutRef.current) {
-      clearTimeout(miniMapTimeoutRef.current)
-      miniMapTimeoutRef.current = null
-    }
-    if (stylePanelTimeoutRef.current) {
-      clearTimeout(stylePanelTimeoutRef.current)
-      stylePanelTimeoutRef.current = null
-    }
-  }, [])
-
-  useEffect(() => {
-    if (shouldHideFloatingUi) {
-      clearDeferredUiTimeouts()
-      setShowMiniMap(false)
-      setShowStylePanel(false)
-      return
-    }
-
-    miniMapTimeoutRef.current = window.setTimeout(() => {
-      setShowMiniMap(true)
-      miniMapTimeoutRef.current = null
-    }, FLOATING_UI_REAPPEAR_DELAY)
-
-    stylePanelTimeoutRef.current = window.setTimeout(() => {
-      setShowStylePanel(true)
-      stylePanelTimeoutRef.current = null
-    }, FLOATING_UI_REAPPEAR_DELAY)
-
-    return () => {
-      clearDeferredUiTimeouts()
-    }
-  }, [shouldHideFloatingUi, clearDeferredUiTimeouts])
-
   const captureThumbnail = useThumbnailCapture(boardId || '')
 
   const handleInit = (instance: ReactFlowInstance<NoteNode, LinkEdge>) => {
@@ -475,20 +393,6 @@ export default function GraphEditor() {
         />
       ) : null}
 
-      {/* Graph-only sidebar (style controls) */}
-      {viewMode === 'graph' &&
-        showStylePanel &&
-        !presentationMode &&
-        !isDragging &&
-        !moving &&
-        !isResizingNode &&
-        !isSelecting &&
-        boardCanEdit && (
-          <div className="absolute top-16 left-1 w-auto max-w-[300px] h-auto z-50">
-            <GraphSidebar />
-          </div>
-        )}
-
       <div
         className="relative w-full h-full"
         style={{ backgroundColor: displayBoardBackground }}
@@ -511,33 +415,15 @@ export default function GraphEditor() {
               onSelectionDragStart={handleSelectionDragStart}
               onSelectionDragStop={handleSelectionDragStop}
               isGraphView={viewMode === 'graph'}
-            >
-              {showMiniMap &&
-                !presentationMode &&
-                !moving &&
-                !isDragging &&
-                !isResizingNode &&
-                !isSelecting && (
-                <ViewportControls
-                  nodes={nodes}
-                  onResetZoom={handleResetZoom}
-                  zoom={zoom}
-                  undo={undo}
-                  redo={redo}
-                  canUndo={canUndo}
-                  canRedo={canRedo}
-                  isLocked={effectiveIsLocked}
-                  toggleLock={handleToggleLock}
-                  boardBackground={boardBackground}
-                  boardBackgroundTexture={boardBackgroundTexture}
-                  onBoardBackgroundChange={setBoardBackground}
-                  onBoardBackgroundReset={() => setBoardBackground(null)}
-                  onBoardBackgroundTextureChange={setBoardBackgroundTexture}
-                  onNavigate={handleMiniMapNavigate}
-                  getCurrentViewport={getCurrentViewport}
-                />
-              )}
-            </GraphCanvas>
+            />
+
+            <GraphFloatingChrome
+              presentationMode={presentationMode}
+              isSelecting={isSelecting}
+              effectiveIsLocked={effectiveIsLocked}
+              boardCanEdit={boardCanEdit}
+              toggleLock={handleToggleLock}
+            />
 
             <NodePlacementOverlay
               pendingPlacement={pendingPlacement}
@@ -573,8 +459,6 @@ export default function GraphEditor() {
           disableNext={!canNext}
         />
       )}
-
-      {viewMode === 'graph' && !presentationMode && <GraphZoomHint />}
 
       <NodeSurfaceHost />
     </div>
