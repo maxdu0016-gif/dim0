@@ -135,6 +135,7 @@ function NodeViewBase({ id, data, selected, width, height, dragging }: NodeProps
     fontSize: data.style.fontSize,
     textStyle: data.style.textStyle,
     enabled: usesContentMinHeight,
+    fallbackHeight: currentNodeHeight,
   })
 
   const baseMinH = isVisualNode
