@@ -381,7 +381,11 @@ export const RoughDiamond: React.FC<RoughDiamondProps> = ({
       <canvas
         ref={canvasRef}
         className='absolute pointer-events-none'
-        style={{ zIndex: 10, background: 'transparent', opacity: isSimplified ? 0 : 1 }}
+        style={{
+          zIndex: 10,
+          background: 'transparent',
+          visibility: isSimplified ? 'hidden' : 'visible',
+        }}
       />
       <div className='relative z-20 w-full h-full'>
         {children}

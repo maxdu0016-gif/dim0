@@ -337,31 +337,6 @@ export const RoughCircle: React.FC<RoughShapeProps> = ({
   const renderEdge = resolveEdgeRender(stroke, fill, isDark, strokeStyle, strokeWidth, roughness)
   const fillInset = 0.5 + renderEdge.width / 2
 
-  if (isSimplified) {
-    return (
-      <div className={mainDivClass}>
-        <FillLayer
-          kind='ellipse'
-          fill={fill}
-          widthPx={widthPx ?? 1}
-          heightPx={heightPx ?? 1}
-          inset={fillInset}
-        />
-        <SimplifiedCircleOverlay
-          edgeColor={renderEdge.color}
-          edgeWidth={renderEdge.width}
-          edgeStyle={renderEdge.style}
-          fillInset={fillInset}
-          widthPx={widthPx}
-          heightPx={heightPx}
-        />
-        <div className='relative z-20 w-full h-full'>
-          {children}
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div ref={wrapperRef} className={mainDivClass}>
       <FillLayer
@@ -374,8 +349,22 @@ export const RoughCircle: React.FC<RoughShapeProps> = ({
       <canvas
         ref={canvasRef}
         className='absolute pointer-events-none'
-        style={{ zIndex: 10, background: 'transparent' }}
+        style={{
+          zIndex: 10,
+          background: 'transparent',
+          visibility: isSimplified ? 'hidden' : 'visible',
+        }}
       />
+      {isSimplified && (
+        <SimplifiedCircleOverlay
+          edgeColor={renderEdge.color}
+          edgeWidth={renderEdge.width}
+          edgeStyle={renderEdge.style}
+          fillInset={fillInset}
+          widthPx={widthPx}
+          heightPx={heightPx}
+        />
+      )}
       <div className='relative z-20 w-full h-full'>
         {children}
       </div>
