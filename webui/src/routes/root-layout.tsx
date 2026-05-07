@@ -115,10 +115,10 @@ export function AuthBackground() {
 
       {/* dot grid overlay */}
       <div
-        className="absolute inset-0 opacity-35"
+        className="absolute inset-0 opacity-50"
         style={{
           backgroundImage:
-            "radial-gradient(circle, color-mix(in oklab, var(--muted-foreground) 40%, transparent) 1px, transparent 1px)",
+            "radial-gradient(circle, color-mix(in oklab, var(--foreground) 55%, transparent) 1px, transparent 1px)",
           backgroundSize: "22px 22px",
         }}
       />
