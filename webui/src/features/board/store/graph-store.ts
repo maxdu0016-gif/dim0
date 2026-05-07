@@ -41,6 +41,7 @@ import {
   loadViewportsFromStorage,
   saveViewportToStorage,
 } from "./viewport-store"
+import { clearLastCursorPosition } from "./cursor-ref"
 import { clearRoughCanvasCache } from "@/components/rough/cache"
 import { generateUuid } from "@/lib/common"
 import {
@@ -916,8 +917,6 @@ export interface GraphStore {
   isDraggingNodes: boolean
   draggingNodeIds: Set<string>
   draggingPointId?: string
-  lastCursorPosition?: { x: number; y: number }
-  setLastCursorPosition: (position?: { x: number; y: number }) => void
   viewSlides: boolean
   setViewSlides: (enabled: boolean) => void
   presentationMode: boolean
@@ -1009,6 +1008,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       const changed = state.boardId !== boardId || state.rootId !== rootId
       if (changed) {
         clearRoughCanvasCache()
+        clearLastCursorPosition()
       }
       return changed
         ? {
@@ -1021,7 +1021,6 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
             resizeSnapshotNodes: null,
             presentationMode: false,
             activeSlideId: undefined,
-            lastCursorPosition: undefined,
             boardBackground: getBoardBackground(boardId),
             boardBackgroundTexture: getBoardBackgroundTexture(boardId),
             boardVisibility: "private",
@@ -1056,8 +1055,6 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   isDraggingNodes: false,
   draggingNodeIds: new Set(),
   draggingPointId: undefined,
-  lastCursorPosition: undefined,
-  setLastCursorPosition: (position) => set({ lastCursorPosition: position }),
   viewSlides: true,
   setViewSlides: (enabled) => set({ viewSlides: enabled }),
   presentationMode: false,

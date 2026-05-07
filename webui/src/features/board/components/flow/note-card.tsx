@@ -140,11 +140,7 @@ export const NodeCard = memo(function NodeCard({
   const isImage = note.style.type === "image"
   const nonSheetDisplayValue = note.content?.markdown || note.label?.markdown || ""
 
-  const setNodesPersist = useGraphStore((state) => state.setNodesPersist)
-  const updateNodeByIdPersist = useGraphStore((state) => state.updateNodeByIdPersist)
-  const setEdgesPersist = useGraphStore((state) => state.setEdgesPersist)
   const boardCanEdit = useGraphStore((state) => state.boardCanEdit)
-  const openNodeSurface = useGraphStore((state) => state.openNodeSurface)
 
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const [labelEditing, setLabelEditing] = useState(false)
@@ -199,14 +195,14 @@ export const NodeCard = memo(function NodeCard({
     if (!isText || !note.autoEdit) return
 
     setLabelEditing(true)
-    updateNodeByIdPersist(note.id, (node) => ({
+    useGraphStore.getState().updateNodeByIdPersist(note.id, (node) => ({
       ...node,
       data: {
         ...node.data,
         autoEdit: false,
       },
     }))
-  }, [isText, note.autoEdit, note.id, updateNodeByIdPersist])
+  }, [isText, note.autoEdit, note.id])
 
   useEffect(() => {
     if (!labelEditing) return
@@ -244,14 +240,14 @@ export const NodeCard = memo(function NodeCard({
   useEffect(() => {
     if (!labelEditing || debouncedLabelDraft === nonSheetDisplayValue) return
 
-    updateNodeByIdPersist(note.id, (node) => ({
+    useGraphStore.getState().updateNodeByIdPersist(note.id, (node) => ({
       ...node,
       data: {
         ...node.data,
         content: { markdown: debouncedLabelDraft },
       },
     }))
-  }, [debouncedLabelDraft, labelEditing, nonSheetDisplayValue, note.id, updateNodeByIdPersist])
+  }, [debouncedLabelDraft, labelEditing, nonSheetDisplayValue, note.id])
 
   const handleLabelChange = useCallback((event: React.ChangeEvent<HTMLTextAreaElement>) => {
     const next = event.target.value
@@ -276,7 +272,7 @@ export const NodeCard = memo(function NodeCard({
 
   const handleTogglePin = useCallback((event: React.MouseEvent) => {
     event.stopPropagation()
-    updateNodeByIdPersist(note.id, (node) => {
+    useGraphStore.getState().updateNodeByIdPersist(note.id, (node) => {
       const props = node.data.properties as NoteProperties
       return {
         ...node,
@@ -289,18 +285,19 @@ export const NodeCard = memo(function NodeCard({
         },
       }
     })
-  }, [isPinned, note.id, updateNodeByIdPersist])
+  }, [isPinned, note.id])
 
   const handleDelete = useCallback((event: React.MouseEvent) => {
     event.stopPropagation()
-    setNodesPersist((nodes) => nodes.filter((node) => node.id !== note.id))
-    setEdgesPersist((edges) => edges.filter((edge) => edge.source !== note.id && edge.target !== note.id))
-  }, [note.id, setEdgesPersist, setNodesPersist])
+    const store = useGraphStore.getState()
+    store.setNodesPersist((nodes) => nodes.filter((node) => node.id !== note.id))
+    store.setEdgesPersist((edges) => edges.filter((edge) => edge.source !== note.id && edge.target !== note.id))
+  }, [note.id])
 
   const handleOpenSheet = useCallback(() => {
     if (!boardCanEdit) return
-    openNodeSurface(note.id, "sheet")
-  }, [boardCanEdit, note.id, openNodeSurface])
+    useGraphStore.getState().openNodeSurface(note.id, "sheet")
+  }, [boardCanEdit, note.id])
 
   if (!isSheet) {
     if (isCodeSandbox) {

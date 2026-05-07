@@ -33,6 +33,7 @@ import { ViewportControls } from './viewport-controls'
 import { NodeSurfaceHost } from './node-surface-host'
 
 import { useGraphStore } from '../../store/graph-store'
+import { setLastCursorPosition } from '../../store/cursor-ref'
 import type { LinkEdge, NoteNode } from '../../types/flow'
 import type { NodeType } from '../../types/style'
 
@@ -307,7 +308,6 @@ export default function GraphEditor() {
   const setPresentationMode = useGraphStore(state => state.setPresentationMode)
   const activeSlideId = useGraphStore(state => state.activeSlideId)
   const setActiveSlideId = useGraphStore(state => state.setActiveSlideId)
-  const setLastCursorPosition = useGraphStore(state => state.setLastCursorPosition)
   const boardBackground = useGraphStore(state => state.boardBackground)
   const setBoardBackground = useGraphStore(state => state.setBoardBackground)
   const boardBackgroundTexture = useGraphStore(state => state.boardBackgroundTexture)
@@ -427,7 +427,7 @@ export default function GraphEditor() {
       const flowPoint = screenToFlowPosition({ x: event.clientX, y: event.clientY })
       setLastCursorPosition(flowPoint)
     },
-    [viewMode, screenToFlowPosition, setLastCursorPosition],
+    [viewMode, screenToFlowPosition],
   )
 
   const { onDragOver: handleImageDragOver, onDrop: handleImageDrop } = useDropImageUpload({

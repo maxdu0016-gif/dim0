@@ -31,7 +31,6 @@ export const CodeSandboxNode = memo(function CodeSandboxNode({
   const palette = isDark ? ROSE_PINE_DARK : ROSE_PINE_LIGHT
   const isMoving = useGraphStore((state) => state.isMoving)
   const boardCanEdit = useGraphStore((state) => state.boardCanEdit)
-  const openNodeSurface = useGraphStore((state) => state.openNodeSurface)
 
   const codePreview = note.content?.markdown || "# Write Python here"
   const previewHtml = useMemo(() => highlightPython(codePreview), [codePreview])
@@ -48,7 +47,7 @@ export const CodeSandboxNode = memo(function CodeSandboxNode({
           className="block h-full w-full text-left"
           onClick={() => {
             if (!boardCanEdit) return
-            openNodeSurface(note.id, "code-sandbox")
+            useGraphStore.getState().openNodeSurface(note.id, "code-sandbox")
           }}
         >
           <div

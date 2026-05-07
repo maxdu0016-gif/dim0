@@ -163,10 +163,9 @@ export const RoughCircle: React.FC<RoughShapeProps> = ({
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const lastConfigRef = useRef<DrawConfig | null>(null)
   const rafRef = useRef<number | null>(null)
-  const viewportZoom = useGraphStore(state => state.zoom ?? 1)
+  const effectiveZoom = useGraphStore(state => quantizeZoom(state.zoom ?? 1))
   const isMoving = useGraphStore(state => state.isMoving)
   const isResizing = useGraphStore(state => state.isResizingNode)
-  const effectiveZoom = quantizeZoom(viewportZoom || 1)
   const isSimplified = isMoving && !isResizing
   const { resolvedTheme } = useTheme()
   const isDark = resolvedTheme === 'dark'
