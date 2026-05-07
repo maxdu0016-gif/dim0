@@ -74,7 +74,6 @@ export default function GraphEditor() {
   const isMobile = useIsMobile()
 
   const enableSelection = useGraphStore(state => state.isSelectMode)
-  const setEnableSelection = useGraphStore(state => state.setIsSelectMode)
   const [shouldRecenter, setShouldRecenter] = useState<boolean>(false)
   const [isLocked, setIsLocked] = useState<boolean>(false)
   const [isSelecting, setIsSelecting] = useState<boolean>(false)
@@ -102,20 +101,19 @@ export default function GraphEditor() {
   const scopeViewportKey = boardId ? `${boardId}:${rootId ?? 'root'}` : undefined
   const navigate = useNavigate()
 
-  // Parent-only subs. Heavy data lives in <GraphCanvas>; motion flags +
-  // chrome state live in <GraphFloatingChrome>.
-  const nodes = useGraphStore(useShallow(state => state.nodes))
-  const undo = useGraphStore(state => state.undo)
-  const redo = useGraphStore(state => state.redo)
-  const setIsMoving = useGraphStore(state => state.setIsMoving)
-  const setRendererSize = useGraphStore(state => state.setRendererSize)
-  const setZoom = useGraphStore(state => state.setZoom)
+  // Parent-only reactive subs. Heavy data lives in <GraphCanvas>; motion
+  // flags + chrome state live in <GraphFloatingChrome>.
+  const slides = useGraphStore(useShallow(state =>
+    (state.nodes as NoteNode[])
+      .filter(n => n.data?.style?.type === 'slide')
+      .sort((a, b) =>
+        (a.data.properties.slideNumber?.number ?? 0)
+          - (b.data.properties.slideNumber?.number ?? 0),
+      ),
+  ))
   const graphViewports = useGraphStore(useShallow(state => state.graphViewports))
-  const setGraphViewport = useGraphStore(state => state.setGraphViewport)
   const presentationMode = useGraphStore(state => state.presentationMode)
-  const setPresentationMode = useGraphStore(state => state.setPresentationMode)
   const activeSlideId = useGraphStore(state => state.activeSlideId)
-  const setActiveSlideId = useGraphStore(state => state.setActiveSlideId)
   const boardBackground = useGraphStore(state => state.boardBackground)
   const effectiveIsLocked = isLocked || !boardCanEdit
 
@@ -130,9 +128,10 @@ export default function GraphEditor() {
     const renderer = document.querySelector('.react-flow__renderer') as HTMLElement | null
     if (!renderer) return
 
+    const setSize = useGraphStore.getState().setRendererSize
     const updateSize = () => {
       const rect = renderer.getBoundingClientRect()
-      setRendererSize({ width: rect.width, height: rect.height })
+      setSize({ width: rect.width, height: rect.height })
     }
 
     updateSize()
@@ -141,9 +140,9 @@ export default function GraphEditor() {
 
     return () => {
       observer.disconnect()
-      setRendererSize(null)
+      setSize(null)
     }
-  }, [setRendererSize])
+  }, [])
 
   const mindmaps = useMindMapStore(state => state.mindmaps)
   const { addMindMapToBoardAsync } = useAddMindMapToBoard()
@@ -158,9 +157,9 @@ export default function GraphEditor() {
   useBoardShortcuts({
     enabled: viewMode === 'graph',
     shortcuts: [
-      { key: 'z', withMod: true, withShift: false, handler: undo },
-      { key: 'z', withMod: true, withShift: true, handler: redo },
-      { key: 'y', withMod: true, handler: redo },
+      { key: 'z', withMod: true, withShift: false, handler: () => useGraphStore.getState().undo() },
+      { key: 'z', withMod: true, withShift: true, handler: () => useGraphStore.getState().redo() },
+      { key: 'y', withMod: true, handler: () => useGraphStore.getState().redo() },
     ],
   })
 
@@ -261,12 +260,6 @@ export default function GraphEditor() {
   }, [beginLinePlacement])
 
   const rfInstanceRef = useRef<ReactFlowInstance<NoteNode, LinkEdge> | null>(null)
-  const slides = useMemo(
-    () => (nodes as NoteNode[])
-      .filter(n => n.data?.style?.type === 'slide')
-      .sort((a, b) => (a.data.properties.slideNumber?.number ?? 0) - (b.data.properties.slideNumber?.number ?? 0)),
-    [nodes]
-  )
   const slideIds = useMemo(() => slides.map(s => s.id), [slides])
 
   // Mindmap integration
@@ -323,9 +316,9 @@ export default function GraphEditor() {
   const goToSlide = useCallback(async (index: number) => {
     const node = slides[index]
     if (!node) return
-    setActiveSlideId(node.id)
+    useGraphStore.getState().setActiveSlideId(node.id)
     await fitView({ nodes: [node], padding: 0.2, duration: 250 })
-  }, [fitView, setActiveSlideId, slides])
+  }, [fitView, slides])
 
   const restoreViewport = useCallback(() => {
     if (!scopeViewportKey) return
@@ -341,9 +334,10 @@ export default function GraphEditor() {
       { key: 'arrowleft', handler: () => canPrev && goToSlide(activeSlideIndex - 1) },
       { key: 'arrowright', handler: () => canNext && goToSlide(activeSlideIndex + 1) },
       { key: 'escape', handler: () => {
-        setPresentationMode(false)
-        setActiveSlideId(undefined)
-        setEnableSelection(false)
+        const store = useGraphStore.getState()
+        store.setPresentationMode(false)
+        store.setActiveSlideId(undefined)
+        store.setIsSelectMode(false)
         restoreViewport()
       } },
     ],
@@ -351,14 +345,15 @@ export default function GraphEditor() {
 
   useOnViewportChange({
     onStart: () => {
-      setIsMoving(true)
+      useGraphStore.getState().setIsMoving(true)
     },
     onEnd: vp => {
+      const store = useGraphStore.getState()
       if (scopeViewportKey && !presentationMode) {
-        setGraphViewport(scopeViewportKey, vp)
+        store.setGraphViewport(scopeViewportKey, vp)
       }
-      setZoom(vp.zoom)
-      setIsMoving(false)
+      store.setZoom(vp.zoom)
+      store.setIsMoving(false)
     },
   })
 
@@ -383,7 +378,7 @@ export default function GraphEditor() {
           onAddNode={handlePanelAddNode}
           onAddLine={handleAddLine}
           enableSelection={enableSelection}
-          setEnableSelection={setEnableSelection}
+          setEnableSelection={useGraphStore.getState().setIsSelectMode}
           onZoomIn={handleZoomIn}
           onZoomOut={handleZoomOut}
           onResetZoom={handleResetZoom}
@@ -450,9 +445,10 @@ export default function GraphEditor() {
           onPrev={() => canPrev && goToSlide(activeSlideIndex - 1)}
           onNext={() => canNext && goToSlide(activeSlideIndex + 1)}
           onStop={() => {
-            setPresentationMode(false)
-            setActiveSlideId(undefined)
-            setEnableSelection(false)
+            const store = useGraphStore.getState()
+            store.setPresentationMode(false)
+            store.setActiveSlideId(undefined)
+            store.setIsSelectMode(false)
             restoreViewport()
           }}
           disablePrev={!canPrev}
