@@ -4,13 +4,18 @@ import asyncpg
 
 from topix.config.config import Config
 
+DEFAULT_MIN_SIZE = 5
+DEFAULT_MAX_SIZE = 25
+DEFAULT_ACQUIRE_TIMEOUT = 10.0
+DEFAULT_COMMAND_TIMEOUT = 30.0
+
 
 async def create_pool(
     *,
-    min_size: int = 5,
-    max_size: int = 25,
-    timeout: float = 10.0,
-    command_timeout: float = 30.0,
+    min_size: int = DEFAULT_MIN_SIZE,
+    max_size: int = DEFAULT_MAX_SIZE,
+    timeout: float = DEFAULT_ACQUIRE_TIMEOUT,
+    command_timeout: float = DEFAULT_COMMAND_TIMEOUT,
 ) -> asyncpg.Pool:
     """Create a new Postgres connection pool.
 

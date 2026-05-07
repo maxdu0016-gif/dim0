@@ -52,6 +52,7 @@ class GraphStore:
         self._note_revision_store: NoteRevisionStore | None = None
         self._note_locks: dict[str, asyncio.Lock] = {}
         self._snapshot_sem = asyncio.Semaphore(snapshot_concurrency)
+        self._snapshot_tasks: set[asyncio.Task] = set()
 
     def note_lock(self, note_id: str) -> asyncio.Lock:
         """Return a per-note lock used to serialize tool-level read-modify-write edits."""
@@ -95,6 +96,7 @@ class GraphStore:
         sem = self._snapshot_sem
 
         def _log_task_result(task: asyncio.Task) -> None:
+            self._snapshot_tasks.discard(task)
             try:
                 task.result()
             except Exception as e:
@@ -105,6 +107,7 @@ class GraphStore:
                 await revision_store.save_note_snapshot(note_to_snapshot, user_uid=user_uid)
 
         task = asyncio.create_task(_bounded_save_snapshot())
+        self._snapshot_tasks.add(task)
         task.add_done_callback(_log_task_result)
 
     @staticmethod
@@ -434,7 +437,10 @@ class GraphStore:
             return await get_graph_by_uid(conn, graph_uid)
 
     async def close(self):
-        """Close the store. Only closes the pool if this store created it."""
+        """Close the store. Drains pending snapshot tasks; closes the pool only if owned."""
+        if self._snapshot_tasks:
+            pending = list(self._snapshot_tasks)
+            await asyncio.gather(*pending, return_exceptions=True)
         if self._pg_pool and self._owns_pool:
             await self._pg_pool.close()
         await self._content_store.close()

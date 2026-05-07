@@ -23,6 +23,7 @@ def _build_store() -> GraphStore:
     store._note_revision_store = None
     store._note_locks = {}
     store._snapshot_sem = asyncio.Semaphore(8)
+    store._snapshot_tasks = set()
     return store
 
 

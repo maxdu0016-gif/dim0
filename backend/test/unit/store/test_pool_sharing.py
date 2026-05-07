@@ -167,6 +167,7 @@ def _build_graph_store(snapshot_concurrency: int = 8) -> graph_module.GraphStore
     store._note_revision_store = None
     store._note_locks = {}
     store._snapshot_sem = asyncio.Semaphore(snapshot_concurrency)
+    store._snapshot_tasks = set()
     return store
 
 
@@ -232,3 +233,35 @@ async def test_snapshot_no_op_when_revision_store_unset() -> None:
     after = len(asyncio.all_tasks())
 
     assert after == before
+
+
+@pytest.mark.asyncio
+async def test_close_drains_pending_snapshot_tasks() -> None:
+    """close() must wait for in-flight snapshot tasks before returning."""
+    store = _build_graph_store()
+
+    started = asyncio.Event()
+    release = asyncio.Event()
+
+    async def slow_save(_note, user_uid=None):
+        started.set()
+        await release.wait()
+
+    revision_store = AsyncMock()
+    revision_store.save_note_snapshot.side_effect = slow_save
+    store._note_revision_store = revision_store
+
+    store._schedule_note_snapshot(_make_note())
+    await started.wait()
+
+    close_task = asyncio.create_task(store.close())
+    # Yield a couple of times so close() can reach the gather and observably block.
+    await asyncio.sleep(0)
+    await asyncio.sleep(0)
+    assert not close_task.done()
+
+    release.set()
+    await close_task
+
+    assert revision_store.save_note_snapshot.await_count == 1
+    assert store._snapshot_tasks == set()
