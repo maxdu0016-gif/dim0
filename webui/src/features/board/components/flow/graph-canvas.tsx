@@ -16,6 +16,7 @@ import { DocumentNode } from './document-node'
 import { EdgeView } from './edge/edge-view'
 import { EdgeMarkerDefs } from './edge/edge-markers'
 import { GraphContextMenu } from './graph-context-menu'
+import { MotionProvider, ZoomProvider } from './motion-state-context'
 import { useGraphStore } from '../../store/graph-store'
 import { useEdgeLabelEdit } from '../../hooks/use-edge-label-edit'
 import type { LinkEdge, NoteNode } from '../../types/flow'
@@ -159,7 +160,8 @@ export const GraphCanvas = memo(function GraphCanvas({
   return (
     <GraphContextMenu nodes={nodes} setNodesPersist={setNodesPersist}>
       {({ onPaneContextMenu, onNodeContextMenu }) => (
-        <>
+        <MotionProvider>
+          <ZoomProvider>
           {isEmptyGraph && !presentationMode && (
             <EmptyGraphHint isMobile={isMobile} />
           )}
@@ -213,7 +215,8 @@ export const GraphCanvas = memo(function GraphCanvas({
             <EdgeMarkerDefs edges={edges} />
             {children}
           </ReactFlow>
-        </>
+          </ZoomProvider>
+        </MotionProvider>
       )}
     </GraphContextMenu>
   )

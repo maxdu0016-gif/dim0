@@ -6,6 +6,7 @@ import { useShallow } from "zustand/react/shallow"
 
 import { DragGripIcon, ExpandIcon, LayoutIcon } from "@/components/icons"
 import { useGraphStore } from "../../store/graph-store"
+import { useMotionState } from "./motion-state-context"
 import type { Note } from "../../types/note"
 import { NodeTitleCaption } from "./node-title-caption"
 import { WidgetIframe } from "./widget-iframe"
@@ -61,14 +62,14 @@ export const WidgetNode = memo(function WidgetNode({
   selected = false,
   dragging,
 }: WidgetNodeProps) {
-  const { boardId, rootId, graphViewports, isMoving, boardCanEdit, rendererSize } = useGraphStore(useShallow((state) => ({
+  const { boardId, rootId, graphViewports, boardCanEdit, rendererSize } = useGraphStore(useShallow((state) => ({
     boardId: state.boardId,
     rootId: state.rootId,
     graphViewports: state.graphViewports,
-    isMoving: state.isMoving,
     boardCanEdit: state.boardCanEdit,
     rendererSize: state.rendererSize,
   })))
+  const { isMoving } = useMotionState()
   const html = note.content?.markdown?.trim() || ""
   const scopeViewportKey = boardId ? `${boardId}:${rootId ?? "root"}` : undefined
   const viewport = scopeViewportKey ? graphViewports[scopeViewportKey] : undefined

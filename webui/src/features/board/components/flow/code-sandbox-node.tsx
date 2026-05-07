@@ -3,6 +3,7 @@ import { memo, useMemo } from "react"
 import { useTheme } from "@/components/theme-provider"
 
 import { useGraphStore } from "../../store/graph-store"
+import { useMotionState } from "./motion-state-context"
 import type { Note } from "../../types/note"
 import {
   highlightPython,
@@ -29,7 +30,7 @@ export const CodeSandboxNode = memo(function CodeSandboxNode({
   const { resolvedTheme } = useTheme()
   const isDark = resolvedTheme === "dark"
   const palette = isDark ? ROSE_PINE_DARK : ROSE_PINE_LIGHT
-  const isMoving = useGraphStore((state) => state.isMoving)
+  const { isMoving } = useMotionState()
   const boardCanEdit = useGraphStore((state) => state.boardCanEdit)
 
   const codePreview = note.content?.markdown || "# Write Python here"
