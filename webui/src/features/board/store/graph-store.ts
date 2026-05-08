@@ -1444,7 +1444,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     })
 
     let nextNodes = applyNodeChanges(changes, prevNodes)
-    let nextNodesById = updateNodesById(get().nodesById, nextNodes, changes)
+    const nextNodesById = updateNodesById(get().nodesById, nextNodes, changes)
     let nodesChanged = false
     // Ids mutated by the in-handler logic (point detach/snap/realign), separate
     // from generic touchedNodeIds. Used to patch nextNodesById incrementally.
