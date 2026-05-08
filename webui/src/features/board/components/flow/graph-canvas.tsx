@@ -19,6 +19,7 @@ import { GraphContextMenu } from './graph-context-menu'
 import { MotionProvider, ZoomProvider } from './motion-state-context'
 import { useGraphStore } from '../../store/graph-store'
 import { useEdgeLabelEdit } from '../../hooks/use-edge-label-edit'
+import { useNodeViewportCull } from '../../hooks/use-node-viewport-cull'
 import type { LinkEdge, NoteNode } from '../../types/flow'
 import { StackedCardsIllustration } from '@/components/illustrations/stacked-cards-illustration'
 import type { BoardBackgroundTexture } from '../../utils/board-background'
@@ -142,6 +143,8 @@ export const GraphCanvas = memo(function GraphCanvas({
       ? 'var(--muted)'
       : 'var(--muted-foreground)'
   }, [boardBackgroundTexture])
+
+  useNodeViewportCull()
 
   const { edgesForRender, handleEdgeDoubleClick } = useEdgeLabelEdit({
     edges,
