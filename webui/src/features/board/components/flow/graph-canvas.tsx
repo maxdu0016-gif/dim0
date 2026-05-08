@@ -199,7 +199,6 @@ export const GraphCanvas = memo(function GraphCanvas({
             zoomOnDoubleClick={false}
             panOnScroll={!isLocked}
             minZoom={0.32}
-            onlyRenderVisibleElements
             onInit={onInit}
             elevateNodesOnSelect={false}
             elevateEdgesOnSelect={true}

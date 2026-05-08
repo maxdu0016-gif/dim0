@@ -4,6 +4,18 @@
   padding: 0rem;
   width: auto;
   box-shadow: none;
+  /*
+   * Browser-native paint skipping for off-screen nodes. Replaces React
+   * Flow's onlyRenderVisibleElements cull: nodes stay mounted in the
+   * React tree but the browser skips layout/paint while off-screen,
+   * eliminating mount/unmount churn during fast pans.
+   *
+   * contain-intrinsic-size: auto means the browser remembers the last
+   * rendered size; the 200x80 fallback is used the first time before
+   * a real size is known.
+   */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 200px 80px;
   &.draggable{
     border: none;
   }
