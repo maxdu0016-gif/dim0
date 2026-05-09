@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Dialog as DialogPrimitive } from "@base-ui-components/react/dialog"
+import { Dialog as DialogPrimitive } from "@base-ui/react/dialog"
 
 import { CloseIcon } from "@/components/icons"
 import { cn } from "@/lib/utils"
