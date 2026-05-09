@@ -7,7 +7,6 @@ import { useGraphStore } from '../../store/graph-store'
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import { useBoardShortcuts } from '../../hooks/use-board-shortcuts'
 import { DocumentUploadDialog } from './utils/document-upload'
-import { AiSparkDialog } from './utils/ai-spark-dialog'
 import { TopBar } from './top-bar'
 import { SlidePanel } from './slide-panel'
 import { CopilotSheet } from './copilot-sheet'
@@ -53,11 +52,9 @@ export const ActionPanel = memo(function ActionPanel({
   const [openChatDialog, setOpenChatDialog] = useState(false)
   const [openShapeMenu, setOpenShapeMenu] = useState(false)
   const [openDocumentUpload, setOpenDocumentUpload] = useState(false)
-  const [openAiSpark, setOpenAiSpark] = useState(false)
   const [openSlidesPanel, setOpenSlidesPanel] = useState(false)
   const boardId = useGraphStore(state => state.boardId)
   const boardVisibility = useGraphStore(state => state.boardVisibility)
-  const nodes = useGraphStore(state => state.nodes)
   const setNodes = useGraphStore(state => state.setNodes)
   const setBoardVisibility = useGraphStore(state => state.setBoardVisibility)
   const setViewSlides = useGraphStore(state => state.setViewSlides)
@@ -101,7 +98,6 @@ export const ActionPanel = memo(function ActionPanel({
       { key: 'g', handler: () => setOpenIconSearch(true) },
       { key: 'i', handler: () => setOpenImageSearch(true) },
       { key: 'c', handler: () => boardId && setOpenChatDialog(true) },
-      { key: 'b', handler: () => boardId && setOpenAiSpark(true) },
       { key: 'm', handler: () => boardId && setOpenSlidesPanel(true) },
       { key: 'p', handler: () => setEnableSelection(false) },
       { key: 'v', handler: () => setEnableSelection(!enableSelection) },
@@ -137,7 +133,6 @@ export const ActionPanel = memo(function ActionPanel({
           setOpenDocumentUpload={setOpenDocumentUpload}
           setOpenChatDialog={setOpenChatDialog}
           chatOpen={openChatDialog}
-          setOpenAiSpark={setOpenAiSpark}
           onToggleSlidesPanel={() => setOpenSlidesPanel(v => !v)}
           slidesPanelOpen={openSlidesPanel}
           boardId={boardId}
@@ -149,12 +144,6 @@ export const ActionPanel = memo(function ActionPanel({
       <ImageSearchDialog openImageSearch={openImageSearch} setOpenImageSearch={setOpenImageSearch} />
       <IconSearchDialog openIconSearch={openIconSearch} setOpenIconSearch={setOpenIconSearch} />
       <DocumentUploadDialog open={openDocumentUpload} onOpenChange={setOpenDocumentUpload} />
-      <AiSparkDialog
-        open={openAiSpark}
-        onOpenChange={setOpenAiSpark}
-        boardId={boardId}
-        selectedNodes={nodes.filter(n => n.selected && (n.data as { kind?: string } | undefined)?.kind !== 'point')}
-      />
       <Sheet open={openSlidesPanel} onOpenChange={setOpenSlidesPanel} modal={false}>
         <SheetContent
           side="right"

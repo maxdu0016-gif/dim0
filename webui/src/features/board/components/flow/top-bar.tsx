@@ -25,7 +25,6 @@ import {
   PuzzlePieceIcon,
   ShapesMenuIcon,
   ShareIcon,
-  SparklesIcon,
   SquareShapeIcon,
   TagIcon,
   TextTIcon,
@@ -59,7 +58,6 @@ type Props = {
   setOpenDocumentUpload: (open: boolean) => void
   setOpenChatDialog: (open: boolean) => void
   chatOpen: boolean
-  setOpenAiSpark: (open: boolean) => void
   onToggleSlidesPanel: () => void
   slidesPanelOpen: boolean
   boardId?: string
@@ -82,7 +80,6 @@ export const TopBar = memo(function TopBar({
   setOpenDocumentUpload,
   setOpenChatDialog,
   chatOpen,
-  setOpenAiSpark,
   onToggleSlidesPanel,
   slidesPanelOpen,
   boardId,
@@ -384,11 +381,6 @@ export const TopBar = memo(function TopBar({
               <DropdownMenuItem onSelect={() => onAddNode({ nodeType: 'widget' })} className='gap-2 text-sm'>
                 <LearnWidgetIcon className='size-4 shrink-0' />
                 <span>Widget</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => setOpenAiSpark(true)} className='gap-2 text-sm' disabled={!boardId}>
-                <SparklesIcon className='size-4 shrink-0 text-secondary-foreground' />
-                <span>AI actions</span>
-                <DropdownMenuShortcut>B</DropdownMenuShortcut>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
