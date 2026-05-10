@@ -28,6 +28,12 @@ export interface MdEditorProps {
   pageProvider?: PageProvider | null
   /** Id of the note this editor is editing — used by `/subpage` to nest. */
   parentNoteId?: string | null
+  /**
+   * Optional content rendered inside the editor's own scroll area, above
+   * the prose. Use this for a page title (Notion-style) so it scrolls
+   * with the article and we don't need a second outer scroll container.
+   */
+  bodyHeader?: React.ReactNode
 }
 
 export function TipTapEditor({
@@ -37,6 +43,7 @@ export function TipTapEditor({
   className,
   pageProvider,
   parentNoteId,
+  bodyHeader,
 }: MdEditorProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const onSaveRef = useRef(onSave)
@@ -90,6 +97,21 @@ export function TipTapEditor({
     return () => window.removeEventListener("keydown", handler)
   }, [editor, debouncedSave])
 
+  // External content sync. `useEditor`'s `content` is only consumed on
+  // mount, so when something outside (e.g. an AI rewrite) updates the
+  // markdown prop we have to push it into the editor manually. Compare
+  // against the editor's *current* markdown to skip our own debounced
+  // saves echoing back through the parent — those would otherwise force
+  // a setContent on every keystroke and trash the cursor.
+  useEffect(() => {
+    if (!editor) return
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const current = (editor as any).storage.markdown.getMarkdown() as string
+    if (current === markdown) return
+    editor.commands.setContent(sanitizeMathDelimiters(markdown), { emitUpdate: false })
+    setTags(scanTags(markdown))
+  }, [editor, markdown])
+
   // Flush on unmount so no pending saves are lost
   useEffect(() => () => { debouncedSave.flush() }, [debouncedSave])
 
@@ -103,6 +125,7 @@ export function TipTapEditor({
           <TableMenu editor={editor} />
           <BlockHandle editor={editor} />
           <MathEditPopover editor={editor} />
+          {bodyHeader}
           <TagPanel tags={tags} />
           <EditorContent editor={editor} />
         </div>

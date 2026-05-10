@@ -246,13 +246,28 @@ export const SheetNodePanel = memo(function SheetNodePanel({
         </div>
       </div>
 
-      <div className="flex-1 flex w-full h-full min-h-0 min-w-0">
-        <div className="h-full w-full min-w-0 overflow-y-auto overflow-x-hidden scrollbar-thin">
-          {/* Title sits with the article body — matches the editor's
-              `max-width: 720px; margin: 0 auto` (see .tiptap-editor
-              .ProseMirror in editor.css) so the H1 aligns with paragraphs,
-              tag panel, etc. below. */}
-          <div className="max-w-[720px] mx-auto px-4 pt-8 md:pt-12 pb-2">
+      {/* Title is pushed into the editor's *own* scroll container as a
+          header slot. That gives us Notion-style behavior — title scrolls
+          with the article, status bar stays at the bottom — without two
+          scroll containers fighting each other for height. */}
+      <SheetEditor
+        // Each note is a distinct document; remount when navigating
+        // between sheets so TipTap re-initializes for the new doc.
+        // Within the same note, content updates flow through MdEditor's
+        // own effect (it diffs the prop against the editor's current
+        // markdown) so user edits aren't disturbed.
+        key={note.id}
+        value={note.content?.markdown || ""}
+        onSave={handleNoteChange}
+        pageProvider={pageProvider}
+        parentNoteId={note.id}
+        className="flex-1 min-h-0"
+        bodyHeader={
+          // No horizontal padding here — the parent `.tiptap-editor`
+          // already has `padding: 0 1.5rem` and `.ProseMirror` is
+          // centered at max-width 720px. Matching that envelope keeps the
+          // title's left edge flush with paragraphs / tag panel below.
+          <div className="max-w-[720px] mx-auto pb-8">
             {titleEditing ? (
               <input
                 ref={titleInputRef}
@@ -283,17 +298,8 @@ export const SheetNodePanel = memo(function SheetNodePanel({
               </button>
             )}
           </div>
-          <SheetEditor
-            // Each note is a distinct document; remount the editor when
-            // navigating between sheets so TipTap re-initializes cleanly.
-            key={note.id}
-            value={note.content?.markdown || ""}
-            onSave={handleNoteChange}
-            pageProvider={pageProvider}
-            parentNoteId={note.id}
-          />
-        </div>
-      </div>
+        }
+      />
     </div>
   )
 })
