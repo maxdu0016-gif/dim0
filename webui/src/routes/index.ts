@@ -17,7 +17,6 @@ import { SubscriptionsScreen } from "@/features/newsfeed/screens/subscriptions"
 import { NewsfeedsScreen } from "@/features/newsfeed/screens/newsfeeds"
 import { NewsfeedLinearPage } from "@/features/newsfeed/screens/newsfeed-linear-page"
 import { HomePage } from "@/features/home/screens/home"
-import { SheetScreen } from "@/features/board/screens/sheet-screen"
 import { DashboardScreen } from "@/features/board/screens/dashboard-screen"
 import { NotFoundPage } from "@/components/not-found"
 import { SettingsScreen } from "@/features/user-settings/screens/settings-screen"
@@ -148,13 +147,31 @@ const boardRoute = createRoute({
   component: BoardScreen,
 })
 
-// /boards/:id/sheets/:noteId (protected)
+// /boards/:id/sheets/:noteId (protected) — opens sheet dialog over the board canvas
 export const SheetUrl = "/boards/$id/sheets/$noteId"
 const sheetRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: SheetUrl,
   beforeLoad: requireVerifiedAuth,
-  component: SheetScreen,
+  component: BoardScreen,
+})
+
+// /boards/:id/code-sandbox/:noteId (protected) — opens code sandbox dialog
+export const CodeSandboxUrl = "/boards/$id/code-sandbox/$noteId"
+const codeSandboxRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: CodeSandboxUrl,
+  beforeLoad: requireVerifiedAuth,
+  component: BoardScreen,
+})
+
+// /boards/:id/widgets/:noteId (protected) — opens widget dialog
+export const WidgetUrl = "/boards/$id/widgets/$noteId"
+const widgetRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: WidgetUrl,
+  beforeLoad: requireVerifiedAuth,
+  component: BoardScreen,
 })
 
 // /subscriptions (protected)
@@ -224,6 +241,8 @@ const routeTree = rootRoute.addChildren([
   dashboardRoute,
   boardRoute,
   sheetRoute,
+  codeSandboxRoute,
+  widgetRoute,
   subscriptionsRoute,
   newsfeedsRoute,
   newsfeedDetailRoute,

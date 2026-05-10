@@ -1,10 +1,9 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useNavigate } from "@tanstack/react-router"
 
-import { CancelPlainIcon, DownloadIcon, SheetExternalLinkIcon } from "@/components/icons"
+import { CancelPlainIcon, DownloadIcon } from "@/components/icons"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
-import { SheetUrl } from "@/routes"
 
 import { useGraphStore } from "../../store/graph-store"
 import { SheetEditor } from "../sheet/sheet-editor"
@@ -147,11 +146,6 @@ export const SheetNodeDialog = memo(function SheetNodeDialog({
     persistRemote({ content: { markdown } })
   }, [note, isLocalNote, persistRemote, updateNodeByIdPersist])
 
-  const handleOpenFullView = useCallback(() => {
-    if (!note?.graphUid) return
-    navigate({ to: SheetUrl, params: { id: note.graphUid, noteId: note.id } })
-  }, [navigate, note?.graphUid, note?.id])
-
   /**
    * Download the current sheet markdown as a local .md file.
    */
@@ -216,7 +210,7 @@ export const SheetNodeDialog = memo(function SheetNodeDialog({
   return (
     <Dialog open onOpenChange={handleOpenChange}>
       <DialogContent
-        className="sm:max-w-4xl h-3/4 flex flex-col items-center text-left p-2 overflow-visible"
+        className="w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] h-[calc(100vh-2rem)] sm:max-w-5xl sm:h-[80vh] flex flex-col items-center text-left p-2 overflow-visible"
         showCloseButton={false}
       >
         <SheetStackBackground depth={stackDepth} />
@@ -290,9 +284,6 @@ export const SheetNodeDialog = memo(function SheetNodeDialog({
               disabled={!note.content?.markdown?.trim()}
             >
               <DownloadIcon className="size-4" />
-            </Button>
-            <Button variant="ghost" size="icon-sm" onClick={handleOpenFullView} title="Open full view" aria-label="Open full view">
-              <SheetExternalLinkIcon className="size-4" />
             </Button>
             <Button variant="ghost" size="icon-sm" onClick={() => handleOpenChange(false)} title="Close" aria-label="Close">
               <CancelPlainIcon className="size-4" />
