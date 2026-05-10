@@ -1,0 +1,289 @@
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useNavigate } from "@tanstack/react-router"
+
+import { CancelPlainIcon, DownloadIcon } from "@/components/icons"
+import { Button } from "@/components/ui/button"
+
+import { useGraphStore } from "../../store/graph-store"
+import { SheetEditor } from "../sheet/sheet-editor"
+import { createBoardPageProvider } from "../../providers/board-page-provider"
+import { useGetNote } from "../../api/get-note"
+import { useGetNotePath } from "../../api/get-note-path"
+import { useUpdateNote } from "../../api/update-note"
+import type { Note } from "../../types/note"
+import { SheetBreadcrumb } from "../sheet/sheet-breadcrumb"
+import { SheetStackBackground } from "../sheet/sheet-stack-background"
+
+
+type SheetNodePanelProps = {
+  nodeId: string
+}
+
+
+const PANEL_CLASS =
+  "absolute left-1/2 -translate-x-1/2 top-4 bottom-4 md:top-20 md:bottom-[96px] w-[min(900px,calc(100vw-2rem))] z-[55] flex flex-col rounded-lg border bg-background shadow-xl overflow-visible"
+
+
+/**
+ * Inline panel for editing a sheet node. Mounts on top of the canvas but
+ * leaves the floating island strip clickable underneath.
+ */
+export const SheetNodePanel = memo(function SheetNodePanel({
+  nodeId,
+}: SheetNodePanelProps) {
+  const navigate = useNavigate()
+  const localNote = useGraphStore((state) => state.nodesById.get(nodeId)?.data)
+  const activeBoardId = useGraphStore((state) => state.boardId)
+  const updateNodeByIdPersist = useGraphStore((state) => state.updateNodeByIdPersist)
+  const closeNodeSurface = useGraphStore((state) => state.closeNodeSurface)
+  const openNodeSurface = useGraphStore((state) => state.openNodeSurface)
+
+  const isLocalNote = !!localNote
+  const { data: fetchedNote, isLoading: isFetchingNote } = useGetNote({
+    boardId: activeBoardId,
+    noteId: nodeId,
+    enabled: !isLocalNote && !!activeBoardId,
+  })
+  const note: Note | undefined = localNote ?? fetchedNote
+  const boardId = note?.graphUid ?? activeBoardId
+
+  const { data: notePath = [] } = useGetNotePath({
+    boardId,
+    noteId: nodeId,
+    enabled: !!boardId,
+  })
+  const ancestors = notePath.slice(0, -1)
+
+  const { mutate: updateNoteMutate } = useUpdateNote()
+  const persistRemote = useCallback(
+    (patch: Partial<Note>) => {
+      if (!boardId) return
+      updateNoteMutate({ boardId, noteId: nodeId, noteData: patch })
+    },
+    [boardId, nodeId, updateNoteMutate],
+  )
+
+  const pageProvider = useMemo(() => {
+    if (!note?.graphUid) return null
+    return createBoardPageProvider({
+      boardId: note.graphUid,
+      parentNoteId: note.id,
+      onNavigate: (id) => openNodeSurface(id, "sheet"),
+    })
+  }, [note?.graphUid, note?.id, openNodeSurface])
+
+  const [titleEditing, setTitleEditing] = useState(false)
+  const [titleDraft, setTitleDraft] = useState(note?.label?.markdown || "")
+  const titleInputRef = useRef<HTMLInputElement | null>(null)
+
+  useEffect(() => {
+    if (!titleEditing) {
+      setTitleDraft(note?.label?.markdown || "")
+    }
+  }, [note?.label?.markdown, titleEditing])
+
+  useEffect(() => {
+    if (!titleEditing) return
+    const frameId = requestAnimationFrame(() => {
+      titleInputRef.current?.focus()
+      titleInputRef.current?.select()
+    })
+    return () => cancelAnimationFrame(frameId)
+  }, [titleEditing])
+
+  const persistTitle = useCallback((title: string) => {
+    if (!note) return
+    if (isLocalNote) {
+      updateNodeByIdPersist(note.id, (node) => ({
+        ...node,
+        data: {
+          ...node.data,
+          label: { markdown: title },
+        },
+      }))
+      return
+    }
+    persistRemote({ label: { markdown: title } })
+  }, [note, isLocalNote, persistRemote, updateNodeByIdPersist])
+
+  const stopTitleEdit = useCallback((save: boolean) => {
+    if (!note) return
+    if (save) {
+      persistTitle(titleDraft)
+    } else {
+      setTitleDraft(note.label?.markdown || "")
+    }
+    setTitleEditing(false)
+  }, [note, persistTitle, titleDraft])
+
+  // Close on Escape — only when not editing the title (Escape there cancels).
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return
+      if (titleEditing) return
+      const target = event.target as HTMLElement | null
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) {
+        return
+      }
+      closeNodeSurface()
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [closeNodeSurface, titleEditing])
+
+  const handleNoteChange = useCallback((markdown: string) => {
+    if (!note) return
+    if (isLocalNote) {
+      updateNodeByIdPersist(note.id, (node) => ({
+        ...node,
+        data: {
+          ...node.data,
+          content: { markdown },
+        },
+      }))
+      return
+    }
+    persistRemote({ content: { markdown } })
+  }, [note, isLocalNote, persistRemote, updateNodeByIdPersist])
+
+  /**
+   * Download the current sheet markdown as a local .md file.
+   */
+  const handleDownloadMarkdown = useCallback(() => {
+    const markdown = note?.content?.markdown || ""
+    if (!markdown.trim()) return
+
+    const safeBaseName = (note?.label?.markdown || "sheet")
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "sheet"
+
+    const blob = new Blob([markdown], { type: "text/markdown;charset=utf-8" })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement("a")
+    link.href = url
+    link.download = `${safeBaseName}.md`
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+  }, [note?.content?.markdown, note?.label?.markdown])
+
+  if (!note) {
+    if (isFetchingNote) {
+      return (
+        <div className={`${PANEL_CLASS} items-center justify-center text-sm text-muted-foreground`}>
+          Loading note…
+        </div>
+      )
+    }
+    return (
+      <div className={`${PANEL_CLASS} items-center justify-center gap-3 text-sm text-muted-foreground`}>
+        <p>This note doesn’t exist or you don’t have access.</p>
+        <Button variant="outline" size="sm" onClick={() => closeNodeSurface()}>
+          Close
+        </Button>
+      </div>
+    )
+  }
+
+  const displayTitle = note.label?.markdown?.trim() || "Untitled note"
+  const stackDepth = Math.max(0, ancestors.length)
+
+  return (
+    <div className={PANEL_CLASS}>
+      <SheetStackBackground depth={stackDepth} />
+      <div className="w-full flex items-start justify-between gap-2 px-4 pt-3 pb-2">
+        <div className="min-w-0 flex-1 pr-2 flex flex-col gap-1.5">
+          <SheetBreadcrumb
+            ancestors={ancestors}
+            onSegmentClick={(ancestor, kind) => {
+              if (kind === "folder") {
+                closeNodeSurface()
+                if (ancestor.graphUid) {
+                  navigate({
+                    to: "/boards/$id",
+                    params: { id: ancestor.graphUid },
+                    search: (prev: Record<string, unknown>) => ({ ...prev, root_id: ancestor.id }),
+                  })
+                }
+                return
+              }
+              if (kind === "sheet" || kind === "code-sandbox" || kind === "widget") {
+                openNodeSurface(ancestor.id, kind)
+                return
+              }
+              if (ancestor.graphUid) {
+                closeNodeSurface()
+                navigate({
+                  to: "/boards/$id",
+                  params: { id: ancestor.graphUid },
+                  search: (prev: Record<string, unknown>) => prev,
+                })
+              }
+            }}
+          />
+          {titleEditing ? (
+            <input
+              ref={titleInputRef}
+              value={titleDraft}
+              onChange={(event) => setTitleDraft(event.target.value)}
+              onBlur={() => stopTitleEdit(true)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault()
+                  stopTitleEdit(true)
+                }
+                if (event.key === "Escape") {
+                  event.preventDefault()
+                  stopTitleEdit(false)
+                }
+              }}
+              className="w-full bg-transparent text-xl font-bold tracking-tight text-foreground border-0 border-b border-foreground/30 focus:border-secondary-foreground focus:outline-none px-0 py-0.5"
+              placeholder="Untitled note"
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => setTitleEditing(true)}
+              className="block max-w-full truncate text-left text-xl font-bold tracking-tight text-foreground hover:opacity-80 transition-opacity"
+              title={displayTitle}
+            >
+              {displayTitle}
+            </button>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={handleDownloadMarkdown}
+            title="Download markdown"
+            aria-label="Download markdown"
+            disabled={!note.content?.markdown?.trim()}
+          >
+            <DownloadIcon className="size-4" />
+          </Button>
+          <Button variant="ghost" size="icon-sm" onClick={() => closeNodeSurface()} title="Close" aria-label="Close">
+            <CancelPlainIcon className="size-4" />
+          </Button>
+        </div>
+      </div>
+
+      <div className="flex-1 flex items-center w-full h-full min-h-0 min-w-0">
+        <div className="h-full w-full min-w-0 overflow-y-auto overflow-x-hidden scrollbar-thin">
+          <SheetEditor
+            // Each note is a distinct document; remount the editor when
+            // navigating between sheets so TipTap re-initializes cleanly.
+            key={note.id}
+            value={note.content?.markdown || ""}
+            onSave={handleNoteChange}
+            pageProvider={pageProvider}
+            parentNoteId={note.id}
+          />
+        </div>
+      </div>
+    </div>
+  )
+})

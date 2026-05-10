@@ -1,9 +1,9 @@
 import { memo, useEffect } from "react"
 
 import { useGraphStore } from "../../store/graph-store"
-import { CodeSandboxDialog } from "./code-sandbox-dialog"
-import { SheetNodeDialog } from "./sheet-node-dialog"
-import { WidgetDialog } from "./widget-dialog"
+import { CodeSandboxPanel } from "./code-sandbox-panel"
+import { SheetNodePanel } from "./sheet-node-panel"
+import { WidgetPanel } from "./widget-panel"
 
 
 /**
@@ -11,8 +11,8 @@ import { WidgetDialog } from "./widget-dialog"
  *
  * Sheets are special: a sub-page is a note whose `parent_id` points at
  * another note rather than living on the canvas, so it never appears in
- * `nodesById`. The sheet dialog handles loading from the API for that
- * case, so we always mount it and let the dialog gate on its own data.
+ * `nodesById`. The sheet panel handles loading from the API for that
+ * case, so we always mount it and let the panel gate on its own data.
  * Widgets and code-sandbox surfaces remain canvas-only.
  */
 export const NodeSurfaceHost = memo(function NodeSurfaceHost() {
@@ -33,14 +33,14 @@ export const NodeSurfaceHost = memo(function NodeSurfaceHost() {
   if (!activeNodeSurface) return null
 
   if (activeNodeSurface.kind === "sheet") {
-    return <SheetNodeDialog nodeId={activeNodeSurface.nodeId} />
+    return <SheetNodePanel nodeId={activeNodeSurface.nodeId} />
   }
 
   if (!hasNode) return null
 
   if (activeNodeSurface.kind === "widget") {
-    return <WidgetDialog nodeId={activeNodeSurface.nodeId} />
+    return <WidgetPanel nodeId={activeNodeSurface.nodeId} />
   }
 
-  return <CodeSandboxDialog nodeId={activeNodeSurface.nodeId} />
+  return <CodeSandboxPanel nodeId={activeNodeSurface.nodeId} />
 })

@@ -11,16 +11,15 @@ export interface SendMessageRequestPayload {
   query: string
   messageId: string
   rootId?: string
-  /**
-   * When set, the user is editing this note when they hit send. Used by
-   * the agent as a hint about which page is currently active so it can
-   * scope retrieval / edits to that note.
-   */
-  attachedNoteId?: string
   model: LlmModel
   webSearchEngine: WebSearchEngine
   enabledTools?: ToolName[]
   useDeepResearch?: boolean
+  /**
+   * Composed at submit time from the active page (when a surface is open)
+   * plus any selected canvas nodes. The backend prepends this to the user
+   * message so the agent knows what the user is looking at.
+   */
   messageContext?: string
 }
 

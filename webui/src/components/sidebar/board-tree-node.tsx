@@ -62,10 +62,15 @@ export function BoardTreeNode({ boardId, item, depth }: BoardTreeNodeProps) {
   })
 
   const handleNavigate = () => {
+    // `search: (prev) => ...` keeps `current_chat_id` (and any other
+    // search params) so opening a note from the sidebar doesn't reset
+    // the user's active chat session.
+    const keepSearch = (prev: Record<string, unknown>) => prev
     if (item.kind === "sheet") {
       navigate({
         to: "/boards/$id/sheets/$noteId",
         params: { id: boardId, noteId: item.id },
+        search: keepSearch,
       })
       return
     }
@@ -73,6 +78,7 @@ export function BoardTreeNode({ boardId, item, depth }: BoardTreeNodeProps) {
       navigate({
         to: "/boards/$id/code-sandbox/$noteId",
         params: { id: boardId, noteId: item.id },
+        search: keepSearch,
       })
       return
     }
@@ -80,6 +86,7 @@ export function BoardTreeNode({ boardId, item, depth }: BoardTreeNodeProps) {
       navigate({
         to: "/boards/$id/widgets/$noteId",
         params: { id: boardId, noteId: item.id },
+        search: keepSearch,
       })
       return
     }
@@ -87,11 +94,11 @@ export function BoardTreeNode({ boardId, item, depth }: BoardTreeNodeProps) {
       navigate({
         to: "/boards/$id",
         params: { id: boardId },
-        search: { root_id: item.id },
+        search: (prev: Record<string, unknown>) => ({ ...prev, root_id: item.id }),
       })
       return
     }
-    navigate({ to: "/boards/$id", params: { id: boardId } })
+    navigate({ to: "/boards/$id", params: { id: boardId }, search: keepSearch })
   }
 
   const handleToggle = (e: MouseEvent) => {

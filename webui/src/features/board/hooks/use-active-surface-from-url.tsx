@@ -24,14 +24,25 @@ export function useActiveSurfaceFromUrl(): void {
   const kind = nodeSurfaceKindFromPath(pathname)
 
   // Register the navigate functions the store uses for state → URL.
+  // `search: (prev) => prev` keeps `current_chat_id`, `root_id`, etc. when
+  // entering or leaving a surface — otherwise opening a sheet drops the
+  // user's active chat.
   useEffect(() => {
     setBoardNavigate(
       (path, navParams) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        navigate({ to: path, params: navParams } as any)
+        navigate({
+          to: path,
+          params: navParams,
+          search: (prev: Record<string, unknown>) => prev,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any)
       },
       (boardId) => {
-        navigate({ to: BoardUrl, params: { id: boardId } })
+        navigate({
+          to: BoardUrl,
+          params: { id: boardId },
+          search: (prev: Record<string, unknown>) => prev,
+        })
       },
     )
   }, [navigate])

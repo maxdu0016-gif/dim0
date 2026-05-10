@@ -93,14 +93,29 @@ export const useSubmitPrompt = () => {
         void updateChatAsync({ chatId: newChatId, chatData: { label: trimText(trimmed, 20) } }).catch(() => {})
 
         if (!preferChatRoute && (isBoardRoute || createdBoardId) && settingsBoardId) {
-          navigate({
-            to: "/boards/$id",
-            params: { id: settingsBoardId },
-            search: (prev: Record<string, unknown>) => ({
-              ...prev,
-              current_chat_id: newChatId,
-            }),
-          })
+          if (createdBoardId) {
+            // A brand-new board was just created — go to it.
+            navigate({
+              to: "/boards/$id",
+              params: { id: settingsBoardId },
+              search: (prev: Record<string, unknown>) => ({
+                ...prev,
+                current_chat_id: newChatId,
+              }),
+            })
+          } else {
+            // Already on a board-family route (board / sheet / code /
+            // widget). `to: "."` keeps the current pathname so we don't
+            // close any active surface panel just because the user sent
+            // their first message in a new chat.
+            navigate({
+              to: ".",
+              search: (prev: Record<string, unknown>) => ({
+                ...prev,
+                current_chat_id: newChatId,
+              }),
+            })
+          }
         } else {
           navigate({ to: ChatUrl, params: { id: newChatId } })
         }
@@ -111,16 +126,10 @@ export const useSubmitPrompt = () => {
         id = chatId!
       }
 
-      // Lazy read — no subscription on graph state, just a one-shot
-      // snapshot at submit time so the agent knows which page (if any)
-      // the user is currently looking at.
-      const attachedNoteId = useGraphStore.getState().activeNodeSurface?.nodeId
-
       const payload: SendMessageRequestPayload = {
         query: trimmed,
         messageId: generateUuid(),
         rootId,
-        attachedNoteId,
         model: llmModel,
         webSearchEngine,
         enabledTools,

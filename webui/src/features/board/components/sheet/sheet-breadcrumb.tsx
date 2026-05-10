@@ -53,7 +53,7 @@ export function SheetBreadcrumb({ ancestors, onSegmentClick }: Props) {
 
   return (
     <nav
-      className="flex items-center gap-1 text-[11px] text-muted-foreground"
+      className="flex items-center gap-1.5 text-xs text-muted-foreground/80"
       aria-label="Breadcrumb"
     >
       {ancestors.map((note, i) => {
@@ -66,18 +66,17 @@ export function SheetBreadcrumb({ ancestors, onSegmentClick }: Props) {
               type="button"
               onClick={() => onSegmentClick(note, kind)}
               title={fullLabel}
-              className="flex items-center gap-1 truncate max-w-[160px] rounded px-0.5 hover:text-foreground hover:underline"
+              className="flex items-center gap-1 truncate max-w-[180px] rounded transition-colors hover:text-foreground"
             >
-              {Icon && <Icon className="size-3 shrink-0 opacity-70" strokeWidth={2} />}
-              <span className="truncate">{trimText(fullLabel, 24)}</span>
+              {Icon && <Icon className="size-3.5 shrink-0 opacity-70" strokeWidth={2} />}
+              <span className="truncate">{trimText(fullLabel, 28)}</span>
             </button>
             {i < ancestors.length - 1 && (
-              <CaretRightIcon className="size-3 shrink-0 opacity-60" />
+              <CaretRightIcon className="size-3 shrink-0 opacity-50" />
             )}
           </Fragment>
         )
       })}
-      <CaretRightIcon className="size-3 shrink-0 opacity-60" />
     </nav>
   )
 }

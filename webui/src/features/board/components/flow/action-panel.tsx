@@ -60,10 +60,13 @@ export const ActionPanel = memo(function ActionPanel({
   const setViewSlides = useGraphStore(state => state.setViewSlides)
   const presentationMode = useGraphStore(state => state.presentationMode)
   const navigate = useNavigate()
+  // `strict: false` so this also reads the search on the surface routes
+  // (/boards/$id/sheets/$noteId, /code-sandbox/$noteId, /widgets/$noteId);
+  // a `from: "/boards/$id"` would only match the bare board route and
+  // silently drop `current_chat_id` on those nested routes.
   const boardSearch = useSearch({
-    from: "/boards/$id",
+    strict: false,
     select: (s: { current_chat_id?: string }) => ({ currentChatId: s.current_chat_id }),
-    shouldThrow: false,
   })
   const currentChatId = boardSearch?.currentChatId
 
