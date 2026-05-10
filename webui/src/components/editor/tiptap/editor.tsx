@@ -51,7 +51,13 @@ export function TipTapEditor({
 
   const [tags, setTags] = useState<TagGroup[]>(() => scanTags(markdown))
 
+  // Tracks the markdown we last set on the editor (or that flowed back
+  // through our own save). Lets the prop-sync effect skip work cheaply
+  // without serializing the whole ProseMirror doc on every tick.
+  const lastKnownMarkdownRef = useRef(markdown)
+
   const debouncedSave = useDebouncedCallback((md: string) => {
+    lastKnownMarkdownRef.current = md
     onSaveRef.current(md)
     setTags(scanTags(md))
   }, 2000)
@@ -100,14 +106,13 @@ export function TipTapEditor({
   // External content sync. `useEditor`'s `content` is only consumed on
   // mount, so when something outside (e.g. an AI rewrite) updates the
   // markdown prop we have to push it into the editor manually. Compare
-  // against the editor's *current* markdown to skip our own debounced
-  // saves echoing back through the parent — those would otherwise force
-  // a setContent on every keystroke and trash the cursor.
+  // against the markdown we last knew about so our own debounced saves
+  // echoing back through the parent are no-ops — those would otherwise
+  // force a setContent on every keystroke and trash the cursor.
   useEffect(() => {
     if (!editor) return
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const current = (editor as any).storage.markdown.getMarkdown() as string
-    if (current === markdown) return
+    if (markdown === lastKnownMarkdownRef.current) return
+    lastKnownMarkdownRef.current = markdown
     editor.commands.setContent(sanitizeMathDelimiters(markdown), { emitUpdate: false })
     setTags(scanTags(markdown))
   }, [editor, markdown])
