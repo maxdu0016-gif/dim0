@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useRef, useState } from "react"
 
-import { CancelPlainIcon, DownloadIcon, LayoutIcon } from "@/components/icons"
+import { CancelPlainIcon, DownloadIcon, LayoutIcon, SparklesIcon } from "@/components/icons"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useTheme } from "@/components/theme-provider"
@@ -31,6 +31,7 @@ export const WidgetPanel = memo(function WidgetPanel({
   const note = useGraphStore((state) => state.nodesById.get(nodeId)?.data)
   const updateNodeByIdPersist = useGraphStore((state) => state.updateNodeByIdPersist)
   const closeNodeSurface = useGraphStore((state) => state.closeNodeSurface)
+  const setChatSheetOpen = useGraphStore((state) => state.setChatSheetOpen)
   const [activeTab, setActiveTab] = useState("rendered")
   const [htmlDraft, setHtmlDraft] = useState(note?.content?.markdown || "")
   const [titleEditing, setTitleEditing] = useState(false)
@@ -183,6 +184,17 @@ export const WidgetPanel = memo(function WidgetPanel({
           </div>
         </div>
         <div className="flex items-center gap-1">
+          {/* Mobile-only AI affordance — see sheet-node-panel for the
+              rationale: floating island is hidden under a panel on mobile. */}
+          <button
+            type="button"
+            onClick={() => setChatSheetOpen(true)}
+            title="Open AI chat"
+            aria-label="Open AI chat"
+            className="md:hidden flex items-center justify-center rounded-md bg-gradient-to-br from-wiki-link to-secondary-foreground size-7 shrink-0 shadow-sm transition hover:brightness-110"
+          >
+            <SparklesIcon className="size-3.5 text-primary-foreground" weight="fill" />
+          </button>
           <Button
             variant="ghost"
             size="icon-sm"

@@ -49,7 +49,11 @@ export const ActionPanel = memo(function ActionPanel({
 }: ActionPanelProps) {
   const [openImageSearch, setOpenImageSearch] = useState(false)
   const [openIconSearch, setOpenIconSearch] = useState(false)
-  const [openChatDialog, setOpenChatDialog] = useState(false)
+  // Lifted to graph-store so the surface panels (sheet/code/widget) can
+  // open the chat sideview from their mobile-only sparkles button. Also
+  // resets automatically on scope change in `setGraphScope`.
+  const openChatDialog = useGraphStore(state => state.chatSheetOpen)
+  const setOpenChatDialog = useGraphStore(state => state.setChatSheetOpen)
   const [openShapeMenu, setOpenShapeMenu] = useState(false)
   const [openDocumentUpload, setOpenDocumentUpload] = useState(false)
   const [openSlidesPanel, setOpenSlidesPanel] = useState(false)

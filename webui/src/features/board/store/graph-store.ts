@@ -1005,6 +1005,17 @@ export interface GraphStore {
   openNodeSurface: (nodeId: string, kind: NodeSurfaceKind) => void
   closeNodeSurface: () => void
 
+  /**
+   * Whether the board's chat sideview (CopilotSheet) is open. Lives in
+   * the store so the surface panels can open it from a mobile-only
+   * sparkles button (the floating island that normally opens it is
+   * hidden on small screens). Reset on scope change in `setGraphScope`
+   * so navigating to a different board / sub-board doesn't carry the
+   * sheet open across with stale context.
+   */
+  chatSheetOpen: boolean
+  setChatSheetOpen: (open: boolean) => void
+
   setNodes: (nodes: Updater<NoteNode[]>) => void
   setEdges: (edges: Updater<LinkEdge[]>) => void
 
@@ -1087,6 +1098,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
             boardCanEdit: true,
             boardLabel: "",
             activeNodeSurface: null,
+            chatSheetOpen: false,
           }
         : {
             boardId,
@@ -1131,6 +1143,8 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   boardCanEdit: true,
   boardLabel: "",
   activeNodeSurface: null,
+  chatSheetOpen: false,
+  setChatSheetOpen: (open) => set({ chatSheetOpen: open }),
   setBoardBackground: (color) => {
     const boardId = get().boardId
     if (!boardId) return

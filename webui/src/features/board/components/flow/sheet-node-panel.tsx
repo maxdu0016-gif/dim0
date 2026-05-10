@@ -1,7 +1,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useNavigate } from "@tanstack/react-router"
 
-import { CancelPlainIcon, DownloadIcon } from "@/components/icons"
+import { CancelPlainIcon, DownloadIcon, SparklesIcon } from "@/components/icons"
 import { Button } from "@/components/ui/button"
 
 import { useGraphStore } from "../../store/graph-store"
@@ -37,6 +37,7 @@ export const SheetNodePanel = memo(function SheetNodePanel({
   const updateNodeByIdPersist = useGraphStore((state) => state.updateNodeByIdPersist)
   const closeNodeSurface = useGraphStore((state) => state.closeNodeSurface)
   const openNodeSurface = useGraphStore((state) => state.openNodeSurface)
+  const setChatSheetOpen = useGraphStore((state) => state.setChatSheetOpen)
 
   const isLocalNote = !!localNote
   const { data: fetchedNote, isLoading: isFetchingNote } = useGetNote({
@@ -230,6 +231,20 @@ export const SheetNodePanel = memo(function SheetNodePanel({
           />
         </div>
         <div className="flex items-center gap-1 shrink-0">
+          {/* Mobile-only AI affordance: the floating island and top bar
+              are hidden when a panel covers the screen, so without this
+              there's no way to reach the chat sideview from a panel on
+              mobile. Hidden on md+ where the floating island is already
+              visible underneath. */}
+          <button
+            type="button"
+            onClick={() => setChatSheetOpen(true)}
+            title="Open AI chat"
+            aria-label="Open AI chat"
+            className="md:hidden flex items-center justify-center rounded-md bg-gradient-to-br from-wiki-link to-secondary-foreground size-7 shrink-0 shadow-sm transition hover:brightness-110"
+          >
+            <SparklesIcon className="size-3.5 text-primary-foreground" weight="fill" />
+          </button>
           <Button
             variant="ghost"
             size="icon-sm"

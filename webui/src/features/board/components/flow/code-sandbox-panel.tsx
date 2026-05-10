@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { ConsoleIcon, LoaderIcon, PlayIcon, CancelPlainIcon } from "@/components/icons"
+import { ConsoleIcon, LoaderIcon, PlayIcon, CancelPlainIcon, SparklesIcon } from "@/components/icons"
 
 import { Button } from "@/components/ui/button"
 import { useTheme } from "@/components/theme-provider"
@@ -38,6 +38,7 @@ export const CodeSandboxPanel = memo(function CodeSandboxPanel({
   const note = useGraphStore((state) => state.nodesById.get(nodeId)?.data)
   const updateNodeByIdPersist = useGraphStore((state) => state.updateNodeByIdPersist)
   const closeNodeSurface = useGraphStore((state) => state.closeNodeSurface)
+  const setChatSheetOpen = useGraphStore((state) => state.setChatSheetOpen)
 
   const [codeDraft, setCodeDraft] = useState(note?.content?.markdown || "")
   const [isExecuting, setIsExecuting] = useState(false)
@@ -231,6 +232,16 @@ export const CodeSandboxPanel = memo(function CodeSandboxPanel({
             )}
             {isExecuting ? "Running" : "Execute"}
           </Button>
+          {/* Mobile-only AI affordance — see sheet-node-panel for the rationale. */}
+          <button
+            type="button"
+            onClick={() => setChatSheetOpen(true)}
+            title="Open AI chat"
+            aria-label="Open AI chat"
+            className="md:hidden flex items-center justify-center rounded-md bg-gradient-to-br from-wiki-link to-secondary-foreground size-7 shrink-0 shadow-sm transition hover:brightness-110"
+          >
+            <SparklesIcon className="size-3.5 text-primary-foreground" weight="fill" />
+          </button>
           <Button
             variant="ghost"
             size="icon-sm"
