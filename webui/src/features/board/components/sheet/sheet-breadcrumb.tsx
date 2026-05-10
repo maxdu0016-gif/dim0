@@ -70,7 +70,7 @@ export function SheetBreadcrumb({ ancestors, onSegmentClick }: Props) {
             <DotsThreeIcon className="size-4 shrink-0" weight="bold" />
             <span>{ancestors.length} {ancestors.length === 1 ? "level" : "levels"} up</span>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="min-w-[220px] z-[70]">
+          <DropdownMenuContent align="start" className="min-w-[220px]">
             {ancestors.map((note) => {
               const kind = kindOf(note)
               const Icon = ICON_BY_KIND[kind]
