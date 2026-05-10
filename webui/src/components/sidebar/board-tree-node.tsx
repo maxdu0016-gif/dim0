@@ -32,6 +32,14 @@ type BoardTreeNodeProps = {
   boardId: string
   item: BoardContentItem
   depth: number
+  /**
+   * Closest folder ancestor of this row in the sidebar lineage. Threaded
+   * down so when the user clicks a leaf (sheet/code/widget) we can scope
+   * the canvas to the matching folder — otherwise the URL keeps an
+   * unrelated `root_id` and the background canvas drifts away from the
+   * note the panel just opened.
+   */
+  parentFolderId?: string
 }
 
 
@@ -42,7 +50,7 @@ type BoardTreeNodeProps = {
  * canvas children. The kind icon morphs to a chevron on row-hover so
  * the user can expand/collapse without leaving the current view.
  */
-export function BoardTreeNode({ boardId, item, depth }: BoardTreeNodeProps) {
+export function BoardTreeNode({ boardId, item, depth, parentFolderId }: BoardTreeNodeProps) {
   const navigate = useNavigate()
   const [expanded, setExpanded] = useState(false)
 
@@ -62,15 +70,19 @@ export function BoardTreeNode({ boardId, item, depth }: BoardTreeNodeProps) {
   })
 
   const handleNavigate = () => {
-    // `search: (prev) => ...` keeps `current_chat_id` (and any other
-    // search params) so opening a note from the sidebar doesn't reset
-    // the user's active chat session.
-    const keepSearch = (prev: Record<string, unknown>) => prev
+    // Keep `current_chat_id` etc. but realign `root_id` to the closest
+    // folder ancestor in the sidebar lineage so the background canvas
+    // matches the note the panel is opening. `parentFolderId` undefined
+    // means the leaf lives at the board root — drop `root_id` entirely.
+    const scopeToParentFolder = (prev: Record<string, unknown>) => {
+      const { root_id: _drop, ...rest } = prev
+      return parentFolderId ? { ...rest, root_id: parentFolderId } : rest
+    }
     if (item.kind === "sheet") {
       navigate({
         to: "/boards/$id/sheets/$noteId",
         params: { id: boardId, noteId: item.id },
-        search: keepSearch,
+        search: scopeToParentFolder,
       })
       return
     }
@@ -78,7 +90,7 @@ export function BoardTreeNode({ boardId, item, depth }: BoardTreeNodeProps) {
       navigate({
         to: "/boards/$id/code-sandbox/$noteId",
         params: { id: boardId, noteId: item.id },
-        search: keepSearch,
+        search: scopeToParentFolder,
       })
       return
     }
@@ -86,7 +98,7 @@ export function BoardTreeNode({ boardId, item, depth }: BoardTreeNodeProps) {
       navigate({
         to: "/boards/$id/widgets/$noteId",
         params: { id: boardId, noteId: item.id },
-        search: keepSearch,
+        search: scopeToParentFolder,
       })
       return
     }
@@ -98,7 +110,11 @@ export function BoardTreeNode({ boardId, item, depth }: BoardTreeNodeProps) {
       })
       return
     }
-    navigate({ to: "/boards/$id", params: { id: boardId }, search: keepSearch })
+    navigate({
+      to: "/boards/$id",
+      params: { id: boardId },
+      search: (prev: Record<string, unknown>) => prev,
+    })
   }
 
   const handleToggle = (e: MouseEvent) => {
@@ -186,6 +202,9 @@ export function BoardTreeNode({ boardId, item, depth }: BoardTreeNodeProps) {
                 boardId={boardId}
                 item={child}
                 depth={depth + 1}
+                // Folders bound a new canvas scope; sheets/sub-pages
+                // inherit the closest folder ancestor unchanged.
+                parentFolderId={isFolder ? item.id : parentFolderId}
               />
             ))
           )}
