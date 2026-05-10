@@ -32,15 +32,40 @@ export const NodeSurfaceHost = memo(function NodeSurfaceHost() {
 
   if (!activeNodeSurface) return null
 
+  // Backdrop dim. Sits just below the panel (z-[54] vs z-[55]) and above
+  // the chrome (z-50). Click-through anywhere outside the panel closes it.
+  const overlay = (
+    <div
+      className="absolute inset-0 z-[54] bg-background/50 backdrop-blur-sm"
+      onClick={closeNodeSurface}
+      aria-hidden="true"
+    />
+  )
+
   if (activeNodeSurface.kind === "sheet") {
-    return <SheetNodePanel nodeId={activeNodeSurface.nodeId} />
+    return (
+      <>
+        {overlay}
+        <SheetNodePanel nodeId={activeNodeSurface.nodeId} />
+      </>
+    )
   }
 
   if (!hasNode) return null
 
   if (activeNodeSurface.kind === "widget") {
-    return <WidgetPanel nodeId={activeNodeSurface.nodeId} />
+    return (
+      <>
+        {overlay}
+        <WidgetPanel nodeId={activeNodeSurface.nodeId} />
+      </>
+    )
   }
 
-  return <CodeSandboxPanel nodeId={activeNodeSurface.nodeId} />
+  return (
+    <>
+      {overlay}
+      <CodeSandboxPanel nodeId={activeNodeSurface.nodeId} />
+    </>
+  )
 })

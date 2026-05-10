@@ -194,8 +194,12 @@ export const SheetNodePanel = memo(function SheetNodePanel({
   return (
     <div className={PANEL_CLASS}>
       <SheetStackBackground depth={stackDepth} />
-      <div className="w-full flex items-start justify-between gap-2 px-4 pt-3 pb-2">
-        <div className="min-w-0 flex-1 pr-2 flex flex-col gap-1.5">
+
+      {/* Thin top bar — breadcrumb on the left, actions on the right.
+          The title intentionally lives inside the scrollable body below
+          (Notion-style) so it reads as the article's H1 instead of chrome. */}
+      <div className="w-full flex items-center justify-between gap-2 px-3 py-1.5">
+        <div className="min-w-0 flex-1 pr-2">
           <SheetBreadcrumb
             ancestors={ancestors}
             onSegmentClick={(ancestor, kind) => {
@@ -224,37 +228,8 @@ export const SheetNodePanel = memo(function SheetNodePanel({
               }
             }}
           />
-          {titleEditing ? (
-            <input
-              ref={titleInputRef}
-              value={titleDraft}
-              onChange={(event) => setTitleDraft(event.target.value)}
-              onBlur={() => stopTitleEdit(true)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  event.preventDefault()
-                  stopTitleEdit(true)
-                }
-                if (event.key === "Escape") {
-                  event.preventDefault()
-                  stopTitleEdit(false)
-                }
-              }}
-              className="w-full bg-transparent text-xl font-bold tracking-tight text-foreground border-0 border-b border-foreground/30 focus:border-secondary-foreground focus:outline-none px-0 py-0.5"
-              placeholder="Untitled note"
-            />
-          ) : (
-            <button
-              type="button"
-              onClick={() => setTitleEditing(true)}
-              className="block max-w-full truncate text-left text-xl font-bold tracking-tight text-foreground hover:opacity-80 transition-opacity"
-              title={displayTitle}
-            >
-              {displayTitle}
-            </button>
-          )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 shrink-0">
           <Button
             variant="ghost"
             size="icon-sm"
@@ -271,8 +246,43 @@ export const SheetNodePanel = memo(function SheetNodePanel({
         </div>
       </div>
 
-      <div className="flex-1 flex items-center w-full h-full min-h-0 min-w-0">
+      <div className="flex-1 flex w-full h-full min-h-0 min-w-0">
         <div className="h-full w-full min-w-0 overflow-y-auto overflow-x-hidden scrollbar-thin">
+          {/* Title sits with the article body — matches the editor's
+              `max-width: 720px; margin: 0 auto` (see .tiptap-editor
+              .ProseMirror in editor.css) so the H1 aligns with paragraphs,
+              tag panel, etc. below. */}
+          <div className="max-w-[720px] mx-auto px-4 pt-8 md:pt-12 pb-2">
+            {titleEditing ? (
+              <input
+                ref={titleInputRef}
+                value={titleDraft}
+                onChange={(event) => setTitleDraft(event.target.value)}
+                onBlur={() => stopTitleEdit(true)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault()
+                    stopTitleEdit(true)
+                  }
+                  if (event.key === "Escape") {
+                    event.preventDefault()
+                    stopTitleEdit(false)
+                  }
+                }}
+                className="w-full bg-transparent text-3xl md:text-4xl font-bold tracking-tight text-foreground border-0 focus:outline-none px-0 py-0.5"
+                placeholder="Untitled note"
+              />
+            ) : (
+              <button
+                type="button"
+                onClick={() => setTitleEditing(true)}
+                className="block w-full text-left text-3xl md:text-4xl font-bold tracking-tight text-foreground hover:opacity-90 transition-opacity"
+                title={displayTitle}
+              >
+                {displayTitle}
+              </button>
+            )}
+          </div>
           <SheetEditor
             // Each note is a distinct document; remount the editor when
             // navigating between sheets so TipTap re-initializes cleanly.
