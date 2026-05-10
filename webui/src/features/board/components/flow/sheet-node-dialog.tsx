@@ -224,7 +224,30 @@ export const SheetNodeDialog = memo(function SheetNodeDialog({
           <div className="min-w-0 flex-1 pr-2 flex flex-col gap-0.5">
             <SheetBreadcrumb
               ancestors={ancestors}
-              onSegmentClick={(id) => openNodeSurface(id, "sheet")}
+              onSegmentClick={(ancestor, kind) => {
+                // Folder ancestors aren't openable as sheets — drop into
+                // the canvas inside that folder. Other surface kinds open
+                // their own dialog. Unknown kinds fall back to the board.
+                if (kind === "folder") {
+                  closeNodeSurface()
+                  if (ancestor.graphUid) {
+                    navigate({
+                      to: "/boards/$id",
+                      params: { id: ancestor.graphUid },
+                      search: { root_id: ancestor.id },
+                    })
+                  }
+                  return
+                }
+                if (kind === "sheet" || kind === "code-sandbox" || kind === "widget") {
+                  openNodeSurface(ancestor.id, kind)
+                  return
+                }
+                if (ancestor.graphUid) {
+                  closeNodeSurface()
+                  navigate({ to: "/boards/$id", params: { id: ancestor.graphUid } })
+                }
+              }}
             />
             {titleEditing ? (
               <input

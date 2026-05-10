@@ -61,9 +61,27 @@ export const SheetScreen = () => {
               <div className="px-2 pb-2">
                 <SheetBreadcrumb
                   ancestors={ancestors}
-                  onSegmentClick={(id) =>
-                    navigate({ to: SheetUrl, params: { id: boardId, noteId: id } })
-                  }
+                  onSegmentClick={(ancestor, kind) => {
+                    // Folders drop the user into the canvas inside that
+                    // folder; other note kinds keep the same full-page route
+                    // (the screen will rerender with the new noteId via key).
+                    if (kind === "folder") {
+                      navigate({
+                        to: "/boards/$id",
+                        params: { id: boardId },
+                        search: { root_id: ancestor.id },
+                      })
+                      return
+                    }
+                    if (kind === "sheet" || kind === "code-sandbox" || kind === "widget") {
+                      navigate({
+                        to: SheetUrl,
+                        params: { id: boardId, noteId: ancestor.id },
+                      })
+                      return
+                    }
+                    navigate({ to: "/boards/$id", params: { id: boardId } })
+                  }}
                 />
               </div>
               <div className="flex-1 min-h-0">
