@@ -69,6 +69,20 @@ export function BoardTreeNode({ boardId, item, depth }: BoardTreeNodeProps) {
       })
       return
     }
+    if (item.kind === "code-sandbox") {
+      navigate({
+        to: "/boards/$id/code-sandbox/$noteId",
+        params: { id: boardId, noteId: item.id },
+      })
+      return
+    }
+    if (item.kind === "widget") {
+      navigate({
+        to: "/boards/$id/widgets/$noteId",
+        params: { id: boardId, noteId: item.id },
+      })
+      return
+    }
     if (item.kind === "folder") {
       navigate({
         to: "/boards/$id",

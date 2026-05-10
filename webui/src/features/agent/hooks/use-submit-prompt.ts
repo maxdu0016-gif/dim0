@@ -111,10 +111,16 @@ export const useSubmitPrompt = () => {
         id = chatId!
       }
 
+      // Lazy read — no subscription on graph state, just a one-shot
+      // snapshot at submit time so the agent knows which page (if any)
+      // the user is currently looking at.
+      const attachedNoteId = useGraphStore.getState().activeNodeSurface?.nodeId
+
       const payload: SendMessageRequestPayload = {
         query: trimmed,
         messageId: generateUuid(),
         rootId,
+        attachedNoteId,
         model: llmModel,
         webSearchEngine,
         enabledTools,

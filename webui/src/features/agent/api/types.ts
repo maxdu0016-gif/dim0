@@ -11,6 +11,12 @@ export interface SendMessageRequestPayload {
   query: string
   messageId: string
   rootId?: string
+  /**
+   * When set, the user is editing this note when they hit send. Used by
+   * the agent as a hint about which page is currently active so it can
+   * scope retrieval / edits to that note.
+   */
+  attachedNoteId?: string
   model: LlmModel
   webSearchEngine: WebSearchEngine
   enabledTools?: ToolName[]
