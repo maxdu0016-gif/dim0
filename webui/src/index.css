@@ -553,6 +553,222 @@
 }
 
 /* ============================================================
+   MONOKAI PRO — neon-on-dark IDE classic (Sun / Octagon)
+   Radius: tight (8px) — matches the editor-precision aesthetic
+   ============================================================ */
+
+[data-theme="monokai-pro"] {
+  --radius: 0.5rem;
+
+  /* surfaces — Filter Sun */
+  --background:            oklch(0.965 0.011 30);    /* #faf4f2 */
+  --foreground:            oklch(0.265 0.018 320);   /* #29242a wine */
+  --card:                  oklch(0.978 0.008 30);    /* slight lift */
+  --card-foreground:       oklch(0.265 0.018 320);
+  --popover:               oklch(0.978 0.008 30);
+  --popover-foreground:    oklch(0.265 0.018 320);
+
+  /* primary = dark wine for IDE-chrome feel; rose stays as accent only */
+  --primary:               oklch(0.265 0.018 320);
+  --primary-foreground:    oklch(0.965 0.011 30);
+  --secondary:             oklch(0.90 0.04 12);      /* soft rose chip */
+  --secondary-foreground:  oklch(0.52 0.13 8);
+
+  --muted:                 oklch(0.92 0.012 35);
+  --muted-foreground:      oklch(0.48 0.014 30);
+  --accent:                oklch(0.92 0.012 35);
+  --accent-foreground:     oklch(0.265 0.018 320);
+  --destructive:           oklch(0.58 0.16 12);
+  --destructive-foreground: oklch(0.965 0.011 30);
+  --border:                oklch(0.86 0.018 40);
+  --input:                 oklch(0.92 0.012 35);
+  --ring:                  oklch(0.55 0.13 10);      /* rose ring accent */
+
+  --sidebar:               oklch(0.945 0.013 30);
+  --sidebar-foreground:    oklch(0.265 0.018 320);
+  --sidebar-primary:       oklch(0.265 0.018 320);
+  --sidebar-primary-foreground: oklch(0.965 0.011 30);
+  --sidebar-accent:        oklch(0.90 0.04 12);
+  --sidebar-accent-foreground: oklch(0.52 0.13 8);
+  --sidebar-border:        oklch(0.86 0.018 40);
+  --sidebar-ring:          oklch(0.55 0.13 10);
+  --sidebar-icon-1:        oklch(0.50 0.10 215);     /* slate-blue */
+  --sidebar-icon-2:        oklch(0.50 0.12 150);     /* green */
+  --sidebar-icon-3:        oklch(0.55 0.13 10);      /* rose */
+  --sidebar-icon-4:        oklch(0.55 0.18 305);     /* purple */
+
+  --highlight-default:     oklch(0.93 0.07 90);
+  --link:                  oklch(0.50 0.10 215);     /* slate-blue */
+  --link-foreground:       oklch(0.42 0.08 215);
+  --wiki-link:             oklch(0.55 0.13 10);      /* rose — matches syntax */
+  --wiki-link-subtle:      oklch(0.90 0.04 12);
+
+  --chart-1: oklch(0.55 0.13 10);
+  --chart-2: oklch(0.50 0.10 215);
+  --chart-3: oklch(0.58 0.14 70);    /* warm yellow */
+  --chart-4: oklch(0.50 0.12 150);   /* green */
+  --chart-5: oklch(0.55 0.18 305);   /* purple */
+}
+
+[data-theme="monokai-pro"][data-mode="dark"] {
+  /* surfaces — Filter Octagon */
+  --background:            oklch(0.297 0.025 280);   /* #282a3a */
+  --foreground:            oklch(0.945 0.012 200);   /* #eaf2f1 */
+  --card:                  oklch(0.345 0.025 280);
+  --card-foreground:       oklch(0.945 0.012 200);
+  --popover:               oklch(0.345 0.025 280);
+  --popover-foreground:    oklch(0.945 0.012 200);
+
+  /* primary = off-white surface; coral stays as accent only */
+  --primary:               oklch(0.945 0.012 200);
+  --primary-foreground:    oklch(0.297 0.025 280);
+  --secondary:             oklch(0.36 0.06 12);      /* dim coral chip */
+  --secondary-foreground:  oklch(0.85 0.13 12);
+
+  --muted:                 oklch(0.36 0.022 280);
+  --muted-foreground:      oklch(0.62 0.022 270);    /* #80818e */
+  --accent:                oklch(0.36 0.022 280);
+  --accent-foreground:     oklch(0.945 0.012 200);
+  --destructive:           oklch(0.65 0.18 12);
+  --destructive-foreground: oklch(0.297 0.025 280);
+  --border:                oklch(1 0 0 / 0.08);
+  --input:                 oklch(0.36 0.022 280);
+  --ring:                  oklch(0.68 0.15 12);      /* coral ring accent */
+
+  --sidebar:               oklch(0.32 0.025 280);
+  --sidebar-foreground:    oklch(0.945 0.012 200);
+  --sidebar-primary:       oklch(0.945 0.012 200);
+  --sidebar-primary-foreground: oklch(0.297 0.025 280);
+  --sidebar-accent:        oklch(0.36 0.06 12);
+  --sidebar-accent-foreground: oklch(0.85 0.13 12);
+  --sidebar-border:        oklch(1 0 0 / 0.08);
+  --sidebar-ring:          oklch(0.68 0.15 12);
+  --sidebar-icon-1:        oklch(0.78 0.10 195);     /* cyan #9cd1bb */
+  --sidebar-icon-2:        oklch(0.83 0.16 110);     /* lime #bad761 */
+  --sidebar-icon-3:        oklch(0.68 0.15 12);      /* coral */
+  --sidebar-icon-4:        oklch(0.86 0.14 85);      /* yellow #ffd76d */
+
+  --highlight-default:     oklch(0.42 0.10 85);
+  --link:                  oklch(0.78 0.10 195);     /* cyan */
+  --link-foreground:       oklch(0.83 0.08 195);
+  --wiki-link:             oklch(0.78 0.10 305);     /* lavender #c39ac9 */
+  --wiki-link-subtle:      oklch(0.36 0.06 12);
+
+  --chart-1: oklch(0.68 0.15 12);
+  --chart-2: oklch(0.78 0.10 195);
+  --chart-3: oklch(0.86 0.14 85);
+  --chart-4: oklch(0.83 0.16 110);
+  --chart-5: oklch(0.78 0.10 305);
+}
+
+/* ============================================================
+   ROSÉ PINE — soft pastel, rose accent (Dawn / Main)
+   Radius: gentle (12px) — matches the soft pastel mood
+   ============================================================ */
+
+[data-theme="rose-pine"] {
+  --radius: 0.75rem;
+
+  /* surfaces — Dawn */
+  --background:            oklch(0.97 0.012 75);     /* base    #faf4ed */
+  --foreground:            oklch(0.42 0.052 290);    /* text    #575279 */
+  --card:                  oklch(0.985 0.008 75);    /* surface #fffaf3 */
+  --card-foreground:       oklch(0.42 0.052 290);
+  --popover:               oklch(0.985 0.008 75);
+  --popover-foreground:    oklch(0.42 0.052 290);
+
+  --primary:               oklch(0.555 0.105 10);    /* love    #b4637a */
+  --primary-foreground:    oklch(0.97 0.012 75);
+  --secondary:             oklch(0.84 0.06 25);      /* rose tint chip */
+  --secondary-foreground:  oklch(0.50 0.13 10);
+
+  --muted:                 oklch(0.93 0.015 60);     /* overlay #f2e9e1 */
+  --muted-foreground:      oklch(0.55 0.025 280);    /* subtle  #797593 */
+  --accent:                oklch(0.93 0.015 60);
+  --accent-foreground:     oklch(0.42 0.052 290);
+  --destructive:           oklch(0.555 0.105 10);
+  --destructive-foreground: oklch(0.97 0.012 75);
+  --border:                oklch(0.83 0.015 30);     /* highlight-high */
+  --input:                 oklch(0.93 0.015 60);
+  --ring:                  oklch(0.555 0.105 10);
+
+  --sidebar:               oklch(0.95 0.013 70);
+  --sidebar-foreground:    oklch(0.42 0.052 290);
+  --sidebar-primary:       oklch(0.555 0.105 10);
+  --sidebar-primary-foreground: oklch(0.97 0.012 75);
+  --sidebar-accent:        oklch(0.84 0.06 25);
+  --sidebar-accent-foreground: oklch(0.50 0.13 10);
+  --sidebar-border:        oklch(0.83 0.015 30);
+  --sidebar-ring:          oklch(0.555 0.105 10);
+  --sidebar-icon-1:        oklch(0.46 0.07 230);     /* pine    #286983 */
+  --sidebar-icon-2:        oklch(0.56 0.07 200);     /* foam    #56949f */
+  --sidebar-icon-3:        oklch(0.555 0.105 10);    /* love */
+  --sidebar-icon-4:        oklch(0.55 0.10 310);     /* iris    #907aa9 */
+
+  --highlight-default:     oklch(0.92 0.08 80);
+  --link:                  oklch(0.56 0.07 200);     /* foam */
+  --link-foreground:       oklch(0.46 0.07 230);     /* pine */
+  --wiki-link:             oklch(0.55 0.10 310);     /* iris */
+  --wiki-link-subtle:      oklch(0.84 0.06 25);
+
+  --chart-1: oklch(0.555 0.105 10);
+  --chart-2: oklch(0.56 0.07 200);
+  --chart-3: oklch(0.65 0.12 50);
+  --chart-4: oklch(0.46 0.07 230);
+  --chart-5: oklch(0.55 0.10 310);
+}
+
+[data-theme="rose-pine"][data-mode="dark"] {
+  /* surfaces — Main */
+  --background:            oklch(0.198 0.026 290);   /* base    #191724 */
+  --foreground:            oklch(0.91 0.025 280);    /* text    #e0def4 */
+  --card:                  oklch(0.243 0.028 290);   /* surface #1f1d2e */
+  --card-foreground:       oklch(0.91 0.025 280);
+  --popover:               oklch(0.243 0.028 290);
+  --popover-foreground:    oklch(0.91 0.025 280);
+
+  --primary:               oklch(0.72 0.135 10);     /* love    #eb6f92 */
+  --primary-foreground:    oklch(0.198 0.026 290);
+  --secondary:             oklch(0.36 0.06 10);      /* dim love chip */
+  --secondary-foreground:  oklch(0.85 0.12 10);
+
+  --muted:                 oklch(0.275 0.028 290);   /* overlay #26233a */
+  --muted-foreground:      oklch(0.70 0.025 290);    /* subtle  #908caa */
+  --accent:                oklch(0.275 0.028 290);
+  --accent-foreground:     oklch(0.91 0.025 280);
+  --destructive:           oklch(0.72 0.135 10);
+  --destructive-foreground: oklch(0.198 0.026 290);
+  --border:                oklch(1 0 0 / 0.08);
+  --input:                 oklch(0.275 0.028 290);
+  --ring:                  oklch(0.72 0.135 10);
+
+  --sidebar:               oklch(0.225 0.028 290);
+  --sidebar-foreground:    oklch(0.91 0.025 280);
+  --sidebar-primary:       oklch(0.72 0.135 10);
+  --sidebar-primary-foreground: oklch(0.198 0.026 290);
+  --sidebar-accent:        oklch(0.36 0.06 10);
+  --sidebar-accent-foreground: oklch(0.85 0.12 10);
+  --sidebar-border:        oklch(1 0 0 / 0.08);
+  --sidebar-ring:          oklch(0.72 0.135 10);
+  --sidebar-icon-1:        oklch(0.55 0.07 215);     /* pine    #31748f */
+  --sidebar-icon-2:        oklch(0.83 0.07 200);     /* foam    #9ccfd8 */
+  --sidebar-icon-3:        oklch(0.72 0.135 10);     /* love */
+  --sidebar-icon-4:        oklch(0.78 0.10 310);     /* iris    #c4a7e7 */
+
+  --highlight-default:     oklch(0.35 0.08 85);
+  --link:                  oklch(0.83 0.07 200);     /* foam */
+  --link-foreground:       oklch(0.86 0.06 200);
+  --wiki-link:             oklch(0.78 0.10 310);     /* iris */
+  --wiki-link-subtle:      oklch(0.36 0.06 10);
+
+  --chart-1: oklch(0.72 0.135 10);
+  --chart-2: oklch(0.83 0.07 200);
+  --chart-3: oklch(0.84 0.13 80);    /* gold */
+  --chart-4: oklch(0.55 0.07 215);   /* pine */
+  --chart-5: oklch(0.78 0.10 310);   /* iris */
+}
+
+/* ============================================================
    BASE
    ============================================================ */
 

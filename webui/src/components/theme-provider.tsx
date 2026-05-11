@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react"
 
 
-export type ThemeId = "parchment" | "catppuccin" | "tokyo-night" | "gruvbox"
+export type ThemeId = "parchment" | "catppuccin" | "tokyo-night" | "gruvbox" | "monokai-pro" | "rose-pine"
 
 export type Mode = "light" | "dark" | "system"
 
@@ -39,6 +39,18 @@ export const THEMES: ThemeMeta[] = [
     label: "Gruvbox",
     swatchLight: ["#fbf1c7", "#d65d0e", "#d5c4a1"],
     swatchDark:  ["#282828", "#fe8019", "#504945"],
+  },
+  {
+    id: "monokai-pro",
+    label: "Monokai Pro",
+    swatchLight: ["#faf4f2", "#cc486f", "#f0e8e3"],
+    swatchDark:  ["#282a3a", "#ff657a", "#363a4d"],
+  },
+  {
+    id: "rose-pine",
+    label: "Rosé Pine",
+    swatchLight: ["#faf4ed", "#b4637a", "#dfdad9"],
+    swatchDark:  ["#191724", "#eb6f92", "#26233a"],
   },
 ]
 
