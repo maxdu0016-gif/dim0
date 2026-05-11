@@ -75,10 +75,8 @@ export function BoardTreeNode({ boardId, item, depth, parentFolderId }: BoardTre
     // matches the note the panel is opening. `parentFolderId` undefined
     // means the leaf lives at the board root — drop `root_id` entirely.
     const scopeToParentFolder = (prev: Record<string, unknown>) => {
-      if (parentFolderId) return { ...prev, root_id: parentFolderId }
-      const rest = { ...prev }
-      delete rest.root_id
-      return rest
+      const { root_id: _drop, ...rest } = prev
+      return parentFolderId ? { ...rest, root_id: parentFolderId } : rest
     }
     if (item.kind === "sheet") {
       navigate({
