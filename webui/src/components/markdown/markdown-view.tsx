@@ -6,7 +6,7 @@ import { CustomTable } from "./custom-table"
 import { Pre } from "./custom-pre"
 import { MarkdownLink } from "./markdown-link"
 import { Streamdown } from "streamdown"
-import { createCodePlugin } from "./streamdown-code-plugin"
+import { codePlugin } from "./streamdown-code-plugin"
 import { sanitizeMathDelimiters } from "./sanitize-math"
 import { useTheme, type ShikiThemePair } from "@/components/theme-provider"
 import type { BundledTheme } from "shiki"
@@ -217,13 +217,6 @@ const Renderer: React.FC<{
 }> = ({ content, isStreaming, shikiThemes }) => {
   const normalized = normalizeMathDelimiters(sanitizeMathDelimiters(content))
 
-  // Plugin instance stays stable across renders; a ref-backed getter feeds it
-  // the latest theme pair so Streamdown re-highlights without rebuilding the
-  // plugin (and its Shiki cache) every time the theme changes.
-  const shikiThemesRef = React.useRef(shikiThemes)
-  shikiThemesRef.current = shikiThemes
-  const code = React.useMemo(() => createCodePlugin(() => shikiThemesRef.current), [])
-
   return (
     <div>
       <Streamdown
@@ -239,7 +232,7 @@ const Renderer: React.FC<{
         rehypePlugins={[
           rehypeKatex, // <- render math with KaTeX
         ]}
-        plugins={isStreaming ? undefined: { code: code }}
+        plugins={isStreaming ? undefined : { code: codePlugin }}
       >
         {normalized}
       </Streamdown>

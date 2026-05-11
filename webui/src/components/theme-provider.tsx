@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react"
 import type { BundledTheme } from "shiki"
+import { setActiveShikiThemes } from "@/components/markdown/streamdown-code-plugin"
 
 
 export type ThemeId = "parchment" | "catppuccin" | "tokyo-night" | "gruvbox" | "monokai-pro" | "rose-pine"
@@ -190,6 +191,7 @@ export function ThemeProvider({
     root.dataset.theme = themeId
     root.dataset.mode = resolved
     setResolvedTheme(resolved)
+    setActiveShikiThemes(THEME_SHIKI_MAP[themeId])
   }, [themeId, mode])
 
   useEffect(() => {

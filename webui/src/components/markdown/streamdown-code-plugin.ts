@@ -148,3 +148,19 @@ export function createCodePlugin(
     },
   }
 }
+
+
+/**
+ * Singleton plugin shared across every `MarkdownView`. Each `createCodePlugin`
+ * call allocates its own Shiki highlighter + WASM grammar registry, so per-
+ * mount instantiation would multiply WASM workers by message count. Theme
+ * switching is handled by the mutable `_activeThemes` cell below — the
+ * plugin's `getThemes` reads it on every highlight request.
+ */
+let _activeThemes: ThemePair = ["rose-pine-dawn", "rose-pine"]
+
+export function setActiveShikiThemes(themes: ThemePair): void {
+  _activeThemes = themes
+}
+
+export const codePlugin: CodeHighlighterPlugin = createCodePlugin(() => _activeThemes)
