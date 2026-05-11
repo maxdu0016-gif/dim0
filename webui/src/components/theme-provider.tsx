@@ -1,7 +1,27 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react"
+import type { BundledTheme } from "shiki"
 
 
 export type ThemeId = "parchment" | "catppuccin" | "tokyo-night" | "gruvbox" | "monokai-pro" | "rose-pine"
+
+
+export type ShikiThemePair = readonly [BundledTheme, BundledTheme]
+
+
+/**
+ * Maps each app theme to a Shiki theme pair `[light, dark]` for syntax
+ * highlighting. Picks are best-effort matches — Shiki doesn't bundle every
+ * theme's light variant, so a few entries borrow a stylistically-similar
+ * theme (Tokyo Night → github-light; Monokai Pro → vitesse-light / monokai).
+ */
+export const THEME_SHIKI_MAP: Record<ThemeId, ShikiThemePair> = {
+  parchment:     ["rose-pine-dawn",       "rose-pine"],
+  catppuccin:    ["catppuccin-latte",     "catppuccin-mocha"],
+  "tokyo-night": ["github-light",         "tokyo-night"],
+  gruvbox:       ["gruvbox-light-medium", "gruvbox-dark-medium"],
+  "monokai-pro": ["vitesse-light",        "monokai"],
+  "rose-pine":   ["rose-pine-dawn",       "rose-pine"],
+}
 
 export type Mode = "light" | "dark" | "system"
 
@@ -120,6 +140,8 @@ type ThemeProviderState = {
   mode: Mode
   /** Always concrete ("light" | "dark") — "system" is resolved against the media query. */
   resolvedTheme: "light" | "dark"
+  /** Shiki theme pair `[light, dark]` matched to the current app theme. */
+  shikiThemes: ShikiThemePair
   setThemeId: (id: ThemeId) => void
   setMode: (mode: Mode) => void
   themes: ThemeMeta[]
@@ -130,6 +152,7 @@ const initialState: ThemeProviderState = {
   themeId: DEFAULT_THEME_ID,
   mode: DEFAULT_MODE,
   resolvedTheme: "light",
+  shikiThemes: THEME_SHIKI_MAP[DEFAULT_THEME_ID],
   setThemeId: () => null,
   setMode: () => null,
   themes: THEMES,
@@ -193,6 +216,7 @@ export function ThemeProvider({
       themeId,
       mode,
       resolvedTheme,
+      shikiThemes: THEME_SHIKI_MAP[themeId],
       themes: THEMES,
       setThemeId: (id) => {
         setPrefs((prev) => {

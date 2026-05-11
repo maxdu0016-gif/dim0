@@ -8,9 +8,8 @@ import { MarkdownLink } from "./markdown-link"
 import { Streamdown } from "streamdown"
 import { createCodePlugin } from "./streamdown-code-plugin"
 import { sanitizeMathDelimiters } from "./sanitize-math"
-
-
-const code = createCodePlugin(["rose-pine-dawn", "rose-pine-moon"])
+import { useTheme, type ShikiThemePair } from "@/components/theme-provider"
+import type { BundledTheme } from "shiki"
 
 import remarkGfm from "remark-gfm"
 import remarkMath from "remark-math"
@@ -211,14 +210,26 @@ const components = {
 /** -------------------------------------------------------
  * Renderer: GFM + math override + mermaid
  * ------------------------------------------------------*/
-const Renderer: React.FC<{ content: string; isStreaming?: boolean }> = ({ content, isStreaming }) => {
+const Renderer: React.FC<{
+  content: string
+  isStreaming?: boolean
+  shikiThemes: ShikiThemePair
+}> = ({ content, isStreaming, shikiThemes }) => {
   const normalized = normalizeMathDelimiters(sanitizeMathDelimiters(content))
+
+  // Plugin instance stays stable across renders; a ref-backed getter feeds it
+  // the latest theme pair so Streamdown re-highlights without rebuilding the
+  // plugin (and its Shiki cache) every time the theme changes.
+  const shikiThemesRef = React.useRef(shikiThemes)
+  shikiThemesRef.current = shikiThemes
+  const code = React.useMemo(() => createCodePlugin(() => shikiThemesRef.current), [])
+
   return (
     <div>
       <Streamdown
         mode={isStreaming ? "streaming" : "static"}
         components={components}
-        shikiTheme={["rose-pine-dawn", "rose-pine-moon"]}
+        shikiTheme={shikiThemes as [BundledTheme, BundledTheme]}
         remarkPlugins={[
           remarkGfm, // <- restores GFM (tables, task lists, etc.)
           // singleDollarTextMath disabled: bare `$` stays literal (currency, prose).
@@ -253,13 +264,15 @@ export interface MarkdownViewProps {
  */
 export const MarkdownView: React.FC<MarkdownViewProps> = React.memo(
   ({ content, isStreaming = false }) => {
+    const { shikiThemes } = useTheme()
+
     React.useEffect(() => {
       ensureScrollbarStyleInjected()
     }, [])
 
     return (
       <div className="w-full min-w-0">
-        <Renderer content={content} isStreaming={isStreaming} />
+        <Renderer content={content} isStreaming={isStreaming} shikiThemes={shikiThemes} />
       </div>
     )
   },

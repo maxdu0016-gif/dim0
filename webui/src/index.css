@@ -180,6 +180,10 @@
   --chart-3: oklch(0.5989 0.1071 2.6555);
   --chart-4: oklch(0.4909 0.0770 227.9983);
   --chart-5: oklch(0.66 0.11 330);
+
+  /* code-block bg — matches the Shiki theme's bg so wrapper + Shiki output
+     share a seamless surface (rose-pine-dawn for this theme). */
+  --code-block-bg: #faf4ed;
 }
 
 [data-theme="parchment"][data-mode="dark"] {
@@ -229,6 +233,8 @@
   --chart-3: oklch(0.78 0.12 2.7);
   --chart-4: oklch(0.78 0.12 228);
   --chart-5: oklch(0.82 0.14 330);
+
+  --code-block-bg: #191724;            /* rose-pine */
 }
 
 /* ============================================================
@@ -286,6 +292,8 @@
   --chart-3: oklch(0.555 0.232 14);  /* red */
   --chart-4: oklch(0.65 0.14 200);   /* sky */
   --chart-5: oklch(0.526 0.244 305); /* mauve */
+
+  --code-block-bg: #eff1f5;            /* catppuccin-latte */
 }
 
 [data-theme="catppuccin"][data-mode="dark"] {
@@ -336,6 +344,8 @@
   --chart-3: oklch(0.762 0.122 8);
   --chart-4: oklch(0.78 0.10 200);
   --chart-5: oklch(0.776 0.136 304);
+
+  --code-block-bg: #1e1e2e;            /* catppuccin-mocha */
 }
 
 /* ============================================================
@@ -393,6 +403,8 @@
   --chart-3: oklch(0.61 0.22 8);
   --chart-4: oklch(0.55 0.13 150);
   --chart-5: oklch(0.55 0.22 305);
+
+  --code-block-bg: #ffffff;            /* github-light (Shiki light substitute) */
 }
 
 [data-theme="tokyo-night"][data-mode="dark"] {
@@ -443,6 +455,8 @@
   --chart-3: oklch(0.71 0.16 14);
   --chart-4: oklch(0.78 0.14 150);
   --chart-5: oklch(0.74 0.13 305);
+
+  --code-block-bg: #1a1b26;            /* tokyo-night */
 }
 
 /* ============================================================
@@ -500,6 +514,8 @@
   --chart-3: oklch(0.486 0.196 31);
   --chart-4: oklch(0.578 0.142 124);
   --chart-5: oklch(0.55 0.137 354);
+
+  --code-block-bg: #fbf1c7;            /* gruvbox-light-medium */
 }
 
 [data-theme="gruvbox"][data-mode="dark"] {
@@ -550,6 +566,8 @@
   --chart-3: oklch(0.65 0.215 32);
   --chart-4: oklch(0.78 0.15 124);
   --chart-5: oklch(0.75 0.10 354);
+
+  --code-block-bg: #282828;            /* gruvbox-dark-medium */
 }
 
 /* ============================================================
@@ -608,6 +626,8 @@
   --chart-3: oklch(0.58 0.14 70);    /* warm yellow */
   --chart-4: oklch(0.50 0.12 150);   /* green */
   --chart-5: oklch(0.55 0.18 305);   /* purple */
+
+  --code-block-bg: #ffffff;            /* vitesse-light (Monokai Pro Sun substitute) */
 }
 
 [data-theme="monokai-pro"][data-mode="dark"] {
@@ -659,6 +679,8 @@
   --chart-3: oklch(0.86 0.14 85);
   --chart-4: oklch(0.83 0.16 110);
   --chart-5: oklch(0.78 0.10 305);
+
+  --code-block-bg: #272822;            /* monokai */
 }
 
 /* ============================================================
@@ -716,6 +738,8 @@
   --chart-3: oklch(0.65 0.12 50);
   --chart-4: oklch(0.46 0.07 230);
   --chart-5: oklch(0.55 0.10 310);
+
+  --code-block-bg: #faf4ed;            /* rose-pine-dawn */
 }
 
 [data-theme="rose-pine"][data-mode="dark"] {
@@ -766,6 +790,8 @@
   --chart-3: oklch(0.84 0.13 80);    /* gold */
   --chart-4: oklch(0.55 0.07 215);   /* pine */
   --chart-5: oklch(0.78 0.10 310);   /* iris */
+
+  --code-block-bg: #191724;            /* rose-pine */
 }
 
 /* ============================================================

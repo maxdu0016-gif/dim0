@@ -279,16 +279,14 @@
 }
 
 /* Stacked grid: Shiki layer behind, editable layer in front.
-   Background matches the Shiki theme so trailing empty lines (which Shiki trims)
-   and the 80ms debounce window don't expose the page behind the shorter shiki pre. */
+   Background pulls from --code-block-bg (set per app theme in index.css) so
+   the wrapper matches whichever Shiki theme the active app theme maps to.
+   Important for trailing empty lines Shiki trims and the ~80ms window before
+   Shiki finishes its first highlight. */
 .code-block-body {
   display: grid;
   overflow-x: auto;
-  background: #faf4ed; /* rose-pine-dawn base */
-}
-
-[data-mode="dark"] .code-block-body {
-  background: #191724; /* rose-pine base */
+  background: var(--code-block-bg);
 }
 
 .code-block-shiki-layer,
