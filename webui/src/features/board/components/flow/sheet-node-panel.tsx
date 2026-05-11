@@ -203,6 +203,7 @@ export const SheetNodePanel = memo(function SheetNodePanel({
         <div className="min-w-0 flex-1 pr-2">
           <SheetBreadcrumb
             ancestors={ancestors}
+            current={note}
             onSegmentClick={(ancestor, kind) => {
               if (kind === "folder") {
                 closeNodeSurface()
