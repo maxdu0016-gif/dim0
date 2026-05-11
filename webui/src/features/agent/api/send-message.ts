@@ -271,10 +271,28 @@ export const useSendMessage = () => {
 
               try {
                 const note = await getBoardNote(activeBoardId, output.noteId)
-                const fetchedNode = convertNoteToNode(note)
-                setNodesPersist((prevNodes) =>
-                  applyRemoteNoteNode(prevNodes, fetchedNode, isNewlyCreated),
-                { persist: false })
+
+                // Only touch the canvas when the note actually belongs
+                // to the current scope. A sub-page (parent is another
+                // note) or a note in a different folder than the one
+                // currently drilled-into shouldn't appear as a phantom
+                // canvas node on edit. The panel still gets the fresh
+                // data via the React Query cache update below.
+                const currentRootId = useGraphStore.getState().rootId
+                const noteParentId = note.parentId
+                const belongsToCanvas =
+                  (noteParentId ?? undefined) === (currentRootId ?? undefined)
+
+                if (belongsToCanvas) {
+                  const fetchedNode = convertNoteToNode(note)
+                  setNodesPersist((prevNodes) =>
+                    applyRemoteNoteNode(prevNodes, fetchedNode, isNewlyCreated),
+                  { persist: false })
+
+                  if (isNewlyCreated) {
+                    createdNoteIds.push(output.noteId)
+                  }
+                }
 
                 // Sub-pages don't live on the canvas, so the panel reads
                 // them via React Query (`useGetNote`). Refresh that cache
@@ -285,10 +303,6 @@ export const useSendMessage = () => {
                   queryKey: ["note", activeBoardId, output.noteId],
                   exact: true,
                 })
-
-                if (isNewlyCreated) {
-                  createdNoteIds.push(output.noteId)
-                }
               } catch (error) {
                 console.error("Failed to apply remote note update locally:", error)
               }
