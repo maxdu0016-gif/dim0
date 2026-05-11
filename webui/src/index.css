@@ -1023,7 +1023,7 @@
 .sheet-stack-layer {
   position: absolute;
   inset: 0;
-  background: var(--background);
+  background: var(--card);
   border: 1px solid var(--border);
   border-radius: inherit;
   pointer-events: none;
