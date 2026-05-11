@@ -9,7 +9,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { type Mode, type ThemeMeta, useTheme } from "@/components/theme-provider"
+import { useTheme } from "@/components/theme-provider"
+import { type Mode, type ThemeMeta } from "@/components/theme-constants"
 
 
 type SwatchTrio = ThemeMeta["swatchLight"]
