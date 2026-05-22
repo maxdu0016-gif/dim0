@@ -56,7 +56,7 @@ export function HarnessToolbar() {
   return (
     <div
       className={cn(
-        "absolute left-1/2 top-3 z-10 flex -translate-x-1/2 items-center gap-1 rounded-lg",
+        "absolute left-1/2 top-3 z-50 flex -translate-x-1/2 items-center gap-1 rounded-lg",
         "border border-border bg-background/95 px-2 py-1 shadow-md backdrop-blur",
       )}
     >

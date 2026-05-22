@@ -30,7 +30,7 @@ export function HarnessSaveStatus({ status }: { status: SaveStatus }) {
   return (
     <div
       className={cn(
-        "absolute right-3 top-3 z-10 rounded-md border border-border bg-background/95 px-2 py-1 text-xs shadow-sm backdrop-blur",
+        "absolute right-3 top-3 z-50 rounded-md border border-border bg-background/95 px-2 py-1 text-xs shadow-sm backdrop-blur",
         STATUS_CLASS[status],
       )}
       aria-live="polite"

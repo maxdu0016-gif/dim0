@@ -136,7 +136,7 @@ function HarnessCanvasInner({ theme, tool, saveStatus, onCreateDrag, onClick }: 
           right: 16,
           borderRadius: 6,
           overflow: "hidden",
-          zIndex: 10,
+          zIndex: 50,
         }}
       />
     </>

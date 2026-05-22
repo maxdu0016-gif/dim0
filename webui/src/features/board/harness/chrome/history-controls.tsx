@@ -57,7 +57,7 @@ export function HarnessHistoryControls() {
   return (
     <div
       className={cn(
-        "absolute left-3 top-3 z-10 flex items-center gap-0.5 rounded-lg",
+        "absolute left-3 top-3 z-50 flex items-center gap-0.5 rounded-lg",
         "border border-border bg-background/95 px-1 py-1 shadow-md backdrop-blur",
       )}
     >
