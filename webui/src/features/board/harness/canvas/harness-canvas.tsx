@@ -1,9 +1,14 @@
 import { useEffect, useRef, useState } from "react"
 import type { CanvasStore } from "@canvas-harness/core"
 import { Canvas, CanvasProvider, Minimap } from "@canvas-harness/react"
+import {
+  HarnessHistoryControls,
+  HarnessSaveStatus,
+  HarnessToolbar,
+} from "../chrome"
 import { boardNodeTypes, useRenderCustomNodeView } from "../node-types"
 import { hydrateBoardStore } from "../persist/snapshot-load"
-import { useBoardDebouncedSave } from "../persist/use-debounced-save"
+import { useBoardDebouncedSave, type SaveStatus } from "../persist/use-debounced-save"
 import { useBoardAppStore } from "../store/board-app-store"
 import { createBoardStore } from "../store/create-board-store"
 import { useBoardTheme } from "../theme/use-board-theme"
@@ -42,7 +47,7 @@ export function HarnessCanvas() {
   const tool = useBoardAppStore((s) => s.tool)
   const theme = useBoardTheme()
   const [ready, setReady] = useState(false)
-  useBoardDebouncedSave(store, boardId, ready)
+  const saveStatus = useBoardDebouncedSave(store, boardId, ready)
   useBoardKeyboard(store)
 
   // Hydrate on scope change. `cancelled` guards against late-arriving fetches
@@ -79,7 +84,7 @@ export function HarnessCanvas() {
 
   return (
     <CanvasProvider store={store}>
-      <HarnessCanvasInner theme={theme} tool={tool} />
+      <HarnessCanvasInner theme={theme} tool={tool} saveStatus={saveStatus} />
     </CanvasProvider>
   )
 }
@@ -88,9 +93,11 @@ export function HarnessCanvas() {
 function HarnessCanvasInner({
   theme,
   tool,
+  saveStatus,
 }: {
   theme: ReturnType<typeof useBoardTheme>
   tool: string
+  saveStatus: SaveStatus
 }) {
   const renderView = useRenderCustomNodeView()
   return (
@@ -102,6 +109,9 @@ function HarnessCanvasInner({
         background={theme.background}
         renderCustomNodeView={renderView}
       />
+      <HarnessToolbar />
+      <HarnessHistoryControls />
+      <HarnessSaveStatus status={saveStatus} />
       <Minimap
         width={200}
         height={140}
