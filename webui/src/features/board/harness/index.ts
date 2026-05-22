@@ -1,3 +1,4 @@
+export * from "./canvas"
 export * from "./convert"
 export * from "./node-types"
 export * from "./persist"

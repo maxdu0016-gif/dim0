@@ -22,31 +22,33 @@ export type UseBoardDebouncedSaveOptions = {
  * with `origin: 'history'`, the timer re-arms, the next flush sees
  * the post-undo scene and writes the inverse calls.
  *
+ * `ready` gates subscription: the caller flips it true once hydration
+ * has populated the store, so the load-time ops don't generate
+ * spurious POSTs. Re-baseline happens on the same transition.
+ *
  * Pass `boardId = null` (e.g. during route transitions) to suspend
  * saving without unmounting the host.
  */
 export const useBoardDebouncedSave = (
   store: CanvasStore,
   boardId: string | null,
+  ready: boolean,
   options: UseBoardDebouncedSaveOptions = {},
 ): SaveStatus => {
   const debounceMs = options.debounceMs ?? 500
   const [status, setStatus] = useState<SaveStatus>("idle")
   const lastSavedRef = useRef<Snapshot>(EMPTY_SNAPSHOT)
 
-  // Re-baseline whenever scope changes — assume the freshly-hydrated
-  // scene is in sync with the server.
   useEffect(() => {
+    if (!boardId || !ready) return
+    let timer: ReturnType<typeof setTimeout> | null = null
+
+    // Re-baseline once hydration declares the scene in sync with the server.
     lastSavedRef.current = {
       nodes: store.getAllNodes(),
       edges: store.getAllEdges(),
     }
     setStatus("idle")
-  }, [store, boardId])
-
-  useEffect(() => {
-    if (!boardId) return
-    let timer: ReturnType<typeof setTimeout> | null = null
 
     const flush = async (): Promise<void> => {
       timer = null
@@ -75,7 +77,7 @@ export const useBoardDebouncedSave = (
       else clearTimeout(timer)
       timer = setTimeout(() => { void flush() }, debounceMs)
     })
-  }, [store, boardId, debounceMs])
+  }, [store, boardId, ready, debounceMs])
 
   return status
 }

@@ -35,7 +35,12 @@ export const hydrateBoardStore = async (
   )
   const edges = links.map((l) => linkToEdge(l, nodesById))
 
+  // Clear any prior scene (scope changes need a clean slate) then load fresh.
+  // Subscribers (incl. the debounced save) should be gated on a `ready` flag
+  // so these ops don't generate spurious REST calls — see use-debounced-save.
   store.batch(() => {
+    for (const e of store.getAllEdges()) store.removeEdge(e.id)
+    for (const n of store.getAllNodes()) store.removeNode(n.id)
     for (const n of nodes) store.addNode(n)
     for (const e of edges) store.addEdge(e)
   })
