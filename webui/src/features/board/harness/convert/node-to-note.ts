@@ -1,7 +1,7 @@
 import type { Node } from "@canvas-harness/core"
 import type { Note, NoteProperties } from "@/features/board/types/note"
-import type { NodeType } from "@/features/board/types/style"
 import type { NoteNodeData } from "./note-to-node"
+import { canvasTypeToDim0 } from "./node-type"
 import { canvasStyleToDim0 } from "./style"
 
 
@@ -50,7 +50,7 @@ export const nodeToNote = (node: Node): Note => {
     label: data.label,
     content: node.content ? { markdown: node.content } : undefined,
     style: canvasStyleToDim0(node.style, {
-      type: node.type as NodeType,
+      type: canvasTypeToDim0(node.type),
       angle: node.angle * RAD_TO_DEG,
       groupIds,
     }),

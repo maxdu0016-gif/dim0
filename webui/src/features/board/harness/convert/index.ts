@@ -4,6 +4,7 @@ export {
   dim0LinkStyleToCanvas,
   canvasEdgeStyleToDim0Link,
 } from "./style"
+export { canvasTypeToDim0, dim0TypeToCanvas } from "./node-type"
 export { noteToNode } from "./note-to-node"
 export type { NoteNodeData } from "./note-to-node"
 export { nodeToNote } from "./node-to-note"

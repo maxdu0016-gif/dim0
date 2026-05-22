@@ -6,6 +6,7 @@ import { createDefaultLink } from "@/features/board/types/link"
 import type { NodeType } from "@/features/board/types/style"
 import { edgeToLink } from "./edge-to-link"
 import { linkToEdge } from "./link-to-edge"
+import { dim0TypeToCanvas } from "./node-type"
 import { nodeToNote } from "./node-to-note"
 import { noteToNode } from "./note-to-node"
 
@@ -44,6 +45,36 @@ const positionedNote = (id: string, x: number, y: number, w: number, h: number):
 }
 
 
+describe("type rename map (Dim0 ↔ canvas-harness)", () => {
+  const RENAMES: ReadonlyArray<[NodeType, string]> = [
+    ["rectangle", "rect"],
+    ["layered-rectangle", "layered-rect"],
+    ["layered-circle", "layered-ellipse"],
+    ["slide", "frame"],
+  ]
+
+  it.each(RENAMES)("Dim0 %s → canvas-harness %s on noteToNode", (dim0Type, canvasType) => {
+    const note = createDefaultNote({ boardId: BOARD_ID, nodeType: dim0Type })
+    const node = noteToNode(note)
+    expect(node.type).toBe(canvasType)
+  })
+
+  it.each(RENAMES)("canvas-harness %2$s → Dim0 %1$s on nodeToNote round-trip", (dim0Type) => {
+    const note = createDefaultNote({ boardId: BOARD_ID, nodeType: dim0Type })
+    const back = nodeToNote(noteToNode(note))
+    expect(back.style.type).toBe(dim0Type)
+  })
+
+  it("passes unrecognized custom types through unchanged", () => {
+    const note = createDefaultNote({ boardId: BOARD_ID, nodeType: "sheet" })
+    const node = noteToNode(note)
+    expect(node.type).toBe("sheet")
+    const back = nodeToNote(node)
+    expect(back.style.type).toBe("sheet")
+  })
+})
+
+
 describe("note ↔ node round-trip", () => {
   it.each(NODE_TYPES)("preserves core fields for %s", (nodeType) => {
     const note = createDefaultNote({ boardId: BOARD_ID, nodeType })
@@ -56,7 +87,7 @@ describe("note ↔ node round-trip", () => {
 
     const node = noteToNode(note)
     expect(node.id as unknown as string).toBe(note.id)
-    expect(node.type).toBe(nodeType)
+    expect(node.type).toBe(dim0TypeToCanvas(nodeType))
     expect(node.x).toBe(123)
     expect(node.y).toBe(456)
     expect(node.w).toBe(200)
