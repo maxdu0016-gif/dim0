@@ -1,4 +1,5 @@
 export * from "./convert"
 export * from "./persist"
+export * from "./shared-views"
 export * from "./store"
 export * from "./theme"
