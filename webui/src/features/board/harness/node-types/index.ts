@@ -1,3 +1,4 @@
+import { codeSandboxDef } from "./code-sandbox"
 import { documentDef } from "./document"
 import { folderDef } from "./folder"
 import { widgetDef } from "./widget"
@@ -12,9 +13,11 @@ export const boardNodeTypes: ReadonlyArray<BoardNodeTypeDef> = [
   folderDef,
   documentDef,
   widgetDef,
+  codeSandboxDef,
 ]
 
 
+export { codeSandboxDef, CodeSandboxView } from "./code-sandbox"
 export { documentDef, DocumentView } from "./document"
 export { folderDef, FolderView } from "./folder"
 export { widgetDef, WidgetView } from "./widget"
