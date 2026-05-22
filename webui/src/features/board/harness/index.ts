@@ -1,4 +1,5 @@
 export * from "./convert"
+export * from "./node-types"
 export * from "./persist"
 export * from "./shared-views"
 export * from "./store"
