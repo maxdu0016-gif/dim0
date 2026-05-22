@@ -1,71 +1,41 @@
-import { ReactFlowProvider } from "@xyflow/react"
-import { useEffect, useMemo } from "react"
-import GraphEditor from "./flow/graph-editor"
+import { useEffect } from "react"
 import { useGraphStore } from "../store/graph-store"
-import { LoadingWindow } from "@/components/loading-view"
 import { useGetBoard } from "../api/get-board"
-import { HarnessCanvas, useCanvasHarnessEnabled } from "../harness/canvas"
+import { HarnessCanvas } from "../harness/canvas"
 import { useBoardAppStore } from "../harness/store/board-app-store"
 
+
 /**
- * GraphView
+ * Board entry-point. Mounts the canvas-harness board surface and keeps
+ * the legacy graph-store populated as a compat shim so other components
+ * (chat panel, dashboard cards, etc.) that still read board metadata
+ * from `useGraphStore` keep working until they're migrated.
  *
- * Board-aware shell for the graph editor that triggers a fetch on board changes
- * and renders purely from derived loading state. It resets the mutation state
- * when the boardId changes, fires a single fetch, and relies on React Query's
- * status combined with the graph store's isLoading to avoid local race conditions.
- *
- * Behind the localStorage feature flag `topix:feature.canvas-harness` the
- * board mounts via the canvas-harness path instead — react-flow stays the
- * default until the migration is complete (phase 7).
+ * Phase 7 removes the `useGetBoard` call + the legacy store entirely.
  */
 export const BoardView: React.FC = () => {
-  const { boardId, rootId, isLoading: storeLoading } = useGraphStore()
-  const { getBoardAsync, isPending, isSuccess, reset } = useGetBoard()
-  const harnessEnabled = useCanvasHarnessEnabled()
+  const { boardId, rootId } = useGraphStore()
+  const { getBoardAsync, reset } = useGetBoard()
   const setBoardScope = useBoardAppStore((s) => s.setBoardScope)
 
-  // Mirror scope into the harness app store so it can drive hydration.
+  // Mirror scope into the harness app store; HarnessCanvas drives hydration off it.
   useEffect(() => {
-    if (!harnessEnabled) return
     setBoardScope({ boardId: boardId ?? null, rootId: rootId ?? null })
-  }, [harnessEnabled, boardId, rootId, setBoardScope])
+  }, [boardId, rootId, setBoardScope])
 
+  // Legacy fetch — populates useGraphStore for components not yet migrated.
+  // TODO phase 7: drop once every useGraphStore consumer has been migrated.
   useEffect(() => {
-    if (harnessEnabled) return
     if (!boardId) return
     reset()
     void getBoardAsync()
-  }, [harnessEnabled, boardId, rootId, getBoardAsync, reset])
-
-  const loading = useMemo(
-    () => !isSuccess || isPending || storeLoading,
-    [isSuccess, isPending, storeLoading]
-  )
-
-  if (harnessEnabled) {
-    return (
-      <div className="absolute inset-0 h-full w-full overflow-hidden">
-        <div className="relative h-full w-full bg-background">
-          <HarnessCanvas />
-        </div>
-      </div>
-    )
-  }
+  }, [boardId, rootId, getBoardAsync, reset])
 
   return (
     <div className="absolute inset-0 h-full w-full overflow-hidden">
-      <ReactFlowProvider>
-        <div className="relative h-full w-full bg-background">
-          {loading ? (
-            <div className="absolute inset-0 bg-background flex items-center justify-center">
-              <LoadingWindow message="Loading board" viewMode="compact" />
-            </div>
-          ) : (
-            <GraphEditor />
-          )}
-        </div>
-      </ReactFlowProvider>
+      <div className="relative h-full w-full bg-background">
+        <HarnessCanvas />
+      </div>
     </div>
   )
 }
