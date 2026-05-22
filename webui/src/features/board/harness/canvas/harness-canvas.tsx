@@ -13,6 +13,7 @@ import { useBoardAppStore } from "../store/board-app-store"
 import { createBoardStore } from "../store/create-board-store"
 import { useBoardTheme } from "../theme/use-board-theme"
 import { useBoardKeyboard } from "./use-board-keyboard"
+import { useCreateHandlers } from "./use-create-handlers"
 
 
 /**
@@ -49,6 +50,7 @@ export function HarnessCanvas() {
   const [ready, setReady] = useState(false)
   const saveStatus = useBoardDebouncedSave(store, boardId, ready)
   useBoardKeyboard(store)
+  const { handleCreateDrag, handleClick } = useCreateHandlers(store, boardId)
 
   // Hydrate on scope change. `cancelled` guards against late-arriving fetches
   // when the user navigates rapidly between boards.
@@ -84,21 +86,28 @@ export function HarnessCanvas() {
 
   return (
     <CanvasProvider store={store}>
-      <HarnessCanvasInner theme={theme} tool={tool} saveStatus={saveStatus} />
+      <HarnessCanvasInner
+        theme={theme}
+        tool={tool}
+        saveStatus={saveStatus}
+        onCreateDrag={handleCreateDrag}
+        onClick={handleClick}
+      />
     </CanvasProvider>
   )
 }
 
 
-function HarnessCanvasInner({
-  theme,
-  tool,
-  saveStatus,
-}: {
+type InnerProps = {
   theme: ReturnType<typeof useBoardTheme>
   tool: string
   saveStatus: SaveStatus
-}) {
+  onCreateDrag: ReturnType<typeof useCreateHandlers>["handleCreateDrag"]
+  onClick: ReturnType<typeof useCreateHandlers>["handleClick"]
+}
+
+
+function HarnessCanvasInner({ theme, tool, saveStatus, onCreateDrag, onClick }: InnerProps) {
   const renderView = useRenderCustomNodeView()
   return (
     <>
@@ -108,6 +117,8 @@ function HarnessCanvasInner({
         selectionColor={theme.selectionColor}
         background={theme.background}
         renderCustomNodeView={renderView}
+        onCreateDrag={onCreateDrag}
+        onClick={onClick}
       />
       <HarnessToolbar />
       <HarnessHistoryControls />
