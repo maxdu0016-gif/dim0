@@ -1,0 +1,267 @@
+import { describe, expect, it } from "vitest"
+import type { Node } from "@canvas-harness/core"
+import { createDefaultNote } from "@/features/board/types/note"
+import type { Note } from "@/features/board/types/note"
+import { createDefaultLink } from "@/features/board/types/link"
+import type { NodeType } from "@/features/board/types/style"
+import { edgeToLink } from "./edge-to-link"
+import { linkToEdge } from "./link-to-edge"
+import { nodeToNote } from "./node-to-note"
+import { noteToNode } from "./note-to-node"
+
+
+const BOARD_ID = "test-board"
+
+
+const NODE_TYPES: NodeType[] = [
+  "rectangle",
+  "ellipse",
+  "diamond",
+  "soft-diamond",
+  "tag",
+  "layered-circle",
+  "layered-rectangle",
+  "layered-diamond",
+  "thought-cloud",
+  "capsule",
+  "text",
+  "image",
+  "icon",
+  "sheet",
+  "slide",
+  "folder",
+  "code-sandbox",
+  "widget",
+]
+
+
+const positionedNote = (id: string, x: number, y: number, w: number, h: number): Note => {
+  const n = createDefaultNote({ boardId: BOARD_ID, nodeType: "rectangle" })
+  n.id = id
+  n.properties.nodePosition = { type: "position", position: { x, y } }
+  n.properties.nodeSize = { type: "size", size: { width: w, height: h } }
+  return n
+}
+
+
+describe("note ↔ node round-trip", () => {
+  it.each(NODE_TYPES)("preserves core fields for %s", (nodeType) => {
+    const note = createDefaultNote({ boardId: BOARD_ID, nodeType })
+    note.label = { markdown: "hello world" }
+    note.style.angle = 30
+    note.style.opacity = 80
+    note.properties.nodePosition = { type: "position", position: { x: 123, y: 456 } }
+    note.properties.nodeSize = { type: "size", size: { width: 200, height: 150 } }
+    note.properties.nodeZIndex = { type: "number", number: 5 }
+
+    const node = noteToNode(note)
+    expect(node.id as unknown as string).toBe(note.id)
+    expect(node.type).toBe(nodeType)
+    expect(node.x).toBe(123)
+    expect(node.y).toBe(456)
+    expect(node.w).toBe(200)
+    expect(node.h).toBe(150)
+    expect(node.z).toBe(5)
+    expect(node.angle).toBeCloseTo((30 * Math.PI) / 180)
+    expect(node.content).toBe("hello world")
+    expect(node.style?.opacity).toBeCloseTo(0.8)
+
+    const back = nodeToNote(node)
+    expect(back.id).toBe(note.id)
+    expect(back.style.type).toBe(nodeType)
+    expect(back.style.angle).toBeCloseTo(30)
+    expect(back.style.opacity).toBeCloseTo(80)
+    expect(back.properties.nodePosition.position).toEqual({ x: 123, y: 456 })
+    expect(back.properties.nodeSize.size).toEqual({ width: 200, height: 150 })
+    expect(back.properties.nodeZIndex.number).toBe(5)
+    expect(back.label?.markdown).toBe("hello world")
+  })
+
+  it("lifts groupIds onto Node.groups and round-trips them", () => {
+    const note = createDefaultNote({ boardId: BOARD_ID, nodeType: "ellipse" })
+    note.style.groupIds = ["g-1", "g-2"]
+
+    const node = noteToNode(note)
+    expect(node.groups as unknown as string[]).toEqual(["g-1", "g-2"])
+
+    const back = nodeToNote(node)
+    expect(back.style.groupIds).toEqual(["g-1", "g-2"])
+  })
+
+  it("preserves extra properties (emoji, pinned, slideName) via data.properties", () => {
+    const note = createDefaultNote({ boardId: BOARD_ID, nodeType: "slide" })
+    note.properties.emoji = { type: "icon", icon: { type: "emoji", emoji: "🎯" } }
+    note.properties.pinned = { type: "boolean", boolean: true }
+    note.properties.slideName = { type: "text", text: "Intro" }
+
+    const node = noteToNode(note)
+    const back = nodeToNote(node)
+
+    expect(back.properties.emoji).toEqual(note.properties.emoji)
+    expect(back.properties.pinned).toEqual(note.properties.pinned)
+    expect(back.properties.slideName).toEqual(note.properties.slideName)
+  })
+
+  it("drops content when node.content is empty (avoids spurious label)", () => {
+    const note = createDefaultNote({ boardId: BOARD_ID, nodeType: "rectangle" })
+    note.label = undefined
+
+    const node = noteToNode(note)
+    expect(node.content).toBe("")
+
+    const back = nodeToNote(node)
+    expect(back.label).toBeUndefined()
+  })
+
+  it("preserves long-form `content` (sheet body) via data.body", () => {
+    const note = createDefaultNote({ boardId: BOARD_ID, nodeType: "sheet" })
+    note.label = { markdown: "Daily notes" }
+    note.content = { markdown: "## Section 1\n- bullet" }
+
+    const node = noteToNode(note)
+    const back = nodeToNote(node)
+
+    expect(back.label?.markdown).toBe("Daily notes")
+    expect(back.content?.markdown).toBe("## Section 1\n- bullet")
+  })
+
+  it("preserves identity fields (version, graphUid, parentId, roughSeed)", () => {
+    const note = createDefaultNote({ boardId: BOARD_ID, nodeType: "rectangle" })
+    note.parentId = "parent-node"
+    note.version = 7
+    note.roughSeed = 12345
+
+    const back = nodeToNote(noteToNode(note))
+    expect(back.version).toBe(7)
+    expect(back.graphUid).toBe(BOARD_ID)
+    expect(back.parentId).toBe("parent-node")
+    expect(back.roughSeed).toBe(12345)
+  })
+})
+
+
+describe("link ↔ edge round-trip", () => {
+  const makeNodes = (): Map<string, Node> => {
+    const noteA = positionedNote("node-a", 100, 100, 200, 100)
+    const noteB = positionedNote("node-b", 500, 300, 200, 100)
+    return new Map([
+      ["node-a", noteToNode(noteA)],
+      ["node-b", noteToNode(noteB)],
+    ])
+  }
+
+  it("attached source + attached target with default centers", () => {
+    const link = createDefaultLink(BOARD_ID, "node-a", "node-b")
+    const nodes = makeNodes()
+    const edge = linkToEdge(link, nodes)
+
+    expect("nodeId" in edge.source).toBe(true)
+    expect("nodeId" in edge.target).toBe(true)
+    if ("nodeId" in edge.source) {
+      expect(edge.source.nodeId as unknown as string).toBe("node-a")
+      expect(edge.source.localOffset).toEqual({ x: 100, y: 50 })
+    }
+    if ("nodeId" in edge.target) {
+      expect(edge.target.nodeId as unknown as string).toBe("node-b")
+      expect(edge.target.localOffset).toEqual({ x: 100, y: 50 })
+    }
+
+    const back = edgeToLink(edge, nodes)
+    expect(back.source).toBe("node-a")
+    expect(back.target).toBe("node-b")
+    expect(back.properties.startPoint).toBeUndefined()
+    expect(back.properties.endPoint).toBeUndefined()
+  })
+
+  it("attached source with custom offset (worldPoint - nodePos)", () => {
+    const link = createDefaultLink(BOARD_ID, "node-a", "node-b")
+    link.properties.startPoint = { type: "position", position: { x: 200, y: 130 } }
+
+    const nodes = makeNodes()
+    const edge = linkToEdge(link, nodes)
+
+    if ("nodeId" in edge.source) {
+      expect(edge.source.localOffset).toEqual({ x: 100, y: 30 })
+    }
+
+    const back = edgeToLink(edge, nodes)
+    expect(back.source).toBe("node-a")
+    expect(back.properties.startPoint?.position).toEqual({ x: 200, y: 130 })
+  })
+
+  it("free source endpoint (sentinel '' source + startPoint)", () => {
+    const link = createDefaultLink(BOARD_ID, "", "node-b")
+    link.properties.startPoint = { type: "position", position: { x: 50, y: 60 } }
+
+    const nodes = makeNodes()
+    const edge = linkToEdge(link, nodes)
+
+    expect("worldPoint" in edge.source).toBe(true)
+    if ("worldPoint" in edge.source) {
+      expect(edge.source.worldPoint).toEqual({ x: 50, y: 60 })
+    }
+
+    const back = edgeToLink(edge, nodes)
+    expect(back.source).toBe("")
+    expect(back.properties.startPoint?.position).toEqual({ x: 50, y: 60 })
+  })
+
+  it("free source + free target", () => {
+    const link = createDefaultLink(BOARD_ID, "", "")
+    link.properties.startPoint = { type: "position", position: { x: 10, y: 20 } }
+    link.properties.endPoint = { type: "position", position: { x: 30, y: 40 } }
+
+    const nodes = makeNodes()
+    const edge = linkToEdge(link, nodes)
+
+    expect("worldPoint" in edge.source).toBe(true)
+    expect("worldPoint" in edge.target).toBe(true)
+
+    const back = edgeToLink(edge, nodes)
+    expect(back.source).toBe("")
+    expect(back.target).toBe("")
+    expect(back.properties.startPoint?.position).toEqual({ x: 10, y: 20 })
+    expect(back.properties.endPoint?.position).toEqual({ x: 30, y: 40 })
+  })
+
+  it("preserves edge control point + label", () => {
+    const link = createDefaultLink(BOARD_ID, "node-a", "node-b")
+    link.properties.edgeControlPoint = { type: "position", position: { x: 300, y: 200 } }
+    link.label = { markdown: "depends on" }
+
+    const nodes = makeNodes()
+    const edge = linkToEdge(link, nodes)
+    expect(edge.control).toEqual([{ x: 300, y: 200 }])
+    expect(edge.content).toBe("depends on")
+
+    const back = edgeToLink(edge, nodes)
+    expect(back.properties.edgeControlPoint.position).toEqual({ x: 300, y: 200 })
+    expect(back.label?.markdown).toBe("depends on")
+  })
+
+  it("preserves arrowheads + pathStyle", () => {
+    const link = createDefaultLink(BOARD_ID, "node-a", "node-b")
+    link.style.sourceArrowhead = "barb"
+    link.style.targetArrowhead = "arrow"
+    link.style.pathStyle = "polyline"
+
+    const nodes = makeNodes()
+    const back = edgeToLink(linkToEdge(link, nodes), nodes)
+
+    expect(back.style.sourceArrowhead).toBe("barb")
+    expect(back.style.targetArrowhead).toBe("arrow")
+    expect(back.style.pathStyle).toBe("polyline")
+  })
+
+  it("lifts link groupIds onto Edge.groups", () => {
+    const link = createDefaultLink(BOARD_ID, "node-a", "node-b")
+    link.style.groupIds = ["g-x", "g-y"]
+
+    const nodes = makeNodes()
+    const edge = linkToEdge(link, nodes)
+    expect(edge.groups as unknown as string[]).toEqual(["g-x", "g-y"])
+
+    const back = edgeToLink(edge, nodes)
+    expect(back.style.groupIds).toEqual(["g-x", "g-y"])
+  })
+})
