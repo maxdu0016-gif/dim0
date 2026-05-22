@@ -17,7 +17,10 @@ import type {
  * canvas-harness Style / EdgeStyle.
  *
  * Differences worth knowing (see migration-canvas-harness.md §3.3):
- *  - Opacity: Dim0 uses 0-100, canvas-harness 0-1.
+ *  - Opacity: both Dim0 and canvas-harness use the 0-100 scale.
+ *    The lib's resolveOpacity divides by 100 internally, so we pass
+ *    the value straight through (don't pre-divide — that would
+ *    double-scale and make everything ~1% alpha).
  *  - Dim0 carries `type`, `angle`, `groupIds` on Style; canvas-harness
  *    lifts those onto Node / Edge — handled in noteToNode / linkToEdge.
  *  - `fillStyle` (hachure / cross-hatch / zigzag / dots) and TextStyle
@@ -40,7 +43,7 @@ export const dim0StyleToCanvas = (s: Dim0BaseStyle): CanvasStyle => ({
   backgroundColor: s.backgroundColor,
   roughness: s.roughness,
   roundness: s.roundness,
-  opacity: s.opacity / 100,
+  opacity: s.opacity,
   fontFamily: s.fontFamily,
   fontSize: s.fontSize,
   textAlign: s.textAlign,
@@ -77,7 +80,7 @@ export const canvasStyleToDim0 = (s: CanvasStyle | undefined, carry: StyleCarry)
   backgroundColor: s?.backgroundColor ?? "#dbeafe",
   roughness: s?.roughness ?? 0,
   roundness: s?.roundness ?? 0,
-  opacity: (s?.opacity ?? 1) * 100,
+  opacity: s?.opacity ?? 100,
   fontFamily: s?.fontFamily ?? "sans-serif",
   fontSize: s?.fontSize ?? "M",
   textAlign: s?.textAlign ?? "center",
@@ -108,7 +111,7 @@ export const canvasEdgeStyleToDim0Link = (
   backgroundColor: s?.backgroundColor ?? "#00000000",
   roughness: s?.roughness ?? 1,
   roundness: s?.roundness ?? 0,
-  opacity: (s?.opacity ?? 1) * 100,
+  opacity: s?.opacity ?? 100,
   fontFamily: s?.fontFamily ?? "handwriting",
   fontSize: s?.fontSize ?? "M",
   textAlign: s?.textAlign ?? "center",

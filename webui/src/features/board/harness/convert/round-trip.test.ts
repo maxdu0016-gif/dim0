@@ -107,7 +107,7 @@ describe("note ↔ node round-trip", () => {
     expect(node.z).toBe(5)
     expect(node.angle).toBeCloseTo((30 * Math.PI) / 180)
     expect(node.content).toBe("hello world")
-    expect(node.style?.opacity).toBeCloseTo(0.8)
+    expect(node.style?.opacity).toBe(80)
 
     const back = nodeToNote(node)
     expect(back.id).toBe(note.id)
