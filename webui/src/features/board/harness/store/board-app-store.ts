@@ -38,6 +38,11 @@ export type BoardAppState = {
   canEdit: boolean
   isLoading: boolean
 
+  // Active canvas tool. `'select'` is default; the top-bar swaps it and the
+  // keyboard hook responds to V / H / F shortcuts. canvas-harness accepts any
+  // string — built-ins use lib-defined names, customs can use their own.
+  tool: string
+
   // UI toggles.
   viewSlides: boolean
   presentationMode: boolean
@@ -64,6 +69,8 @@ export type BoardAppActions = {
   setCanEdit: (canEdit: boolean) => void
   setIsLoading: (loading: boolean) => void
 
+  setTool: (tool: string) => void
+
   setViewSlides: (enabled: boolean) => void
   setPresentationMode: (enabled: boolean) => void
 
@@ -85,6 +92,7 @@ const initialState: BoardAppState = {
   boardVisibility: null,
   canEdit: true,
   isLoading: false,
+  tool: "select",
   viewSlides: true,
   presentationMode: false,
   currentFolderDepth: -1,
@@ -106,6 +114,7 @@ export const useBoardAppStore = create<BoardAppState & BoardAppActions>((set) =>
       boardVisibility: null,
       canEdit: true,
       isLoading: false,
+      tool: "select",
       currentFolderDepth: -1,
       maxFolderDepth: 0,
       presentationMode: false,
@@ -118,6 +127,8 @@ export const useBoardAppStore = create<BoardAppState & BoardAppActions>((set) =>
   setBoardVisibility: (visibility) => set({ boardVisibility: visibility }),
   setCanEdit: (canEdit) => set({ canEdit }),
   setIsLoading: (loading) => set({ isLoading: loading }),
+
+  setTool: (tool) => set({ tool }),
 
   setViewSlides: (enabled) => set({ viewSlides: enabled }),
   setPresentationMode: (enabled) => set({ presentationMode: enabled }),

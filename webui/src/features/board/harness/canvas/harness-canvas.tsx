@@ -7,6 +7,7 @@ import { useBoardDebouncedSave } from "../persist/use-debounced-save"
 import { useBoardAppStore } from "../store/board-app-store"
 import { createBoardStore } from "../store/create-board-store"
 import { useBoardTheme } from "../theme/use-board-theme"
+import { useBoardKeyboard } from "./use-board-keyboard"
 
 
 /**
@@ -38,9 +39,11 @@ export function HarnessCanvas() {
   }
   const store = storeRef.current
 
+  const tool = useBoardAppStore((s) => s.tool)
   const theme = useBoardTheme()
   const [ready, setReady] = useState(false)
   useBoardDebouncedSave(store, boardId, ready)
+  useBoardKeyboard(store)
 
   // Hydrate on scope change. `cancelled` guards against late-arriving fetches
   // when the user navigates rapidly between boards.
@@ -76,18 +79,24 @@ export function HarnessCanvas() {
 
   return (
     <CanvasProvider store={store}>
-      <HarnessCanvasInner theme={theme} />
+      <HarnessCanvasInner theme={theme} tool={tool} />
     </CanvasProvider>
   )
 }
 
 
-function HarnessCanvasInner({ theme }: { theme: ReturnType<typeof useBoardTheme> }) {
+function HarnessCanvasInner({
+  theme,
+  tool,
+}: {
+  theme: ReturnType<typeof useBoardTheme>
+  tool: string
+}) {
   const renderView = useRenderCustomNodeView()
   return (
     <>
       <Canvas
-        tool="select"
+        tool={tool}
         theme={theme.resolver}
         selectionColor={theme.selectionColor}
         background={theme.background}
