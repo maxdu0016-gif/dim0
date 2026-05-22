@@ -72,6 +72,18 @@ describe("type rename map (Dim0 ↔ canvas-harness)", () => {
     const back = nodeToNote(node)
     expect(back.style.type).toBe("sheet")
   })
+
+  it("overrides canvas type to 'document' for note.type==='document'", () => {
+    const base = createDefaultNote({ boardId: BOARD_ID, nodeType: "rectangle" })
+    const doc: Note = { ...base, type: "document" }
+    const node = noteToNode(doc)
+    expect(node.type).toBe("document")
+
+    const back = nodeToNote(node)
+    expect(back.type).toBe("document")
+    // style.type round-trips via data.styleType.
+    expect(back.style.type).toBe("rectangle")
+  })
 })
 
 

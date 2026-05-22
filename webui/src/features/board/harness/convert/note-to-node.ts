@@ -2,6 +2,7 @@ import { asGroupId, asNodeId } from "@canvas-harness/core"
 import type { Node } from "@canvas-harness/core"
 import type { Note, NoteProperties, RichText } from "@/features/board/types/note"
 import type { Document } from "@/features/board/types/document"
+import type { NodeType as Dim0NodeType } from "@/features/board/types/style"
 import { dim0TypeToCanvas } from "./node-type"
 import { dim0StyleToCanvas } from "./style"
 
@@ -16,6 +17,13 @@ const DEG_TO_RAD = Math.PI / 180
  */
 export type NoteNodeData = {
   noteType: "note" | "document"
+  /**
+   * The original Dim0 `note.style.type`. Preserved verbatim so we can
+   * restore it on save — necessary because `node.type` may differ from
+   * `style.type` for documents (which override node.type → "document"
+   * while keeping a visual style.type underneath like "rectangle").
+   */
+  styleType: Dim0NodeType
   version: number
   createdAt?: string
   updatedAt?: string
@@ -45,6 +53,7 @@ export const noteToNode = (note: Note | Document): Node => {
 
   const data: NoteNodeData = {
     noteType: note.type,
+    styleType: note.style.type,
     version: note.version,
     createdAt: note.createdAt,
     updatedAt: note.updatedAt,
@@ -63,9 +72,15 @@ export const noteToNode = (note: Note | Document): Node => {
   // Older notes with text stored on label fall through to keep them visible.
   const body = note.content?.markdown ?? note.label?.markdown ?? ""
 
+  // Documents get a distinct canvas type ("document") so they hit their
+  // own paint dispatch + custom view. Everything else maps by style.type.
+  const canvasType = note.type === "document"
+    ? "document"
+    : dim0TypeToCanvas(note.style.type)
+
   return {
     id: asNodeId(note.id),
-    type: dim0TypeToCanvas(note.style.type),
+    type: canvasType,
     x: pos.x,
     y: pos.y,
     w: size.width,

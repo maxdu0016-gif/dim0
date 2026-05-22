@@ -1,6 +1,7 @@
 import { useCallback, type ReactNode } from "react"
 import type { NodeId } from "@canvas-harness/core"
 import { useCanvasStore } from "@canvas-harness/react"
+import { DocumentView } from "./document"
 import { FolderView } from "./folder"
 
 
@@ -12,7 +13,8 @@ import { FolderView } from "./folder"
  */
 const VIEW_REGISTRY: Readonly<Record<string, (props: { id: NodeId }) => ReactNode>> = {
   folder: FolderView,
-  // sheet, code-sandbox, widget, document — land in their phase commits
+  document: DocumentView,
+  // sheet, code-sandbox, widget — land in their phase commits
 }
 
 

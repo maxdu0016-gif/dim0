@@ -50,7 +50,9 @@ export const nodeToNote = (node: Node): Note => {
     label: data.label,
     content: node.content ? { markdown: node.content } : undefined,
     style: canvasStyleToDim0(node.style, {
-      type: canvasTypeToDim0(node.type),
+      // Prefer the original style.type stashed in data — preserves it
+      // across canvas-type overrides (e.g. documents).
+      type: data.styleType ?? canvasTypeToDim0(node.type),
       angle: node.angle * RAD_TO_DEG,
       groupIds,
     }),
