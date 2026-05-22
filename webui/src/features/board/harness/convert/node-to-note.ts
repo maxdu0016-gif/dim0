@@ -47,8 +47,8 @@ export const nodeToNote = (node: Node): Note => {
     minWidth: data.minWidth,
     minHeight: data.minHeight,
     roughSeed: data.roughSeed,
-    label: node.content ? { markdown: node.content } : undefined,
-    content: data.body,
+    label: data.label,
+    content: node.content ? { markdown: node.content } : undefined,
     style: canvasStyleToDim0(node.style, {
       type: node.type as NodeType,
       angle: node.angle * RAD_TO_DEG,

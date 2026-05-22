@@ -24,8 +24,8 @@ export type NoteNodeData = {
   minWidth?: number
   minHeight?: number
   roughSeed?: number
-  /** Long-form body (sheets / widgets / code-sandbox). `node.content` carries the label. */
-  body?: RichText
+  /** Title / display name. Used by breadcrumbs, sheet headers, folder names, list cards. */
+  label?: RichText
   /** All Note properties except the ones lifted to Node primitives. */
   properties: Partial<NoteProperties>
 }
@@ -53,12 +53,14 @@ export const noteToNode = (note: Note | Document): Node => {
     minWidth: note.minWidth,
     minHeight: note.minHeight,
     roughSeed: note.roughSeed,
-    body: note.content,
+    label: note.label,
     properties: rest,
   }
 
-  const label = note.label?.markdown
-  const fallbackContent = note.content?.markdown
+  // Inline text on a shape lives in note.content.markdown — note.label is the
+  // title (breadcrumbs / folder name / sheet header) and rides on data.label.
+  // Older notes with text stored on label fall through to keep them visible.
+  const body = note.content?.markdown ?? note.label?.markdown ?? ""
 
   return {
     id: asNodeId(note.id),
@@ -70,7 +72,7 @@ export const noteToNode = (note: Note | Document): Node => {
     angle: (note.style.angle ?? 0) * DEG_TO_RAD,
     z,
     groups: (note.style.groupIds ?? []).map(asGroupId),
-    content: label ?? fallbackContent ?? "",
+    content: body,
     style: dim0StyleToCanvas(note.style),
     data,
   }

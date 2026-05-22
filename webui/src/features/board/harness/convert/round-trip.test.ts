@@ -47,7 +47,7 @@ const positionedNote = (id: string, x: number, y: number, w: number, h: number):
 describe("note ↔ node round-trip", () => {
   it.each(NODE_TYPES)("preserves core fields for %s", (nodeType) => {
     const note = createDefaultNote({ boardId: BOARD_ID, nodeType })
-    note.label = { markdown: "hello world" }
+    note.content = { markdown: "hello world" }
     note.style.angle = 30
     note.style.opacity = 80
     note.properties.nodePosition = { type: "position", position: { x: 123, y: 456 } }
@@ -74,7 +74,7 @@ describe("note ↔ node round-trip", () => {
     expect(back.properties.nodePosition.position).toEqual({ x: 123, y: 456 })
     expect(back.properties.nodeSize.size).toEqual({ width: 200, height: 150 })
     expect(back.properties.nodeZIndex.number).toBe(5)
-    expect(back.label?.markdown).toBe("hello world")
+    expect(back.content?.markdown).toBe("hello world")
   })
 
   it("lifts groupIds onto Node.groups and round-trips them", () => {
@@ -102,27 +102,43 @@ describe("note ↔ node round-trip", () => {
     expect(back.properties.slideName).toEqual(note.properties.slideName)
   })
 
-  it("drops content when node.content is empty (avoids spurious label)", () => {
+  it("drops content when node.content is empty (avoids spurious body)", () => {
     const note = createDefaultNote({ boardId: BOARD_ID, nodeType: "rectangle" })
-    note.label = undefined
+    note.content = undefined
 
     const node = noteToNode(note)
     expect(node.content).toBe("")
 
     const back = nodeToNote(node)
-    expect(back.label).toBeUndefined()
+    expect(back.content).toBeUndefined()
   })
 
-  it("preserves long-form `content` (sheet body) via data.body", () => {
+  it("preserves label (title) separately from content (body)", () => {
     const note = createDefaultNote({ boardId: BOARD_ID, nodeType: "sheet" })
     note.label = { markdown: "Daily notes" }
     note.content = { markdown: "## Section 1\n- bullet" }
 
     const node = noteToNode(note)
-    const back = nodeToNote(node)
+    // node.content carries the body (visible inline text)
+    expect(node.content).toBe("## Section 1\n- bullet")
 
+    const back = nodeToNote(node)
     expect(back.label?.markdown).toBe("Daily notes")
     expect(back.content?.markdown).toBe("## Section 1\n- bullet")
+  })
+
+  it("falls back to legacy label-as-text when note.content is absent", () => {
+    const note = createDefaultNote({ boardId: BOARD_ID, nodeType: "rectangle" })
+    note.label = { markdown: "legacy text" }
+    note.content = undefined
+
+    const node = noteToNode(note)
+    expect(node.content).toBe("legacy text")
+
+    const back = nodeToNote(node)
+    // Label preserved on data; the text is now also written to content on save.
+    expect(back.label?.markdown).toBe("legacy text")
+    expect(back.content?.markdown).toBe("legacy text")
   })
 
   it("preserves identity fields (version, graphUid, parentId, roughSeed)", () => {
