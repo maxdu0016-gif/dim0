@@ -3,6 +3,7 @@ import type { NodeId } from "@canvas-harness/core"
 import { useCanvasStore } from "@canvas-harness/react"
 import { DocumentView } from "./document"
 import { FolderView } from "./folder"
+import { WidgetView } from "./widget"
 
 
 /**
@@ -14,7 +15,8 @@ import { FolderView } from "./folder"
 const VIEW_REGISTRY: Readonly<Record<string, (props: { id: NodeId }) => ReactNode>> = {
   folder: FolderView,
   document: DocumentView,
-  // sheet, code-sandbox, widget — land in their phase commits
+  widget: WidgetView,
+  // sheet, code-sandbox — land in their phase commits
 }
 
 
