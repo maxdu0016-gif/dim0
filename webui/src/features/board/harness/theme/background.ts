@@ -1,24 +1,76 @@
 import type { CanvasBackground } from "@canvas-harness/core"
 import type { ThemeId } from "@/components/theme-constants"
+import { darkModeDisplayHex } from "@/features/board/lib/colors/dark-variants"
+import {
+  applyBackgroundAlpha,
+  type BoardBackgroundTexture,
+} from "@/features/board/utils/board-background"
+import { readCssVar } from "./css-vars"
 import { getSwatch, type Mode } from "./tokens"
 
 
+export type GetBackgroundInput = {
+  themeId: ThemeId
+  mode: Mode
+  /** Per-board user-picked tint from localStorage. `null` → no tint. */
+  boardBackground: string | null
+  /** Per-board texture pattern from localStorage. Default in dim0 is `"dots"`. */
+  boardBackgroundTexture: BoardBackgroundTexture | null
+}
+
+
 /**
- * Resolve the canvas page background for a Dim0 theme variant.
+ * Resolve the canvas page background for a Dim0 board, matching the
+ * existing react-flow path's behavior:
  *
- * Pattern stays `'none'` for v1 — paper textures are tracked as an
- * open question in migration-canvas-harness.md §12 (may need lib
- * extension). `patternColor` and `gap` are configured so flipping
- * pattern to `'dots'` or `'grid'` produces a sensible look without
- * further tuning.
+ *   - When `boardBackground` is set, apply a 50%-alpha tint
+ *     (dark-mode-shifted via `darkModeDisplayHex` so user-picked
+ *     light colors don't blow out in dark theme).
+ *   - When unset, fall back to the theme swatch (step 2 will swap to
+ *     reading `--background` directly so the default exactly matches
+ *     the rest of the app).
+ *
+ * Texture pattern follows dim0's existing logic:
+ *   - `"dots"`  → `pattern: "dots"`,  `patternColor: --muted-foreground`
+ *   - `"lines"` → `pattern: "grid"`,  `patternColor: --muted`
+ *
+ * `"lines"` maps to canvas-harness's `"grid"` (only naming differs —
+ * both render a line-grid pattern).
  */
-export const getBackground = (themeId: ThemeId, mode: Mode): CanvasBackground => {
-  const [bg, , accent] = getSwatch(themeId, mode)
+export const getBackground = ({
+  themeId,
+  mode,
+  boardBackground,
+  boardBackgroundTexture,
+}: GetBackgroundInput): CanvasBackground => {
+  const [defaultBg] = getSwatch(themeId, mode)
+
+  const tinted = boardBackground
+    ? applyBackgroundAlpha(
+        mode === "dark"
+          ? (darkModeDisplayHex(boardBackground) ?? boardBackground)
+          : boardBackground,
+        0.5,
+      )
+    : null
+
+  const color = tinted ?? defaultBg
+
+  let pattern: CanvasBackground["pattern"] = "none"
+  let patternColor: string | undefined
+  if (boardBackgroundTexture === "dots") {
+    pattern = "dots"
+    patternColor = readCssVar("--muted-foreground")
+  } else if (boardBackgroundTexture === "lines") {
+    pattern = "grid"
+    patternColor = readCssVar("--muted")
+  }
+
   return {
-    color: bg,
-    pattern: "none",
-    patternColor: accent,
-    gap: 24,
+    color,
+    pattern,
+    patternColor,
+    gap: 25,
     minZoom: 0.4,
   }
 }
