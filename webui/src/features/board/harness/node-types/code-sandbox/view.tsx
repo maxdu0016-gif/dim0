@@ -1,6 +1,6 @@
 import { useMemo, useRef } from "react"
 import type { NodeId } from "@canvas-harness/core"
-import { useIsMoving, useNode } from "@canvas-harness/react"
+import { useNode } from "@canvas-harness/react"
 import { cn } from "@/lib/utils"
 import { useTheme } from "@/components/theme-provider"
 import {
@@ -21,8 +21,9 @@ export type CodeSandboxViewProps = {
 
 /**
  * Code-sandbox inline view — rose-pine themed Python preview. Entire
- * body is the click target (matches prod). Suspends to a pill during
- * canvas motion to keep pan/zoom smooth.
+ * body is the click target (matches prod). Pan/zoom suspension is
+ * handled by the canvas placeholder; this component only mounts at
+ * idle so the rose-pine background never flashes during motion.
  */
 export function CodeSandboxView({ id }: CodeSandboxViewProps) {
   const node = useNode(id)
@@ -30,7 +31,6 @@ export function CodeSandboxView({ id }: CodeSandboxViewProps) {
   const canEdit = useBoardAppStore((s) => s.canEdit)
   const bodyRef = useRef<HTMLButtonElement>(null)
   useStopCanvasGesture(bodyRef)
-  const isMoving = useIsMoving()
   const { resolvedTheme } = useTheme()
   const isDark = resolvedTheme === "dark"
   const palette = isDark ? ROSE_PINE_DARK : ROSE_PINE_LIGHT
@@ -71,34 +71,10 @@ export function CodeSandboxView({ id }: CodeSandboxViewProps) {
           )}
           style={{ backgroundColor: palette.bg, color: palette.text }}
         >
-          {!isMoving && (
-            <pre
-              className="hljs min-h-full whitespace-pre-wrap break-words bg-transparent p-0 font-mono text-base leading-5"
-              dangerouslySetInnerHTML={{ __html: previewHtml }}
-            />
-          )}
-          {isMoving && (
-            <div
-              className="absolute inset-0 flex items-center justify-center"
-              style={{
-                backgroundColor: isDark
-                  ? "rgba(31,29,46,0.62)"
-                  : "rgba(255,250,243,0.72)",
-              }}
-            >
-              <div
-                className="rounded-full px-3 py-1 text-base font-medium"
-                style={{
-                  color: palette.muted,
-                  backgroundColor: isDark
-                    ? "rgba(64,61,82,0.72)"
-                    : "rgba(223,218,217,0.8)",
-                }}
-              >
-                Moving sandbox…
-              </div>
-            </div>
-          )}
+          <pre
+            className="hljs min-h-full whitespace-pre-wrap break-words bg-transparent p-0 font-mono text-base leading-5"
+            dangerouslySetInnerHTML={{ __html: previewHtml }}
+          />
         </div>
       </button>
 

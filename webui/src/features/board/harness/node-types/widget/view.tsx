@@ -1,7 +1,7 @@
 import { useRef } from "react"
 import { ArrowsOutSimpleIcon, LayoutIcon } from "@phosphor-icons/react"
 import type { NodeId } from "@canvas-harness/core"
-import { useIsMoving, useNode } from "@canvas-harness/react"
+import { useNode } from "@canvas-harness/react"
 import { cn } from "@/lib/utils"
 import { WidgetIframe } from "@/features/board/components/flow/widget-iframe"
 import type { NoteNodeData } from "../../convert/note-to-node"
@@ -21,9 +21,10 @@ export type WidgetViewProps = {
 /**
  * Widget inline view — sandboxed iframe rendering `node.content` as
  * HTML, with an expand button top-right that opens the full editor.
- * Suspends the iframe to a "Moving widget…" pill during canvas
- * motion or when the node scrolls off-screen, matching prod UX and
- * keeping pan/zoom smooth even with many widgets.
+ * The iframe is dropped when the node scrolls fully off-screen
+ * (useIsInView) to free its event loop. Pan/zoom suspension is
+ * handled by the canvas placeholder (drawWidgetPlaceholder); this
+ * component only mounts at idle.
  */
 export function WidgetView({ id }: WidgetViewProps) {
   const node = useNode(id)
@@ -32,14 +33,12 @@ export function WidgetView({ id }: WidgetViewProps) {
   const expandRef = useRef<HTMLButtonElement>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
   useStopCanvasGesture(expandRef)
-  const isMoving = useIsMoving()
   const isInView = useIsInView(wrapRef, "200px")
   if (!node) return null
 
   const data = (node.data ?? {}) as Partial<NoteNodeData>
   const label = data.label?.markdown
   const html = node.content ?? ""
-  const suspendPreview = isMoving || !isInView
 
   return (
     <div
@@ -52,7 +51,7 @@ export function WidgetView({ id }: WidgetViewProps) {
         )}
       >
         <div className="relative h-full w-full overflow-hidden rounded-2xl border border-border/50 bg-background">
-          {html && !suspendPreview ? (
+          {html && isInView ? (
             <WidgetIframe
               html={html}
               title="Widget"
@@ -61,16 +60,9 @@ export function WidgetView({ id }: WidgetViewProps) {
           ) : (
             <div className="flex h-full w-full flex-col items-center justify-center gap-2 px-4 text-center text-sm text-muted-foreground">
               <LayoutIcon className="size-5 shrink-0" />
-              <span>Widget HTML will render here</span>
+              <span>{html ? "Widget paused" : "Widget HTML will render here"}</span>
             </div>
           )}
-          {suspendPreview && html ? (
-            <div className="absolute inset-0 flex items-center justify-center bg-card/75 backdrop-blur-[1px]">
-              <div className="rounded-full border border-border/70 bg-card px-3 py-1 text-xs font-medium text-muted-foreground shadow-sm">
-                {isMoving ? "Moving widget…" : "Widget preview paused"}
-              </div>
-            </div>
-          ) : null}
         </div>
       </div>
 

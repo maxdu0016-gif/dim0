@@ -2,9 +2,10 @@ import type { Node, RenderEnv } from "@canvas-harness/core"
 
 
 /**
- * Code-sandbox placeholder — dark-toned card with horizontal "lines of
- * code" strokes of varying widths. No real syntax highlighting, just
- * enough visual texture that the shape reads as a code block.
+ * Code-sandbox placeholder — bg-card rounded card with a centered
+ * `< >` bracket glyph + a few code-line strokes. Drops the dark
+ * rose-pine background during motion so the canvas reads as a calm
+ * card on the rest of the canvas surface.
  */
 export const drawCodeSandboxPlaceholder = (
   ctx: CanvasRenderingContext2D,
@@ -12,39 +13,62 @@ export const drawCodeSandboxPlaceholder = (
   env: RenderEnv,
 ): void => {
   const { w, h } = node
-  const fill = (env.theme("backgroundColor") as string) ?? "#1f2937"
-  const stroke = (env.theme("strokeColor") as string) ?? "#9ca3af"
-  const titleH = Math.min(h * 0.15, 24)
+  const card = (env.theme("card") as string) ?? "#ffffff"
+  const stroke = (env.theme("muted-foreground") as string) ?? "#9ca3af"
+  const r = Math.min(16, w * 0.06, h * 0.06)
 
   ctx.save()
-  ctx.fillStyle = fill
+  ctx.fillStyle = card
   ctx.strokeStyle = stroke
-  ctx.lineWidth = 1
-  ctx.fillRect(0, 0, w, h)
-  ctx.strokeRect(0.5, 0.5, w - 1, h - 1)
+  ctx.lineWidth = 1.5
+  ctx.lineCap = "round"
+  ctx.lineJoin = "round"
 
-  // Title-bar divider.
+  // Rounded card body.
   ctx.beginPath()
-  ctx.moveTo(0, titleH)
-  ctx.lineTo(w, titleH)
+  ctx.moveTo(r, 0)
+  ctx.lineTo(w - r, 0)
+  ctx.quadraticCurveTo(w, 0, w, r)
+  ctx.lineTo(w, h - r)
+  ctx.quadraticCurveTo(w, h, w - r, h)
+  ctx.lineTo(r, h)
+  ctx.quadraticCurveTo(0, h, 0, h - r)
+  ctx.lineTo(0, r)
+  ctx.quadraticCurveTo(0, 0, r, 0)
+  ctx.closePath()
+  ctx.fill()
+  ctx.globalAlpha = 0.5
   ctx.stroke()
 
-  // Pseudo-code strokes — alternating widths suggest indented lines.
-  const lineH = 8
-  const startY = titleH + 8
-  const padX = 8
-  const widths = [0.6, 0.45, 0.7, 0.3, 0.55, 0.65, 0.4, 0.5, 0.7, 0.35]
-  ctx.globalAlpha = 0.45
-  ctx.lineWidth = 2
-  for (let i = 0; i < widths.length; i += 1) {
-    const y = startY + i * lineH
-    if (y > h - 6) break
-    const lineW = (w - padX * 2) * widths[i]
-    const indent = i % 3 === 1 ? 10 : 0
-    ctx.beginPath()
-    ctx.moveTo(padX + indent, y)
-    ctx.lineTo(padX + indent + lineW, y)
-    ctx.stroke()
-  }
+  // Centered `< / >` glyph — three strokes forming the code icon.
+  ctx.globalAlpha = 0.4
+  ctx.lineWidth = 2.5
+  ctx.strokeStyle = stroke
+  const glyphSize = Math.min(w * 0.28, h * 0.42, 56)
+  const cx = w / 2
+  const cy = h / 2
+  const half = glyphSize / 2
+  const armX = glyphSize * 0.35
+  const armY = glyphSize * 0.3
+
+  // Left bracket: <
+  ctx.beginPath()
+  ctx.moveTo(cx - half * 0.55, cy - armY)
+  ctx.lineTo(cx - half * 0.55 - armX, cy)
+  ctx.lineTo(cx - half * 0.55, cy + armY)
+  ctx.stroke()
+
+  // Right bracket: >
+  ctx.beginPath()
+  ctx.moveTo(cx + half * 0.55, cy - armY)
+  ctx.lineTo(cx + half * 0.55 + armX, cy)
+  ctx.lineTo(cx + half * 0.55, cy + armY)
+  ctx.stroke()
+
+  // Forward slash between the brackets.
+  ctx.beginPath()
+  ctx.moveTo(cx + glyphSize * 0.12, cy - armY * 1.1)
+  ctx.lineTo(cx - glyphSize * 0.12, cy + armY * 1.1)
+  ctx.stroke()
   ctx.restore()
 }

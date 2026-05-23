@@ -2,10 +2,11 @@ import type { Node, RenderEnv } from "@canvas-harness/core"
 
 
 /**
- * Canvas placeholder for a folder node — rendered when zoomed out below
- * the React-view threshold. A flat folder silhouette (body + tab) in
- * theme colors. No text — at low zoom labels are unreadable; the shape
- * alone identifies the type.
+ * Folder placeholder painted on the canvas while panning/zooming or
+ * when zoomed out below the React-view threshold. The folder
+ * silhouette (tab + body) is what identifies the type at a glance;
+ * fill = `card`, stroke = soft muted-foreground for a calm, modern
+ * look that matches the React view's bg-card aesthetic.
  */
 export const drawFolderPlaceholder = (
   ctx: CanvasRenderingContext2D,
@@ -13,44 +14,51 @@ export const drawFolderPlaceholder = (
   env: RenderEnv,
 ): void => {
   const { w, h } = node
-  const fill = (env.theme("backgroundColor") as string) ?? "#fde68a"
-  const stroke = (env.theme("strokeColor") as string) ?? "#92400e"
-  const tabW = Math.min(w * 0.35, 60)
-  const tabH = Math.min(h * 0.18, 22)
-  const radius = Math.min(6, w * 0.04, h * 0.04)
+  const card = (env.theme("card") as string) ?? "#ffffff"
+  const stroke = (env.theme("muted-foreground") as string) ?? "#9ca3af"
+  const tabW = Math.min(w * 0.35, w * 0.6)
+  const tabH = Math.min(h * 0.18, 28)
+  const r = Math.min(14, w * 0.05, h * 0.05)
+  const tabSkew = tabH * 0.4
 
   ctx.save()
-  ctx.fillStyle = fill
+  ctx.fillStyle = card
   ctx.strokeStyle = stroke
+  ctx.globalAlpha = 0.55
   ctx.lineWidth = 1.5
+  ctx.lineCap = "round"
+  ctx.lineJoin = "round"
 
-  // Folder body — rounded rect occupying the bottom 82% so the tab sits above.
-  const bodyY = tabH
+  // Tab — soft trapezoid on the top-left.
   ctx.beginPath()
-  ctx.moveTo(radius, bodyY)
-  ctx.lineTo(w - radius, bodyY)
-  ctx.quadraticCurveTo(w, bodyY, w, bodyY + radius)
-  ctx.lineTo(w, h - radius)
-  ctx.quadraticCurveTo(w, h, w - radius, h)
-  ctx.lineTo(radius, h)
-  ctx.quadraticCurveTo(0, h, 0, h - radius)
-  ctx.lineTo(0, bodyY + radius)
-  ctx.quadraticCurveTo(0, bodyY, radius, bodyY)
+  ctx.moveTo(r, 0)
+  ctx.lineTo(tabW - tabSkew, 0)
+  ctx.lineTo(tabW, tabH)
+  ctx.lineTo(0, tabH)
+  ctx.lineTo(0, r)
+  ctx.quadraticCurveTo(0, 0, r, 0)
   ctx.closePath()
+  ctx.globalAlpha = 1
+  ctx.fillStyle = card
   ctx.fill()
+  ctx.globalAlpha = 0.55
   ctx.stroke()
 
-  // Tab — small trapezoid on the top-left.
+  // Body — rounded rect occupying everything below the tab.
+  const bodyY = tabH
   ctx.beginPath()
-  ctx.moveTo(radius, 0)
-  ctx.lineTo(tabW - tabH * 0.4, 0)
-  ctx.lineTo(tabW, tabH)
-  ctx.lineTo(radius, tabH)
-  ctx.quadraticCurveTo(0, tabH, 0, tabH - radius)
-  ctx.lineTo(0, radius)
-  ctx.quadraticCurveTo(0, 0, radius, 0)
+  ctx.moveTo(r, bodyY)
+  ctx.lineTo(w - r, bodyY)
+  ctx.quadraticCurveTo(w, bodyY, w, bodyY + r)
+  ctx.lineTo(w, h - r)
+  ctx.quadraticCurveTo(w, h, w - r, h)
+  ctx.lineTo(r, h)
+  ctx.quadraticCurveTo(0, h, 0, h - r)
+  ctx.lineTo(0, bodyY)
   ctx.closePath()
+  ctx.globalAlpha = 1
   ctx.fill()
+  ctx.globalAlpha = 0.55
   ctx.stroke()
   ctx.restore()
 }
