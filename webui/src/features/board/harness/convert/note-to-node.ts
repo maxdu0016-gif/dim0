@@ -11,6 +11,25 @@ const DEG_TO_RAD = Math.PI / 180
 
 
 /**
+ * Custom node types where the lib's height autoFit must be off.
+ *
+ * autoFit measures `node.content` and forces `node.h` to fit on
+ * resize-commit. For these types `node.content` is the full body
+ * (sheet markdown, code sandbox source, widget HTML/JS) but the React
+ * view only renders a preview — so autoFit would snap the node tall
+ * enough for the whole body the user can't see, breaking height
+ * resize. See migration plan §4.x.
+ */
+const AUTOFIT_DISABLED_TYPES = new Set([
+  "folder",
+  "sheet",
+  "code-sandbox",
+  "widget",
+  "document",
+])
+
+
+/**
  * Payload on `Node.data` that holds every Dim0 Note field which doesn't
  * lift onto a canvas-harness Node primitive. Round-trip integrity
  * depends on these being preserved.
@@ -78,6 +97,11 @@ export const noteToNode = (note: Note | Document): Node => {
     ? "document"
     : dim0TypeToCanvas(note.style.type)
 
+  const style = dim0StyleToCanvas(note.style)
+  if (AUTOFIT_DISABLED_TYPES.has(canvasType)) {
+    style.autoFit = false
+  }
+
   return {
     id: asNodeId(note.id),
     type: canvasType,
@@ -89,7 +113,7 @@ export const noteToNode = (note: Note | Document): Node => {
     z,
     groups: (note.style.groupIds ?? []).map(asGroupId),
     content: body,
-    style: dim0StyleToCanvas(note.style),
+    style,
     data,
   }
 }
