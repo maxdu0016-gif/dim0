@@ -5,6 +5,7 @@ import {
   HarnessSaveStatus,
   HarnessToolbar,
   HarnessViewportControls,
+  StyleSidebar,
 } from "../chrome"
 import { boardNodeTypes, useRenderCustomNodeView } from "../node-types"
 import { hydrateBoardStore } from "../persist/snapshot-load"
@@ -124,6 +125,7 @@ function HarnessCanvasInner({ theme, tool, saveStatus, onCreateDrag, onClick }: 
       />
       <HarnessToolbar />
       <HarnessViewportControls />
+      <StyleSidebar />
       <HarnessSaveStatus status={saveStatus} />
       <Minimap
         width={200}
