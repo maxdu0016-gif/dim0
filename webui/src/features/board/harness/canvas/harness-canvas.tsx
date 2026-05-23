@@ -2,9 +2,9 @@ import { useEffect, useRef, useState } from "react"
 import type { CanvasStore } from "@canvas-harness/core"
 import { Canvas, CanvasProvider, Minimap } from "@canvas-harness/react"
 import {
-  HarnessHistoryControls,
   HarnessSaveStatus,
   HarnessToolbar,
+  HarnessViewportControls,
 } from "../chrome"
 import { boardNodeTypes, useRenderCustomNodeView } from "../node-types"
 import { hydrateBoardStore } from "../persist/snapshot-load"
@@ -121,7 +121,7 @@ function HarnessCanvasInner({ theme, tool, saveStatus, onCreateDrag, onClick }: 
         onClick={onClick}
       />
       <HarnessToolbar />
-      <HarnessHistoryControls />
+      <HarnessViewportControls />
       <HarnessSaveStatus status={saveStatus} />
       <Minimap
         width={200}

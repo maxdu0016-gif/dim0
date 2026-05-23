@@ -5,7 +5,7 @@ import {
   applyBackgroundAlpha,
   type BoardBackgroundTexture,
 } from "@/features/board/utils/board-background"
-import { readCssVar } from "./css-vars"
+import { readCssVarMixed } from "./css-vars"
 import { getSwatch, type Mode } from "./tokens"
 
 
@@ -56,14 +56,18 @@ export const getBackground = ({
 
   const color = tinted ?? defaultBg
 
+  // Texture color picks up the theme via CSS vars but tones down via
+  // color-mix so it reads as a subtle pattern, not a solid foreground.
+  // canvas-harness paints dots/lines more boldly than react-flow's SVG
+  // pattern; without the alpha drop they end up too contrasty.
   let pattern: CanvasBackground["pattern"] = "none"
   let patternColor: string | undefined
   if (boardBackgroundTexture === "dots") {
     pattern = "dots"
-    patternColor = readCssVar("--muted-foreground")
+    patternColor = readCssVarMixed("--muted-foreground", 25)
   } else if (boardBackgroundTexture === "lines") {
     pattern = "grid"
-    patternColor = readCssVar("--muted")
+    patternColor = readCssVarMixed("--muted-foreground", 35)
   }
 
   return {
