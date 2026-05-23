@@ -20,6 +20,12 @@ const SHAPE_TOOLS = new Set([
   "soft-diamond",
   "text",
   "frame",
+  // Custom node types — go through the same convert + addNode path
+  // (createDefaultNote handles their default sizes / styles per type).
+  "folder",
+  "sheet",
+  "code-sandbox",
+  "widget",
 ])
 
 

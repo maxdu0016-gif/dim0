@@ -1,11 +1,15 @@
 import { Fragment } from "react"
 import {
   ArrowRight,
+  BrowserIcon,
   Circle,
+  CodeBlockIcon,
   Cursor,
   Diamond,
+  FolderIcon,
   FrameCorners,
   Hand,
+  NotepadIcon,
   Square,
   TextT,
   type Icon as PhosphorIcon,
@@ -40,6 +44,12 @@ const TOOL_GROUPS: ReadonlyArray<ReadonlyArray<ToolDef>> = [
     { id: "arrow", label: "Arrow", icon: ArrowRight },
     { id: "text", label: "Text", icon: TextT },
     { id: "frame", label: "Frame (F)", icon: FrameCorners },
+  ],
+  [
+    { id: "folder", label: "Folder", icon: FolderIcon },
+    { id: "sheet", label: "Sheet", icon: NotepadIcon },
+    { id: "code-sandbox", label: "Code sandbox", icon: CodeBlockIcon },
+    { id: "widget", label: "Widget", icon: BrowserIcon },
   ],
 ]
 
