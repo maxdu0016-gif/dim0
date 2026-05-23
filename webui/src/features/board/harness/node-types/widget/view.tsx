@@ -1,10 +1,15 @@
 import { useRef } from "react"
-import { ArrowsOutSimpleIcon } from "@phosphor-icons/react"
+import { ArrowsOutSimpleIcon, LayoutIcon } from "@phosphor-icons/react"
 import type { NodeId } from "@canvas-harness/core"
-import { useNode } from "@canvas-harness/react"
+import { useIsMoving, useNode } from "@canvas-harness/react"
 import { cn } from "@/lib/utils"
+import { WidgetIframe } from "@/features/board/components/flow/widget-iframe"
 import type { NoteNodeData } from "../../convert/note-to-node"
-import { NodeTitleCaption, useStopCanvasGesture } from "../../shared-views"
+import {
+  NodeTitleCaption,
+  useIsInView,
+  useStopCanvasGesture,
+} from "../../shared-views"
 import { useBoardAppStore } from "../../store/board-app-store"
 
 
@@ -13,46 +18,60 @@ export type WidgetViewProps = {
 }
 
 
-// Scripts run inside the iframe, but no same-origin access (no cookies,
-// no parent storage). Matches the existing widget-node sandbox set.
-const IFRAME_SANDBOX = "allow-scripts allow-popups allow-modals allow-forms"
-
-
 /**
- * Widget node view — title bar at top + sandboxed iframe rendering
- * `node.content` as HTML. Expand button top-right opens the full HTML
- * editor (phase 5.2). Editable title sits below the card.
- *
- * The wrapper is pointer-event-transparent so the canvas dispatches
- * drags; the iframe + expand button opt back in.
+ * Widget inline view — sandboxed iframe rendering `node.content` as
+ * HTML, with an expand button top-right that opens the full editor.
+ * Suspends the iframe to a "Moving widget…" pill during canvas
+ * motion or when the node scrolls off-screen, matching prod UX and
+ * keeping pan/zoom smooth even with many widgets.
  */
 export function WidgetView({ id }: WidgetViewProps) {
   const node = useNode(id)
   const openNodeSurface = useBoardAppStore((s) => s.openNodeSurface)
   const canEdit = useBoardAppStore((s) => s.canEdit)
   const expandRef = useRef<HTMLButtonElement>(null)
+  const wrapRef = useRef<HTMLDivElement>(null)
   useStopCanvasGesture(expandRef)
+  const isMoving = useIsMoving()
+  const isInView = useIsInView(wrapRef, "200px")
   if (!node) return null
 
   const data = (node.data ?? {}) as Partial<NoteNodeData>
   const label = data.label?.markdown
-  const title = label?.trim() || "Widget"
   const html = node.content ?? ""
+  const suspendPreview = isMoving || !isInView
 
   return (
-    <div className="pointer-events-none relative h-full w-full select-none">
+    <div
+      ref={wrapRef}
+      className="pointer-events-none relative h-full w-full select-none"
+    >
       <div
         className={cn(
-          "absolute inset-0 flex flex-col overflow-hidden rounded-md border border-border bg-background",
+          "absolute inset-0 flex flex-col overflow-hidden rounded-3xl border border-dashed border-border bg-background p-2",
         )}
       >
-        <iframe
-          title={title}
-          srcDoc={html}
-          sandbox={IFRAME_SANDBOX}
-          className="pointer-events-auto h-full w-full flex-1 bg-white"
-          style={{ border: 0 }}
-        />
+        <div className="relative h-full w-full overflow-hidden rounded-2xl border border-border/50 bg-background">
+          {html && !suspendPreview ? (
+            <WidgetIframe
+              html={html}
+              title="Widget"
+              className="pointer-events-auto h-full w-full bg-transparent"
+            />
+          ) : (
+            <div className="flex h-full w-full flex-col items-center justify-center gap-2 px-4 text-center text-sm text-muted-foreground">
+              <LayoutIcon className="size-5 shrink-0" />
+              <span>Widget HTML will render here</span>
+            </div>
+          )}
+          {suspendPreview && html ? (
+            <div className="absolute inset-0 flex items-center justify-center bg-card/75 backdrop-blur-[1px]">
+              <div className="rounded-full border border-border/70 bg-card px-3 py-1 text-xs font-medium text-muted-foreground shadow-sm">
+                {isMoving ? "Moving widget…" : "Widget preview paused"}
+              </div>
+            </div>
+          ) : null}
+        </div>
       </div>
 
       {canEdit ? (

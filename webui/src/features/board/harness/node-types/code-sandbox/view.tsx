@@ -1,8 +1,14 @@
-import { useRef } from "react"
-import { CodeIcon } from "@phosphor-icons/react"
+import { useMemo, useRef } from "react"
 import type { NodeId } from "@canvas-harness/core"
-import { useNode } from "@canvas-harness/react"
+import { useIsMoving, useNode } from "@canvas-harness/react"
 import { cn } from "@/lib/utils"
+import { useTheme } from "@/components/theme-provider"
+import {
+  highlightPython,
+  ROSE_PINE_DARK,
+  ROSE_PINE_LIGHT,
+} from "@/features/board/components/flow/code-sandbox-utils"
+import "@/features/board/components/flow/code-sandbox-node.css"
 import type { NoteNodeData } from "../../convert/note-to-node"
 import { NodeTitleCaption, useStopCanvasGesture } from "../../shared-views"
 import { useBoardAppStore } from "../../store/board-app-store"
@@ -13,13 +19,10 @@ export type CodeSandboxViewProps = {
 }
 
 
-const PREVIEW_LINES = 12
-
-
 /**
- * Code-sandbox inline view — entire body is a click-to-open button
- * (matches dim0's prod UX). Click anywhere on the code preview opens
- * the full editor surface. Editable title sits below the card.
+ * Code-sandbox inline view — rose-pine themed Python preview. Entire
+ * body is the click target (matches prod). Suspends to a pill during
+ * canvas motion to keep pan/zoom smooth.
  */
 export function CodeSandboxView({ id }: CodeSandboxViewProps) {
   const node = useNode(id)
@@ -27,13 +30,21 @@ export function CodeSandboxView({ id }: CodeSandboxViewProps) {
   const canEdit = useBoardAppStore((s) => s.canEdit)
   const bodyRef = useRef<HTMLButtonElement>(null)
   useStopCanvasGesture(bodyRef)
+  const isMoving = useIsMoving()
+  const { resolvedTheme } = useTheme()
+  const isDark = resolvedTheme === "dark"
+  const palette = isDark ? ROSE_PINE_DARK : ROSE_PINE_LIGHT
+
+  const code = node?.content ?? ""
+  const previewHtml = useMemo(
+    () => highlightPython(code || "# Write Python here"),
+    [code],
+  )
+
   if (!node) return null
 
   const data = (node.data ?? {}) as Partial<NoteNodeData>
   const label = data.label?.markdown
-  const language = data.properties?.programmingLanguage?.text?.trim() || "python"
-  const code = node.content ?? ""
-  const preview = code.split("\n").slice(0, PREVIEW_LINES).join("\n")
 
   return (
     <div className="pointer-events-none relative h-full w-full select-none">
@@ -47,21 +58,48 @@ export function CodeSandboxView({ id }: CodeSandboxViewProps) {
         }}
         onDoubleClick={(e) => e.stopPropagation()}
         className={cn(
-          "absolute inset-0 flex flex-col overflow-hidden rounded-md border border-border bg-stone-900 text-stone-100",
-          "pointer-events-auto text-left",
+          "absolute inset-0 overflow-hidden rounded-2xl text-left shadow-sm",
+          "pointer-events-auto",
           canEdit ? "cursor-pointer" : "cursor-default",
         )}
-        title={canEdit ? "Open code sandbox" : undefined}
+        title={canEdit ? "Open Python sandbox" : "Python sandbox preview"}
       >
-        <div className="flex shrink-0 items-center gap-2 border-b border-stone-700 px-2 py-1 text-xs font-medium">
-          <CodeIcon className="size-3.5 opacity-70" weight="bold" />
-          <span className="ml-auto rounded bg-stone-700 px-1.5 py-0.5 text-[10px] font-normal uppercase tracking-wider text-stone-300">
-            {language}
-          </span>
+        <div
+          className={cn(
+            "code-sandbox-theme relative h-full w-full overflow-auto scrollbar-thin p-3",
+            isDark ? "code-sandbox-theme-dark" : "code-sandbox-theme-light",
+          )}
+          style={{ backgroundColor: palette.bg, color: palette.text }}
+        >
+          {!isMoving && (
+            <pre
+              className="hljs min-h-full whitespace-pre-wrap break-words bg-transparent p-0 font-mono text-base leading-5"
+              dangerouslySetInnerHTML={{ __html: previewHtml }}
+            />
+          )}
+          {isMoving && (
+            <div
+              className="absolute inset-0 flex items-center justify-center"
+              style={{
+                backgroundColor: isDark
+                  ? "rgba(31,29,46,0.62)"
+                  : "rgba(255,250,243,0.72)",
+              }}
+            >
+              <div
+                className="rounded-full px-3 py-1 text-base font-medium"
+                style={{
+                  color: palette.muted,
+                  backgroundColor: isDark
+                    ? "rgba(64,61,82,0.72)"
+                    : "rgba(223,218,217,0.8)",
+                }}
+              >
+                Moving sandbox…
+              </div>
+            </div>
+          )}
         </div>
-        <pre className="scrollbar-thin min-h-0 flex-1 overflow-auto whitespace-pre p-2 font-mono text-[11px] leading-relaxed text-stone-300">
-          {preview || <span className="italic text-stone-500">no code</span>}
-        </pre>
       </button>
 
       <div className="pointer-events-auto absolute left-1/2 top-full z-20 mt-2 w-full -translate-x-1/2">

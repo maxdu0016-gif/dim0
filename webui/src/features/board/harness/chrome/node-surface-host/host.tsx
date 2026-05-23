@@ -1,9 +1,9 @@
 import { memo, useEffect } from "react"
 import { useCanvasStore } from "@canvas-harness/react"
 import { useBoardAppStore } from "../../store/board-app-store"
-import { CodeSandboxStubPanel } from "./code-sandbox-stub"
-import { SheetStubPanel } from "./sheet-stub"
-import { WidgetStubPanel } from "./widget-stub"
+import { CodeSandboxPanel } from "./code-sandbox-panel"
+import { SheetPanel } from "./sheet-panel"
+import { WidgetPanel } from "./widget-panel"
 
 
 /**
@@ -11,10 +11,6 @@ import { WidgetStubPanel } from "./widget-stub"
  * port of dim0's NodeSurfaceHost. Reads `activeNodeSurface` from
  * board-app-store and renders the matching panel; closing dispatches
  * back to the store. Click on the backdrop closes.
- *
- * Phase 5.1 ships STUB panels (placeholders that exercise the open /
- * close / backdrop / esc flow end-to-end). Phase 5.2 swaps each stub
- * for the real editor port (TipTap / monaco / iframe).
  */
 export const NodeSurfaceHost = memo(function NodeSurfaceHost() {
   const activeNodeSurface = useBoardAppStore((s) => s.activeNodeSurface)
@@ -58,17 +54,17 @@ export const NodeSurfaceHost = memo(function NodeSurfaceHost() {
     <>
       {backdrop}
       {activeNodeSurface.kind === "sheet" ? (
-        <SheetStubPanel
+        <SheetPanel
           nodeId={activeNodeSurface.nodeId}
           onClose={closeNodeSurface}
         />
       ) : activeNodeSurface.kind === "code-sandbox" ? (
-        <CodeSandboxStubPanel
+        <CodeSandboxPanel
           nodeId={activeNodeSurface.nodeId}
           onClose={closeNodeSurface}
         />
       ) : (
-        <WidgetStubPanel
+        <WidgetPanel
           nodeId={activeNodeSurface.nodeId}
           onClose={closeNodeSurface}
         />
