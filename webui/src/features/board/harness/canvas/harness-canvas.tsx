@@ -1,10 +1,16 @@
-import { useEffect, useRef, useState } from "react"
-import type { CanvasStore } from "@canvas-harness/core"
-import { Canvas, CanvasProvider, Minimap } from "@canvas-harness/react"
+import { useCallback, useEffect, useRef, useState } from "react"
+import { hitTestAny, type CanvasStore } from "@canvas-harness/core"
+import {
+  Canvas,
+  CanvasProvider,
+  Minimap,
+  type CanvasPointerEvent,
+} from "@canvas-harness/react"
 import {
   HarnessSaveStatus,
   HarnessToolbar,
   HarnessViewportControls,
+  NodeSurfaceHost,
   StyleSidebar,
 } from "../chrome"
 import { boardNodeTypes, useRenderCustomNodeView } from "../node-types"
@@ -55,6 +61,26 @@ export function HarnessCanvas() {
   useViewportPersistence(store, boardId, rootId, ready)
   const { handleCreateDrag, handleClick } = useCreateHandlers(store, boardId)
 
+  // canvas-harness fires beginEdit on dbl-click of any node body. for
+  // custom node types we own the editing surface (sheet / code-sandbox /
+  // widget open via the panel; folder / document have no inline editor),
+  // so cancel the auto-fired beginEdit. lib fires beginEdit BEFORE the
+  // consumer onDoubleClick, so cancel here happens synchronously in the
+  // same tick — no editor frame is rendered.
+  const handleDoubleClick = useCallback(
+    (e: CanvasPointerEvent): void => {
+      const camera = store.getCamera()
+      const hit = hitTestAny(store, e.world, camera.z)
+      if (!hit || !("nodeId" in hit)) return
+      const node = store.getNode(hit.nodeId)
+      if (!node) return
+      if (CUSTOM_NODE_TYPES.has(node.type)) {
+        store.cancelEdit()
+      }
+    },
+    [store],
+  )
+
   // Hydrate on scope change. `cancelled` guards against late-arriving fetches
   // when the user navigates rapidly between boards.
   useEffect(() => {
@@ -95,10 +121,21 @@ export function HarnessCanvas() {
         saveStatus={saveStatus}
         onCreateDrag={handleCreateDrag}
         onClick={handleClick}
+        onDoubleClick={handleDoubleClick}
       />
     </CanvasProvider>
   )
 }
+
+
+/** canvas node.type values whose dbl-click should NOT trigger the lib's beginEdit. */
+const CUSTOM_NODE_TYPES = new Set([
+  "folder",
+  "document",
+  "sheet",
+  "code-sandbox",
+  "widget",
+])
 
 
 type InnerProps = {
@@ -107,10 +144,18 @@ type InnerProps = {
   saveStatus: SaveStatus
   onCreateDrag: ReturnType<typeof useCreateHandlers>["handleCreateDrag"]
   onClick: ReturnType<typeof useCreateHandlers>["handleClick"]
+  onDoubleClick: (e: CanvasPointerEvent) => void
 }
 
 
-function HarnessCanvasInner({ theme, tool, saveStatus, onCreateDrag, onClick }: InnerProps) {
+function HarnessCanvasInner({
+  theme,
+  tool,
+  saveStatus,
+  onCreateDrag,
+  onClick,
+  onDoubleClick,
+}: InnerProps) {
   const renderView = useRenderCustomNodeView()
   return (
     <>
@@ -122,11 +167,13 @@ function HarnessCanvasInner({ theme, tool, saveStatus, onCreateDrag, onClick }: 
         renderCustomNodeView={renderView}
         onCreateDrag={onCreateDrag}
         onClick={onClick}
+        onDoubleClick={onDoubleClick}
       />
       <HarnessToolbar />
       <HarnessViewportControls />
       <StyleSidebar />
       <HarnessSaveStatus status={saveStatus} />
+      <NodeSurfaceHost />
       <Minimap
         width={200}
         height={140}

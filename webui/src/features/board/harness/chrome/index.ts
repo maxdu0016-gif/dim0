@@ -1,3 +1,4 @@
+export { NodeSurfaceHost } from "./node-surface-host"
 export { HarnessSaveStatus } from "./save-status"
 export { StyleSidebar } from "./style-panel"
 export { HarnessToolbar } from "./toolbar"
