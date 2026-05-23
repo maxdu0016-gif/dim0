@@ -1,6 +1,6 @@
 export { getBackground } from "./background"
 export type { GetBackgroundInput } from "./background"
-export { readCssVar } from "./css-vars"
+export { blendCssColors, readCssVar, readCssVarMixed } from "./css-vars"
 export { getMinimapColors } from "./minimap-colors"
 export { makeBoardThemeResolver } from "./resolver"
 export { getSelectionColor } from "./selection-color"

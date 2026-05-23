@@ -1,11 +1,8 @@
 import type { CanvasBackground } from "@canvas-harness/core"
 import type { ThemeId } from "@/components/theme-constants"
 import { darkModeDisplayHex } from "@/features/board/lib/colors/dark-variants"
-import {
-  applyBackgroundAlpha,
-  type BoardBackgroundTexture,
-} from "@/features/board/utils/board-background"
-import { readCssVarMixed } from "./css-vars"
+import type { BoardBackgroundTexture } from "@/features/board/utils/board-background"
+import { blendCssColors, readCssVar, readCssVarMixed } from "./css-vars"
 import { getSwatch, type Mode } from "./tokens"
 
 
@@ -23,16 +20,18 @@ export type GetBackgroundInput = {
  * Resolve the canvas page background for a Dim0 board, matching the
  * existing react-flow path's behavior:
  *
- *   - When `boardBackground` is set, apply a 50%-alpha tint
- *     (dark-mode-shifted via `darkModeDisplayHex` so user-picked
- *     light colors don't blow out in dark theme).
- *   - When unset, fall back to the theme swatch (step 2 will swap to
- *     reading `--background` directly so the default exactly matches
- *     the rest of the app).
+ *   - Default: read `--background` directly so the canvas matches the
+ *     rest of the app pixel-for-pixel. Falls back to the theme swatch
+ *     if the CSS var isn't resolvable (SSR, unusual host env).
+ *   - When `boardBackground` is set, pre-blend the dark-mode-shifted
+ *     user color with `--background` at 50% via color-mix and pass the
+ *     resulting solid color to canvas-harness. Using rgba(...) here
+ *     would blend with the renderer's hardcoded wrap-div bg instead of
+ *     the actual page bg the user sees in the rest of the app.
  *
  * Texture pattern follows dim0's existing logic:
- *   - `"dots"`  → `pattern: "dots"`,  `patternColor: --muted-foreground`
- *   - `"lines"` → `pattern: "grid"`,  `patternColor: --muted`
+ *   - `"dots"`  → `pattern: "dots"`,  patternColor toned down via color-mix
+ *   - `"lines"` → `pattern: "grid"`,  patternColor toned down via color-mix
  *
  * `"lines"` maps to canvas-harness's `"grid"` (only naming differs —
  * both render a line-grid pattern).
@@ -43,14 +42,16 @@ export const getBackground = ({
   boardBackground,
   boardBackgroundTexture,
 }: GetBackgroundInput): CanvasBackground => {
-  const [defaultBg] = getSwatch(themeId, mode)
+  const [swatchBg] = getSwatch(themeId, mode)
+  const defaultBg = readCssVar("--background") || swatchBg
 
   const tinted = boardBackground
-    ? applyBackgroundAlpha(
+    ? blendCssColors(
         mode === "dark"
           ? (darkModeDisplayHex(boardBackground) ?? boardBackground)
           : boardBackground,
-        0.5,
+        "var(--background)",
+        50,
       )
     : null
 
