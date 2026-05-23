@@ -1,5 +1,6 @@
 import { defineNode } from "@canvas-harness/core"
 import { drawCodeSandboxPlaceholder } from "./placeholder"
+import { CodeSandboxView } from "./view"
 
 
 /**
@@ -10,6 +11,7 @@ import { drawCodeSandboxPlaceholder } from "./placeholder"
  */
 export const codeSandboxDef = defineNode({
   type: "code-sandbox",
+  view: CodeSandboxView,
   drawPlaceholder: drawCodeSandboxPlaceholder,
   lod: { minZoomForReact: 0.5, minZoomForPlaceholder: 0.2 },
   hitTest: (node, p) => p.x >= 0 && p.x <= node.w && p.y >= 0 && p.y <= node.h,

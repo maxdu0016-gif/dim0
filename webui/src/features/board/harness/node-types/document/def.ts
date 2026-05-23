@@ -1,5 +1,6 @@
 import { defineNode } from "@canvas-harness/core"
 import { drawDocumentPlaceholder } from "./placeholder"
+import { DocumentView } from "./view"
 
 
 /**
@@ -10,6 +11,7 @@ import { drawDocumentPlaceholder } from "./placeholder"
  */
 export const documentDef = defineNode({
   type: "document",
+  view: DocumentView,
   drawPlaceholder: drawDocumentPlaceholder,
   lod: { minZoomForReact: 0.4, minZoomForPlaceholder: 0.15 },
   hitTest: (node, p) => p.x >= 0 && p.x <= node.w && p.y >= 0 && p.y <= node.h,

@@ -1,5 +1,6 @@
 import { defineNode } from "@canvas-harness/core"
 import { drawWidgetPlaceholder } from "./placeholder"
+import { WidgetView } from "./view"
 
 
 /**
@@ -10,6 +11,7 @@ import { drawWidgetPlaceholder } from "./placeholder"
  */
 export const widgetDef = defineNode({
   type: "widget",
+  view: WidgetView,
   drawPlaceholder: drawWidgetPlaceholder,
   lod: { minZoomForReact: 0.6, minZoomForPlaceholder: 0.2 },
   hitTest: (node, p) => p.x >= 0 && p.x <= node.w && p.y >= 0 && p.y <= node.h,
