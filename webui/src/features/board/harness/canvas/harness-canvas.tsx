@@ -14,6 +14,7 @@ import { createBoardStore } from "../store/create-board-store"
 import { useBoardTheme } from "../theme/use-board-theme"
 import { useBoardKeyboard } from "./use-board-keyboard"
 import { useCreateHandlers } from "./use-create-handlers"
+import { useViewportPersistence } from "./use-viewport-persistence"
 
 
 /**
@@ -50,6 +51,7 @@ export function HarnessCanvas() {
   const [ready, setReady] = useState(false)
   const saveStatus = useBoardDebouncedSave(store, boardId, ready)
   useBoardKeyboard(store)
+  useViewportPersistence(store, boardId, rootId, ready)
   const { handleCreateDrag, handleClick } = useCreateHandlers(store, boardId)
 
   // Hydrate on scope change. `cancelled` guards against late-arriving fetches
