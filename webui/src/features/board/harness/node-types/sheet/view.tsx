@@ -40,21 +40,23 @@ export function SheetView({ id }: SheetViewProps) {
     : ""
 
   return (
-    <div
-      className={cn(
-        "flex h-full w-full flex-col overflow-hidden rounded-md border border-border bg-amber-50/60 dark:bg-stone-900/60",
-        "pointer-events-none select-none",
-      )}
-    >
-      <div className="border-b border-border/40 px-3 py-1.5 text-sm font-medium text-foreground">
-        <span className="line-clamp-1">{title}</span>
-      </div>
-      <div className="flex-1 overflow-hidden px-3 py-2 text-xs leading-relaxed text-muted-foreground">
-        {preview ? (
-          <p className="line-clamp-8 whitespace-pre-wrap">{preview}</p>
-        ) : (
-          <span className="italic">empty</span>
+    <div className="pointer-events-none relative h-full w-full select-none">
+      <div
+        className={cn(
+          "absolute inset-0 flex flex-col overflow-hidden rounded-md border border-border",
+          "bg-amber-50/60 dark:bg-stone-900/60",
         )}
+      >
+        <div className="shrink-0 border-b border-border/40 px-3 py-1.5 text-sm font-medium text-foreground">
+          <span className="line-clamp-1">{title}</span>
+        </div>
+        <div className="scrollbar-thin pointer-events-auto min-h-0 flex-1 overflow-auto px-3 py-2 text-xs leading-relaxed text-muted-foreground">
+          {preview ? (
+            <p className="whitespace-pre-wrap">{preview}</p>
+          ) : (
+            <span className="italic">empty</span>
+          )}
+        </div>
       </div>
     </div>
   )
