@@ -102,6 +102,29 @@ export const noteToNode = (note: Note | Document): Node => {
     style.autoFit = false
   }
 
+  // Canvas-harness's image renderer reads `node.data.src` (see
+  // ImageNodeData in core/types/node.ts), separate from the rest of
+  // the round-tripped properties. Lift the image URL + dims onto
+  // top-level data fields so paintImageNode sees them. nodeSize is
+  // the post-downscale display size (already aspect-correct), so
+  // reusing it for natural dims keeps resize aspect preservation
+  // correct without stashing a second set of dims on the Note.
+  const finalData: NoteNodeData & {
+    src?: string
+    naturalW?: number
+    naturalH?: number
+    alt?: string
+  } = data
+  if (canvasType === "image") {
+    const url = note.properties?.imageUrl?.image?.url
+    if (url) {
+      finalData.src = url
+      finalData.naturalW = size.width
+      finalData.naturalH = size.height
+      finalData.alt = note.label?.markdown
+    }
+  }
+
   return {
     id: asNodeId(note.id),
     type: canvasType,
@@ -114,6 +137,6 @@ export const noteToNode = (note: Note | Document): Node => {
     groups: (note.style.groupIds ?? []).map(asGroupId),
     content: body,
     style,
-    data,
+    data: finalData,
   }
 }

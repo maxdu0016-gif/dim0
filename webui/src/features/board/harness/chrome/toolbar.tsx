@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
 import { useBoardAppStore } from "../store/board-app-store"
+import { HarnessToolbarMore } from "./toolbar-more"
 
 
 type ToolDef = {
@@ -100,6 +101,8 @@ export function HarnessToolbar() {
           })}
         </Fragment>
       ))}
+      <div className="mx-0.5 h-5 w-px bg-border" />
+      <HarnessToolbarMore />
     </div>
   )
 }

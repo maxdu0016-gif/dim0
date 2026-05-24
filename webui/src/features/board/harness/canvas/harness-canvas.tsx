@@ -21,9 +21,12 @@ import { useBoardAppStore } from "../store/board-app-store"
 import { createBoardStore } from "../store/create-board-store"
 import { useBoardTheme } from "../theme/use-board-theme"
 import { useBoardKeyboard } from "./use-board-keyboard"
+import { useCenterFromUrl } from "./use-center-from-url"
 import { useCreateHandlers } from "./use-create-handlers"
+import { useHarnessDropFiles } from "./use-drop-files"
 import { useStampNewEdges } from "./use-stamp-new-edges"
 import { useViewportPersistence } from "./use-viewport-persistence"
+import { HarnessWrapRefProvider } from "./wrap-ref-context"
 
 
 /**
@@ -44,6 +47,7 @@ import { useViewportPersistence } from "./use-viewport-persistence"
 export function HarnessCanvas() {
   const boardId = useBoardAppStore((s) => s.boardId)
   const rootId = useBoardAppStore((s) => s.rootId)
+  const canEdit = useBoardAppStore((s) => s.canEdit)
   const setIsLoading = useBoardAppStore((s) => s.setIsLoading)
   const setCanEdit = useBoardAppStore((s) => s.setCanEdit)
   const setBoardLabel = useBoardAppStore((s) => s.setBoardLabel)
@@ -59,10 +63,13 @@ export function HarnessCanvas() {
   const theme = useBoardTheme()
   const [ready, setReady] = useState(false)
   const saveStatus = useBoardDebouncedSave(store, boardId, ready)
+  const wrapRef = useRef<HTMLDivElement>(null)
   useBoardKeyboard(store)
   useViewportPersistence(store, boardId, rootId, ready)
+  useCenterFromUrl(store, wrapRef, ready)
   useStampNewEdges(store, boardId, rootId)
   const { handleCreateDrag, handleClick } = useCreateHandlers(store, boardId, rootId)
+  const { onDragOver, onDrop } = useHarnessDropFiles(wrapRef, store, boardId, rootId, canEdit)
   const navigate = useNavigate()
 
   // canvas-harness fires beginEdit on dbl-click of any node body. For
@@ -129,14 +136,23 @@ export function HarnessCanvas() {
 
   return (
     <CanvasProvider store={store}>
-      <HarnessCanvasInner
-        theme={theme}
-        tool={tool}
-        saveStatus={saveStatus}
-        onCreateDrag={handleCreateDrag}
-        onClick={handleClick}
-        onDoubleClick={handleDoubleClick}
-      />
+      <HarnessWrapRefProvider value={wrapRef}>
+        <div
+          ref={wrapRef}
+          className="absolute inset-0"
+          onDragOver={onDragOver}
+          onDrop={onDrop}
+        >
+          <HarnessCanvasInner
+            theme={theme}
+            tool={tool}
+            saveStatus={saveStatus}
+            onCreateDrag={handleCreateDrag}
+            onClick={handleClick}
+            onDoubleClick={handleDoubleClick}
+          />
+        </div>
+      </HarnessWrapRefProvider>
     </CanvasProvider>
   )
 }
