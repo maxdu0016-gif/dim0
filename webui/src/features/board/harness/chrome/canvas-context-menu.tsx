@@ -99,6 +99,7 @@ const buildSelectedContextText = (
 export function CanvasContextMenu({ wrapRef, store }: CanvasContextMenuProps) {
   const boardId = useBoardAppStore((s) => s.boardId)
   const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null)
+  const [aiOpen, setAiOpen] = useState(false)
   const [translateOpen, setTranslateOpen] = useState(false)
   const [exportTransparent, setExportTransparent] = useState(false)
   const [customLanguage, setCustomLanguage] = useState("")
@@ -112,6 +113,7 @@ export function CanvasContextMenu({ wrapRef, store }: CanvasContextMenuProps) {
 
   const closeMenu = useCallback(() => {
     setMenuPos(null)
+    setAiOpen(false)
     setTranslateOpen(false)
   }, [])
 
@@ -133,6 +135,7 @@ export function CanvasContextMenu({ wrapRef, store }: CanvasContextMenuProps) {
       if (store.getSelection().length === 0) return
       e.preventDefault()
       setMenuPos({ x: e.clientX, y: e.clientY })
+      setAiOpen(false)
       setTranslateOpen(false)
     }
     wrap.addEventListener("contextmenu", onContext)
@@ -323,74 +326,87 @@ export function CanvasContextMenu({ wrapRef, store }: CanvasContextMenuProps) {
       />
 
       <Divider />
-      <div className="flex items-center gap-2 px-3 py-1 text-xs font-medium text-muted-foreground">
-        <SparklesIcon className="size-3 text-secondary-foreground" />
-        AI Spark
-      </div>
-      {aiMenuActions.map((action) => {
-        const visual = AI_SPARK_VISUALS.find((v) => v.key === action.key)
-        const Icon = visual?.Icon ?? SparklesIcon
-        return (
-          <MenuButton
-            key={action.key}
-            icon={Icon}
-            label={action.label}
-            disabled={!!processingKey}
-            badge={action.key === "drawify" ? "Beta" : undefined}
-            iconClassName="text-secondary-foreground"
-            onClick={() => void handleAiAction(action.key)}
-          />
-        )
-      })}
-
-      <Divider />
       <button
         type="button"
         className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left hover:bg-muted"
-        onClick={() => setTranslateOpen((o) => !o)}
+        onClick={() => setAiOpen((o) => !o)}
       >
-        <ChatTranslateIcon className="size-4 text-secondary-foreground" />
-        <span>Translate</span>
+        <SparklesIcon className="size-4 text-secondary-foreground" weight="fill" />
+        <span>AI</span>
         <span className="ml-auto text-xs text-muted-foreground">
-          {translateOpen ? (
+          {aiOpen ? (
             <ChevronDownIcon className="size-3" />
           ) : (
             <ChevronRightIcon className="size-3" />
           )}
         </span>
       </button>
-      {translateOpen && (
-        <div className="flex flex-col gap-2 px-3 pb-2 pt-1">
-          <div className="flex items-center gap-2">
-            <input
-              className="h-7 flex-1 rounded-md border border-input bg-background px-2 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary-foreground/30"
-              placeholder="Custom language…"
-              value={customLanguage}
-              onChange={(e) => setCustomLanguage(e.target.value)}
-              onMouseDown={(e) => e.stopPropagation()}
-            />
-            <button
-              type="button"
-              className="h-7 rounded-sm border border-border bg-muted/70 px-2 text-xs font-medium hover:text-secondary-foreground"
-              onClick={() =>
-                void handleTranslate(customLanguage.trim() || "English")
-              }
-            >
-              Go
-            </button>
-          </div>
-          <div className="flex flex-wrap gap-1">
-            {COMMON_LANGUAGES.map((language) => (
-              <button
-                key={language}
-                type="button"
-                className="rounded-sm bg-muted px-2 py-1 text-xs font-medium hover:bg-muted/70"
-                onClick={() => void handleTranslate(language)}
-              >
-                {language}
-              </button>
-            ))}
-          </div>
+      {aiOpen && (
+        <div className="ml-2 border-l border-border/60 pl-1">
+          {aiMenuActions.map((action) => {
+            const visual = AI_SPARK_VISUALS.find((v) => v.key === action.key)
+            const Icon = visual?.Icon ?? SparklesIcon
+            return (
+              <MenuButton
+                key={action.key}
+                icon={Icon}
+                label={action.label}
+                disabled={!!processingKey}
+                badge={action.key === "drawify" ? "Beta" : undefined}
+                iconClassName="text-secondary-foreground"
+                onClick={() => void handleAiAction(action.key)}
+              />
+            )
+          })}
+          <button
+            type="button"
+            className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left hover:bg-muted"
+            onClick={() => setTranslateOpen((o) => !o)}
+          >
+            <ChatTranslateIcon className="size-4 text-secondary-foreground" />
+            <span>Translate</span>
+            <span className="ml-auto text-xs text-muted-foreground">
+              {translateOpen ? (
+                <ChevronDownIcon className="size-3" />
+              ) : (
+                <ChevronRightIcon className="size-3" />
+              )}
+            </span>
+          </button>
+          {translateOpen && (
+            <div className="flex flex-col gap-2 px-3 pb-2 pt-1">
+              <div className="flex items-center gap-2">
+                <input
+                  className="h-7 flex-1 rounded-md border border-input bg-background px-2 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary-foreground/30"
+                  placeholder="Custom language…"
+                  value={customLanguage}
+                  onChange={(e) => setCustomLanguage(e.target.value)}
+                  onMouseDown={(e) => e.stopPropagation()}
+                />
+                <button
+                  type="button"
+                  className="h-7 rounded-sm border border-border bg-muted/70 px-2 text-xs font-medium hover:text-secondary-foreground"
+                  onClick={() =>
+                    void handleTranslate(customLanguage.trim() || "English")
+                  }
+                >
+                  Go
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {COMMON_LANGUAGES.map((language) => (
+                  <button
+                    key={language}
+                    type="button"
+                    className="rounded-sm bg-muted px-2 py-1 text-xs font-medium hover:bg-muted/70"
+                    onClick={() => void handleTranslate(language)}
+                  >
+                    {language}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
