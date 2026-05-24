@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useNavigate } from "@tanstack/react-router"
 import { hitTestAny, type CanvasStore } from "@canvas-harness/core"
 import {
   Canvas,
   CanvasProvider,
   Minimap,
+  type ArrowToolDefaults,
   type CanvasPointerEvent,
 } from "@canvas-harness/react"
 import {
@@ -25,6 +26,7 @@ import { useCenterFromUrl } from "./use-center-from-url"
 import { useCreateHandlers } from "./use-create-handlers"
 import { useHarnessDropFiles } from "./use-drop-files"
 import { useStampNewEdges } from "./use-stamp-new-edges"
+import { useStyleMemory } from "./use-style-memory"
 import { useViewportPersistence } from "./use-viewport-persistence"
 import { HarnessWrapRefProvider } from "./wrap-ref-context"
 
@@ -64,11 +66,21 @@ export function HarnessCanvas() {
   const [ready, setReady] = useState(false)
   const saveStatus = useBoardDebouncedSave(store, boardId, ready)
   const wrapRef = useRef<HTMLDivElement>(null)
+
   useBoardKeyboard(store)
   useViewportPersistence(store, boardId, rootId, ready)
   useCenterFromUrl(store, wrapRef, ready)
   useStampNewEdges(store, boardId, rootId)
-  const { handleCreateDrag, handleClick } = useCreateHandlers(store, boardId, rootId)
+
+  const styleMemory = useStyleMemory(store)
+  const { handleCreateDrag, handleClick } = useCreateHandlers(store, boardId, rootId, styleMemory)
+  const arrowDefaults = useMemo<ArrowToolDefaults>(
+    () => ({
+      pathStyle: styleMemory.getEdgePathStyle(),
+      style: styleMemory.getEdgeStyle(),
+    }),
+    [styleMemory],
+  )
   const { onDragOver, onDrop } = useHarnessDropFiles(wrapRef, store, boardId, rootId, canEdit)
   const navigate = useNavigate()
 
@@ -147,6 +159,7 @@ export function HarnessCanvas() {
             theme={theme}
             tool={tool}
             saveStatus={saveStatus}
+            arrowDefaults={arrowDefaults}
             onCreateDrag={handleCreateDrag}
             onClick={handleClick}
             onDoubleClick={handleDoubleClick}
@@ -172,6 +185,7 @@ type InnerProps = {
   theme: ReturnType<typeof useBoardTheme>
   tool: string
   saveStatus: SaveStatus
+  arrowDefaults: ArrowToolDefaults
   onCreateDrag: ReturnType<typeof useCreateHandlers>["handleCreateDrag"]
   onClick: ReturnType<typeof useCreateHandlers>["handleClick"]
   onDoubleClick: (e: CanvasPointerEvent) => void
@@ -182,6 +196,7 @@ function HarnessCanvasInner({
   theme,
   tool,
   saveStatus,
+  arrowDefaults,
   onCreateDrag,
   onClick,
   onDoubleClick,
@@ -195,6 +210,7 @@ function HarnessCanvasInner({
         selectionColor={theme.selectionColor}
         background={theme.background}
         renderCustomNodeView={renderView}
+        arrowDefaults={arrowDefaults}
         onCreateDrag={onCreateDrag}
         onClick={onClick}
         onDoubleClick={onDoubleClick}
