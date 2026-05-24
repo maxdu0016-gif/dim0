@@ -3,6 +3,7 @@ import { Outlet, useParams, useSearch } from "@tanstack/react-router"
 import { useGraphStore } from "../store/graph-store"
 import { useEffect } from "react"
 import { useActiveSurfaceFromUrl } from "../hooks/use-active-surface-from-url"
+import { useHarnessSurfaceFromUrl } from "../harness/hooks/use-surface-from-url"
 
 
 // Board screen — parent route for the canvas. The surface routes
@@ -29,6 +30,7 @@ export const BoardScreen = () => {
   }, [boardId, rootId, setGraphScope])
 
   useActiveSurfaceFromUrl()
+  useHarnessSurfaceFromUrl()
 
   return (
     <>

@@ -8,9 +8,29 @@ import {
   setBoardBackground as persistSetBoardBackground,
   setBoardBackgroundTexture as persistSetBoardBackgroundTexture,
 } from "@/features/board/utils/board-background"
+import { nodeSurfacePath } from "@/features/board/utils/node-surface-url"
 
 
 export type NodeSurfaceKind = "sheet" | "code-sandbox" | "widget"
+
+
+/**
+ * Router callbacks injected by a host hook so the store can push URL
+ * changes when surfaces open/close without importing the router (would
+ * create a cycle through the screen components). Mirrors prod's
+ * `setBoardNavigate` pattern in graph-store.ts.
+ */
+type SurfaceNavigateOpen = (path: string, params: { id: string; noteId: string }) => void
+type SurfaceNavigateClose = (boardId: string) => void
+let _navigateOpen: SurfaceNavigateOpen | null = null
+let _navigateClose: SurfaceNavigateClose | null = null
+export const setNodeSurfaceNavigator = (
+  open: SurfaceNavigateOpen,
+  close: SurfaceNavigateClose,
+): void => {
+  _navigateOpen = open
+  _navigateClose = close
+}
 
 
 export type OpenNodeSurface = {
@@ -103,7 +123,7 @@ const initialState: BoardAppState = {
 }
 
 
-export const useBoardAppStore = create<BoardAppState & BoardAppActions>((set) => ({
+export const useBoardAppStore = create<BoardAppState & BoardAppActions>((set, get) => ({
   ...initialState,
 
   setBoardScope: ({ boardId = null, rootId = null }) =>
@@ -152,6 +172,16 @@ export const useBoardAppStore = create<BoardAppState & BoardAppActions>((set) =>
       return { boardBackgroundTexture: texture }
     }),
 
-  openNodeSurface: (nodeId, kind) => set({ activeNodeSurface: { nodeId, kind } }),
-  closeNodeSurface: () => set({ activeNodeSurface: null }),
+  openNodeSurface: (nodeId, kind) => {
+    set({ activeNodeSurface: { nodeId, kind } })
+    const boardId = get().boardId
+    if (!boardId || !_navigateOpen) return
+    _navigateOpen(nodeSurfacePath(kind), { id: boardId, noteId: nodeId })
+  },
+  closeNodeSurface: () => {
+    set({ activeNodeSurface: null })
+    const boardId = get().boardId
+    if (!boardId || !_navigateClose) return
+    _navigateClose(boardId)
+  },
 }))
