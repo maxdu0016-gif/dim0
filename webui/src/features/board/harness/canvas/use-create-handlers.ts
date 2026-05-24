@@ -48,6 +48,7 @@ const isShapeTool = (tool: string): boolean => SHAPE_TOOLS.has(tool)
 export const useCreateHandlers = (
   store: CanvasStore,
   boardId: string | null,
+  rootId: string | null,
 ): {
   handleCreateDrag: (e: CanvasCreateDragEvent) => void
   handleClick: (e: CanvasPointerEvent) => void
@@ -57,6 +58,7 @@ export const useCreateHandlers = (
       if (!isShapeTool(e.tool)) return
       const dim0Type = canvasTypeToDim0(e.tool)
       const note = createDefaultNote({ boardId: boardId ?? "", nodeType: dim0Type })
+      if (rootId) note.parentId = rootId
       note.properties.nodePosition = {
         type: "position",
         position: { x: e.rect.x, y: e.rect.y },
@@ -67,7 +69,7 @@ export const useCreateHandlers = (
       }
       store.addNode(noteToNode(note))
     },
-    [store, boardId],
+    [store, boardId, rootId],
   )
 
   const handleClick = useCallback(
@@ -75,6 +77,7 @@ export const useCreateHandlers = (
       if (!isShapeTool(e.tool)) return
       const dim0Type = canvasTypeToDim0(e.tool)
       const note = createDefaultNote({ boardId: boardId ?? "", nodeType: dim0Type })
+      if (rootId) note.parentId = rootId
       const size = note.properties.nodeSize.size ?? { width: 200, height: 120 }
       const { width, height } = size
       note.properties.nodePosition = {
@@ -83,7 +86,7 @@ export const useCreateHandlers = (
       }
       store.addNode(noteToNode(note))
     },
-    [store, boardId],
+    [store, boardId, rootId],
   )
 
   return { handleCreateDrag, handleClick }

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react"
+import { useNavigate } from "@tanstack/react-router"
 import { hitTestAny, type CanvasStore } from "@canvas-harness/core"
 import {
   Canvas,
@@ -21,6 +22,7 @@ import { createBoardStore } from "../store/create-board-store"
 import { useBoardTheme } from "../theme/use-board-theme"
 import { useBoardKeyboard } from "./use-board-keyboard"
 import { useCreateHandlers } from "./use-create-handlers"
+import { useStampNewEdges } from "./use-stamp-new-edges"
 import { useViewportPersistence } from "./use-viewport-persistence"
 
 
@@ -59,14 +61,17 @@ export function HarnessCanvas() {
   const saveStatus = useBoardDebouncedSave(store, boardId, ready)
   useBoardKeyboard(store)
   useViewportPersistence(store, boardId, rootId, ready)
-  const { handleCreateDrag, handleClick } = useCreateHandlers(store, boardId)
+  useStampNewEdges(store, boardId, rootId)
+  const { handleCreateDrag, handleClick } = useCreateHandlers(store, boardId, rootId)
+  const navigate = useNavigate()
 
-  // canvas-harness fires beginEdit on dbl-click of any node body. for
-  // custom node types we own the editing surface (sheet / code-sandbox /
-  // widget open via the panel; folder / document have no inline editor),
-  // so cancel the auto-fired beginEdit. lib fires beginEdit BEFORE the
-  // consumer onDoubleClick, so cancel here happens synchronously in the
-  // same tick — no editor frame is rendered.
+  // canvas-harness fires beginEdit on dbl-click of any node body. For
+  // custom node types we own the editing surface (sheet/code-sandbox/
+  // widget open via the panel; folder dbl-click navigates into the
+  // folder; document has no inline editor), so cancel the auto-fired
+  // beginEdit. Lib fires beginEdit BEFORE the consumer onDoubleClick,
+  // so cancel here runs synchronously in the same tick — no editor
+  // frame is rendered.
   const handleDoubleClick = useCallback(
     (e: CanvasPointerEvent): void => {
       const camera = store.getCamera()
@@ -74,11 +79,20 @@ export function HarnessCanvas() {
       if (!hit || !("nodeId" in hit)) return
       const node = store.getNode(hit.nodeId)
       if (!node) return
-      if (CUSTOM_NODE_TYPES.has(node.type)) {
-        store.cancelEdit()
+      if (!CUSTOM_NODE_TYPES.has(node.type)) return
+      store.cancelEdit()
+      if (node.type === "folder" && boardId) {
+        navigate({
+          to: "/boards/$id",
+          params: { id: boardId },
+          search: (prev: Record<string, unknown>) => ({
+            ...prev,
+            root_id: node.id,
+          }),
+        })
       }
     },
-    [store],
+    [store, boardId, navigate],
   )
 
   // Hydrate on scope change. `cancelled` guards against late-arriving fetches
