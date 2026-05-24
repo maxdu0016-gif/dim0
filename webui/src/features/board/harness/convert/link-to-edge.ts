@@ -1,7 +1,20 @@
-import { asEdgeId, asGroupId } from "@canvas-harness/core"
+import { asEdgeId, asGroupId, midpointToCubicControls } from "@canvas-harness/core"
 import type { Edge, EdgeEnd, Node, Vec2 } from "@canvas-harness/core"
 import type { Link } from "@/features/board/types/link"
 import { dim0LinkStyleToCanvas } from "./style"
+
+
+/** Resolve an EdgeEnd to world coords — used for midpoint→cubic math. */
+const endWorldPoint = (end: EdgeEnd, nodes: Map<string, Node>): Vec2 => {
+  if ("nodeId" in end) {
+    const node = nodes.get(end.nodeId as unknown as string)
+    if (node) {
+      return { x: node.x + end.localOffset.x, y: node.y + end.localOffset.y }
+    }
+    return { x: end.localOffset.x, y: end.localOffset.y }
+  }
+  return end.worldPoint
+}
 
 
 /** Payload on `Edge.data` that preserves Dim0 Link fields not lifted to Edge primitives. */
@@ -95,8 +108,18 @@ export const linkToEdge = (link: Link, nodes: Map<string, Node>): Edge => {
     link.properties?.endPoint?.isLocalOffset,
     nodes,
   )
-  const controlPos = link.properties?.edgeControlPoint?.position
-  const control: Vec2[] | undefined = controlPos ? [controlPos] : undefined
+  // Wire format stores a single midpoint the curve passes through at
+  // t=0.5; canvas-harness wants the pair of cubic control points
+  // (c1, c2). Resolve endpoint world coords + run the lib's
+  // midpoint→cubic math so the curve renders through the saved point.
+  const midpoint = link.properties?.edgeControlPoint?.position
+  let control: Vec2[] | undefined
+  if (midpoint) {
+    const srcWorld = endWorldPoint(sourceResolved.end, nodes)
+    const tgtWorld = endWorldPoint(targetResolved.end, nodes)
+    const { c1, c2 } = midpointToCubicControls(srcWorld, midpoint, tgtWorld)
+    control = [c1, c2]
+  }
 
   const data: LinkEdgeData = {
     version: link.version,

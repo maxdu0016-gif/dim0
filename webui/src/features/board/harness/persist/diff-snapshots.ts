@@ -81,7 +81,7 @@ export const diffSnapshots = (prev: Snapshot, next: Snapshot): ApiCall[] => {
   const updatedEdgeIds = new Set<string>()
   for (const [id, edge] of nextEdges) {
     if (!prevEdges.has(id)) {
-      calls.push({ kind: "addLink", link: edgeToLink(edge) })
+      calls.push({ kind: "addLink", link: edgeToLink(edge, nextNodes) })
       updatedEdgeIds.add(id)
     }
   }
@@ -96,7 +96,7 @@ export const diffSnapshots = (prev: Snapshot, next: Snapshot): ApiCall[] => {
   for (const [id, nextEdge] of nextEdges) {
     const prevEdge = prevEdges.get(id)
     if (prevEdge && !sameSerialized(prevEdge, nextEdge)) {
-      calls.push({ kind: "updateLink", link: edgeToLink(nextEdge) })
+      calls.push({ kind: "updateLink", link: edgeToLink(nextEdge, nextNodes) })
       updatedEdgeIds.add(id)
     }
   }
@@ -118,7 +118,7 @@ export const diffSnapshots = (prev: Snapshot, next: Snapshot): ApiCall[] => {
         "nodeId" in edge.target &&
         movedNodeIds.has(edge.target.nodeId as unknown as string)
       if (sourceNeedsCascade || targetNeedsCascade) {
-        calls.push({ kind: "updateLink", link: edgeToLink(edge) })
+        calls.push({ kind: "updateLink", link: edgeToLink(edge, nextNodes) })
       }
     }
   }

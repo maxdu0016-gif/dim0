@@ -227,7 +227,7 @@ describe("link ↔ edge round-trip", () => {
 
     // Save now always emits position + isLocalOffset for attached
     // endpoints (drops the "omit at center" shortcut).
-    const back = edgeToLink(edge)
+    const back = edgeToLink(edge, nodes)
     expect(back.source).toBe("node-a")
     expect(back.target).toBe("node-b")
     expect(back.properties.startPoint).toEqual({
@@ -259,7 +259,7 @@ describe("link ↔ edge round-trip", () => {
     expect(edge.data).toMatchObject({ sourceLegacyOffset: true })
 
     // Save emits the new format: position is the local offset, flag is set.
-    const back = edgeToLink(edge)
+    const back = edgeToLink(edge, nodes)
     expect(back.source).toBe("node-a")
     expect(back.properties.startPoint).toEqual({
       type: "position",
@@ -286,7 +286,7 @@ describe("link ↔ edge round-trip", () => {
     // No legacy marker — this edge doesn't need the cascade.
     expect(edge.data).not.toMatchObject({ sourceLegacyOffset: true })
 
-    const back = edgeToLink(edge)
+    const back = edgeToLink(edge, nodes)
     expect(back.properties.startPoint).toEqual({
       type: "position",
       position: { x: 100, y: 30 },
@@ -307,7 +307,7 @@ describe("link ↔ edge round-trip", () => {
     }
 
     // Free endpoint: position stays world, isLocalOffset = false.
-    const back = edgeToLink(edge)
+    const back = edgeToLink(edge, nodes)
     expect(back.source).toBe("")
     expect(back.properties.startPoint).toEqual({
       type: "position",
@@ -327,7 +327,7 @@ describe("link ↔ edge round-trip", () => {
     expect("worldPoint" in edge.source).toBe(true)
     expect("worldPoint" in edge.target).toBe(true)
 
-    const back = edgeToLink(edge)
+    const back = edgeToLink(edge, nodes)
     expect(back.source).toBe("")
     expect(back.target).toBe("")
     expect(back.properties.startPoint).toEqual({
@@ -342,19 +342,43 @@ describe("link ↔ edge round-trip", () => {
     })
   })
 
-  it("preserves edge control point + label", () => {
+  it("edge control point round-trips through midpoint↔cubic conversion", () => {
+    // Wire format stores the midpoint the curve passes through at t=0.5.
+    // Canvas-harness wants [c1, c2] cubic control points. The convert
+    // layer does the conversion in both directions; assert the midpoint
+    // round-trips even though the in-memory cubic values are derived.
     const link = createDefaultLink(BOARD_ID, "node-a", "node-b")
     link.properties.edgeControlPoint = { type: "position", position: { x: 300, y: 200 } }
     link.label = { markdown: "depends on" }
 
     const nodes = makeNodes()
     const edge = linkToEdge(link, nodes)
-    expect(edge.control).toEqual([{ x: 300, y: 200 }])
+    // node-a at (100, 100, 200, 100) → center (200, 150)
+    // node-b at (500, 300, 200, 100) → center (600, 350)
+    // midpoint (300, 200) → c = (8M - S - T)/6
+    //   c.x = (8·300 - 200 - 600)/6 = 1600/6 ≈ 266.67
+    //   c.y = (8·200 - 150 - 350)/6 = 1100/6 ≈ 183.33
+    expect(edge.control).toHaveLength(2)
+    expect(edge.control?.[0].x).toBeCloseTo(1600 / 6)
+    expect(edge.control?.[0].y).toBeCloseTo(1100 / 6)
+    expect(edge.control?.[1]).toEqual(edge.control?.[0]) // symmetric split
     expect(edge.content).toBe("depends on")
 
-    const back = edgeToLink(edge)
-    expect(back.properties.edgeControlPoint.position).toEqual({ x: 300, y: 200 })
+    const back = edgeToLink(edge, nodes)
+    expect(back.properties.edgeControlPoint.position?.x).toBeCloseTo(300)
+    expect(back.properties.edgeControlPoint.position?.y).toBeCloseTo(200)
     expect(back.label?.markdown).toBe("depends on")
+  })
+
+  it("no control point means no midpoint on save", () => {
+    const link = createDefaultLink(BOARD_ID, "node-a", "node-b")
+    const nodes = makeNodes()
+    const edge = linkToEdge(link, nodes)
+    expect(edge.control).toBeUndefined()
+
+    const back = edgeToLink(edge, nodes)
+    // Wire shape is preserved: edgeControlPoint exists but has no position.
+    expect(back.properties.edgeControlPoint.position).toBeUndefined()
   })
 
   it("preserves arrowheads + pathStyle", () => {
@@ -364,7 +388,7 @@ describe("link ↔ edge round-trip", () => {
     link.style.pathStyle = "polyline"
 
     const nodes = makeNodes()
-    const back = edgeToLink(linkToEdge(link, nodes))
+    const back = edgeToLink(linkToEdge(link, nodes), nodes)
 
     expect(back.style.sourceArrowhead).toBe("barb")
     expect(back.style.targetArrowhead).toBe("arrow")
@@ -379,7 +403,7 @@ describe("link ↔ edge round-trip", () => {
     const edge = linkToEdge(link, nodes)
     expect(edge.groups as unknown as string[]).toEqual(["g-x", "g-y"])
 
-    const back = edgeToLink(edge)
+    const back = edgeToLink(edge, nodes)
     expect(back.style.groupIds).toEqual(["g-x", "g-y"])
   })
 })
