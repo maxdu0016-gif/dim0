@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query"
 import { hitTestAny, type CanvasStore } from "@canvas-harness/core"
 import { setAgentBridge } from "../agent/agent-bridge"
 import { applyLinkOutput, applyNoteOutput } from "../agent/apply-tool-output"
+import { setCanvasStoreRef } from "../canvas-store-ref"
 import {
   Canvas,
   CanvasProvider,
@@ -88,6 +89,13 @@ export function HarnessCanvas() {
     })
     return () => setAgentBridge(null)
   }, [store, queryClient, boardId, rootId])
+
+  // Module-level store ref — lets non-React code (buildMessageContext,
+  // other agent helpers) reach the active store without prop-drilling.
+  useEffect(() => {
+    setCanvasStoreRef(store)
+    return () => setCanvasStoreRef(null)
+  }, [store])
 
   useBoardKeyboard(store)
   useViewportPersistence(store, boardId, rootId, ready)
