@@ -3,6 +3,7 @@ import clsx from "clsx"
 import type { NodeId } from "@canvas-harness/core"
 import { useCanvasStore } from "@canvas-harness/react"
 import { useBoardAppStore } from "../store/board-app-store"
+import { useStopCanvasGesture } from "./use-stop-canvas-gesture"
 
 
 type NodeTitleCaptionProps = {
@@ -54,6 +55,14 @@ export const NodeTitleCaption = memo(function NodeTitleCaption({
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(label ?? "")
   const inputRef = useRef<HTMLInputElement | null>(null)
+  const buttonRef = useRef<HTMLButtonElement | null>(null)
+
+  // Canvas-harness's gesture captures the pointer on body-hit and on
+  // empty-world clicks via a native listener on the wrap div. React's
+  // onClick fires too late to stop it, so any click on the caption is
+  // swallowed without a native-phase guard. See use-stop-canvas-gesture.
+  useStopCanvasGesture(buttonRef)
+  useStopCanvasGesture(inputRef)
 
   const storedTitle = label?.trim() ?? ""
   const displayTitle = storedTitle || placeholder
@@ -141,6 +150,7 @@ export const NodeTitleCaption = memo(function NodeTitleCaption({
         />
       ) : (
         <button
+          ref={buttonRef}
           type="button"
           onClick={(event) => {
             event.stopPropagation()
