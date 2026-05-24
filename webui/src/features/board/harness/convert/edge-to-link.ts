@@ -1,4 +1,4 @@
-import type { Edge, EdgeEnd, Node } from "@canvas-harness/core"
+import type { Edge, EdgeEnd } from "@canvas-harness/core"
 import type { Link } from "@/features/board/types/link"
 import { canvasEdgeStyleToDim0Link } from "./style"
 import type { LinkEdgeData } from "./link-to-edge"
@@ -7,39 +7,43 @@ import type { LinkEdgeData } from "./link-to-edge"
 type FlatEnd = {
   /** Empty string when the endpoint is free-floating (the '' sentinel — see §3.5). */
   nodeId: string
-  /** Only set when the endpoint isn't at the attached node's center, or when it's free. */
-  worldPoint?: { x: number; y: number }
+  position?: { x: number; y: number }
+  /**
+   * True when `position` is a node-local offset (attached endpoint).
+   * False when `position` is an absolute world coord (free endpoint).
+   * Always set so the wire format is explicit — see backend
+   * `PositionProperty.is_local_offset`.
+   */
+  isLocalOffset: boolean
 }
 
 
-/** Flatten an EdgeEnd to (nodeId, optional worldPoint) for Link storage. */
-const flattenEnd = (end: EdgeEnd, nodes: Map<string, Node>): FlatEnd => {
+/** Flatten an EdgeEnd into the Link wire format for `start_point`/`end_point`. */
+const flattenEnd = (end: EdgeEnd): FlatEnd => {
   if ("nodeId" in end) {
-    const id = end.nodeId as unknown as string
-    const node = nodes.get(id)
-    if (!node) {
-      return { nodeId: "", worldPoint: { x: end.localOffset.x, y: end.localOffset.y } }
-    }
-    const isCenter = end.localOffset.x === node.w / 2 && end.localOffset.y === node.h / 2
     return {
-      nodeId: id,
-      worldPoint: isCenter
-        ? undefined
-        : { x: node.x + end.localOffset.x, y: node.y + end.localOffset.y },
+      nodeId: end.nodeId as unknown as string,
+      position: { x: end.localOffset.x, y: end.localOffset.y },
+      isLocalOffset: true,
     }
   }
-  return { nodeId: "", worldPoint: end.worldPoint }
+  return {
+    nodeId: "",
+    position: end.worldPoint,
+    isLocalOffset: false,
+  }
 }
 
 
 /**
  * Convert a canvas-harness Edge back to a Dim0 Link. Inverse of `linkToEdge`.
- * `nodes` is the map used for resolving attachments (same one used on load).
+ * Always emits the new local-offset wire format for attached endpoints;
+ * legacy edges loaded with world coords get upgraded on first save.
  */
-export const edgeToLink = (edge: Edge, nodes: Map<string, Node>): Link => {
+export const edgeToLink = (edge: Edge): Link => {
   const data = (edge.data ?? {}) as Partial<LinkEdgeData>
-  const sourceFlat = flattenEnd(edge.source, nodes)
-  const targetFlat = flattenEnd(edge.target, nodes)
+  const sourceFlat = flattenEnd(edge.source)
+  const targetFlat = flattenEnd(edge.target)
   const groupIds = edge.groups as unknown as string[]
   const controlPos = edge.control?.[0]
 
@@ -64,11 +68,19 @@ export const edgeToLink = (edge: Edge, nodes: Map<string, Node>): Link => {
       edgeControlPoint: controlPos
         ? { type: "position", position: controlPos }
         : { type: "position" },
-      startPoint: sourceFlat.worldPoint
-        ? { type: "position", position: sourceFlat.worldPoint }
+      startPoint: sourceFlat.position
+        ? {
+            type: "position",
+            position: sourceFlat.position,
+            isLocalOffset: sourceFlat.isLocalOffset,
+          }
         : undefined,
-      endPoint: targetFlat.worldPoint
-        ? { type: "position", position: targetFlat.worldPoint }
+      endPoint: targetFlat.position
+        ? {
+            type: "position",
+            position: targetFlat.position,
+            isLocalOffset: targetFlat.isLocalOffset,
+          }
         : undefined,
     },
   }

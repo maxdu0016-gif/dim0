@@ -12,39 +12,68 @@ export type LinkEdgeData = {
   deletedAt?: string
   graphUid: string
   parentId?: string
+  /**
+   * Client-side marker — `true` when this endpoint was loaded with the
+   * legacy world-coord interpretation (`isLocalOffset` was falsy on the
+   * wire). Used by the persist diff to cascade-resave the edge when its
+   * attached node moves, which upgrades it to the new local-offset
+   * format. Never sent to the server; rewritten on every load.
+   */
+  sourceLegacyOffset?: boolean
+  targetLegacyOffset?: boolean
+}
+
+
+type ResolveResult = {
+  end: EdgeEnd
+  /** True iff this endpoint was attached AND came in with world coords (legacy format). */
+  legacy: boolean
 }
 
 
 /**
- * Resolve a Link end (source or target side) into an `EdgeEnd`.
+ * Resolve a Link end (source or target side) into an `EdgeEnd`. Picks
+ * between local-offset (new format) and world-coord (legacy) based on
+ * the `isLocalOffset` flag.
  *
- *  - Resolved node + no world point   → attach at node center.
- *  - Resolved node + world point      → attach with local offset (worldPoint - node.x/y).
- *  - Unresolved node (empty / missing) + world point → free world point.
- *  - Both fail                        → fall back to (0, 0) world point so the edge survives.
+ *  - Attached + isLocalOffset=true             → localOffset = position as-is.
+ *  - Attached + isLocalOffset falsy + position → localOffset = position - node.x/y (legacy math).
+ *  - Attached + no position                    → localOffset = node center.
+ *  - Unresolved node + position                → free worldPoint.
+ *  - Both fail                                  → fall back to (0, 0) free worldPoint.
  *
  * See migration-canvas-harness.md §3.2 for the schema rationale.
  */
 const resolveEnd = (
   nodeId: string,
-  worldPoint: { x: number; y: number } | undefined,
+  position: { x: number; y: number } | undefined,
+  isLocalOffset: boolean | undefined,
   nodes: Map<string, Node>,
-): EdgeEnd => {
+): ResolveResult => {
   const node = nodeId ? nodes.get(nodeId) : undefined
   if (node) {
-    if (worldPoint) {
+    if (position) {
+      if (isLocalOffset) {
+        return {
+          end: { nodeId: node.id, localOffset: { x: position.x, y: position.y } },
+          legacy: false,
+        }
+      }
       return {
-        nodeId: node.id,
-        localOffset: { x: worldPoint.x - node.x, y: worldPoint.y - node.y },
+        end: {
+          nodeId: node.id,
+          localOffset: { x: position.x - node.x, y: position.y - node.y },
+        },
+        legacy: true,
       }
     }
     return {
-      nodeId: node.id,
-      localOffset: { x: node.w / 2, y: node.h / 2 },
+      end: { nodeId: node.id, localOffset: { x: node.w / 2, y: node.h / 2 } },
+      legacy: false,
     }
   }
-  if (worldPoint) return { worldPoint }
-  return { worldPoint: { x: 0, y: 0 } }
+  if (position) return { end: { worldPoint: position }, legacy: false }
+  return { end: { worldPoint: { x: 0, y: 0 } }, legacy: false }
 }
 
 
@@ -54,8 +83,18 @@ const resolveEnd = (
  * resolve attachment endpoints.
  */
 export const linkToEdge = (link: Link, nodes: Map<string, Node>): Edge => {
-  const source = resolveEnd(link.source, link.properties?.startPoint?.position, nodes)
-  const target = resolveEnd(link.target, link.properties?.endPoint?.position, nodes)
+  const sourceResolved = resolveEnd(
+    link.source,
+    link.properties?.startPoint?.position,
+    link.properties?.startPoint?.isLocalOffset,
+    nodes,
+  )
+  const targetResolved = resolveEnd(
+    link.target,
+    link.properties?.endPoint?.position,
+    link.properties?.endPoint?.isLocalOffset,
+    nodes,
+  )
   const controlPos = link.properties?.edgeControlPoint?.position
   const control: Vec2[] | undefined = controlPos ? [controlPos] : undefined
 
@@ -67,11 +106,13 @@ export const linkToEdge = (link: Link, nodes: Map<string, Node>): Edge => {
     graphUid: link.graphUid,
     parentId: link.parentId,
   }
+  if (sourceResolved.legacy) data.sourceLegacyOffset = true
+  if (targetResolved.legacy) data.targetLegacyOffset = true
 
   return {
     id: asEdgeId(link.id),
-    source,
-    target,
+    source: sourceResolved.end,
+    target: targetResolved.end,
     pathStyle: link.style.pathStyle,
     control,
     z: 0,

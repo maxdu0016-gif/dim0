@@ -225,27 +225,73 @@ describe("link ↔ edge round-trip", () => {
       expect(edge.target.localOffset).toEqual({ x: 100, y: 50 })
     }
 
-    const back = edgeToLink(edge, nodes)
+    // Save now always emits position + isLocalOffset for attached
+    // endpoints (drops the "omit at center" shortcut).
+    const back = edgeToLink(edge)
     expect(back.source).toBe("node-a")
     expect(back.target).toBe("node-b")
-    expect(back.properties.startPoint).toBeUndefined()
-    expect(back.properties.endPoint).toBeUndefined()
+    expect(back.properties.startPoint).toEqual({
+      type: "position",
+      position: { x: 100, y: 50 },
+      isLocalOffset: true,
+    })
+    expect(back.properties.endPoint).toEqual({
+      type: "position",
+      position: { x: 100, y: 50 },
+      isLocalOffset: true,
+    })
   })
 
-  it("attached source with custom offset (worldPoint - nodePos)", () => {
+  it("legacy attached source (world coords) → upgraded to local offset on save", () => {
+    // Legacy wire format: position is world, no isLocalOffset flag.
     const link = createDefaultLink(BOARD_ID, "node-a", "node-b")
     link.properties.startPoint = { type: "position", position: { x: 200, y: 130 } }
 
     const nodes = makeNodes()
     const edge = linkToEdge(link, nodes)
 
+    // Loaded localOffset is computed from worldPoint - node.x/y.
     if ("nodeId" in edge.source) {
       expect(edge.source.localOffset).toEqual({ x: 100, y: 30 })
     }
+    // Legacy marker stashed on edge data — used by the persist diff to
+    // cascade resave when the attached node moves.
+    expect(edge.data).toMatchObject({ sourceLegacyOffset: true })
 
-    const back = edgeToLink(edge, nodes)
+    // Save emits the new format: position is the local offset, flag is set.
+    const back = edgeToLink(edge)
     expect(back.source).toBe("node-a")
-    expect(back.properties.startPoint?.position).toEqual({ x: 200, y: 130 })
+    expect(back.properties.startPoint).toEqual({
+      type: "position",
+      position: { x: 100, y: 30 },
+      isLocalOffset: true,
+    })
+  })
+
+  it("new-format attached source (isLocalOffset=true) round-trips identically", () => {
+    const link = createDefaultLink(BOARD_ID, "node-a", "node-b")
+    link.properties.startPoint = {
+      type: "position",
+      position: { x: 100, y: 30 },
+      isLocalOffset: true,
+    }
+
+    const nodes = makeNodes()
+    const edge = linkToEdge(link, nodes)
+
+    if ("nodeId" in edge.source) {
+      // Local offset is the position as-is — no math against node.x/y.
+      expect(edge.source.localOffset).toEqual({ x: 100, y: 30 })
+    }
+    // No legacy marker — this edge doesn't need the cascade.
+    expect(edge.data).not.toMatchObject({ sourceLegacyOffset: true })
+
+    const back = edgeToLink(edge)
+    expect(back.properties.startPoint).toEqual({
+      type: "position",
+      position: { x: 100, y: 30 },
+      isLocalOffset: true,
+    })
   })
 
   it("free source endpoint (sentinel '' source + startPoint)", () => {
@@ -260,9 +306,14 @@ describe("link ↔ edge round-trip", () => {
       expect(edge.source.worldPoint).toEqual({ x: 50, y: 60 })
     }
 
-    const back = edgeToLink(edge, nodes)
+    // Free endpoint: position stays world, isLocalOffset = false.
+    const back = edgeToLink(edge)
     expect(back.source).toBe("")
-    expect(back.properties.startPoint?.position).toEqual({ x: 50, y: 60 })
+    expect(back.properties.startPoint).toEqual({
+      type: "position",
+      position: { x: 50, y: 60 },
+      isLocalOffset: false,
+    })
   })
 
   it("free source + free target", () => {
@@ -276,11 +327,19 @@ describe("link ↔ edge round-trip", () => {
     expect("worldPoint" in edge.source).toBe(true)
     expect("worldPoint" in edge.target).toBe(true)
 
-    const back = edgeToLink(edge, nodes)
+    const back = edgeToLink(edge)
     expect(back.source).toBe("")
     expect(back.target).toBe("")
-    expect(back.properties.startPoint?.position).toEqual({ x: 10, y: 20 })
-    expect(back.properties.endPoint?.position).toEqual({ x: 30, y: 40 })
+    expect(back.properties.startPoint).toEqual({
+      type: "position",
+      position: { x: 10, y: 20 },
+      isLocalOffset: false,
+    })
+    expect(back.properties.endPoint).toEqual({
+      type: "position",
+      position: { x: 30, y: 40 },
+      isLocalOffset: false,
+    })
   })
 
   it("preserves edge control point + label", () => {
@@ -293,7 +352,7 @@ describe("link ↔ edge round-trip", () => {
     expect(edge.control).toEqual([{ x: 300, y: 200 }])
     expect(edge.content).toBe("depends on")
 
-    const back = edgeToLink(edge, nodes)
+    const back = edgeToLink(edge)
     expect(back.properties.edgeControlPoint.position).toEqual({ x: 300, y: 200 })
     expect(back.label?.markdown).toBe("depends on")
   })
@@ -305,7 +364,7 @@ describe("link ↔ edge round-trip", () => {
     link.style.pathStyle = "polyline"
 
     const nodes = makeNodes()
-    const back = edgeToLink(linkToEdge(link, nodes), nodes)
+    const back = edgeToLink(linkToEdge(link, nodes))
 
     expect(back.style.sourceArrowhead).toBe("barb")
     expect(back.style.targetArrowhead).toBe("arrow")
@@ -320,7 +379,7 @@ describe("link ↔ edge round-trip", () => {
     const edge = linkToEdge(link, nodes)
     expect(edge.groups as unknown as string[]).toEqual(["g-x", "g-y"])
 
-    const back = edgeToLink(edge, nodes)
+    const back = edgeToLink(edge)
     expect(back.style.groupIds).toEqual(["g-x", "g-y"])
   })
 })
