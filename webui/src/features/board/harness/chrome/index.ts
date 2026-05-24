@@ -1,3 +1,4 @@
+export { CanvasContextMenu } from "./canvas-context-menu"
 export { NodeSurfaceHost } from "./node-surface-host"
 export { HarnessSaveStatus } from "./save-status"
 export { StyleSidebar } from "./style-panel"

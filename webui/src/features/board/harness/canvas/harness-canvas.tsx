@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query"
 import { hitTestAny, type CanvasStore } from "@canvas-harness/core"
 import { setAgentBridge } from "../agent/agent-bridge"
 import { applyLinkOutput, applyNoteOutput } from "../agent/apply-tool-output"
+import { useHarnessApplyMindMap } from "../agent/use-harness-apply-mindmap"
 import { setCanvasStoreRef } from "../canvas-store-ref"
 import {
   Canvas,
@@ -13,6 +14,7 @@ import {
   type CanvasPointerEvent,
 } from "@canvas-harness/react"
 import {
+  CanvasContextMenu,
   HarnessSaveStatus,
   HarnessToolbar,
   HarnessViewportControls,
@@ -101,6 +103,7 @@ export function HarnessCanvas() {
   useViewportPersistence(store, boardId, rootId, ready)
   useCenterFromUrl(store, wrapRef, ready)
   useStampNewEdges(store, boardId, rootId)
+  useHarnessApplyMindMap(store, boardId, rootId)
 
   const styleMemory = useStyleMemory(store)
   const { handleCreateDrag, handleClick } = useCreateHandlers(store, boardId, rootId, styleMemory)
@@ -194,6 +197,7 @@ export function HarnessCanvas() {
             onClick={handleClick}
             onDoubleClick={handleDoubleClick}
           />
+          <CanvasContextMenu wrapRef={wrapRef} store={store} />
         </div>
       </HarnessWrapRefProvider>
     </CanvasProvider>
