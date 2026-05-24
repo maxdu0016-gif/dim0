@@ -15,6 +15,14 @@ export type NodeSurfaceKind = "sheet" | "code-sandbox" | "widget"
 
 
 /**
+ * Tracks which floating chrome dialog/menu is open. Lives on the app
+ * store so the keyboard handler (which doesn't sit inside the toolbar)
+ * can toggle them via hotkeys (S → shapes menu, G → icons, I → images).
+ */
+export type ChromeDialog = "shape-menu" | "icon-search" | "image-search"
+
+
+/**
  * Router callbacks injected by a host hook so the store can push URL
  * changes when surfaces open/close without importing the router (would
  * create a cycle through the screen components). Mirrors prod's
@@ -77,6 +85,9 @@ export type BoardAppState = {
 
   // Modal surface for sheet / code-sandbox / widget nodes.
   activeNodeSurface: OpenNodeSurface | null
+
+  // Which floating chrome dialog/menu is open (one at a time).
+  chromeDialog: ChromeDialog | null
 }
 
 
@@ -102,6 +113,8 @@ export type BoardAppActions = {
 
   openNodeSurface: (nodeId: string, kind: NodeSurfaceKind) => void
   closeNodeSurface: () => void
+
+  setChromeDialog: (dialog: ChromeDialog | null) => void
 }
 
 
@@ -120,6 +133,7 @@ const initialState: BoardAppState = {
   boardBackground: null,
   boardBackgroundTexture: null,
   activeNodeSurface: null,
+  chromeDialog: null,
 }
 
 
@@ -139,6 +153,7 @@ export const useBoardAppStore = create<BoardAppState & BoardAppActions>((set, ge
       maxFolderDepth: 0,
       presentationMode: false,
       activeNodeSurface: null,
+      chromeDialog: null,
       boardBackground: boardId ? getBoardBackground(boardId) : null,
       boardBackgroundTexture: boardId ? getBoardBackgroundTexture(boardId) : null,
     }),
@@ -184,4 +199,6 @@ export const useBoardAppStore = create<BoardAppState & BoardAppActions>((set, ge
     if (!boardId || !_navigateClose) return
     _navigateClose(boardId)
   },
+
+  setChromeDialog: (dialog) => set({ chromeDialog: dialog }),
 }))

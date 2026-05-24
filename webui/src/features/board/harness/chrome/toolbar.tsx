@@ -1,19 +1,29 @@
-import { Fragment } from "react"
+import { FrameCorners } from "@phosphor-icons/react"
 import {
-  ArrowRight,
-  BrowserIcon,
-  Circle,
-  CodeBlockIcon,
-  Cursor,
-  Diamond,
-  FolderIcon,
-  FrameCorners,
-  Hand,
+  ChevronDownIcon,
+  CircleClusterIcon,
+  CircleShapeIcon,
+  ConnectorPathIcon,
+  CursorSelectIcon,
+  DiamondShapeIcon,
+  HandGrabIcon,
+  HandPanIcon,
+  LayerStackIcon,
   NotepadIcon,
-  Square,
-  TextT,
-  type Icon as PhosphorIcon,
-} from "@phosphor-icons/react"
+  ShapesMenuIcon,
+  SquareShapeIcon,
+  TagIcon,
+  TextTIcon,
+  WeatherCloudIcon,
+} from "@/components/icons"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuShortcut,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Separator } from "@/components/ui/separator"
 import {
   Tooltip,
   TooltipContent,
@@ -24,84 +34,241 @@ import { useBoardAppStore } from "../store/board-app-store"
 import { HarnessToolbarMore } from "./toolbar-more"
 
 
-type ToolDef = {
+type ShapeTool = {
   id: string
   label: string
-  icon: PhosphorIcon
+  icon: React.ComponentType<{ className?: string }>
+  shortcut?: string
 }
 
 
-const TOOL_GROUPS: ReadonlyArray<ReadonlyArray<ToolDef>> = [
-  [
-    { id: "select", label: "Select (V)", icon: Cursor },
-    { id: "pan", label: "Pan (H)", icon: Hand },
-  ],
-  [
-    { id: "rect", label: "Rectangle", icon: Square },
-    { id: "ellipse", label: "Ellipse", icon: Circle },
-    { id: "diamond", label: "Diamond", icon: Diamond },
-  ],
-  [
-    { id: "arrow", label: "Arrow", icon: ArrowRight },
-    { id: "text", label: "Text", icon: TextT },
-    { id: "frame", label: "Frame (F)", icon: FrameCorners },
-  ],
-  [
-    { id: "folder", label: "Folder", icon: FolderIcon },
-    { id: "sheet", label: "Sheet", icon: NotepadIcon },
-    { id: "code-sandbox", label: "Code sandbox", icon: CodeBlockIcon },
-    { id: "widget", label: "Widget", icon: BrowserIcon },
-  ],
+/**
+ * All built-in canvas-harness shape tools the user can pick from the
+ * Shapes dropdown. Order + icon choices mirror prod's `top-bar.tsx`
+ * shapeOptions. Tool ids are canvas-harness names (see
+ * `convert/node-type.ts` for the dim0↔canvas mapping).
+ */
+const SHAPE_TOOLS: ReadonlyArray<ShapeTool> = [
+  { id: "rect", label: "Rectangle", icon: SquareShapeIcon, shortcut: "R" },
+  { id: "layered-rect", label: "Layered card", icon: LayerStackIcon },
+  { id: "ellipse", label: "Ellipse", icon: CircleShapeIcon, shortcut: "O" },
+  { id: "diamond", label: "Diamond", icon: DiamondShapeIcon, shortcut: "D" },
+  { id: "soft-diamond", label: "Double diamond", icon: DiamondShapeIcon },
+  { id: "layered-diamond", label: "Layered diamond", icon: LayerStackIcon },
+  { id: "layered-ellipse", label: "Layered circle", icon: CircleClusterIcon },
+  { id: "tag", label: "Tag", icon: TagIcon },
+  { id: "thought-cloud", label: "Cloud", icon: WeatherCloudIcon },
+  { id: "capsule", label: "Capsule", icon: TagIcon },
 ]
 
 
+const SHAPE_TOOL_IDS = new Set(SHAPE_TOOLS.map((t) => t.id))
+
+
+const baseButtonClass =
+  "transition-colors !p-2.5 rounded-lg flex items-center justify-center gap-2"
+const inactiveClass = `${baseButtonClass} text-card-foreground hover:bg-secondary hover:text-secondary-foreground`
+const activeClass = `${baseButtonClass} bg-secondary text-secondary-foreground`
+
+
 /**
- * Floating tool tray for the canvas-harness board — center-top. Reads
- * + writes `tool` on the board-app-store so keyboard shortcuts and
- * future external triggers stay in sync.
+ * Compact keyboard hint badge in the corner of a tool button.
+ */
+const ShortcutHint = ({ shortcut }: { shortcut: string }) => (
+  <span className="pointer-events-none absolute -bottom-1 -right-1 px-0 text-[9px] font-semibold leading-none text-muted-foreground/80">
+    {shortcut}
+  </span>
+)
+
+
+/**
+ * Floating tool tray for the canvas-harness board — center-top. Mirrors
+ * prod's `TopBar` styling (sidebar surface, rounded-xl, blurred bg) and
+ * icon set while preserving the harness's tool-mode contract (each
+ * button sets `tool` on board-app-store; canvas-harness reacts to it).
  */
 export function HarnessToolbar() {
   const tool = useBoardAppStore((s) => s.tool)
   const setTool = useBoardAppStore((s) => s.setTool)
+  const chromeDialog = useBoardAppStore((s) => s.chromeDialog)
+  const setChromeDialog = useBoardAppStore((s) => s.setChromeDialog)
+
+  const isPan = tool === "pan"
+  const isSelect = tool === "select"
+  const isShape = SHAPE_TOOL_IDS.has(tool)
+  const ActiveShape = SHAPE_TOOLS.find((s) => s.id === tool)?.icon ?? ShapesMenuIcon
+  const shapeMenuOpen = chromeDialog === "shape-menu"
 
   return (
     <div
       className={cn(
-        "absolute left-1/2 top-3 z-50 flex -translate-x-1/2 items-center gap-1 rounded-lg",
-        "border border-border bg-background/95 px-2 py-1 shadow-md backdrop-blur",
+        "absolute left-1/2 top-2 z-50 flex -translate-x-1/2 items-center gap-1",
+        "rounded-xl border border-border/60 shadow-md backdrop-blur-md backdrop-saturate-150",
+        "bg-sidebar text-sidebar-foreground supports-[backdrop-filter]:bg-sidebar/80",
+        "p-1",
       )}
+      role="toolbar"
+      aria-label="Board toolbar"
     >
-      {TOOL_GROUPS.map((group, gi) => (
-        <Fragment key={gi}>
-          {gi > 0 ? <div className="mx-0.5 h-5 w-px bg-border" /> : null}
-          {group.map((t) => {
-            const active = tool === t.id
-            const Icon = t.icon
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            onClick={() => setTool("pan")}
+            aria-label="Pan"
+            aria-pressed={isPan}
+            className={isPan ? activeClass : inactiveClass}
+          >
+            <div className="relative">
+              {isPan ? (
+                <HandGrabIcon className="size-4 shrink-0" weight="fill" />
+              ) : (
+                <HandPanIcon className="size-4 shrink-0" />
+              )}
+              <ShortcutHint shortcut="P" />
+            </div>
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="bottom" sideOffset={10}>Pan</TooltipContent>
+      </Tooltip>
+
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            onClick={() => setTool("select")}
+            aria-label="Select"
+            aria-pressed={isSelect}
+            className={isSelect ? activeClass : inactiveClass}
+          >
+            <div className="relative">
+              <CursorSelectIcon
+                className="size-4 shrink-0"
+                weight={isSelect ? "fill" : undefined}
+              />
+              <ShortcutHint shortcut="V" />
+            </div>
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="bottom" sideOffset={10}>Select</TooltipContent>
+      </Tooltip>
+
+      <Separator orientation="vertical" className="hidden md:!h-6 md:block" />
+
+      <DropdownMenu
+        open={shapeMenuOpen}
+        onOpenChange={(open) => setChromeDialog(open ? "shape-menu" : null)}
+      >
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                aria-label="Add shape"
+                className={isShape ? activeClass : inactiveClass}
+              >
+                <div className="relative flex flex-col items-center gap-0.5">
+                  <ActiveShape className="size-4 shrink-0" />
+                  <ShortcutHint shortcut="S" />
+                  <ChevronDownIcon className="absolute inset-x-0 -bottom-3.5 size-3 text-muted-foreground" />
+                </div>
+              </button>
+            </DropdownMenuTrigger>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" sideOffset={10}>Shapes</TooltipContent>
+        </Tooltip>
+        <DropdownMenuContent align="center" side="bottom" sideOffset={8} className="min-w-[180px]">
+          {SHAPE_TOOLS.map((s) => {
+            const Icon = s.icon
             return (
-              <Tooltip key={t.id}>
-                <TooltipTrigger asChild>
-                  <button
-                    type="button"
-                    onClick={() => setTool(t.id)}
-                    aria-label={t.label}
-                    aria-pressed={active}
-                    className={cn(
-                      "inline-flex size-8 items-center justify-center rounded-md transition-colors",
-                      active
-                        ? "bg-accent text-foreground"
-                        : "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
-                    )}
-                  >
-                    <Icon className="size-4" weight={active ? "fill" : "regular"} />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom">{t.label}</TooltipContent>
-              </Tooltip>
+              <DropdownMenuItem
+                key={s.id}
+                onSelect={() => setTool(s.id)}
+                className="gap-2 text-sm"
+              >
+                <Icon className="size-4 shrink-0" />
+                <span>{s.label}</span>
+                {s.shortcut ? <DropdownMenuShortcut>{s.shortcut}</DropdownMenuShortcut> : null}
+              </DropdownMenuItem>
             )
           })}
-        </Fragment>
-      ))}
-      <div className="mx-0.5 h-5 w-px bg-border" />
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            onClick={() => setTool("arrow")}
+            aria-label="Connector"
+            aria-pressed={tool === "arrow"}
+            className={tool === "arrow" ? activeClass : inactiveClass}
+          >
+            <div className="relative">
+              <ConnectorPathIcon className="size-4 shrink-0" />
+              <ShortcutHint shortcut="A" />
+            </div>
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="bottom" sideOffset={10}>Connector</TooltipContent>
+      </Tooltip>
+
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            onClick={() => setTool("text")}
+            aria-label="Text"
+            aria-pressed={tool === "text"}
+            className={tool === "text" ? activeClass : inactiveClass}
+          >
+            <div className="relative">
+              <TextTIcon className="size-4 shrink-0" />
+              <ShortcutHint shortcut="T" />
+            </div>
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="bottom" sideOffset={10}>Text</TooltipContent>
+      </Tooltip>
+
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            onClick={() => setTool("frame")}
+            aria-label="Frame"
+            aria-pressed={tool === "frame"}
+            className={tool === "frame" ? activeClass : inactiveClass}
+          >
+            <div className="relative">
+              <FrameCorners className="size-4 shrink-0" weight={tool === "frame" ? "fill" : "regular"} />
+              <ShortcutHint shortcut="F" />
+            </div>
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="bottom" sideOffset={10}>Frame</TooltipContent>
+      </Tooltip>
+
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            onClick={() => setTool("sheet")}
+            aria-label="Note"
+            aria-pressed={tool === "sheet"}
+            className={tool === "sheet" ? activeClass : inactiveClass}
+          >
+            <div className="relative">
+              <NotepadIcon className="size-4 shrink-0" />
+              <ShortcutHint shortcut="N" />
+            </div>
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="bottom" sideOffset={10}>Note</TooltipContent>
+      </Tooltip>
+
+      <Separator orientation="vertical" className="hidden md:!h-6 md:block" />
+
       <HarnessToolbarMore />
     </div>
   )

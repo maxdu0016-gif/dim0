@@ -31,6 +31,7 @@ import { useBoardKeyboard } from "./use-board-keyboard"
 import { useCenterFromUrl } from "./use-center-from-url"
 import { useCreateHandlers } from "./use-create-handlers"
 import { useHarnessDropFiles } from "./use-drop-files"
+import { useHydrateIconNodes } from "./use-hydrate-icon-nodes"
 import { useStampNewEdges } from "./use-stamp-new-edges"
 import { useStyleMemory } from "./use-style-memory"
 import { useViewportPersistence } from "./use-viewport-persistence"
@@ -104,6 +105,7 @@ export function HarnessCanvas() {
   useCenterFromUrl(store, wrapRef, ready)
   useStampNewEdges(store, boardId, rootId)
   useHarnessApplyMindMap(store, boardId, rootId)
+  useHydrateIconNodes(store, boardId, rootId, ready)
 
   const styleMemory = useStyleMemory(store)
   const { handleCreateDrag, handleClick } = useCreateHandlers(store, boardId, rootId, styleMemory)

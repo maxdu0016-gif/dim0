@@ -16,23 +16,44 @@ const isTypingTarget = (target: EventTarget | null): boolean => {
 }
 
 
+/** Single-key shortcuts that map straight to a tool-mode swap. */
+const TOOL_SHORTCUTS: Record<string, string> = {
+  p: "pan",
+  h: "pan",
+  v: "select",
+  a: "arrow",
+  t: "text",
+  n: "sheet",
+  r: "rect",
+  o: "ellipse",
+  d: "diamond",
+  f: "frame",
+  y: "code-sandbox",
+}
+
+
 /**
- * Global keyboard bindings for the canvas-harness board:
+ * Global keyboard bindings for the canvas-harness board. Mirrors
+ * prod's `use-board-shortcuts` keymap so muscle memory carries over:
  *
- *  - Cmd/Ctrl+Z         → store.undo()
- *  - Cmd/Ctrl+Shift+Z   → store.redo()
- *  - Cmd/Ctrl+Y         → store.redo()  (Windows convention)
- *  - V                  → tool 'select'
- *  - H                  → tool 'pan'
- *  - F                  → tool 'frame'
+ *  - Cmd/Ctrl+Z / Shift+Z / Cmd+Y → undo / redo
+ *  - P / H                        → pan tool
+ *  - V                            → select tool
+ *  - A                            → connector (arrow)
+ *  - T                            → text tool
+ *  - N                            → sheet tool
+ *  - R / O / D                    → rect / ellipse / diamond tool
+ *  - F                            → frame tool
+ *  - Y                            → code-sandbox tool
+ *  - S                            → open Shapes menu
+ *  - G                            → open Icons search dialog
+ *  - I                            → open Images search dialog
  *
  * Skipped when focus is in an input / textarea / contentEditable so
  * inline editing keeps the native shortcuts. canvas-harness already
  * wires Cmd+C/X/V/[]/]} internally — see Canvas.tsx.
  */
 export const useBoardKeyboard = (store: CanvasStore): void => {
-  const setTool = useBoardAppStore((s) => s.setTool)
-
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       if (isTypingTarget(e.target)) return
@@ -50,14 +71,35 @@ export const useBoardKeyboard = (store: CanvasStore): void => {
         return
       }
 
-      if (meta || e.altKey) return
+      if (meta || e.altKey || e.shiftKey) return
 
-      if (e.key === "v" || e.key === "V") setTool("select")
-      else if (e.key === "h" || e.key === "H") setTool("pan")
-      else if (e.key === "f" || e.key === "F") setTool("frame")
+      const key = e.key.toLowerCase()
+      const app = useBoardAppStore.getState()
+
+      const tool = TOOL_SHORTCUTS[key]
+      if (tool) {
+        e.preventDefault()
+        app.setTool(tool)
+        return
+      }
+
+      if (key === "s") {
+        e.preventDefault()
+        app.setChromeDialog(app.chromeDialog === "shape-menu" ? null : "shape-menu")
+        return
+      }
+      if (key === "g") {
+        e.preventDefault()
+        app.setChromeDialog("icon-search")
+        return
+      }
+      if (key === "i") {
+        e.preventDefault()
+        app.setChromeDialog("image-search")
+      }
     }
 
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
-  }, [store, setTool])
+  }, [store])
 }

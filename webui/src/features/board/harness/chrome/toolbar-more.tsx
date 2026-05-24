@@ -1,5 +1,12 @@
-import { useState } from "react"
-import { DotsThree, ImagesSquareIcon } from "@phosphor-icons/react"
+import {
+  CodeFileIcon,
+  DocumentFileIcon,
+  EllipsisIcon,
+  FolderPlusActionIcon,
+  ImageStackIcon,
+  LearnWidgetIcon,
+  PuzzlePieceIcon,
+} from "@/components/icons"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,17 +20,30 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
+import { useBoardAppStore } from "../store/board-app-store"
+import { IconSearchDialog } from "./icon-search-dialog"
 import { ImageSearchDialog } from "./image-search-dialog"
+
+
+const moreButtonClass =
+  "transition-colors !p-2.5 rounded-lg flex items-center justify-center gap-2 text-card-foreground hover:bg-secondary hover:text-secondary-foreground"
 
 
 /**
  * Overflow menu mounted at the right edge of the harness toolbar.
- * Houses affordances that don't earn a primary toolbar slot (image
- * search, future document upload, etc.). Mirrors prod's `⋯` More
- * dropdown in top-bar.tsx.
+ * Mirrors prod's `⋯` More dropdown: Icons / Images / Sub-board /
+ * Document / Code sandbox / Widget. Open state for the icon + image
+ * search dialogs lives on board-app-store so keyboard shortcuts can
+ * toggle them too. Sub-board / code-sandbox / widget set `tool` so the
+ * next canvas click materializes the node.
  */
 export function HarnessToolbarMore() {
-  const [openImageSearch, setOpenImageSearch] = useState(false)
+  const setTool = useBoardAppStore((s) => s.setTool)
+  const chromeDialog = useBoardAppStore((s) => s.chromeDialog)
+  const setChromeDialog = useBoardAppStore((s) => s.setChromeDialog)
+
+  const openImageSearch = chromeDialog === "image-search"
+  const openIconSearch = chromeDialog === "icon-search"
 
   return (
     <>
@@ -34,16 +54,13 @@ export function HarnessToolbarMore() {
               <button
                 type="button"
                 aria-label="More actions"
-                className={cn(
-                  "inline-flex size-8 items-center justify-center rounded-md transition-colors",
-                  "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
-                )}
+                className={cn(moreButtonClass)}
               >
-                <DotsThree className="size-4" weight="bold" />
+                <EllipsisIcon className="size-4 shrink-0" />
               </button>
             </DropdownMenuTrigger>
           </TooltipTrigger>
-          <TooltipContent side="bottom">More actions</TooltipContent>
+          <TooltipContent side="bottom" sideOffset={10}>More actions</TooltipContent>
         </Tooltip>
         <DropdownMenuContent
           align="end"
@@ -52,19 +69,57 @@ export function HarnessToolbarMore() {
           className="min-w-[190px]"
         >
           <DropdownMenuItem
-            onSelect={() => setOpenImageSearch(true)}
+            onSelect={() => setChromeDialog("icon-search")}
             className="gap-2 text-sm"
           >
-            <ImagesSquareIcon className="size-4 shrink-0" />
+            <PuzzlePieceIcon className="size-4 shrink-0" />
+            <span>Icons</span>
+            <DropdownMenuShortcut>G</DropdownMenuShortcut>
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onSelect={() => setChromeDialog("image-search")}
+            className="gap-2 text-sm"
+          >
+            <ImageStackIcon className="size-4 shrink-0" />
             <span>Images</span>
             <DropdownMenuShortcut>I</DropdownMenuShortcut>
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onSelect={() => setTool("folder")}
+            className="gap-2 text-sm"
+          >
+            <FolderPlusActionIcon className="size-4 shrink-0" />
+            <span>Sub-board</span>
+          </DropdownMenuItem>
+          <DropdownMenuItem disabled className="gap-2 text-sm opacity-60">
+            <DocumentFileIcon className="size-4 shrink-0" />
+            <span>Document</span>
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onSelect={() => setTool("code-sandbox")}
+            className="gap-2 text-sm"
+          >
+            <CodeFileIcon className="size-4 shrink-0" />
+            <span>Code sandbox</span>
+            <DropdownMenuShortcut>Y</DropdownMenuShortcut>
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onSelect={() => setTool("widget")}
+            className="gap-2 text-sm"
+          >
+            <LearnWidgetIcon className="size-4 shrink-0" />
+            <span>Widget</span>
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
 
       <ImageSearchDialog
         open={openImageSearch}
-        onOpenChange={setOpenImageSearch}
+        onOpenChange={(open) => setChromeDialog(open ? "image-search" : null)}
+      />
+      <IconSearchDialog
+        open={openIconSearch}
+        onOpenChange={(open) => setChromeDialog(open ? "icon-search" : null)}
       />
     </>
   )
