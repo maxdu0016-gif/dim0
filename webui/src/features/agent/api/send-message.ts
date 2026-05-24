@@ -15,6 +15,7 @@ import { useGraphStore } from "@/features/board/store/graph-store"
 import { getBoardLink, getBoardNote } from "@/features/board/api/get-board"
 import { convertLinkToEdgeWithPoints, convertNoteToNode } from "@/features/board/utils/graph"
 import type { LinkEdge, NoteNode } from "@/features/board/types/flow"
+import { getAgentBridge } from "@/features/board/harness/agent/agent-bridge"
 import type {
   CreateNoteOutput,
   EditNoteOutput,
@@ -261,6 +262,12 @@ export const useSendMessage = () => {
             setEdges,
           } = useGraphStore.getState()
 
+          // Harness bridge — applies the same outputs to the canvas-harness
+          // store via a `remote`-origin batch so the canvas reflects the AI
+          // edit and the debounced save loop skips re-uploading. Runs
+          // alongside the legacy block until phase 7 deletes useGraphStore.
+          const harnessBridge = getAgentBridge()
+
           if (activeBoardId) {
             const createdNoteIds: string[] = []
             for (const output of noteToolOutputs) {
@@ -322,13 +329,30 @@ export const useSendMessage = () => {
               }
             }
 
+            // Mirror the same outputs into the canvas-harness store
+            // (when a board is open). Each call is independent — failures
+            // are logged inside the bridge methods; loop continues.
+            if (harnessBridge) {
+              for (const output of noteToolOutputs) {
+                const result = await harnessBridge.applyNoteOutput(output)
+                if (result?.created && result.onCanvas
+                  && !createdNoteIds.includes(result.noteId)
+                ) {
+                  createdNoteIds.push(result.noteId)
+                }
+              }
+              for (const output of linkToolOutputs) {
+                await harnessBridge.applyLinkOutput(output)
+              }
+            }
+
             if (createdNoteIds.length > 0 && router.state.location.pathname.startsWith(`/boards/${activeBoardId}`)) {
-              const centerAround = createdNoteIds.join(",")
+              const centerIds = createdNoteIds.join(",")
               navigate({
                 to: "/boards/$id",
                 params: { id: activeBoardId },
                 replace: true,
-                search: (prev: Record<string, unknown>) => ({ ...prev, center_around: centerAround }),
+                search: (prev: Record<string, unknown>) => ({ ...prev, center: centerIds }),
               })
             }
           }

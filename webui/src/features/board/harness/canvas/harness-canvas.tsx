@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useNavigate } from "@tanstack/react-router"
+import { useQueryClient } from "@tanstack/react-query"
 import { hitTestAny, type CanvasStore } from "@canvas-harness/core"
+import { setAgentBridge } from "../agent/agent-bridge"
+import { applyLinkOutput, applyNoteOutput } from "../agent/apply-tool-output"
 import {
   Canvas,
   CanvasProvider,
@@ -66,6 +69,25 @@ export function HarnessCanvas() {
   const [ready, setReady] = useState(false)
   const saveStatus = useBoardDebouncedSave(store, boardId, ready)
   const wrapRef = useRef<HTMLDivElement>(null)
+  const queryClient = useQueryClient()
+
+  // Bridge for the agent's post-stream apply block (lives outside this
+  // component tree). Closures capture the current store + scope so the
+  // applier doesn't need access to React state. Cleared on unmount /
+  // scope change.
+  useEffect(() => {
+    if (!boardId) {
+      setAgentBridge(null)
+      return
+    }
+    setAgentBridge({
+      applyNoteOutput: (output) =>
+        applyNoteOutput(store, queryClient, boardId, rootId, output),
+      applyLinkOutput: (output) =>
+        applyLinkOutput(store, boardId, output),
+    })
+    return () => setAgentBridge(null)
+  }, [store, queryClient, boardId, rootId])
 
   useBoardKeyboard(store)
   useViewportPersistence(store, boardId, rootId, ready)

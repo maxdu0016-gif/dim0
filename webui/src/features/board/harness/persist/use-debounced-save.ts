@@ -22,6 +22,12 @@ export type UseBoardDebouncedSaveOptions = {
  * with `origin: 'history'`, the timer re-arms, the next flush sees
  * the post-undo scene and writes the inverse calls.
  *
+ * **Remote-origin batches** (agent writes via `store.applyBatch` with
+ * `origin: 'remote'`) are skipped: the backend already has them, so
+ * re-persisting would round-trip the same data. We rebaseline
+ * `lastSavedRef` on remote batches so a subsequent local edit's diff
+ * doesn't treat the remote-applied state as "needs upload."
+ *
  * `ready` gates subscription: the caller flips it true once hydration
  * has populated the store, so the load-time ops don't generate
  * spurious POSTs. Re-baseline happens on the same transition.
@@ -72,7 +78,18 @@ export const useBoardDebouncedSave = (
       }
     }
 
-    return store.subscribe("change", () => {
+    return store.subscribe("change", (batch) => {
+      // Remote-origin batches (AI/agent applies) are already on the
+      // server — folding them into lastSaved prevents the next flush
+      // from re-uploading the same data while still keeping the
+      // baseline in sync for any later local edits.
+      if (batch.origin === "remote") {
+        lastSavedRef.current = {
+          nodes: store.getAllNodes(),
+          edges: store.getAllEdges(),
+        }
+        return
+      }
       if (timer === null) setStatus("pending")
       else clearTimeout(timer)
       timer = setTimeout(() => { void flush() }, debounceMs)
