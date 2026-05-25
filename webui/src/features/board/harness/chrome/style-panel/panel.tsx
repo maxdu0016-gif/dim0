@@ -1,5 +1,5 @@
 import { type ReactElement, useMemo } from "react"
-import type { Style as CanvasStyle } from "@canvas-harness/core"
+import type { Arrowhead, PathStyle, Style as CanvasStyle } from "@canvas-harness/core"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent } from "@/components/ui/card"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -20,18 +20,32 @@ import type {
 } from "@/features/board/types/style"
 import { cn } from "@/lib/utils"
 import { ColorGrid } from "./color-panel"
+import {
+  ARROWHEAD_OPTIONS,
+  ArrowheadGlyph,
+  PATH_STYLE_OPTIONS,
+  PathStyleGlyph,
+} from "./edge-glyphs"
 
 
-// canvas-harness's Style + a couple of fields the lib doesn't model but the
-// user-facing controls reference (textAlign / roundness). canvas-harness's
-// `roundness` only varies 0..1, but Dim0 historically uses 0 / 2 so we
-// preserve the binary toggle UX and let the convert layer clamp.
-type NodeStylePanel = CanvasStyle
+// canvas-harness's Style augmented with edge-only fields (arrowheads,
+// pathStyle) so the panel can drive both kinds from one snapshot.
+// `pathStyle` lives on the Edge itself (not in style) — the sidebar's
+// dispatch helper splits the patch on commit. `roundness` only varies
+// 0..1 in canvas-harness but Dim0 historically uses 0/2; convert layer
+// clamps for us.
+export type StylePanelStyle = CanvasStyle & {
+  sourceArrowhead?: Arrowhead
+  targetArrowhead?: Arrowhead
+  pathStyle?: PathStyle
+}
 
 
 export type StylePanelProps = {
-  style: NodeStylePanel
-  onStyleChange: (next: Partial<NodeStylePanel>) => void
+  /** Tells the panel which feature set to expose. */
+  kind: "node" | "edge"
+  style: StylePanelStyle
+  onStyleChange: (next: Partial<StylePanelStyle>) => void
   className?: string
 }
 
@@ -47,6 +61,9 @@ type SettingKey =
   | "textAlign"
   | "fontFamily"
   | "fontSize"
+  | "pathStyle"
+  | "sourceArrowhead"
+  | "targetArrowhead"
 
 
 const SETTING_TITLES: Record<SettingKey, string> = {
@@ -60,10 +77,13 @@ const SETTING_TITLES: Record<SettingKey, string> = {
   textAlign: "Text align",
   fontFamily: "Font family",
   fontSize: "Font size",
+  pathStyle: "Path style",
+  sourceArrowhead: "Source arrowhead",
+  targetArrowhead: "Target arrowhead",
 }
 
 
-const SETTING_ORDER: SettingKey[] = [
+const NODE_SETTING_ORDER: SettingKey[] = [
   "strokeColor",
   "backgroundColor",
   "textColor",
@@ -72,6 +92,20 @@ const SETTING_ORDER: SettingKey[] = [
   "roughness",
   "roundness",
   "textAlign",
+  "fontFamily",
+  "fontSize",
+]
+
+
+const EDGE_SETTING_ORDER: SettingKey[] = [
+  "strokeColor",
+  "textColor",
+  "strokeWidth",
+  "strokeStyle",
+  "roughness",
+  "pathStyle",
+  "sourceArrowhead",
+  "targetArrowhead",
   "fontFamily",
   "fontSize",
 ]
@@ -179,15 +213,21 @@ function RailButton({
 
 /**
  * Rail-style style panel — rows are popover triggers, content opens on
- * the right when clicked. Adapted from dim0's panel.tsx; v1 covers
- * node-only styling (edges deferred). Reads a single `style` snapshot
- * (the first selected node's, the sidebar wrapper handles selection +
- * dispatch).
+ * the right when clicked. Adapted from dim0's panel.tsx; covers both
+ * node + edge styling. The dispatcher (`onStyleChange`) is responsible
+ * for routing edge-only fields (pathStyle, arrowheads) and for the
+ * stored↔displayed color split — see `sidebar.tsx`.
  */
-export function StylePanel({ style, onStyleChange, className }: StylePanelProps): ReactElement {
+export function StylePanel({
+  kind,
+  style,
+  onStyleChange,
+  className,
+}: StylePanelProps): ReactElement {
   const { resolvedTheme } = useTheme()
   const isDark = resolvedTheme === "dark"
   const s = style
+  const ORDER = kind === "edge" ? EDGE_SETTING_ORDER : NODE_SETTING_ORDER
 
   const settingIndicator = useMemo<Record<SettingKey, React.ReactNode>>(
     () => ({
@@ -195,6 +235,9 @@ export function StylePanel({ style, onStyleChange, className }: StylePanelProps)
       backgroundColor: <ColorDot color={resolveDisplay(s.backgroundColor, isDark)} />,
       textColor: <ColorDot color={resolveDisplay(s.textColor, isDark)} />,
       strokeWidth: <LineGlyph width={s.strokeWidth ?? 2} />,
+      pathStyle: <PathStyleGlyph kind={s.pathStyle ?? "bezier"} />,
+      sourceArrowhead: <ArrowheadGlyph kind={s.sourceArrowhead ?? "none"} flip />,
+      targetArrowhead: <ArrowheadGlyph kind={s.targetArrowhead ?? "arrow-filled"} />,
       strokeStyle: (
         <LineGlyph
           width={2}
@@ -443,6 +486,66 @@ export function StylePanel({ style, onStyleChange, className }: StylePanelProps)
         </ToggleGroup>
       </Section>
     ),
+    pathStyle: (
+      <Section title="Path style">
+        <ToggleGroup
+          type="single"
+          value={s.pathStyle ?? "bezier"}
+          onValueChange={(v) => v && onStyleChange({ pathStyle: v as PathStyle })}
+          className="flex gap-2"
+        >
+          {PATH_STYLE_OPTIONS.map((p) => (
+            <ToggleGroupItem
+              key={p}
+              value={p}
+              className="h-9 w-12 items-center justify-center rounded-md border bg-muted data-[state=on]:bg-secondary-foreground/10 data-[state=on]:text-secondary-foreground"
+            >
+              <PathStyleGlyph kind={p} />
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+      </Section>
+    ),
+    sourceArrowhead: (
+      <Section title="Source arrowhead">
+        <ToggleGroup
+          type="single"
+          value={s.sourceArrowhead ?? "none"}
+          onValueChange={(v) => v && onStyleChange({ sourceArrowhead: v as Arrowhead })}
+          className="flex flex-wrap gap-2"
+        >
+          {ARROWHEAD_OPTIONS.map((a) => (
+            <ToggleGroupItem
+              key={a}
+              value={a}
+              className="h-9 w-12 items-center justify-center rounded-md border bg-muted data-[state=on]:bg-secondary-foreground/10 data-[state=on]:text-secondary-foreground"
+            >
+              <ArrowheadGlyph kind={a} flip />
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+      </Section>
+    ),
+    targetArrowhead: (
+      <Section title="Target arrowhead">
+        <ToggleGroup
+          type="single"
+          value={s.targetArrowhead ?? "arrow-filled"}
+          onValueChange={(v) => v && onStyleChange({ targetArrowhead: v as Arrowhead })}
+          className="flex flex-wrap gap-2"
+        >
+          {ARROWHEAD_OPTIONS.map((a) => (
+            <ToggleGroupItem
+              key={a}
+              value={a}
+              className="h-9 w-12 items-center justify-center rounded-md border bg-muted data-[state=on]:bg-secondary-foreground/10 data-[state=on]:text-secondary-foreground"
+            >
+              <ArrowheadGlyph kind={a} />
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+      </Section>
+    ),
   }
 
   return (
@@ -455,7 +558,7 @@ export function StylePanel({ style, onStyleChange, className }: StylePanelProps)
       <CardContent className="h-auto max-h-[60vh] p-0">
         <div className="scrollbar-thin h-full overflow-y-auto p-1 [scrollbar-gutter:stable_both-edges]">
           <div className="space-y-0">
-            {SETTING_ORDER.map((key) => (
+            {ORDER.map((key) => (
               <Popover key={key}>
                 <PopoverTrigger asChild>
                   <div>
