@@ -1,4 +1,5 @@
 import { useRef } from "react"
+import { NotepadIcon } from "@phosphor-icons/react"
 import type { NodeId } from "@canvas-harness/core"
 import { useNode } from "@canvas-harness/react"
 import { MarkdownView } from "@/components/markdown/markdown-view"
@@ -100,9 +101,12 @@ export function SheetView({ id }: SheetViewProps) {
               <MarkdownView content={truncate(body)} />
             </div>
           ) : body ? (
-            // In-bounds-but-clipped state: nothing rendered, keeps the
-            // card silhouette visible without re-parsing markdown.
-            null
+            // Off-screen: skip markdown parse, show a dimmed "paused"
+            // placeholder so the card still reads as a sheet at a glance.
+            <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-center text-muted-foreground">
+              <NotepadIcon className="size-5 shrink-0" />
+              <span className="text-xs">Sheet paused</span>
+            </div>
           ) : (
             <span className="italic text-muted-foreground">Empty sheet</span>
           )}

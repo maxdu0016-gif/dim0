@@ -1,5 +1,6 @@
 import { DragGripIcon } from "@/components/icons"
 import { cn } from "@/lib/utils"
+import { useIsEmbeddedNodeView } from "./embedded-node-view-context"
 
 
 export type NodeDragHandleProps = {
@@ -24,19 +25,25 @@ export type NodeDragHandleProps = {
  * Do not add `useStopCanvasGesture`, `onPointerDown`, or anything else
  * that consumes events here — that's the whole point.
  */
-export const NodeDragHandle = ({ className }: NodeDragHandleProps) => (
-  <div
-    aria-label="Drag node"
-    title="Drag to move · click to select"
-    className={cn(
-      "pointer-events-auto absolute left-2 top-2 z-30",
-      "inline-flex size-6 items-center justify-center rounded-md",
-      "border border-border/60 bg-background/80 text-muted-foreground/70 shadow-sm",
-      "transition-colors hover:bg-accent hover:text-foreground",
-      "cursor-grab active:cursor-grabbing",
-      className,
-    )}
-  >
-    <DragGripIcon className="size-4" />
-  </div>
-)
+export const NodeDragHandle = ({ className }: NodeDragHandleProps) => {
+  // Suppress when the view is mounted inside a non-canvas surface
+  // (Files cards already own a drag handle on their parent cell).
+  const embedded = useIsEmbeddedNodeView()
+  if (embedded) return null
+  return (
+    <div
+      aria-label="Drag node"
+      title="Drag to move · click to select"
+      className={cn(
+        "pointer-events-auto absolute left-2 top-2 z-30",
+        "inline-flex size-6 items-center justify-center rounded-md",
+        "border border-border/60 bg-background/80 text-muted-foreground/70 shadow-sm",
+        "transition-colors hover:bg-accent hover:text-foreground",
+        "cursor-grab active:cursor-grabbing",
+        className,
+      )}
+    >
+      <DragGripIcon className="size-4" />
+    </div>
+  )
+}

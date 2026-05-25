@@ -29,6 +29,7 @@ import {
   SlidesPanel,
   StyleSidebar,
 } from "../chrome"
+import { LinearView, ListView } from "../views"
 import { boardNodeTypes, useRenderCustomNodeView } from "../node-types"
 import { hydrateBoardStore } from "../persist/snapshot-load"
 import { useBoardDebouncedSave, type SaveStatus } from "../persist/use-debounced-save"
@@ -80,6 +81,7 @@ export function HarnessCanvas() {
   const store = storeRef.current
 
   const tool = useBoardAppStore((s) => s.tool)
+  const viewMode = useBoardAppStore((s) => s.viewMode)
   const theme = useBoardTheme()
   const [ready, setReady] = useState(false)
   const saveStatus = useBoardDebouncedSave(store, boardId, ready)
@@ -211,6 +213,7 @@ export function HarnessCanvas() {
           <HarnessCanvasInner
             theme={theme}
             tool={tool}
+            viewMode={viewMode}
             saveStatus={saveStatus}
             arrowDefaults={arrowDefaults}
             onCreateDrag={handleCreateDrag}
@@ -241,6 +244,7 @@ const CUSTOM_NODE_TYPES = new Set([
 type InnerProps = {
   theme: ReturnType<typeof useBoardTheme>
   tool: string
+  viewMode: "board" | "files" | "list"
   saveStatus: SaveStatus
   arrowDefaults: ArrowToolDefaults
   onCreateDrag: ReturnType<typeof useCreateHandlers>["handleCreateDrag"]
@@ -253,6 +257,7 @@ type InnerProps = {
 function HarnessCanvasInner({
   theme,
   tool,
+  viewMode,
   saveStatus,
   arrowDefaults,
   onCreateDrag,
@@ -261,43 +266,57 @@ function HarnessCanvasInner({
   onRenderer,
 }: InnerProps) {
   const renderView = useRenderCustomNodeView()
+  const isBoard = viewMode === "board"
   return (
     <>
-      <Canvas
-        tool={tool}
-        theme={theme.resolver}
-        selectionColor={theme.selectionColor}
-        background={theme.background}
-        renderCustomNodeView={renderView}
-        arrowDefaults={arrowDefaults}
-        onCreateDrag={onCreateDrag}
-        onClick={onClick}
-        onDoubleClick={onDoubleClick}
-        onRenderer={onRenderer}
-      />
+      {isBoard ? (
+        <>
+          <Canvas
+            tool={tool}
+            theme={theme.resolver}
+            selectionColor={theme.selectionColor}
+            background={theme.background}
+            renderCustomNodeView={renderView}
+            arrowDefaults={arrowDefaults}
+            onCreateDrag={onCreateDrag}
+            onClick={onClick}
+            onDoubleClick={onDoubleClick}
+            onRenderer={onRenderer}
+          />
+          <Minimap
+            width={200}
+            height={140}
+            viewportColor={theme.minimap.viewportColor}
+            backgroundColor={theme.minimap.backgroundColor}
+            borderColor={theme.minimap.borderColor}
+            defaultNodeColor={theme.minimap.defaultNodeColor}
+            style={{
+              position: "absolute",
+              bottom: 16,
+              right: 16,
+              borderRadius: 6,
+              overflow: "hidden",
+              zIndex: 50,
+            }}
+          />
+          <HarnessViewportControls />
+          <StyleSidebar />
+        </>
+      ) : viewMode === "files" ? (
+        <LinearView />
+      ) : (
+        <ListView />
+      )}
+      {/*
+        Always-mounted chrome: toolbar (with view dropdown), save
+        status badge, slide-related surfaces. NodeSurfaceHost stays
+        mounted everywhere so the modal editor opens from any view.
+      */}
       <HarnessToolbar />
-      <HarnessViewportControls />
-      <StyleSidebar />
       <HarnessSaveStatus status={saveStatus} />
       <NodeSurfaceHost />
       <SlidesSheet />
       <PresentationOverlay />
-      <Minimap
-        width={200}
-        height={140}
-        viewportColor={theme.minimap.viewportColor}
-        backgroundColor={theme.minimap.backgroundColor}
-        borderColor={theme.minimap.borderColor}
-        defaultNodeColor={theme.minimap.defaultNodeColor}
-        style={{
-          position: "absolute",
-          bottom: 16,
-          right: 16,
-          borderRadius: 6,
-          overflow: "hidden",
-          zIndex: 50,
-        }}
-      />
     </>
   )
 }

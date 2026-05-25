@@ -75,6 +75,13 @@ export type BoardAppState = {
   // string — built-ins use lib-defined names, customs can use their own.
   tool: string
 
+  /**
+   * Which top-level surface is mounted. `"board"` is the canvas-harness
+   * Canvas; `"files"` and `"list"` are alternate read-mostly views of
+   * the document-like nodes on the current scope.
+   */
+  viewMode: "board" | "files" | "list"
+
   // UI toggles.
   viewSlides: boolean
   presentationMode: boolean
@@ -113,6 +120,7 @@ export type BoardAppActions = {
 
   setTool: (tool: string) => void
 
+  setViewMode: (mode: BoardAppState["viewMode"]) => void
   setViewSlides: (enabled: boolean) => void
   setPresentationMode: (enabled: boolean) => void
   setSlidesPanelOpen: (open: boolean) => void
@@ -139,6 +147,7 @@ const initialState: BoardAppState = {
   canEdit: true,
   isLoading: false,
   tool: "select",
+  viewMode: "board",
   viewSlides: true,
   presentationMode: false,
   slidesPanelOpen: false,
@@ -164,6 +173,7 @@ export const useBoardAppStore = create<BoardAppState & BoardAppActions>((set, ge
       canEdit: true,
       isLoading: false,
       tool: "select",
+      viewMode: "board",
       currentFolderDepth: -1,
       maxFolderDepth: 0,
       presentationMode: false,
@@ -182,6 +192,7 @@ export const useBoardAppStore = create<BoardAppState & BoardAppActions>((set, ge
 
   setTool: (tool) => set({ tool }),
 
+  setViewMode: (mode) => set({ viewMode: mode }),
   setViewSlides: (enabled) => set({ viewSlides: enabled }),
   setPresentationMode: (enabled) => set({ presentationMode: enabled }),
   setSlidesPanelOpen: (open) => set({ slidesPanelOpen: open }),

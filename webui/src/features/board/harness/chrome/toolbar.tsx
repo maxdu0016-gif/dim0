@@ -5,9 +5,12 @@ import {
   ConnectorPathIcon,
   CursorSelectIcon,
   DiamondShapeIcon,
+  GraphViewIcon,
+  GridViewIcon,
   HandGrabIcon,
   HandPanIcon,
   LayerStackIcon,
+  ListViewIcon,
   NotepadIcon,
   PresentationIcon,
   ShapesMenuIcon,
@@ -87,6 +90,13 @@ const ShortcutHint = ({ shortcut }: { shortcut: string }) => (
  * icon set while preserving the harness's tool-mode contract (each
  * button sets `tool` on board-app-store; canvas-harness reacts to it).
  */
+const VIEW_OPTIONS = [
+  { id: "board" as const, label: "Board", icon: GraphViewIcon },
+  { id: "files" as const, label: "Files", icon: GridViewIcon },
+  { id: "list" as const, label: "List", icon: ListViewIcon },
+]
+
+
 export function HarnessToolbar() {
   const tool = useBoardAppStore((s) => s.tool)
   const setTool = useBoardAppStore((s) => s.setTool)
@@ -94,12 +104,17 @@ export function HarnessToolbar() {
   const setChromeDialog = useBoardAppStore((s) => s.setChromeDialog)
   const slidesPanelOpen = useBoardAppStore((s) => s.slidesPanelOpen)
   const setSlidesPanelOpen = useBoardAppStore((s) => s.setSlidesPanelOpen)
+  const viewMode = useBoardAppStore((s) => s.viewMode)
+  const setViewMode = useBoardAppStore((s) => s.setViewMode)
 
+  const isBoard = viewMode === "board"
   const isPan = tool === "pan"
   const isSelect = tool === "select"
   const isShape = SHAPE_TOOL_IDS.has(tool)
   const ActiveShape = SHAPE_TOOLS.find((s) => s.id === tool)?.icon ?? ShapesMenuIcon
   const shapeMenuOpen = chromeDialog === "shape-menu"
+  const activeView = VIEW_OPTIONS.find((v) => v.id === viewMode) ?? VIEW_OPTIONS[0]
+  const ActiveViewIcon = activeView.icon
 
   return (
     <div
@@ -112,6 +127,52 @@ export function HarnessToolbar() {
       role="toolbar"
       aria-label="Board toolbar"
     >
+      <DropdownMenu>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                aria-label="Change view"
+                className={activeClass}
+              >
+                <ActiveViewIcon className="size-4 shrink-0" />
+                <span className="sr-only text-[10px] md:not-sr-only">
+                  {activeView.label}
+                </span>
+                <ChevronDownIcon className="hidden size-3 shrink-0 text-muted-foreground md:block" />
+              </button>
+            </DropdownMenuTrigger>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" sideOffset={10}>Change view</TooltipContent>
+        </Tooltip>
+        <DropdownMenuContent align="start" side="bottom" sideOffset={8} className="min-w-[160px]">
+          {VIEW_OPTIONS.map((option) => {
+            const Icon = option.icon
+            return (
+              <DropdownMenuItem
+                key={option.id}
+                onSelect={() => setViewMode(option.id)}
+                className="gap-2 text-sm"
+              >
+                <Icon className="size-4 shrink-0" />
+                <span>{option.label}</span>
+              </DropdownMenuItem>
+            )
+          })}
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <Separator orientation="vertical" className="hidden md:!h-6 md:block" />
+
+      {/*
+        Canvas-only tools are hidden in non-board view modes. The
+        view dropdown and the More menu (create-only actions) stay
+        visible everywhere so users can navigate + create from any
+        surface.
+      */}
+      {isBoard && (
+      <>
       <Tooltip>
         <TooltipTrigger asChild>
           <button
@@ -275,6 +336,8 @@ export function HarnessToolbar() {
       </Tooltip>
 
       <Separator orientation="vertical" className="hidden md:!h-6 md:block" />
+      </>
+      )}
 
       <HarnessToolbarMore />
     </div>
