@@ -62,7 +62,7 @@ export function DocumentView({ id }: DocumentViewProps) {
           nodeId={id}
           label={filename}
           placeholder="Untitled file"
-          textClassName="text-center text-sm font-medium text-foreground"
+          textClassName="text-center text-sm font-handwriting text-foreground"
         />
       </div>
     </div>

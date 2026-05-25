@@ -91,7 +91,7 @@ export function WidgetView({ id }: WidgetViewProps) {
           nodeId={id}
           label={label}
           placeholder="Untitled widget"
-          textClassName="text-center text-sm font-medium text-foreground"
+          textClassName="text-center text-sm font-handwriting text-foreground"
         />
       </div>
     </div>

@@ -89,7 +89,7 @@ export function CodeSandboxView({ id }: CodeSandboxViewProps) {
           nodeId={id}
           label={label}
           placeholder="Untitled sandbox"
-          textClassName="text-center text-sm font-medium text-foreground"
+          textClassName="text-center text-sm font-handwriting text-foreground"
         />
       </div>
     </div>

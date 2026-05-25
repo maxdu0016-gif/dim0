@@ -81,7 +81,7 @@ export function FolderView({ id }: FolderViewProps) {
           nodeId={id}
           label={label}
           placeholder="Untitled folder"
-          textClassName="text-center text-sm font-medium text-foreground"
+          textClassName="text-center text-sm font-handwriting text-foreground"
         />
       </div>
     </div>

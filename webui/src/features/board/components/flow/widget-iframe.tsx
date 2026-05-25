@@ -28,24 +28,6 @@ export const WidgetIframe = memo(function WidgetIframe({
   const [height, setHeight] = useState(minHeight)
   const iframeRef = useRef<HTMLIFrameElement | null>(null)
 
-  // Force the iframe to navigate to an empty document before React detaches
-  // it. Setting srcdoc to a fresh value triggers the browser to unload the
-  // previous document, terminating any setInterval / requestAnimationFrame /
-  // listeners the widget HTML had scheduled. Without this, the previous
-  // document can outlive the React unmount until garbage collection
-  // (non-deterministic), and its scheduled work continues to consume CPU.
-  useEffect(() => {
-    // Cache the element at mount: `key={resolvedTheme}` already remounts
-    // the whole component when the iframe DOM node changes, so the
-    // captured `el` is guaranteed to match the iframe this instance owns
-    // at cleanup time.
-    const el = iframeRef.current
-    return () => {
-      if (!el) return
-      el.srcdoc = "<!doctype html><html></html>"
-    }
-  }, [])
-
   useEffect(() => {
     if (!autoHeight || typeof window === "undefined") {
       return
@@ -90,14 +72,25 @@ export const WidgetIframe = memo(function WidgetIframe({
     [autoHeight, frameId, html, title]
   )
 
+  // Serve the HTML through a Blob URL rather than srcDoc. Chromium's
+  // srcDoc navigation can silently fail to render content when the
+  // iframe lives inside a CSS-`transform`-ed ancestor (canvas-harness
+  // applies a camera transform on the overlay div). Blob URLs are
+  // regular navigable URLs, so the iframe loads them reliably in any
+  // layout context. Cleanup revokes the previous URL on srcDoc change.
+  const srcUrl = useMemo(
+    () => URL.createObjectURL(new Blob([srcDoc], { type: "text/html;charset=utf-8" })),
+    [srcDoc],
+  )
+  useEffect(() => () => URL.revokeObjectURL(srcUrl), [srcUrl])
+
   return (
     <iframe
       key={resolvedTheme}
       ref={iframeRef}
       title={title}
-      srcDoc={srcDoc}
+      src={srcUrl}
       sandbox="allow-scripts"
-      loading="lazy"
       referrerPolicy="no-referrer"
       className={className}
       style={autoHeight ? { height: `${height}px` } : undefined}

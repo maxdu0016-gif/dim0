@@ -101,7 +101,7 @@ export function SheetView({ id }: SheetViewProps) {
           nodeId={id}
           label={label}
           placeholder="Untitled"
-          textClassName="text-center text-sm font-medium text-foreground"
+          textClassName="text-center text-sm font-handwriting text-foreground"
         />
       </div>
     </div>
