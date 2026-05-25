@@ -1,7 +1,5 @@
-import type { Arrowhead, PathStyle } from "@canvas-harness/core"
-
-
-export type ArrowheadOption = Arrowhead
+import type { PathStyle } from "@canvas-harness/core"
+import type { ArrowheadOption } from "./edge-glyph-options"
 
 
 /**
@@ -112,16 +110,3 @@ export function PathStyleGlyph({ kind }: { kind: PathStyle }) {
 }
 
 
-export const ARROWHEAD_OPTIONS: ReadonlyArray<ArrowheadOption> = [
-  "none",
-  "arrow",
-  "arrow-filled",
-  "barb",
-]
-
-
-export const PATH_STYLE_OPTIONS: ReadonlyArray<PathStyle> = [
-  "straight",
-  "bezier",
-  "polyline",
-]

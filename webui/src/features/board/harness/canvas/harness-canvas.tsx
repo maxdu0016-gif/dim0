@@ -46,7 +46,7 @@ import { useStampNewEdges } from "./use-stamp-new-edges"
 import { useStyleMemory } from "./use-style-memory"
 import { useThumbnailCapture } from "./use-thumbnail-capture"
 import { useViewportPersistence } from "./use-viewport-persistence"
-import { HarnessWrapRefProvider } from "./wrap-ref-context"
+import { HarnessWrapRefProvider } from "./wrap-ref-provider"
 
 
 /**

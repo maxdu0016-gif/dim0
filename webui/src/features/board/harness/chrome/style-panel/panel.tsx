@@ -20,12 +20,8 @@ import type {
 } from "@/features/board/types/style"
 import { cn } from "@/lib/utils"
 import { ColorGrid } from "./color-panel"
-import {
-  ARROWHEAD_OPTIONS,
-  ArrowheadGlyph,
-  PATH_STYLE_OPTIONS,
-  PathStyleGlyph,
-} from "./edge-glyphs"
+import { ARROWHEAD_OPTIONS, PATH_STYLE_OPTIONS } from "./edge-glyph-options"
+import { ArrowheadGlyph, PathStyleGlyph } from "./edge-glyphs"
 
 
 // canvas-harness's Style augmented with edge-only fields (arrowheads,
