@@ -1,5 +1,6 @@
 import type { Node } from "@canvas-harness/core"
 import type { Note, NoteProperties } from "@/features/board/types/note"
+import { applyColorsToStyle } from "../theme/color-adapter"
 import type { NoteNodeData } from "./note-to-node"
 import { canvasTypeToDim0 } from "./node-type"
 import { canvasStyleToDim0 } from "./style"
@@ -49,13 +50,23 @@ export const nodeToNote = (node: Node): Note => {
     roughSeed: data.roughSeed,
     label: data.label,
     content: node.content ? { markdown: node.content } : undefined,
-    style: canvasStyleToDim0(node.style, {
-      // Prefer the original style.type stashed in data — preserves it
-      // across canvas-type overrides (e.g. documents).
-      type: data.styleType ?? canvasTypeToDim0(node.type),
-      angle: node.angle * RAD_TO_DEG,
-      groupIds,
-    }),
+    // `node.style.{bg,stroke,text}` may carry dark-mode display values;
+    // `_storedColors` holds what the user actually picked. Prefer stored
+    // when present so a theme toggle never round-trips adapted colors
+    // back to the server. Falls back to `node.style` for legacy nodes
+    // that pre-date the field.
+    style: canvasStyleToDim0(
+      data._storedColors
+        ? applyColorsToStyle(node.style ?? {}, data._storedColors)
+        : node.style,
+      {
+        // Prefer the original style.type stashed in data — preserves it
+        // across canvas-type overrides (e.g. documents).
+        type: data.styleType ?? canvasTypeToDim0(node.type),
+        angle: node.angle * RAD_TO_DEG,
+        groupIds,
+      },
+    ),
     properties,
   }
 }

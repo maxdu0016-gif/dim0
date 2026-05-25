@@ -3,6 +3,13 @@ import type { Node } from "@canvas-harness/core"
 import type { Note, NoteProperties, RichText } from "@/features/board/types/note"
 import type { Document } from "@/features/board/types/document"
 import type { NodeType as Dim0NodeType } from "@/features/board/types/style"
+import {
+  adaptNodeColors,
+  applyColorsToStyle,
+  pickStoredColors,
+  type StoredColors,
+} from "../theme/color-adapter"
+import { getBoardThemeMode } from "../theme/theme-mode-ref"
 import { dim0TypeToCanvas } from "./node-type"
 import { dim0StyleToCanvas } from "./style"
 
@@ -56,6 +63,14 @@ export type NoteNodeData = {
   label?: RichText
   /** All Note properties except the ones lifted to Node primitives. */
   properties: Partial<NoteProperties>
+  /**
+   * Source-of-truth colors as the user picked them — these are what
+   * the server stores. `node.style.{bg,stroke,text}` may carry adapted
+   * variants in dark mode (see `theme/color-adapter.ts`). On save,
+   * `nodeToNote` reads these instead of `node.style` so a theme toggle
+   * never dirties or corrupts persisted colors.
+   */
+  _storedColors?: StoredColors
 }
 
 
@@ -97,10 +112,20 @@ export const noteToNode = (note: Note | Document): Node => {
     ? "document"
     : dim0TypeToCanvas(note.style.type)
 
-  const style = dim0StyleToCanvas(note.style)
+  const baseStyle = dim0StyleToCanvas(note.style)
   if (AUTOFIT_DISABLED_TYPES.has(canvasType)) {
-    style.autoFit = false
+    baseStyle.autoFit = false
   }
+
+  // Stash the original colors then project for the current theme mode.
+  // Light mode: project is identity (style === stored). Dark mode:
+  // style holds adapted variants while `_storedColors` keeps the truth.
+  const storedColors = pickStoredColors(baseStyle)
+  const mode = getBoardThemeMode()
+  const style = mode === "light"
+    ? baseStyle
+    : applyColorsToStyle(baseStyle, adaptNodeColors(storedColors, mode))
+  data._storedColors = storedColors
 
   // Canvas-harness's image renderer reads `node.data.src` (see
   // ImageNodeData in core/types/node.ts), separate from the rest of

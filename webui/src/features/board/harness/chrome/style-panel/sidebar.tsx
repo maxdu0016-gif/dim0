@@ -1,7 +1,32 @@
 import { useCallback, useMemo } from "react"
 import type { Node, Style as CanvasStyle } from "@canvas-harness/core"
 import { useCanvasStore, useNodes, useSelection } from "@canvas-harness/react"
+import { useTheme } from "@/components/theme-provider"
+import type { NoteNodeData } from "../../convert/note-to-node"
+import {
+  adaptNodeColors,
+  applyColorsToStyle,
+  type StoredColors,
+} from "../../theme/color-adapter"
 import { StylePanel } from "./panel"
+
+
+/** The three color fields that round-trip through `data._storedColors`. */
+const COLOR_FIELDS = ["strokeColor", "backgroundColor", "textColor"] as const
+type ColorField = (typeof COLOR_FIELDS)[number]
+
+
+/** Lift stored colors off a Node, falling back to `node.style` for legacy nodes. */
+const storedColorsOf = (n: Node): StoredColors => {
+  const data = n.data as Partial<NoteNodeData> | undefined
+  return (
+    data?._storedColors ?? {
+      backgroundColor: n.style?.backgroundColor,
+      strokeColor: n.style?.strokeColor,
+      textColor: n.style?.textColor,
+    }
+  )
+}
 
 
 /**
@@ -10,19 +35,18 @@ import { StylePanel } from "./panel"
  * dispatches style changes back to all selected nodes in one undoable
  * batch.
  *
- * Mounted standalone in the canvas chrome — hidden when no nodes are
- * selected. Edge styling (pathStyle / arrowheads) is deferred to a
- * follow-up; nodes only for v1.
- *
- * Frames are skipped (no visual styling worth exposing in the panel).
- * Custom node types (sheet / code-sandbox / widget / document / folder)
- * also appear here — their style fields work the same way, even though
- * their React views override most of the rendering.
+ * Color fields are special: the panel works in the user's stored
+ * color space (what they actually picked). On commit we write the
+ * picked value back to `data._storedColors` AND project it for the
+ * current theme mode before assigning to `node.style` — that keeps
+ * the displayed paint in sync without ever touching the source of
+ * truth on the wrong path.
  */
 export function StyleSidebar() {
   const selection = useSelection()
   const allNodes = useNodes()
   const store = useCanvasStore()
+  const { resolvedTheme } = useTheme()
 
   const selectedNodes = useMemo<Node[]>(() => {
     if (selection.length === 0) return []
@@ -30,17 +54,51 @@ export function StyleSidebar() {
     return allNodes.filter((n) => ids.has(n.id as unknown as string) && n.type !== "frame")
   }, [selection, allNodes])
 
-  const representativeStyle = selectedNodes[0]?.style
+  // Build the style we hand to the panel out of stored colors (so the
+  // picker shows the user's pick, not its dark-mode shadow) layered on
+  // top of the rest of the displayed style.
+  const representativeStyle = useMemo<CanvasStyle | undefined>(() => {
+    const first = selectedNodes[0]
+    if (!first?.style) return undefined
+    return applyColorsToStyle(first.style, storedColorsOf(first))
+  }, [selectedNodes])
 
   const handleStyleChange = useCallback(
     (patch: Partial<CanvasStyle>) => {
+      // Split patch into color fields (need stored+displayed split) and
+      // everything else (passes through unchanged).
+      const colorPatch: Partial<StoredColors> = {}
+      const rest: Partial<CanvasStyle> = { ...patch }
+      for (const k of COLOR_FIELDS) {
+        if (k in patch) {
+          colorPatch[k] = patch[k as ColorField] ?? undefined
+          delete rest[k]
+        }
+      }
+      const hasColor = Object.keys(colorPatch).length > 0
+      const hasRest = Object.keys(rest).length > 0
+
       store.batch(() => {
         for (const n of selectedNodes) {
-          store.updateNode(n.id, { style: { ...n.style, ...patch } })
+          const prevStored = storedColorsOf(n)
+          const nextStored: StoredColors = hasColor
+            ? { ...prevStored, ...colorPatch }
+            : prevStored
+          const displayColors =
+            resolvedTheme === "dark" ? adaptNodeColors(nextStored, "dark") : nextStored
+          const baseStyle = hasRest ? { ...n.style, ...rest } : n.style ?? {}
+          const nextStyle = hasColor
+            ? applyColorsToStyle(baseStyle, displayColors)
+            : baseStyle
+          const nextData: NoteNodeData = {
+            ...((n.data ?? {}) as NoteNodeData),
+            _storedColors: nextStored,
+          }
+          store.updateNode(n.id, { style: nextStyle, data: nextData })
         }
       })
     },
-    [store, selectedNodes],
+    [store, selectedNodes, resolvedTheme],
   )
 
   if (selectedNodes.length === 0 || !representativeStyle) return null

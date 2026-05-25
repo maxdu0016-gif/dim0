@@ -5,6 +5,12 @@ import type {
   PathStyle,
   Style,
 } from "@canvas-harness/core"
+import type { LinkEdgeData } from "../convert/link-to-edge"
+import type { NoteNodeData } from "../convert/note-to-node"
+import {
+  applyColorsToEdgeStyle,
+  applyColorsToStyle,
+} from "../theme/color-adapter"
 
 
 /**
@@ -103,6 +109,11 @@ export const useStyleMemory = (store: CanvasStore): StyleMemoryApi => {
 
   useEffect(() => {
     const unsub = store.subscribe("change", (batch) => {
+      // Theme-projection batches rewrite every style in the scene with
+      // dark-mode display values. Don't sponge those into memory — the
+      // user didn't pick those colors. Stored colors don't change, so
+      // memory should stay put across a theme flip.
+      if (batch.origin === "remote") return
       let dirty = false
       for (const op of batch.ops) {
         if (op.type === "node.update") {
@@ -110,9 +121,17 @@ export const useStyleMemory = (store: CanvasStore): StyleMemoryApi => {
           const node = store.getNode(op.id)
           if (!node) continue
           if (EXCLUDED_TYPES.has(node.type)) continue
+          // Memory holds stored colors (what the user picked), not the
+          // currently-painted display values. Overlay the stored color
+          // triplet from `data._storedColors` so a memory captured in
+          // dark mode replays correctly in light and vice versa.
+          const data = node.data as Partial<NoteNodeData> | undefined
+          const styleForMemory = data?._storedColors
+            ? applyColorsToStyle(node.style ?? {}, data._storedColors)
+            : node.style
           memoryRef.current.nodes = {
             ...memoryRef.current.nodes,
-            ...(node.style ?? {}),
+            ...(styleForMemory ?? {}),
           }
           dirty = true
         } else if (op.type === "edge.update") {
@@ -122,9 +141,13 @@ export const useStyleMemory = (store: CanvasStore): StyleMemoryApi => {
           const edge = store.getEdge(op.id)
           if (!edge) continue
           if (op.patch.style !== undefined) {
+            const data = edge.data as Partial<LinkEdgeData> | undefined
+            const styleForMemory = data?._storedColors
+              ? applyColorsToEdgeStyle(edge.style ?? {}, data._storedColors)
+              : edge.style
             memoryRef.current.edge.style = {
               ...memoryRef.current.edge.style,
-              ...(edge.style ?? {}),
+              ...(styleForMemory ?? {}),
             }
           }
           if (op.patch.pathStyle !== undefined) {

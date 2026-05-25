@@ -3,7 +3,13 @@ import type { CanvasStore, Node } from "@canvas-harness/core"
 import type { CanvasCreateDragEvent, CanvasPointerEvent } from "@canvas-harness/react"
 import { createDefaultNote } from "@/features/board/types/note"
 import { canvasTypeToDim0 } from "../convert/node-type"
-import { noteToNode } from "../convert/note-to-node"
+import { noteToNode, type NoteNodeData } from "../convert/note-to-node"
+import {
+  adaptNodeColors,
+  applyColorsToStyle,
+  pickStoredColors,
+} from "../theme/color-adapter"
+import { getBoardThemeMode } from "../theme/theme-mode-ref"
 import { isStylableNodeType, type StyleMemoryApi } from "./use-style-memory"
 
 
@@ -36,16 +42,34 @@ const isShapeTool = (tool: string): boolean => SHAPE_TOOLS.has(tool)
 /**
  * Fold the user's sticky style memory into a freshly-converted Node
  * for stylable tool types. Custom node types and frames are excluded
- * so they keep their built-in visual identity. The `type` field on
- * canvas-harness's Style is absent (it lives on `Node`), so we can
- * spread directly without preserving anything.
+ * so they keep their built-in visual identity.
+ *
+ * Memory holds stored colors (the user's pick); we merge them, then
+ * project for the current theme mode before assigning to `node.style`.
+ * `data._storedColors` is refreshed so save round-trips the picked
+ * colors, not their dark-mode shadows.
  */
 const applyStyleMemory = (node: Node, styleMemory: StyleMemoryApi): Node => {
   if (!isStylableNodeType(node.type)) return node
   if (node.type === "frame") return node
   const remembered = styleMemory.getNodeStyle()
   if (!remembered) return node
-  return { ...node, style: { ...node.style, ...remembered } }
+
+  // Merge memory onto the default style in stored-color space first.
+  const mergedStored = { ...node.style, ...remembered }
+  const storedColors = pickStoredColors(mergedStored)
+  const mode = getBoardThemeMode()
+  const displayColors = mode === "dark" ? adaptNodeColors(storedColors, "dark") : storedColors
+
+  const nextData: NoteNodeData = {
+    ...((node.data ?? {}) as NoteNodeData),
+    _storedColors: storedColors,
+  }
+  return {
+    ...node,
+    style: applyColorsToStyle(mergedStored, displayColors),
+    data: nextData,
+  }
 }
 
 

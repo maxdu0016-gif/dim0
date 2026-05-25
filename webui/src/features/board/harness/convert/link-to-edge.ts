@@ -1,6 +1,13 @@
 import { asEdgeId, asGroupId, midpointToCubicControls } from "@canvas-harness/core"
 import type { Edge, EdgeEnd, Node, Vec2 } from "@canvas-harness/core"
 import type { Link } from "@/features/board/types/link"
+import {
+  adaptEdgeColors,
+  applyColorsToEdgeStyle,
+  pickStoredEdgeColors,
+  type StoredEdgeColors,
+} from "../theme/color-adapter"
+import { getBoardThemeMode } from "../theme/theme-mode-ref"
 import { dim0LinkStyleToCanvas } from "./style"
 
 
@@ -34,6 +41,12 @@ export type LinkEdgeData = {
    */
   sourceLegacyOffset?: boolean
   targetLegacyOffset?: boolean
+  /**
+   * Source-of-truth colors as the user picked them. `edge.style.{stroke,text}`
+   * may carry dark-mode display variants; this field is what the server
+   * holds. See `theme/color-adapter.ts`.
+   */
+  _storedColors?: StoredEdgeColors
 }
 
 
@@ -121,6 +134,13 @@ export const linkToEdge = (link: Link, nodes: Map<string, Node>): Edge => {
     control = [c1, c2]
   }
 
+  const baseStyle = dim0LinkStyleToCanvas(link.style)
+  const storedColors = pickStoredEdgeColors(baseStyle)
+  const mode = getBoardThemeMode()
+  const style = mode === "light"
+    ? baseStyle
+    : applyColorsToEdgeStyle(baseStyle, adaptEdgeColors(storedColors, mode))
+
   const data: LinkEdgeData = {
     version: link.version,
     createdAt: link.createdAt,
@@ -128,6 +148,7 @@ export const linkToEdge = (link: Link, nodes: Map<string, Node>): Edge => {
     deletedAt: link.deletedAt,
     graphUid: link.graphUid,
     parentId: link.parentId,
+    _storedColors: storedColors,
   }
   if (sourceResolved.legacy) data.sourceLegacyOffset = true
   if (targetResolved.legacy) data.targetLegacyOffset = true
@@ -141,7 +162,7 @@ export const linkToEdge = (link: Link, nodes: Map<string, Node>): Edge => {
     z: 0,
     groups: (link.style.groupIds ?? []).map(asGroupId),
     content: link.label?.markdown ?? "",
-    style: dim0LinkStyleToCanvas(link.style),
+    style,
     data,
   }
 }

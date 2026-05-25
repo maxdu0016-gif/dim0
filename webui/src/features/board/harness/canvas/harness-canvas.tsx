@@ -27,6 +27,7 @@ import { useBoardDebouncedSave, type SaveStatus } from "../persist/use-debounced
 import { useBoardAppStore } from "../store/board-app-store"
 import { createBoardStore } from "../store/create-board-store"
 import { useBoardTheme } from "../theme/use-board-theme"
+import { useThemeColorProjection } from "../theme/use-theme-color-projection"
 import { useBoardKeyboard } from "./use-board-keyboard"
 import { useCenterFromUrl } from "./use-center-from-url"
 import { useCreateHandlers } from "./use-create-handlers"
@@ -106,6 +107,7 @@ export function HarnessCanvas() {
   useStampNewEdges(store, boardId, rootId)
   useHarnessApplyMindMap(store, boardId, rootId)
   useHydrateIconNodes(store, boardId, rootId, ready)
+  useThemeColorProjection(store, ready)
 
   const styleMemory = useStyleMemory(store)
   const { handleCreateDrag, handleClick } = useCreateHandlers(store, boardId, rootId, styleMemory)

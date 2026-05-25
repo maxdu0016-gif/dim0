@@ -1,5 +1,6 @@
 import type { Edge, EdgeEnd, Node, Vec2 } from "@canvas-harness/core"
 import type { Link } from "@/features/board/types/link"
+import { applyColorsToEdgeStyle } from "../theme/color-adapter"
 import { canvasEdgeStyleToDim0Link } from "./style"
 import type { LinkEdgeData } from "./link-to-edge"
 
@@ -90,6 +91,12 @@ export const edgeToLink = (edge: Edge, nodes: Map<string, Node>): Link => {
   const targetWorld = endWorldPoint(edge.target, nodes)
   const midpoint = cubicControlToMidpoint(sourceWorld, targetWorld, edge.control)
 
+  // Prefer stored colors over the (possibly dark-adapted) display
+  // values on `edge.style` so save round-trips the user's pick.
+  const storedStyle = data._storedColors
+    ? applyColorsToEdgeStyle(edge.style ?? {}, data._storedColors)
+    : edge.style
+
   return {
     id: edge.id as unknown as string,
     type: "link",
@@ -97,7 +104,7 @@ export const edgeToLink = (edge: Edge, nodes: Map<string, Node>): Link => {
     source: sourceFlat.nodeId,
     target: targetFlat.nodeId,
     label: edge.content ? { markdown: edge.content } : undefined,
-    style: canvasEdgeStyleToDim0Link(edge.style, {
+    style: canvasEdgeStyleToDim0Link(storedStyle, {
       angle: 0,
       groupIds,
       pathStyle: edge.pathStyle,

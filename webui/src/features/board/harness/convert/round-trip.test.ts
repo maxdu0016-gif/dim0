@@ -1,9 +1,10 @@
-import { describe, expect, it } from "vitest"
+import { afterEach, describe, expect, it } from "vitest"
 import type { Node } from "@canvas-harness/core"
 import { createDefaultNote } from "@/features/board/types/note"
 import type { Note } from "@/features/board/types/note"
 import { createDefaultLink } from "@/features/board/types/link"
 import type { NodeType } from "@/features/board/types/style"
+import { setBoardThemeMode } from "../theme/theme-mode-ref"
 import { edgeToLink } from "./edge-to-link"
 import { linkToEdge } from "./link-to-edge"
 import { dim0TypeToCanvas } from "./node-type"
@@ -405,5 +406,89 @@ describe("link ↔ edge round-trip", () => {
 
     const back = edgeToLink(edge, nodes)
     expect(back.style.groupIds).toEqual(["g-x", "g-y"])
+  })
+})
+
+
+describe("dark-mode color projection", () => {
+  // Theme mode is a module-level singleton. Reset to light after each
+  // case so unrelated suites don't see dark-adapted styles.
+  afterEach(() => {
+    setBoardThemeMode("light")
+  })
+
+  it("light mode keeps node.style colors identical to stored", () => {
+    setBoardThemeMode("light")
+    const note = createDefaultNote({ boardId: BOARD_ID, nodeType: "rectangle" })
+    note.style.backgroundColor = "#fde047" // tailwind yellow-300
+    note.style.strokeColor = "#1d4ed8"
+    note.style.textColor = "#0f172a"
+
+    const node = noteToNode(note)
+    expect(node.style?.backgroundColor).toBe("#fde047")
+    expect(node.style?.strokeColor).toBe("#1d4ed8")
+    expect(node.style?.textColor).toBe("#0f172a")
+  })
+
+  it("dark mode adapts node.style colors but stashes originals on data._storedColors", () => {
+    setBoardThemeMode("dark")
+    const note = createDefaultNote({ boardId: BOARD_ID, nodeType: "rectangle" })
+    note.style.backgroundColor = "#fde047"
+    note.style.strokeColor = "#1d4ed8"
+    note.style.textColor = "#0f172a"
+
+    const node = noteToNode(note)
+    // Displayed values diverge from stored.
+    expect(node.style?.backgroundColor).not.toBe("#fde047")
+    expect(node.style?.strokeColor).not.toBe("#1d4ed8")
+    // Stored values survive verbatim on data._storedColors.
+    const data = node.data as { _storedColors?: Record<string, string> }
+    expect(data._storedColors?.backgroundColor).toBe("#fde047")
+    expect(data._storedColors?.strokeColor).toBe("#1d4ed8")
+    expect(data._storedColors?.textColor).toBe("#0f172a")
+  })
+
+  it("nodeToNote reads stored colors regardless of mode (no dark colors round-tripped to server)", () => {
+    setBoardThemeMode("dark")
+    const note = createDefaultNote({ boardId: BOARD_ID, nodeType: "rectangle" })
+    note.style.backgroundColor = "#fde047"
+    note.style.strokeColor = "#1d4ed8"
+    note.style.textColor = "#0f172a"
+
+    const node = noteToNode(note)
+    const back = nodeToNote(node)
+    expect(back.style.backgroundColor).toBe("#fde047")
+    expect(back.style.strokeColor).toBe("#1d4ed8")
+    expect(back.style.textColor).toBe("#0f172a")
+  })
+
+  it("legacy nodes without data._storedColors save using node.style as-is", () => {
+    setBoardThemeMode("light")
+    const note = createDefaultNote({ boardId: BOARD_ID, nodeType: "rectangle" })
+    note.style.backgroundColor = "#fde047"
+    const node = noteToNode(note)
+    // Simulate a legacy in-memory node that pre-dates _storedColors.
+    const legacy = {
+      ...node,
+      data: { ...(node.data as object), _storedColors: undefined },
+    } as Node
+    const back = nodeToNote(legacy)
+    expect(back.style.backgroundColor).toBe("#fde047")
+  })
+
+  it("edges adapt stroke + text color in dark mode and round-trip the originals", () => {
+    setBoardThemeMode("dark")
+    const link = createDefaultLink(BOARD_ID, "a", "b")
+    link.style.strokeColor = "#a78bfa" // violet-400
+    link.style.textColor = "#f59e0b" // amber-500
+    const edge = linkToEdge(link, new Map())
+    expect(edge.style?.strokeColor).not.toBe("#a78bfa")
+    const data = edge.data as { _storedColors?: Record<string, string> }
+    expect(data._storedColors?.strokeColor).toBe("#a78bfa")
+    expect(data._storedColors?.textColor).toBe("#f59e0b")
+
+    const back = edgeToLink(edge, new Map())
+    expect(back.style.strokeColor).toBe("#a78bfa")
+    expect(back.style.textColor).toBe("#f59e0b")
   })
 })
