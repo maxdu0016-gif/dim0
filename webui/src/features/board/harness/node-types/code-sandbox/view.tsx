@@ -10,7 +10,11 @@ import {
 } from "@/features/board/components/flow/code-sandbox-utils"
 import "@/features/board/components/flow/code-sandbox-node.css"
 import type { NoteNodeData } from "../../convert/note-to-node"
-import { NodeTitleCaption, useStopCanvasGesture } from "../../shared-views"
+import {
+  NodeDragHandle,
+  NodeTitleCaption,
+  useStopCanvasGesture,
+} from "../../shared-views"
 import { useBoardAppStore } from "../../store/board-app-store"
 
 
@@ -77,6 +81,8 @@ export function CodeSandboxView({ id }: CodeSandboxViewProps) {
           />
         </div>
       </button>
+
+      <NodeDragHandle />
 
       <div className="pointer-events-auto absolute left-1/2 top-full z-20 mt-2 w-full -translate-x-1/2">
         <NodeTitleCaption

@@ -1,5 +1,7 @@
 export { NodeBreadcrumb } from "./NodeBreadcrumb"
 export type { BreadcrumbItem, NodeBreadcrumbProps } from "./NodeBreadcrumb"
+export { NodeDragHandle } from "./NodeDragHandle"
+export type { NodeDragHandleProps } from "./NodeDragHandle"
 export { NodeFooter } from "./NodeFooter"
 export type { NodeFooterProps, NodeFooterStatus } from "./NodeFooter"
 export { NodeHeader } from "./NodeHeader"

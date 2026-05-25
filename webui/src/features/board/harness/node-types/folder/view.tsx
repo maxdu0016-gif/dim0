@@ -1,4 +1,3 @@
-import { Icon } from "@iconify/react"
 import type { NodeId } from "@canvas-harness/core"
 import { useNode } from "@canvas-harness/react"
 import { cn } from "@/lib/utils"
@@ -12,14 +11,48 @@ export type FolderViewProps = {
 
 
 /**
- * React view for a folder node. Subscribes to its own node via
- * useNode(id) so content edits / position changes are live. The card
- * shows an iconify folder glyph; the editable label sits BELOW the
- * node card (absolute top-full) matching dim0's prod UX.
+ * Inline SVG silhouette that mirrors `drawFolderPlaceholder` — tab on
+ * top-left, rounded body below. Dimensions scale with the parent box;
+ * `preserveAspectRatio="none"` lets us reuse the same path for any
+ * node aspect ratio without recomputing geometry.
  *
- * Dbl-click → nested-board router navigation lands in a follow-up
- * (Phase 5 folder nav). For now the card is non-interactive on its
- * own — only the title responds to clicks.
+ * Using `currentColor` for stroke + `bg-card` for fill lets the
+ * silhouette adopt the active theme automatically.
+ */
+const FolderSilhouette = () => (
+  <svg
+    viewBox="0 0 200 140"
+    width="100%"
+    height="100%"
+    preserveAspectRatio="none"
+    className="text-muted-foreground/60"
+    aria-hidden="true"
+  >
+    {/* Tab — soft trapezoid on the top-left. */}
+    <path
+      d="M 7 0 L 65 0 L 75 25 L 0 25 L 0 7 Q 0 0 7 0 Z"
+      fill="hsl(var(--card))"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinejoin="round"
+    />
+    {/* Body — rounded rect below the tab. */}
+    <path
+      d="M 7 25 L 193 25 Q 200 25 200 32 L 200 133 Q 200 140 193 140 L 7 140 Q 0 140 0 133 L 0 25 Z"
+      fill="hsl(var(--card))"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinejoin="round"
+    />
+  </svg>
+)
+
+
+/**
+ * Folder React view — replaces the canvas placeholder at zoom ≥ 0.4.
+ * Renders the same tab+body silhouette via inline SVG so low- and
+ * high-zoom look identical (the canvas placeholder we ship matches
+ * this exact shape). Editable title sits below the card.
  */
 export function FolderView({ id }: FolderViewProps) {
   const node = useNode(id)
@@ -27,22 +60,14 @@ export function FolderView({ id }: FolderViewProps) {
 
   const data = (node.data ?? {}) as Partial<NoteNodeData>
   const label = data.label?.markdown
-  const emoji =
-    data.properties?.emoji?.type === "icon" && data.properties.emoji.icon?.type === "icon"
-      ? data.properties.emoji.icon.icon
-      : null
 
   return (
     <div
       className="pointer-events-none relative h-full w-full select-none"
       data-folder-label-edit-guard="true"
     >
-      <div className="flex h-full w-full flex-col items-center justify-center gap-2 p-2 text-foreground">
-        {emoji ? (
-          <Icon icon={emoji} className="size-12" />
-        ) : (
-          <Icon icon="lucide:folder" className="size-12 opacity-80" />
-        )}
+      <div className="absolute inset-0">
+        <FolderSilhouette />
       </div>
 
       <div

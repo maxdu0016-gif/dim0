@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils"
 import { WidgetIframe } from "@/features/board/components/flow/widget-iframe"
 import type { NoteNodeData } from "../../convert/note-to-node"
 import {
+  NodeDragHandle,
   NodeTitleCaption,
   useIsInView,
   useStopCanvasGesture,
@@ -82,6 +83,8 @@ export function WidgetView({ id }: WidgetViewProps) {
           <ArrowsOutSimpleIcon className="size-4" />
         </button>
       ) : null}
+
+      <NodeDragHandle />
 
       <div className="pointer-events-auto absolute left-1/2 top-full z-20 mt-2 w-full -translate-x-1/2">
         <NodeTitleCaption

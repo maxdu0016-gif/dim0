@@ -1,9 +1,15 @@
 import { useRef } from "react"
 import type { NodeId } from "@canvas-harness/core"
 import { useNode } from "@canvas-harness/react"
+import { MarkdownView } from "@/components/markdown/markdown-view"
 import { cn } from "@/lib/utils"
 import type { NoteNodeData } from "../../convert/note-to-node"
-import { NodeTitleCaption, useStopCanvasGesture } from "../../shared-views"
+import {
+  NodeDragHandle,
+  NodeTitleCaption,
+  useIsInView,
+  useStopCanvasGesture,
+} from "../../shared-views"
 import { useBoardAppStore } from "../../store/board-app-store"
 
 
@@ -12,42 +18,49 @@ export type SheetViewProps = {
 }
 
 
-const PREVIEW_LINES = 10
+/**
+ * Cap the body markdown handed to MarkdownView. Parse + layout cost
+ * grows linearly with content length, and the inline preview only
+ * needs to read as a rich snippet — full content opens in the modal
+ * editor surface. Trailing ellipsis hints at "more below".
+ */
+const PREVIEW_CHAR_LIMIT = 800
 
 
-// Strip cheap markdown noise so the inline preview reads as plain
-// text. Full markdown rendering lives in the modal editor surface.
-const stripMarkdown = (md: string): string =>
-  md
-    .replace(/^#{1,6}\s+/gm, "")
-    .replace(/[*_`>~]/g, "")
-    .replace(/\[(.+?)\]\(.+?\)/g, "$1")
-    .trim()
+const truncate = (body: string): string =>
+  body.length <= PREVIEW_CHAR_LIMIT ? body : `${body.slice(0, PREVIEW_CHAR_LIMIT)}…`
 
 
 /**
- * Sheet inline view — sticky-note style card. The whole body is the
- * click target (opens the editor surface). Editable title sits below.
- * Pan/zoom suspension is handled by the canvas placeholder
- * (drawSheetPlaceholder) — this component only mounts at idle.
+ * Sheet inline view — sticky-note style card. Whole body is the click
+ * target (opens the editor surface). Editable title sits below.
+ *
+ * Preview content renders only when the card intersects the viewport
+ * (`useIsInView`) to avoid spinning markdown parse / KaTeX / Shiki
+ * cost on every off-screen sheet at high zoom. LOD-zoom gating from
+ * the lib already suppresses the React view entirely below ~0.4 zoom.
  */
 export function SheetView({ id }: SheetViewProps) {
   const node = useNode(id)
   const openNodeSurface = useBoardAppStore((s) => s.openNodeSurface)
   const canEdit = useBoardAppStore((s) => s.canEdit)
   const bodyRef = useRef<HTMLButtonElement>(null)
+  const wrapRef = useRef<HTMLDivElement>(null)
   useStopCanvasGesture(bodyRef)
+  // 200px margin so a pan barely off-screen doesn't blink the preview
+  // out — matches the widget view's threshold.
+  const isInView = useIsInView(wrapRef, "200px")
   if (!node) return null
 
   const data = (node.data ?? {}) as Partial<NoteNodeData>
   const label = data.label?.markdown
   const body = node.content?.trim() ?? ""
-  const preview = body
-    ? stripMarkdown(body).split("\n").slice(0, PREVIEW_LINES).join("\n")
-    : ""
 
   return (
-    <div className="pointer-events-none relative h-full w-full select-none">
+    <div
+      ref={wrapRef}
+      className="pointer-events-none relative h-full w-full select-none"
+    >
       <button
         ref={bodyRef}
         type="button"
@@ -65,13 +78,23 @@ export function SheetView({ id }: SheetViewProps) {
         title={canEdit ? "Open sheet" : undefined}
       >
         <div className="scrollbar-thin min-h-0 flex-1 overflow-hidden px-4 py-3 text-sm leading-relaxed text-foreground">
-          {preview ? (
-            <p className="whitespace-pre-wrap">{preview}</p>
+          {body && isInView ? (
+            // pointer-events-none so links / images inside the preview
+            // don't intercept the card's click → surface-open handler.
+            <div className="pointer-events-none">
+              <MarkdownView content={truncate(body)} />
+            </div>
+          ) : body ? (
+            // In-bounds-but-clipped state: nothing rendered, keeps the
+            // card silhouette visible without re-parsing markdown.
+            null
           ) : (
             <span className="italic text-muted-foreground">Empty sheet</span>
           )}
         </div>
       </button>
+
+      <NodeDragHandle />
 
       <div className="pointer-events-auto absolute left-1/2 top-full z-20 mt-2 w-full -translate-x-1/2">
         <NodeTitleCaption
