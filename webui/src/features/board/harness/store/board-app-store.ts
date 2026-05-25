@@ -19,7 +19,11 @@ export type NodeSurfaceKind = "sheet" | "code-sandbox" | "widget"
  * store so the keyboard handler (which doesn't sit inside the toolbar)
  * can toggle them via hotkeys (S → shapes menu, G → icons, I → images).
  */
-export type ChromeDialog = "shape-menu" | "icon-search" | "image-search"
+export type ChromeDialog =
+  | "shape-menu"
+  | "icon-search"
+  | "image-search"
+  | "document-upload"
 
 
 /**

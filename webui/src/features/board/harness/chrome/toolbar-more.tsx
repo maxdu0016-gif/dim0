@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
 import { useBoardAppStore } from "../store/board-app-store"
+import { DocumentUploadDialog } from "./document-upload-dialog"
 import { IconSearchDialog } from "./icon-search-dialog"
 import { ImageSearchDialog } from "./image-search-dialog"
 
@@ -44,6 +45,7 @@ export function HarnessToolbarMore() {
 
   const openImageSearch = chromeDialog === "image-search"
   const openIconSearch = chromeDialog === "icon-search"
+  const openDocumentUpload = chromeDialog === "document-upload"
 
   return (
     <>
@@ -91,7 +93,10 @@ export function HarnessToolbarMore() {
             <FolderPlusActionIcon className="size-4 shrink-0" />
             <span>Sub-board</span>
           </DropdownMenuItem>
-          <DropdownMenuItem disabled className="gap-2 text-sm opacity-60">
+          <DropdownMenuItem
+            onSelect={() => setChromeDialog("document-upload")}
+            className="gap-2 text-sm"
+          >
             <DocumentFileIcon className="size-4 shrink-0" />
             <span>Document</span>
           </DropdownMenuItem>
@@ -120,6 +125,10 @@ export function HarnessToolbarMore() {
       <IconSearchDialog
         open={openIconSearch}
         onOpenChange={(open) => setChromeDialog(open ? "icon-search" : null)}
+      />
+      <DocumentUploadDialog
+        open={openDocumentUpload}
+        onOpenChange={(open) => setChromeDialog(open ? "document-upload" : null)}
       />
     </>
   )

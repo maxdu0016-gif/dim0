@@ -77,19 +77,30 @@ export const WidgetIframe = memo(function WidgetIframe({
   // iframe lives inside a CSS-`transform`-ed ancestor (canvas-harness
   // applies a camera transform on the overlay div). Blob URLs are
   // regular navigable URLs, so the iframe loads them reliably in any
-  // layout context. Cleanup revokes the previous URL on srcDoc change.
-  const srcUrl = useMemo(
-    () => URL.createObjectURL(new Blob([srcDoc], { type: "text/html;charset=utf-8" })),
-    [srcDoc],
-  )
-  useEffect(() => () => URL.revokeObjectURL(srcUrl), [srcUrl])
+  // layout context.
+  //
+  // Create + revoke MUST live in the same effect lifecycle. If we
+  // created via useMemo and revoked via a separate effect cleanup,
+  // React StrictMode's fake unmount/remount cycle would revoke the
+  // URL right after the iframe started fetching it, surfacing
+  // "Not allowed to load local resource: blob:…" in Chromium. Putting
+  // the create inside the effect means each setup pair includes a
+  // fresh URL the iframe can navigate to.
+  const [srcUrl, setSrcUrl] = useState<string | null>(null)
+  useEffect(() => {
+    const url = URL.createObjectURL(
+      new Blob([srcDoc], { type: "text/html;charset=utf-8" }),
+    )
+    setSrcUrl(url)
+    return () => URL.revokeObjectURL(url)
+  }, [srcDoc])
 
   return (
     <iframe
       key={resolvedTheme}
       ref={iframeRef}
       title={title}
-      src={srcUrl}
+      src={srcUrl ?? "about:blank"}
       sandbox="allow-scripts"
       referrerPolicy="no-referrer"
       className={className}

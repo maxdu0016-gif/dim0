@@ -44,7 +44,7 @@ export function SheetView({ id }: SheetViewProps) {
   const node = useNode(id)
   const openNodeSurface = useBoardAppStore((s) => s.openNodeSurface)
   const canEdit = useBoardAppStore((s) => s.canEdit)
-  const bodyRef = useRef<HTMLButtonElement>(null)
+  const bodyRef = useRef<HTMLDivElement>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
   useStopCanvasGesture(bodyRef)
   // 200px margin so a pan barely off-screen doesn't blink the preview
@@ -61,13 +61,28 @@ export function SheetView({ id }: SheetViewProps) {
       ref={wrapRef}
       className="pointer-events-none relative h-full w-full select-none"
     >
-      <button
+      {/*
+        Not a <button> — MarkdownView renders Streamdown code blocks
+        with their own button children (download, copy), and nested
+        <button> is invalid HTML / hydration error. role="button" +
+        keyboard handlers keep the same UX without the constraint.
+      */}
+      <div
         ref={bodyRef}
-        type="button"
+        role={canEdit ? "button" : undefined}
+        tabIndex={canEdit ? 0 : undefined}
         onClick={(e) => {
           e.stopPropagation()
           if (!canEdit) return
           openNodeSurface(id as unknown as string, "sheet")
+        }}
+        onKeyDown={(e) => {
+          if (!canEdit) return
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault()
+            e.stopPropagation()
+            openNodeSurface(id as unknown as string, "sheet")
+          }
         }}
         onDoubleClick={(e) => e.stopPropagation()}
         className={cn(
@@ -92,7 +107,7 @@ export function SheetView({ id }: SheetViewProps) {
             <span className="italic text-muted-foreground">Empty sheet</span>
           )}
         </div>
-      </button>
+      </div>
 
       <NodeDragHandle />
 
