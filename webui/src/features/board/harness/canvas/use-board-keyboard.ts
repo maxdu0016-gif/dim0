@@ -27,7 +27,6 @@ const TOOL_SHORTCUTS: Record<string, string> = {
   r: "rect",
   o: "ellipse",
   d: "diamond",
-  f: "frame",
   y: "code-sandbox",
 }
 
@@ -43,9 +42,9 @@ const TOOL_SHORTCUTS: Record<string, string> = {
  *  - T                            → text tool
  *  - N                            → sheet tool
  *  - R / O / D                    → rect / ellipse / diamond tool
- *  - F                            → frame tool
  *  - Y                            → code-sandbox tool
  *  - S                            → open Shapes menu
+ *  - M                            → toggle Slides panel
  *  - G                            → open Icons search dialog
  *  - I                            → open Images search dialog
  *
@@ -96,6 +95,11 @@ export const useBoardKeyboard = (store: CanvasStore): void => {
       if (key === "i") {
         e.preventDefault()
         app.setChromeDialog("image-search")
+        return
+      }
+      if (key === "m") {
+        e.preventDefault()
+        app.setSlidesPanelOpen(!app.slidesPanelOpen)
       }
     }
 

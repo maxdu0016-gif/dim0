@@ -74,6 +74,13 @@ export type BoardAppState = {
   // UI toggles.
   viewSlides: boolean
   presentationMode: boolean
+  /** Right-side slides Sheet visibility. */
+  slidesPanelOpen: boolean
+  /**
+   * Frame id currently focused by the slides panel / present mode.
+   * Mirrors prod's `activeSlideId`. `null` when no slide is active.
+   */
+  activeSlideId: string | null
 
   // Folder navigation (per-board depth, reset on scope change).
   currentFolderDepth: number
@@ -104,6 +111,8 @@ export type BoardAppActions = {
 
   setViewSlides: (enabled: boolean) => void
   setPresentationMode: (enabled: boolean) => void
+  setSlidesPanelOpen: (open: boolean) => void
+  setActiveSlideId: (id: string | null) => void
 
   setCurrentFolderDepth: (depth: number) => void
   setMaxFolderDepth: (depth: number) => void
@@ -128,6 +137,8 @@ const initialState: BoardAppState = {
   tool: "select",
   viewSlides: true,
   presentationMode: false,
+  slidesPanelOpen: false,
+  activeSlideId: null,
   currentFolderDepth: -1,
   maxFolderDepth: 0,
   boardBackground: null,
@@ -152,6 +163,8 @@ export const useBoardAppStore = create<BoardAppState & BoardAppActions>((set, ge
       currentFolderDepth: -1,
       maxFolderDepth: 0,
       presentationMode: false,
+      slidesPanelOpen: false,
+      activeSlideId: null,
       activeNodeSurface: null,
       chromeDialog: null,
       boardBackground: boardId ? getBoardBackground(boardId) : null,
@@ -167,6 +180,8 @@ export const useBoardAppStore = create<BoardAppState & BoardAppActions>((set, ge
 
   setViewSlides: (enabled) => set({ viewSlides: enabled }),
   setPresentationMode: (enabled) => set({ presentationMode: enabled }),
+  setSlidesPanelOpen: (open) => set({ slidesPanelOpen: open }),
+  setActiveSlideId: (id) => set({ activeSlideId: id }),
 
   setCurrentFolderDepth: (depth) => set({ currentFolderDepth: Math.max(-1, Math.floor(depth)) }),
   setMaxFolderDepth: (depth) => set({ maxFolderDepth: Math.max(0, Math.floor(depth)) }),

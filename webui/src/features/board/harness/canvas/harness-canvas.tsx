@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useNavigate } from "@tanstack/react-router"
 import { useQueryClient } from "@tanstack/react-query"
-import { hitTestAny, type CanvasStore } from "@canvas-harness/core"
+import { hitTestAny, type CanvasStore, type Renderer } from "@canvas-harness/core"
 import { setAgentBridge } from "../agent/agent-bridge"
 import { applyLinkOutput, applyNoteOutput } from "../agent/apply-tool-output"
 import { useHarnessApplyMindMap } from "../agent/use-harness-apply-mindmap"
@@ -14,11 +14,19 @@ import {
   type CanvasPointerEvent,
 } from "@canvas-harness/react"
 import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet"
+import {
   CanvasContextMenu,
   HarnessSaveStatus,
   HarnessToolbar,
   HarnessViewportControls,
   NodeSurfaceHost,
+  PresentationControls,
+  SlidesPanel,
   StyleSidebar,
 } from "../chrome"
 import { boardNodeTypes, useRenderCustomNodeView } from "../node-types"
@@ -33,6 +41,7 @@ import { useCenterFromUrl } from "./use-center-from-url"
 import { useCreateHandlers } from "./use-create-handlers"
 import { useHarnessDropFiles } from "./use-drop-files"
 import { useHydrateIconNodes } from "./use-hydrate-icon-nodes"
+import { usePresentationMode } from "./use-presentation-mode"
 import { useStampNewEdges } from "./use-stamp-new-edges"
 import { useStyleMemory } from "./use-style-memory"
 import { useThumbnailCapture } from "./use-thumbnail-capture"
@@ -75,6 +84,10 @@ export function HarnessCanvas() {
   const [ready, setReady] = useState(false)
   const saveStatus = useBoardDebouncedSave(store, boardId, ready)
   const wrapRef = useRef<HTMLDivElement>(null)
+  // Captured via `<Canvas onRenderer>`; presentation mode toggles
+  // `setHideFrames` on this so slide chrome (border + label) drops out
+  // and only the contents show.
+  const rendererRef = useRef<Renderer | null>(null)
   const queryClient = useQueryClient()
 
   // Bridge for the agent's post-stream apply block (lives outside this
@@ -110,6 +123,7 @@ export function HarnessCanvas() {
   useHydrateIconNodes(store, boardId, rootId, ready)
   useThemeColorProjection(store, ready)
   useThumbnailCapture(store, boardId, ready, theme.minimap)
+  usePresentationMode(store, wrapRef, rendererRef)
 
   const styleMemory = useStyleMemory(store)
   const { handleCreateDrag, handleClick } = useCreateHandlers(store, boardId, rootId, styleMemory)
@@ -202,6 +216,9 @@ export function HarnessCanvas() {
             onCreateDrag={handleCreateDrag}
             onClick={handleClick}
             onDoubleClick={handleDoubleClick}
+            onRenderer={(r) => {
+              rendererRef.current = r
+            }}
           />
           <CanvasContextMenu wrapRef={wrapRef} store={store} />
         </div>
@@ -229,6 +246,7 @@ type InnerProps = {
   onCreateDrag: ReturnType<typeof useCreateHandlers>["handleCreateDrag"]
   onClick: ReturnType<typeof useCreateHandlers>["handleClick"]
   onDoubleClick: (e: CanvasPointerEvent) => void
+  onRenderer: (r: Renderer) => void
 }
 
 
@@ -240,6 +258,7 @@ function HarnessCanvasInner({
   onCreateDrag,
   onClick,
   onDoubleClick,
+  onRenderer,
 }: InnerProps) {
   const renderView = useRenderCustomNodeView()
   return (
@@ -254,12 +273,15 @@ function HarnessCanvasInner({
         onCreateDrag={onCreateDrag}
         onClick={onClick}
         onDoubleClick={onDoubleClick}
+        onRenderer={onRenderer}
       />
       <HarnessToolbar />
       <HarnessViewportControls />
       <StyleSidebar />
       <HarnessSaveStatus status={saveStatus} />
       <NodeSurfaceHost />
+      <SlidesSheet />
+      <PresentationOverlay />
       <Minimap
         width={200}
         height={140}
@@ -278,4 +300,39 @@ function HarnessCanvasInner({
       />
     </>
   )
+}
+
+
+/**
+ * Right-side Sheet hosting the slides panel. Open state lives on the
+ * app store so the toolbar button + keyboard shortcut can toggle it.
+ * `modal={false}` + no overlay keeps the canvas interactive while the
+ * panel is up (you can still pan / pick a slide on the canvas).
+ */
+function SlidesSheet() {
+  const open = useBoardAppStore((s) => s.slidesPanelOpen)
+  const setOpen = useBoardAppStore((s) => s.setSlidesPanelOpen)
+  return (
+    <Sheet open={open} onOpenChange={setOpen} modal={false}>
+      <SheetContent
+        side="right"
+        showOverlay={false}
+        showClose={false}
+        className="w-[360px] max-w-[92vw] border-l border-border bg-sidebar p-0 text-sidebar-foreground"
+      >
+        <SheetHeader className="sr-only">
+          <SheetTitle>Slides</SheetTitle>
+        </SheetHeader>
+        <SlidesPanel />
+      </SheetContent>
+    </Sheet>
+  )
+}
+
+
+/** Floating bottom-center controls, only mounted while presenting. */
+function PresentationOverlay() {
+  const presenting = useBoardAppStore((s) => s.presentationMode)
+  if (!presenting) return null
+  return <PresentationControls />
 }

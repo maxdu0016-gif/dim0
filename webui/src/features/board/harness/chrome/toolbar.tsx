@@ -1,4 +1,3 @@
-import { FrameCorners } from "@phosphor-icons/react"
 import {
   ChevronDownIcon,
   CircleClusterIcon,
@@ -10,6 +9,7 @@ import {
   HandPanIcon,
   LayerStackIcon,
   NotepadIcon,
+  PresentationIcon,
   ShapesMenuIcon,
   SquareShapeIcon,
   TagIcon,
@@ -92,6 +92,8 @@ export function HarnessToolbar() {
   const setTool = useBoardAppStore((s) => s.setTool)
   const chromeDialog = useBoardAppStore((s) => s.chromeDialog)
   const setChromeDialog = useBoardAppStore((s) => s.setChromeDialog)
+  const slidesPanelOpen = useBoardAppStore((s) => s.slidesPanelOpen)
+  const setSlidesPanelOpen = useBoardAppStore((s) => s.setSlidesPanelOpen)
 
   const isPan = tool === "pan"
   const isSelect = tool === "select"
@@ -235,24 +237,6 @@ export function HarnessToolbar() {
         <TooltipTrigger asChild>
           <button
             type="button"
-            onClick={() => setTool("frame")}
-            aria-label="Frame"
-            aria-pressed={tool === "frame"}
-            className={tool === "frame" ? activeClass : inactiveClass}
-          >
-            <div className="relative">
-              <FrameCorners className="size-4 shrink-0" weight={tool === "frame" ? "fill" : "regular"} />
-              <ShortcutHint shortcut="F" />
-            </div>
-          </button>
-        </TooltipTrigger>
-        <TooltipContent side="bottom" sideOffset={10}>Frame</TooltipContent>
-      </Tooltip>
-
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <button
-            type="button"
             onClick={() => setTool("sheet")}
             aria-label="Note"
             aria-pressed={tool === "sheet"}
@@ -265,6 +249,29 @@ export function HarnessToolbar() {
           </button>
         </TooltipTrigger>
         <TooltipContent side="bottom" sideOffset={10}>Note</TooltipContent>
+      </Tooltip>
+
+      <Separator orientation="vertical" className="hidden md:!h-6 md:block" />
+
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            onClick={() => setSlidesPanelOpen(!slidesPanelOpen)}
+            aria-label="Slides"
+            aria-pressed={slidesPanelOpen}
+            className={slidesPanelOpen ? activeClass : inactiveClass}
+          >
+            <div className="relative">
+              <PresentationIcon
+                className="size-4 shrink-0"
+                weight={slidesPanelOpen ? "fill" : undefined}
+              />
+              <ShortcutHint shortcut="M" />
+            </div>
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="bottom" sideOffset={10}>Slides</TooltipContent>
       </Tooltip>
 
       <Separator orientation="vertical" className="hidden md:!h-6 md:block" />
