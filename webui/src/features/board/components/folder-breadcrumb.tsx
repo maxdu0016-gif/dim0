@@ -1,8 +1,8 @@
-import { Button } from "@/components/ui/button"
-import { useNavigate } from "@tanstack/react-router"
 import { useEffect, useMemo } from "react"
-import { useGetNotePath } from "../../api/get-note-path"
-import { useGraphStore } from "../../store/graph-store"
+import { useNavigate } from "@tanstack/react-router"
+import { Button } from "@/components/ui/button"
+import { useGetNotePath } from "../api/get-note-path"
+import { useBoardAppStore } from "../harness/store/board-app-store"
 
 
 const normalizeLabel = (markdown?: string) => {
@@ -11,6 +11,15 @@ const normalizeLabel = (markdown?: string) => {
 }
 
 
+/**
+ * Folder path breadcrumb for the sidebar header. Reads the parent
+ * chain via `useGetNotePath` and renders one button per ancestor;
+ * clicking jumps the board to that folder by setting `root_id`.
+ *
+ * Side-effect: keeps `currentFolderDepth` on the board-app-store in
+ * sync with the URL so other chrome (e.g. toolbar "Sub-board" entry)
+ * can gate UX on depth.
+ */
 export function FolderBreadcrumb({
   boardId,
   rootId,
@@ -23,13 +32,12 @@ export function FolderBreadcrumb({
   boardLabel?: string
 }) {
   const navigate = useNavigate()
-  const setCurrentFolderDepth = useGraphStore(state => state.setCurrentFolderDepth)
-  const setFolderDepthFromPathLength = useGraphStore(state => state.setFolderDepthFromPathLength)
+  const setCurrentFolderDepth = useBoardAppStore((s) => s.setCurrentFolderDepth)
   const { data: path = [] } = useGetNotePath({ boardId, noteId: rootId, enabled: !!rootId })
 
   const crumbs = useMemo(
     () =>
-      path.map(note => ({
+      path.map((note) => ({
         id: note.id,
         label: normalizeLabel(note.label?.markdown),
       })),
@@ -37,23 +45,19 @@ export function FolderBreadcrumb({
   )
 
   useEffect(() => {
-    if (!rootId) {
-      setCurrentFolderDepth(-1)
-      return
-    }
-    setFolderDepthFromPathLength(path.length)
-  }, [path.length, rootId, setCurrentFolderDepth, setFolderDepthFromPathLength])
+    setCurrentFolderDepth(rootId ? path.length - 1 : -1)
+  }, [path.length, rootId, setCurrentFolderDepth])
 
   if (!boardId || !rootId) return null
 
   if (inline) {
     return (
-      <div className="max-w-[60vw] flex items-center gap-1 overflow-x-auto min-w-0">
+      <div className="flex min-w-0 max-w-[60vw] items-center gap-1 overflow-x-auto">
         {boardLabel ? (
           <Button
             variant="ghost"
             size="sm"
-            className="h-auto px-0 text-sm font-normal max-w-[200px] truncate hover:underline"
+            className="h-auto max-w-[200px] truncate px-0 text-sm font-normal hover:underline"
             title={boardLabel}
             onClick={() =>
               navigate({
@@ -71,7 +75,7 @@ export function FolderBreadcrumb({
           </Button>
         ) : (
           <>
-            <span className="text-muted-foreground text-sm">/</span>
+            <span className="text-sm text-muted-foreground">/</span>
             <Button
               variant="ghost"
               size="sm"
@@ -97,12 +101,12 @@ export function FolderBreadcrumb({
           const isLast = index === crumbs.length - 1
           const crumbLabel = isLast ? crumb.label : "..."
           return (
-            <div key={crumb.id} className="flex items-center gap-1 min-w-0">
-              <span className="text-muted-foreground text-sm">/</span>
+            <div key={crumb.id} className="flex min-w-0 items-center gap-1">
+              <span className="text-sm text-muted-foreground">/</span>
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-auto px-0 text-sm font-normal max-w-[180px] truncate hover:underline"
+                className="h-auto max-w-[180px] truncate px-0 text-sm font-normal hover:underline"
                 disabled={isLast}
                 onClick={() =>
                   navigate({
@@ -125,7 +129,7 @@ export function FolderBreadcrumb({
   }
 
   return (
-    <div className="max-w-[60vw] rounded-lg border border-border bg-sidebar/90 backdrop-blur px-2 py-1.5 flex items-center gap-1 overflow-x-auto">
+    <div className="flex max-w-[60vw] items-center gap-1 overflow-x-auto rounded-lg border border-border bg-sidebar/90 px-2 py-1.5 backdrop-blur">
       <Button
         variant="ghost"
         size="sm"
@@ -150,11 +154,11 @@ export function FolderBreadcrumb({
         const crumbLabel = isLast ? crumb.label : "..."
         return (
           <div key={crumb.id} className="flex items-center gap-1">
-            <span className="text-muted-foreground text-xs">/</span>
+            <span className="text-xs text-muted-foreground">/</span>
             <Button
               variant="ghost"
               size="sm"
-              className="h-6 px-2 text-xs max-w-[180px] truncate"
+              className="h-6 max-w-[180px] truncate px-2 text-xs"
               disabled={isLast}
               onClick={() =>
                 navigate({

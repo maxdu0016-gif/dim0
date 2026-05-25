@@ -87,6 +87,8 @@ export type BoardAppState = {
   presentationMode: boolean
   /** Right-side slides Sheet visibility. */
   slidesPanelOpen: boolean
+  /** Full chat surface (CopilotSheet) visibility. */
+  chatSheetOpen: boolean
   /**
    * Frame id currently focused by the slides panel / present mode.
    * Mirrors prod's `activeSlideId`. `null` when no slide is active.
@@ -125,6 +127,7 @@ export type BoardAppActions = {
   setPresentationMode: (enabled: boolean) => void
   setSlidesPanelOpen: (open: boolean) => void
   setActiveSlideId: (id: string | null) => void
+  setChatSheetOpen: (open: boolean) => void
 
   setCurrentFolderDepth: (depth: number) => void
   setMaxFolderDepth: (depth: number) => void
@@ -152,6 +155,7 @@ const initialState: BoardAppState = {
   presentationMode: false,
   slidesPanelOpen: false,
   activeSlideId: null,
+  chatSheetOpen: false,
   currentFolderDepth: -1,
   maxFolderDepth: 0,
   boardBackground: null,
@@ -179,6 +183,7 @@ export const useBoardAppStore = create<BoardAppState & BoardAppActions>((set, ge
       presentationMode: false,
       slidesPanelOpen: false,
       activeSlideId: null,
+      chatSheetOpen: false,
       activeNodeSurface: null,
       chromeDialog: null,
       boardBackground: boardId ? getBoardBackground(boardId) : null,
@@ -197,6 +202,7 @@ export const useBoardAppStore = create<BoardAppState & BoardAppActions>((set, ge
   setPresentationMode: (enabled) => set({ presentationMode: enabled }),
   setSlidesPanelOpen: (open) => set({ slidesPanelOpen: open }),
   setActiveSlideId: (id) => set({ activeSlideId: id }),
+  setChatSheetOpen: (open) => set({ chatSheetOpen: open }),
 
   setCurrentFolderDepth: (depth) => set({ currentFolderDepth: Math.max(-1, Math.floor(depth)) }),
   setMaxFolderDepth: (depth) => set({ maxFolderDepth: Math.max(0, Math.floor(depth)) }),
