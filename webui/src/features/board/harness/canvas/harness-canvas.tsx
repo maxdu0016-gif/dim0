@@ -35,6 +35,7 @@ import { useHarnessDropFiles } from "./use-drop-files"
 import { useHydrateIconNodes } from "./use-hydrate-icon-nodes"
 import { useStampNewEdges } from "./use-stamp-new-edges"
 import { useStyleMemory } from "./use-style-memory"
+import { useThumbnailCapture } from "./use-thumbnail-capture"
 import { useViewportPersistence } from "./use-viewport-persistence"
 import { HarnessWrapRefProvider } from "./wrap-ref-context"
 
@@ -108,6 +109,7 @@ export function HarnessCanvas() {
   useHarnessApplyMindMap(store, boardId, rootId)
   useHydrateIconNodes(store, boardId, rootId, ready)
   useThemeColorProjection(store, ready)
+  useThumbnailCapture(store, boardId, ready, theme.minimap)
 
   const styleMemory = useStyleMemory(store)
   const { handleCreateDrag, handleClick } = useCreateHandlers(store, boardId, rootId, styleMemory)
