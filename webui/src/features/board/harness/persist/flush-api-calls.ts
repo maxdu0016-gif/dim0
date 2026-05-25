@@ -4,7 +4,29 @@ import { removeLink } from "@/features/board/api/remove-link"
 import { removeNote } from "@/features/board/api/remove-note"
 import { updateLink } from "@/features/board/api/update-link"
 import { updateNote } from "@/features/board/api/update-note"
+import type { Note } from "@/features/board/types/note"
 import type { ApiCall } from "./diff-snapshots"
+
+
+/**
+ * Drop fields that are either in the URL (`id`) or backend-managed
+ * (`graphUid`, `createdAt`) before PATCHing. We keep the real `type`
+ * — backend `patch_note` now validates merged payloads against the
+ * matching pydantic model (Note or Document) based on the existing
+ * row's discriminator, so documents round-trip their type correctly.
+ */
+const patchableNote = (note: Note): Partial<Note> => {
+  const {
+    id: _id,
+    graphUid: _graphUid,
+    createdAt: _createdAt,
+    ...rest
+  } = note
+  void _id
+  void _graphUid
+  void _createdAt
+  return rest
+}
 
 
 /**
@@ -56,7 +78,9 @@ export const flushApiCalls = async (calls: ApiCall[], boardId: string): Promise<
 
   await Promise.all(
     updateNotes.map((c) =>
-      c.kind === "updateNote" ? updateNote(boardId, c.note.id, c.note) : Promise.resolve(),
+      c.kind === "updateNote"
+        ? updateNote(boardId, c.note.id, patchableNote(c.note))
+        : Promise.resolve(),
     ),
   )
   await Promise.all(
