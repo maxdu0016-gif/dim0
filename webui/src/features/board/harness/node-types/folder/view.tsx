@@ -31,7 +31,7 @@ const FolderSilhouette = () => (
     {/* Tab — soft trapezoid on the top-left. */}
     <path
       d="M 7 0 L 65 0 L 75 25 L 0 25 L 0 7 Q 0 0 7 0 Z"
-      fill="hsl(var(--card))"
+      fill="var(--card)"
       stroke="currentColor"
       strokeWidth="1.5"
       strokeLinejoin="round"
@@ -39,7 +39,7 @@ const FolderSilhouette = () => (
     {/* Body — rounded rect below the tab. */}
     <path
       d="M 7 25 L 193 25 Q 200 25 200 32 L 200 133 Q 200 140 193 140 L 7 140 Q 0 140 0 133 L 0 25 Z"
-      fill="hsl(var(--card))"
+      fill="var(--card)"
       stroke="currentColor"
       strokeWidth="1.5"
       strokeLinejoin="round"

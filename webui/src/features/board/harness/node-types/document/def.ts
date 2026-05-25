@@ -13,6 +13,6 @@ export const documentDef = defineNode({
   type: "document",
   view: DocumentView,
   drawPlaceholder: drawDocumentPlaceholder,
-  lod: { minZoomForReact: 0.4, minZoomForPlaceholder: 0.15 },
+  lod: { minZoomForReact: 0.4, minZoomForPlaceholder: 0.05 },
   hitTest: (node, p) => p.x >= 0 && p.x <= node.w && p.y >= 0 && p.y <= node.h,
 })
