@@ -357,8 +357,16 @@ function HarnessCanvasInner({
         mounted everywhere so the modal editor opens from any view.
       */}
       <HarnessToolbar />
-      <HarnessSaveStatus status={saveStatus} />
-      <ShareButton />
+      {/*
+        Top-right chrome row: save status + share button live in one
+        flex container so they never overlap (z-stack collisions cost
+        us once already). Each child decides whether to render itself
+        — the container is invisible when empty.
+      */}
+      <div className="absolute right-3 top-3 z-50 flex items-center gap-2">
+        <HarnessSaveStatus status={saveStatus} />
+        <ShareButton />
+      </div>
       <ReadonlyBanner />
       <NodeSurfaceHost />
       <SlidesSheet />

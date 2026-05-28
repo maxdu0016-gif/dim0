@@ -6,9 +6,12 @@ import { ShareDialog } from "./share-dialog"
 
 
 /**
- * Floating "Share" button that mounts in the top-right of the canvas.
- * Visible only when the signed-in user's role on the current board
- * is `"owner"` — non-owner editors and viewers shouldn't see it.
+ * "Share" button shown next to the save-status pill at the canvas
+ * top-right. Visible only when the signed-in user's role on the
+ * current board is `"owner"` — non-owner editors and viewers don't see it.
+ *
+ * Layout is owned by the host (`harness-canvas.tsx`) which places this
+ * inside a flex container alongside `<HarnessSaveStatus>`.
  */
 export function ShareButton() {
   const boardId = useBoardAppStore((s) => s.boardId)
@@ -23,16 +26,14 @@ export function ShareButton() {
 
   return (
     <>
-      <div className="absolute right-3 top-3 z-40">
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={() => setOpen(true)}
-          aria-label="Share this board"
-        >
-          Share
-        </Button>
-      </div>
+      <Button
+        variant="secondary"
+        size="sm"
+        onClick={() => setOpen(true)}
+        aria-label="Share this board"
+      >
+        Share
+      </Button>
       <ShareDialog
         boardId={boardId}
         boardLabel={boardLabel}
