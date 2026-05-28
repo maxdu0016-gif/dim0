@@ -64,6 +64,31 @@ export function RootLayout() {
     initConnectionState()
   }, [])
 
+  // When the user finishes sign-in after clicking a share link, route
+  // them back to /share/<token> automatically so they don't have to
+  // dig the URL out of their email/chat a second time. Only fires
+  // once a successful sign-in transition has been observed (isAuthed
+  // flips from false to true).
+  useEffect(() => {
+    if (!isAuthed) return
+    let token: string | null = null
+    try {
+      token = sessionStorage.getItem("dim0:pendingShareToken")
+    } catch {
+      token = null
+    }
+    if (!token) return
+    try {
+      sessionStorage.removeItem("dim0:pendingShareToken")
+    } catch {
+      // ignore
+    }
+    // Skip if we're already on the share landing — avoids a no-op
+    // loop and lets the share screen's own consume logic run.
+    if (location.pathname.startsWith("/share/")) return
+    navigate({ to: "/share/$token", params: { token } })
+  }, [isAuthed, location.pathname, navigate])
+
   return (
     <ThemeProvider>
       <StyleDefaultsProvider>
