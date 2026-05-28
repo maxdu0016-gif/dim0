@@ -12,6 +12,8 @@ import { clearTokens } from '@/features/signin/auth-storage'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useBoardAppStore } from '@/features/board/harness/store/board-app-store'
 import { useAuth } from '@/features/signin/hooks/auth'
+import { initConnectionState } from '@/features/connection/connection-state'
+import { OfflineOverlay } from '@/features/connection/offline-overlay'
 
 export function RootLayout() {
   // only hydrates store from token; does not navigate
@@ -58,9 +60,14 @@ export function RootLayout() {
     }
   }, [presentationMode])
 
+  useEffect(() => {
+    initConnectionState()
+  }, [])
+
   return (
     <ThemeProvider>
       <StyleDefaultsProvider>
+        <OfflineOverlay />
         <main>
           {showShell ? (
             <SidebarProvider open={effectiveSidebarOpen} onOpenChange={setSidebarOpen}>

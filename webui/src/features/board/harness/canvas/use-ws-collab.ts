@@ -10,6 +10,7 @@ import {
 } from "@canvas-harness/core"
 import { mintCollabTicket } from "@/features/board/api/collab-ticket"
 import { API_URL } from "@/config/api"
+import { notifyWsClose } from "@/features/connection/connection-state"
 import { useAppStore } from "@/store"
 
 
@@ -198,6 +199,7 @@ const createWebSocketSyncAdapter = ({
     if (e.code !== 1000 && e.code !== 1001) {
       console.warn(`collab: ws closed code=${e.code} reason=${e.reason || "(none)"}`)
     }
+    notifyWsClose(e.code)
   })
 
   const onPageHide = () => {
