@@ -1,13 +1,19 @@
-"""Collaboration router — ticket mint endpoint + WebSocket relay (Phase 1a).
+"""Collaboration router — ticket mint endpoint + WebSocket session (Phase 1b).
 
-The relay is intentionally minimal: every text frame received on a
-socket is forwarded verbatim to all other sockets in the same room.
-The wire shape is whatever the client adapter sends (today it mirrors
-the BroadcastChannel adapter — `{kind: "batch" | "presence" | ...}`).
-Server-side sequencing, snapshot-on-hello, and op application land in
-Phase 1b.
+Per-board WebSocket session:
+
+  1. Ticket exchange validates `(user_id, board_id)`.
+  2. On accept, a `welcome { seq, snapshot }` is sent inside the room's
+     lock so a racing `peer-op` cannot precede it on this socket.
+  3. Incoming `{ kind: "op", batch, client_seq }` is applied to the
+     `GraphStore` under the lock, assigned the next monotonic `seq`,
+     and rebroadcast as `peer-op` to all other clients. The sender gets
+     `op-applied { seq, client_seq }` ack on the same lock.
+  4. Other message kinds (presence, hello, presence-leave) still relay
+     verbatim — those graduate to `peer-*` shapes in Phase 3.
 """
 
+import json
 import logging
 
 from typing import Annotated
@@ -16,7 +22,9 @@ from fastapi import APIRouter, Depends, Path, Query, Request, Response, WebSocke
 
 from topix.api.utils.decorators import with_standard_response
 from topix.api.utils.security import get_current_user_uid, verify_board_member
-from topix.collab.room import RoomRegistry
+from topix.collab.apply_ops import apply_batch
+from topix.collab.room import Client, Room, RoomRegistry
+from topix.collab.snapshot import read_snapshot_payload
 from topix.collab.tickets import consume_ticket, mint_ticket
 
 logger = logging.getLogger(__name__)
@@ -77,14 +85,40 @@ async def collab_ws(
 
     await websocket.accept()
 
+    graph_store = websocket.app.graph_store
     registry: RoomRegistry = websocket.app.collab_rooms
     room, client = await registry.join(graph_id, websocket, user_id)
     logger.info("collab join board=%s user=%s client=%s", graph_id, user_id, client.client_id)
 
+    # Welcome handshake — read seq + snapshot AND send the welcome
+    # while holding the room lock, so a racing op-handler can't queue
+    # a `peer-op` on this socket before the welcome lands.
+    try:
+        async with room.lock:
+            seq = room.seq
+            snapshot = await read_snapshot_payload(graph_store=graph_store, board_id=graph_id)
+            await websocket.send_json({
+                "kind": "welcome",
+                "seq": seq,
+                "snapshot": snapshot,
+            })
+    except Exception:
+        logger.exception("collab welcome send failed board=%s", graph_id)
+        await registry.leave(room, client)
+        return
+
     try:
         while True:
             raw = await websocket.receive_text()
-            await room.broadcast(raw, exclude=client)
+            await _handle_message(
+                websocket=websocket,
+                raw=raw,
+                graph_store=graph_store,
+                room=room,
+                client=client,
+                board_id=graph_id,
+                user_id=user_id,
+            )
     except WebSocketDisconnect:
         pass
     except Exception:
@@ -92,3 +126,64 @@ async def collab_ws(
     finally:
         await registry.leave(room, client)
         logger.info("collab leave board=%s client=%s", graph_id, client.client_id)
+
+
+async def _handle_message(
+    *,
+    websocket: WebSocket,
+    raw: str,
+    graph_store,
+    room: Room,
+    client: Client,
+    board_id: str,
+    user_id: str,
+) -> None:
+    """Dispatch one inbound frame.
+
+    `op` frames go through the sequencer+applier+broadcaster under the
+    room lock; everything else still relays verbatim for Phase 1b. The
+    presence path will become a structured `peer-presence` in Phase 3.
+    """
+    try:
+        msg = json.loads(raw)
+    except json.JSONDecodeError:
+        return
+
+    kind = msg.get("kind") if isinstance(msg, dict) else None
+
+    if kind == "op":
+        batch = msg.get("batch") or {}
+        client_seq = msg.get("client_seq")
+        ops = batch.get("ops") or []
+        async with room.lock:
+            seq = room.next_seq_unlocked()
+            await apply_batch(
+                graph_store=graph_store,
+                board_id=board_id,
+                user_id=user_id,
+                ops=ops,
+            )
+            peer_op = json.dumps({"kind": "peer-op", "seq": seq, "batch": batch})
+            # Send under the lock so peer-op ordering across peers
+            # matches the seq order. Head-of-line latency to one peer
+            # blocks the room briefly; per-peer outbox queues are a
+            # Phase 3 optimization.
+            for c in list(room.clients.values()):
+                if c is client:
+                    try:
+                        await c.socket.send_json({
+                            "kind": "op-applied",
+                            "seq": seq,
+                            "client_seq": client_seq,
+                        })
+                    except Exception:
+                        logger.debug("collab op-applied send failed", exc_info=True)
+                else:
+                    try:
+                        await c.socket.send_text(peer_op)
+                    except Exception:
+                        logger.debug("collab peer-op send failed", exc_info=True)
+        return
+
+    # Non-op kinds (presence, hello, presence-leave): relay verbatim.
+    await room.broadcast(raw, exclude=client)

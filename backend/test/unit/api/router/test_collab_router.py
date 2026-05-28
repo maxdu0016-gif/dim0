@@ -26,13 +26,45 @@ class _FakeRedisStore:
 
 
 class _FakeGraphStore:
-    """Stub GraphStore exposing only what verify_board_member touches."""
+    """Stub GraphStore covering the surface the collab router actually uses.
+
+    Records every mutating call so op-flow tests can assert that
+    `apply_batch` reached the underlying store.
+    """
 
     def __init__(self, role: str = "owner"):
         self.role = role
+        self.patch_calls: list = []
+        self.add_notes_calls: list = []
+        self.delete_node_calls: list = []
+        self.add_links_calls: list = []
+        self.update_link_calls: list = []
+        self.delete_link_calls: list = []
 
     async def get_graph_role(self, graph_uid: str, user_uid: str) -> str | None:
         return self.role
+
+    async def get_graph(self, *, graph_uid: str, root_id: str | None = None):
+        # Empty board — welcome.snapshot will be {}.
+        return None
+
+    async def patch_note(self, *, node_id, data, user_uid):
+        self.patch_calls.append({"node_id": node_id, "data": data, "user_uid": user_uid})
+
+    async def add_notes(self, *, nodes):
+        self.add_notes_calls.append(nodes)
+
+    async def delete_node(self, *, node_id, user_uid):
+        self.delete_node_calls.append({"node_id": node_id, "user_uid": user_uid})
+
+    async def add_links(self, *, links):
+        self.add_links_calls.append(links)
+
+    async def update_link(self, *, link_id, data):
+        self.update_link_calls.append({"link_id": link_id, "data": data})
+
+    async def delete_link(self, *, link_id):
+        self.delete_link_calls.append(link_id)
 
 
 def _build_app(*, user_uid: str = "u1", role: str = "owner") -> tuple[TestClient, FastAPI]:
@@ -130,23 +162,116 @@ def test_ws_rejects_ticket_for_different_board():
 # WebSocket relay happy path
 # ---------------------------------------------------------------------------
 
-def test_ws_relays_messages_between_peers():
-    """A frame from one peer is forwarded to other connected peers in the same room."""
-    client, app = _build_app()
-
+def _mint_tickets(app, **bindings):
+    """Helper to mint many tickets in one synchronous block."""
     import asyncio
     loop = asyncio.new_event_loop()
     try:
-        t1 = loop.run_until_complete(mint_ticket(app.redis_store, user_id="u1", board_id="b1"))
-        t2 = loop.run_until_complete(mint_ticket(app.redis_store, user_id="u2", board_id="b1"))
+        return {
+            label: loop.run_until_complete(
+                mint_ticket(app.redis_store, user_id=user_id, board_id=board_id)
+            )
+            for label, (user_id, board_id) in bindings.items()
+        }
     finally:
         loop.close()
 
-    with client.websocket_connect(f"/boards/b1/collab?ticket={t1}") as ws1:
-        with client.websocket_connect(f"/boards/b1/collab?ticket={t2}") as ws2:
+
+def _drain_welcome(ws) -> dict:
+    """Consume the welcome frame the server sends right after accept."""
+    msg = ws.receive_json()
+    assert msg["kind"] == "welcome"
+    return msg
+
+
+def test_ws_sends_welcome_with_seq_and_snapshot_on_connect():
+    """First frame to a freshly-connected peer is `welcome { seq, snapshot }`."""
+    client, app = _build_app()
+    tickets = _mint_tickets(app, t1=("u1", "b1"))
+
+    with client.websocket_connect(f"/boards/b1/collab?ticket={tickets['t1']}") as ws:
+        welcome = ws.receive_json()
+        assert welcome["kind"] == "welcome"
+        assert welcome["seq"] == 0
+        assert welcome["snapshot"] == {}
+
+
+def test_ws_relays_presence_between_peers():
+    """A `presence` frame is still relayed verbatim through the room."""
+    client, app = _build_app()
+    tickets = _mint_tickets(app, t1=("u1", "b1"), t2=("u2", "b1"))
+
+    with client.websocket_connect(f"/boards/b1/collab?ticket={tickets['t1']}") as ws1:
+        _drain_welcome(ws1)
+        with client.websocket_connect(f"/boards/b1/collab?ticket={tickets['t2']}") as ws2:
+            _drain_welcome(ws2)
             ws1.send_text('{"kind":"presence","clientId":"c1","state":{}}')
             received = ws2.receive_text()
             assert received == '{"kind":"presence","clientId":"c1","state":{}}'
+
+
+def test_ws_op_message_sequences_and_broadcasts_peer_op():
+    """An incoming `op` is applied via apply_batch, assigned a seq,
+    broadcast as `peer-op` to other clients, and acked back to the
+    sender as `op-applied`.
+    """
+    client, app = _build_app()
+    tickets = _mint_tickets(app, t1=("u1", "b1"), t2=("u2", "b1"))
+
+    with client.websocket_connect(f"/boards/b1/collab?ticket={tickets['t1']}") as sender:
+        _drain_welcome(sender)
+        with client.websocket_connect(f"/boards/b1/collab?ticket={tickets['t2']}") as peer:
+            _drain_welcome(peer)
+
+            sender.send_json({
+                "kind": "op",
+                "client_seq": 7,
+                "batch": {
+                    "id": "batch-1",
+                    "clientId": "alice",
+                    "origin": "local",
+                    "ops": [
+                        {"type": "node.update", "id": "n1", "patch": {"x": 200, "y": 150}, "prev": {}},
+                    ],
+                },
+            })
+
+            ack = sender.receive_json()
+            assert ack["kind"] == "op-applied"
+            assert ack["seq"] == 1
+            assert ack["client_seq"] == 7
+
+            peer_op = peer.receive_json()
+            assert peer_op["kind"] == "peer-op"
+            assert peer_op["seq"] == 1
+            assert peer_op["batch"]["id"] == "batch-1"
+
+            # apply_batch reached the store
+            assert len(app.graph_store.patch_calls) == 1
+            assert app.graph_store.patch_calls[0]["node_id"] == "n1"
+
+
+def test_ws_op_seq_is_monotonic_across_ops():
+    """Two ops from the same sender should be assigned seq=1 then seq=2."""
+    client, app = _build_app()
+    tickets = _mint_tickets(app, t1=("u1", "b1"))
+
+    with client.websocket_connect(f"/boards/b1/collab?ticket={tickets['t1']}") as ws:
+        _drain_welcome(ws)
+        for client_seq in (1, 2):
+            ws.send_json({
+                "kind": "op",
+                "client_seq": client_seq,
+                "batch": {
+                    "id": f"b{client_seq}",
+                    "clientId": "alice",
+                    "origin": "local",
+                    "ops": [{"type": "node.remove", "node": {"id": f"n{client_seq}"}}],
+                },
+            })
+            ack = ws.receive_json()
+            assert ack["seq"] == client_seq
+            assert ack["client_seq"] == client_seq
 
 
 def test_ws_two_peers_same_board_register_in_same_room():

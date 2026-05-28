@@ -28,17 +28,28 @@ class Client:
 
 @dataclass
 class Room:
-    """Per-board in-memory presence + relay surface.
+    """Per-board in-memory presence + sequenced op relay.
 
-    `lock` serializes membership changes and broadcast ordering so two
-    near-simultaneous events can't interleave clients seeing different
-    causal orders. The actual `send` calls run outside the lock to
-    avoid head-of-line blocking on a slow peer.
+    `lock` serializes both membership changes and op sequencing so a
+    `peer-op` broadcast can never observe a seq earlier than its own
+    DB apply. `send` calls inside `broadcast` run outside the lock so
+    a slow peer doesn't block ordering for the rest of the room.
+
+    `seq` is the monotonic per-room sequence assigned to every applied
+    op. Survives the lifetime of the in-process Room; rooms reset to 0
+    on first creation (acceptable for Phase 1b — Phase 1c may pin it
+    to a Redis INCR for cross-restart durability).
     """
 
     board_id: str
     clients: dict[str, Client] = field(default_factory=dict)
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
+    seq: int = 0
+
+    def next_seq_unlocked(self) -> int:
+        """Caller must hold `self.lock`. Assigns the next monotonic seq."""
+        self.seq += 1
+        return self.seq
 
     async def add(self, socket: WebSocket, user_id: str) -> Client:
         """Register a connected socket; return the assigned Client."""

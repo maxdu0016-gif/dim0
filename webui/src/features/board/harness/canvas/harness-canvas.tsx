@@ -93,7 +93,6 @@ export function HarnessCanvas() {
   const viewMode = useBoardAppStore((s) => s.viewMode)
   const theme = useBoardTheme()
   const [ready, setReady] = useState(false)
-  const saveStatus = useBoardDebouncedSave(store, boardId, ready)
   const wrapRef = useRef<HTMLDivElement>(null)
   // Captured via `<Canvas onRenderer>`; presentation mode toggles
   // `setHideFrames` on this so slide chrome (border + label) drops out
@@ -140,6 +139,11 @@ export function HarnessCanvas() {
   // Gated by localStorage "dim0:collab" === "broadcast"; off by default.
   const collabMode = useCollabMode()
   const collabEnabled = collabMode !== "off" && ready
+  // In `ws` collab mode the server is the sole writer — turn off the
+  // local REST save loop so the same edit isn't persisted twice.
+  const saveStatus = useBoardDebouncedSave(store, boardId, ready, {
+    enabled: collabMode !== "ws",
+  })
   useBroadcastCollab(store, boardId, rootId, collabMode === "broadcast" && ready)
   useWsCollab(store, boardId, collabMode === "ws" && ready)
   useLocalPresence(store, wrapRef, collabEnabled)

@@ -10,6 +10,14 @@ export type SaveStatus = "idle" | "pending" | "saving" | "saved" | "error"
 export type UseBoardDebouncedSaveOptions = {
   /** Idle delay between the last commit and the next flush. Default 500ms. */
   debounceMs?: number
+  /**
+   * When `false`, the hook is inert — no subscription, no flushes,
+   * status stays `idle`. Used to hand persistence off to the collab
+   * WebSocket in Phase 1b: the server becomes the only writer, so
+   * the REST save loop must not double-write the same edits.
+   * Defaults to `true`.
+   */
+  enabled?: boolean
 }
 
 
@@ -59,11 +67,12 @@ export const useBoardDebouncedSave = (
   options: UseBoardDebouncedSaveOptions = {},
 ): SaveStatus => {
   const debounceMs = options.debounceMs ?? 500
+  const enabled = options.enabled ?? true
   const [status, setStatus] = useState<SaveStatus>("idle")
   const lastSavedRef = useRef<LastSaved | null>(null)
 
   useEffect(() => {
-    if (!boardId || !ready) return
+    if (!enabled || !boardId || !ready) return
     let timer: ReturnType<typeof setTimeout> | null = null
 
     // Re-baseline once hydration declares the scene in sync with the
@@ -139,7 +148,7 @@ export const useBoardDebouncedSave = (
       }
       unsubscribe()
     }
-  }, [store, boardId, ready, debounceMs])
+  }, [store, boardId, ready, debounceMs, enabled])
 
   return status
 }

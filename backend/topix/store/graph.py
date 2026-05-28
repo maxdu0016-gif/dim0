@@ -130,6 +130,13 @@ class GraphStore:
         their type discriminator and document-specific properties intact —
         otherwise validating a document row against the bare `Note` model
         fails with a literal_error on the `type` field.
+
+        **Embed-skip fast path.** When the patch leaves every embeddable
+        field unchanged (label / content / searchable TextProperties),
+        the embedder is bypassed and only the Qdrant payload is updated.
+        This keeps spatial ops (drag, resize, z-order, color) off the
+        OpenAI hot path — critical because the collab apply lock is
+        held across this call.
         """
         existing_nodes = await self.get_nodes([node_id])
         if not existing_nodes:
@@ -146,7 +153,14 @@ class GraphStore:
         model = Document if isinstance(existing_note, Document) else Note
         merged_note = model.model_validate(merged_payload)
 
-        await self._content_store.update([merged_note.model_dump(exclude_none=False)])
+        if merged_note.to_embeddable() == existing_note.to_embeddable():
+            await self._content_store.update_payload_only(
+                [merged_note.model_dump(exclude_none=False)]
+            )
+        else:
+            await self._content_store.update(
+                [merged_note.model_dump(exclude_none=False)]
+            )
         return merged_note
 
     async def update_node(self, node_id: str, data: dict, user_uid: str | None = None):
