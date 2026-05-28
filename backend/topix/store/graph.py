@@ -27,6 +27,7 @@ from topix.store.postgres.graph import (
 from topix.store.postgres.graph_user import (
     add_user_to_graph_by_uid,
     get_graph_role_by_user_uid,
+    get_owner_uid_by_graph_uid,
     list_graphs_by_user_uid,
 )
 from topix.store.postgres.pool import create_pool
@@ -448,6 +449,11 @@ class GraphStore:
         async with self._pg_pool.acquire() as conn:
             graphs = await list_graphs_by_user_uid(conn, user_uid)
         return graphs
+
+    async def get_owner_uid(self, graph_uid: str) -> str | None:
+        """Return the user_uid of the board's owner, or None when missing."""
+        async with self._pg_pool.acquire() as conn:
+            return await get_owner_uid_by_graph_uid(conn, graph_uid)
 
     async def get_graph_role(self, graph_uid: str, user_uid: str) -> str | None:
         """Return user's graph role, or None if user has no access."""

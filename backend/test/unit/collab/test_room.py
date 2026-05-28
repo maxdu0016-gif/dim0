@@ -119,6 +119,51 @@ async def test_registry_keeps_room_alive_while_other_clients_remain():
     assert len(room.clients) == 2
 
 
+async def test_room_add_respects_max_size_cap():
+    """Once the room hits max_size, further adds return None."""
+    room = Room(board_id="b1")
+    for i in range(3):
+        result = await room.add(FakeSocket(), f"u{i}", max_size=3)
+        assert result is not None
+
+    # 4th attempt: at cap, refuse.
+    overflow = await room.add(FakeSocket(), "u3", max_size=3)
+    assert overflow is None
+    assert len(room.clients) == 3
+
+
+async def test_room_add_persists_role():
+    """The role passed to add is stamped on the Client."""
+    room = Room(board_id="b1")
+    member = await room.add(FakeSocket(), "u1", role="member")
+    viewer = await room.add(FakeSocket(), "u2", role="viewer")
+
+    assert member is not None and member.role == "member"
+    assert viewer is not None and viewer.role == "viewer"
+
+
+async def test_room_add_defaults_role_to_member():
+    """Calling add without role keeps the 'member' default."""
+    room = Room(board_id="b1")
+    client = await room.add(FakeSocket(), "u1")
+
+    assert client is not None and client.role == "member"
+
+
+async def test_registry_join_returns_none_client_when_room_at_capacity():
+    """RoomRegistry.join surfaces the cap as a (room, None) tuple."""
+    registry = RoomRegistry()
+    # Fill to cap=2 first.
+    room1, c1 = await registry.join("b1", FakeSocket(), "u1", max_size=2)
+    room2, c2 = await registry.join("b1", FakeSocket(), "u2", max_size=2)
+    assert c1 is not None and c2 is not None
+
+    room3, c3 = await registry.join("b1", FakeSocket(), "u3", max_size=2)
+
+    assert room3 is room1  # same room object
+    assert c3 is None
+
+
 async def test_registry_concurrent_joins_share_one_room():
     """Concurrent joins on the same board must not race two Room instances into existence."""
     registry = RoomRegistry()

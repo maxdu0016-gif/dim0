@@ -26,17 +26,39 @@ class _FakeRedisStore:
 
 
 async def test_mint_round_trips_payload_and_uses_ttl():
-    """Minted ticket decodes back to (user_id, board_id) and uses the configured TTL."""
+    """Minted ticket decodes back to (user_id, board_id, role) and uses the configured TTL."""
     redis_store = _FakeRedisStore()
 
-    token = await mint_ticket(redis_store, user_id="u1", board_id="b1")
+    token = await mint_ticket(redis_store, user_id="u1", board_id="b1", role="member")
 
     assert token
     assert redis_store.redis.last_ex == 30
     assert f"{TICKET_KEY_PREFIX}{token}" in redis_store.redis.store
 
     payload = await consume_ticket(redis_store, token)
-    assert payload == {"user_id": "u1", "board_id": "b1"}
+    assert payload == {"user_id": "u1", "board_id": "b1", "role": "member"}
+
+
+async def test_mint_defaults_role_to_member_when_omitted():
+    """Calling mint_ticket without `role` keeps a `member` default."""
+    redis_store = _FakeRedisStore()
+
+    token = await mint_ticket(redis_store, user_id="u1", board_id="b1")
+    payload = await consume_ticket(redis_store, token)
+
+    assert payload is not None
+    assert payload["role"] == "member"
+
+
+async def test_mint_carries_viewer_role():
+    """Viewer tickets round-trip the role through the payload."""
+    redis_store = _FakeRedisStore()
+
+    token = await mint_ticket(redis_store, user_id="u1", board_id="b1", role="viewer")
+    payload = await consume_ticket(redis_store, token)
+
+    assert payload is not None
+    assert payload["role"] == "viewer"
 
 
 async def test_consume_is_single_use():

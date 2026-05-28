@@ -110,6 +110,26 @@ async def get_graph_role_by_user_uid(
     return await conn.fetchval(query, graph_id, user_id)
 
 
+async def get_owner_uid_by_graph_uid(
+    conn: asyncpg.Connection,
+    graph_uid: str,
+) -> str | None:
+    """Return the user_uid of the owner of `graph_uid`, or None if none.
+
+    Single-statement join so the WS-side capacity check (which calls
+    this synchronously inside the ticket-mint endpoint) doesn't pay
+    two round-trips.
+    """
+    row = await conn.fetchrow(
+        "SELECT u.uid "
+        "FROM graph_user gu JOIN users u ON gu.user_id = u.id "
+        "WHERE gu.graph_id = (SELECT id FROM graphs WHERE uid = $1) "
+        "AND gu.role = 'owner' LIMIT 1",
+        graph_uid,
+    )
+    return row["uid"] if row else None
+
+
 async def remove_user_from_graph_by_uid(
     conn: asyncpg.Connection,
     user_uid: str,

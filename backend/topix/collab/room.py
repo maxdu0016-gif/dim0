@@ -19,11 +19,19 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class Client:
-    """One connected socket inside a Room."""
+    """One connected socket inside a Room.
+
+    `role` is the per-board role copied from the consumed collab ticket
+    (`"owner" | "member" | "viewer"`). It governs op-message acceptance
+    inside the WS handler — viewers receive everything but their own ops
+    are rejected with `op-rejected`. Defaults to `"member"` for back-compat
+    with call sites that pre-date Slice 2 of sharing Phase A.
+    """
 
     client_id: str
     user_id: str
     socket: WebSocket
+    role: str = "member"
 
 
 @dataclass
@@ -51,10 +59,31 @@ class Room:
         self.seq += 1
         return self.seq
 
-    async def add(self, socket: WebSocket, user_id: str) -> Client:
-        """Register a connected socket; return the assigned Client."""
-        client = Client(client_id=str(uuid.uuid4()), user_id=user_id, socket=socket)
+    async def add(
+        self,
+        socket: WebSocket,
+        user_id: str,
+        role: str = "member",
+        *,
+        max_size: int | None = None,
+    ) -> Client | None:
+        """Register a connected socket; return the assigned Client.
+
+        When `max_size` is set, the membership check + insertion happen
+        atomically under `self.lock` so a race between two concurrent
+        joiners can't push the room over its capacity. Returns `None`
+        when the room is already at `max_size` (caller should close the
+        socket with a `"room-full"` reason).
+        """
         async with self.lock:
+            if max_size is not None and len(self.clients) >= max_size:
+                return None
+            client = Client(
+                client_id=str(uuid.uuid4()),
+                user_id=user_id,
+                role=role,
+                socket=socket,
+            )
             self.clients[client.client_id] = client
         return client
 
@@ -85,14 +114,29 @@ class RoomRegistry:
         self._rooms: dict[str, Room] = {}
         self._lock = asyncio.Lock()
 
-    async def join(self, board_id: str, socket: WebSocket, user_id: str) -> tuple[Room, Client]:
-        """Join (or create) the room for `board_id` and return (room, client)."""
+    async def join(
+        self,
+        board_id: str,
+        socket: WebSocket,
+        user_id: str,
+        role: str = "member",
+        *,
+        max_size: int | None = None,
+    ) -> tuple[Room | None, Client | None]:
+        """Join (or create) the room for `board_id`.
+
+        Returns `(room, client)` on success. When `max_size` is set and
+        the room is already at capacity, returns `(room, None)` — the
+        room is preserved (it may still be hosting peers) but this
+        socket was not added. Callers should close the socket with a
+        `"room-full"` reason on a `None` client.
+        """
         async with self._lock:
             room = self._rooms.get(board_id)
             if room is None:
                 room = Room(board_id=board_id)
                 self._rooms[board_id] = room
-        client = await room.add(socket, user_id)
+        client = await room.add(socket, user_id, role, max_size=max_size)
         return room, client
 
     def get(self, board_id: str) -> Room | None:

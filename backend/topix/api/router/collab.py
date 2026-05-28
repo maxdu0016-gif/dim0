@@ -1,15 +1,22 @@
-"""Collaboration router — ticket mint endpoint + WebSocket session (Phase 1b).
+"""Collaboration router — ticket mint endpoint + WebSocket session.
 
 Per-board WebSocket session:
 
-  1. Ticket exchange validates `(user_id, board_id)`.
-  2. On accept, a `welcome { seq, snapshot }` is sent inside the room's
-     lock so a racing `peer-op` cannot precede it on this socket.
-  3. Incoming `{ kind: "op", batch, client_seq }` is applied to the
-     `GraphStore` under the lock, assigned the next monotonic `seq`,
-     and rebroadcast as `peer-op` to all other clients. The sender gets
-     `op-applied { seq, client_seq }` ack on the same lock.
-  4. Other message kinds (presence, hello, presence-leave) still relay
+  1. Ticket exchange validates `(user_id, board_id)` and looks up the
+     user's effective role on the board (owner / member / viewer).
+     The role is stamped on the ticket and propagated to the WS
+     handler via the consumed payload.
+  2. On accept, a capacity check looks up the owner's plan and rejects
+     joiners that would push the room over its plan-tier cap (close
+     code 4429).
+  3. `welcome { seq, snapshot }` is sent inside the room's lock so a
+     racing `peer-op` cannot precede it on this socket.
+  4. Incoming `{ kind: "op" }` from a viewer is rejected with
+     `op-rejected { client_seq, reason: "read-only" }`. From an owner
+     or member, the op is sequenced under the lock, applied to the
+     GraphStore, broadcast as `peer-op` to other clients, and acked
+     to the sender with `op-applied`.
+  5. Other message kinds (presence, hello, presence-leave) still relay
      verbatim — those graduate to `peer-*` shapes in Phase 3.
 """
 
@@ -18,14 +25,17 @@ import logging
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Path, Query, Request, Response, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, HTTPException, Path, Query, Request, Response, WebSocket, WebSocketDisconnect, status
+from fastapi import Depends
 
 from topix.api.utils.decorators import with_standard_response
-from topix.api.utils.security import get_current_user_uid, verify_board_member
+from topix.api.utils.security import get_current_user_uid
 from topix.collab.apply_ops import apply_batch
+from topix.collab.capacity import get_room_cap_for_board
 from topix.collab.room import Client, Room, RoomRegistry
 from topix.collab.snapshot import read_snapshot_payload
 from topix.collab.tickets import consume_ticket, mint_ticket
+from topix.store.graph import GraphStore
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +50,10 @@ router = APIRouter(
 # Close codes — 4000-4999 range is reserved for app-defined per RFC 6455.
 WS_INVALID_TICKET = 4401
 WS_BOARD_MISMATCH = 4403
+WS_ROOM_FULL = 4429
+
+_ACCESS_ROLES = frozenset({"owner", "member", "viewer"})
+_EDIT_ROLES = frozenset({"owner", "member"})
 
 
 @router.post("/{graph_id}/collab/ticket/", include_in_schema=False)
@@ -50,11 +64,22 @@ async def mint_collab_ticket(
     request: Request,
     graph_id: Annotated[str, Path(description="Graph ID")],
     user_id: Annotated[str, Depends(get_current_user_uid)],
-    _: Annotated[None, Depends(verify_board_member)],
 ):
-    """Mint a short-lived single-use ticket the client exchanges on WS upgrade."""
-    token = await mint_ticket(request.app.redis_store, user_id=user_id, board_id=graph_id)
-    return {"ticket": token, "expires_in": 30}
+    """Mint a short-lived single-use ticket the client exchanges on WS upgrade.
+
+    Resolves the user's effective role on the board inline (replaces
+    the previous `verify_board_member` dep — we need the role anyway,
+    and viewers must be allowed through). 404 for users with no role
+    so we don't leak board existence.
+    """
+    graph_store: GraphStore = request.app.graph_store
+    role = await graph_store.get_graph_role(graph_uid=graph_id, user_uid=user_id)
+    if role not in _ACCESS_ROLES:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Board not found")
+    token = await mint_ticket(
+        request.app.redis_store, user_id=user_id, board_id=graph_id, role=role,
+    )
+    return {"ticket": token, "expires_in": 30, "role": role}
 
 
 @router.websocket("/{graph_id}/collab")
@@ -82,13 +107,41 @@ async def collab_ws(
         return
 
     user_id: str = payload["user_id"]
+    role: str = payload.get("role", "member")
+
+    graph_store = websocket.app.graph_store
+    user_billing_store = websocket.app.user_billing_store
+    registry: RoomRegistry = websocket.app.collab_rooms
+
+    # Owner's plan caps the room. Done BEFORE accept() so the rejected
+    # joiner sees an HTTP 403 on the upgrade rather than an immediate
+    # WS close (cleaner UX for the "room full" error).
+    try:
+        max_size = await get_room_cap_for_board(
+            graph_store=graph_store,
+            user_billing_store=user_billing_store,
+            board_uid=graph_id,
+        )
+    except Exception:
+        logger.exception("collab capacity lookup failed board=%s", graph_id)
+        max_size = None  # fail open — log + allow rather than block on infra hiccup
 
     await websocket.accept()
 
-    graph_store = websocket.app.graph_store
-    registry: RoomRegistry = websocket.app.collab_rooms
-    room, client = await registry.join(graph_id, websocket, user_id)
-    logger.info("collab join board=%s user=%s client=%s", graph_id, user_id, client.client_id)
+    room, client = await registry.join(
+        graph_id, websocket, user_id, role=role, max_size=max_size,
+    )
+    if client is None:
+        logger.info(
+            "collab room-full board=%s user=%s (cap=%s)",
+            graph_id, user_id, max_size,
+        )
+        await websocket.close(code=WS_ROOM_FULL, reason="room-full")
+        return
+    logger.info(
+        "collab join board=%s user=%s role=%s client=%s",
+        graph_id, user_id, role, client.client_id,
+    )
 
     # Welcome handshake — read seq + snapshot AND send the welcome
     # while holding the room lock, so a racing op-handler can't queue
@@ -154,6 +207,19 @@ async def _handle_message(
     if kind == "op":
         batch = msg.get("batch") or {}
         client_seq = msg.get("client_seq")
+        # Read-only clients (viewers) can't mutate. Reject the op
+        # outright; nothing applies, nothing broadcasts. The client
+        # surfaces this via a toast / read-only banner.
+        if client.role not in _EDIT_ROLES:
+            try:
+                await websocket.send_json({
+                    "kind": "op-rejected",
+                    "client_seq": client_seq,
+                    "reason": "read-only",
+                })
+            except Exception:
+                logger.debug("collab op-rejected send failed", exc_info=True)
+            return
         ops = batch.get("ops") or []
         async with room.lock:
             seq = room.next_seq_unlocked()

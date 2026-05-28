@@ -32,8 +32,9 @@ class _FakeGraphStore:
     `apply_batch` reached the underlying store.
     """
 
-    def __init__(self, role: str = "owner"):
+    def __init__(self, role: str = "owner", owner_uid: str = "u1"):
         self.role = role
+        self.owner_uid = owner_uid
         self.patch_calls: list = []
         self.add_notes_calls: list = []
         self.delete_node_calls: list = []
@@ -43,6 +44,9 @@ class _FakeGraphStore:
 
     async def get_graph_role(self, graph_uid: str, user_uid: str) -> str | None:
         return self.role
+
+    async def get_owner_uid(self, graph_uid: str) -> str | None:
+        return self.owner_uid
 
     async def get_graph(self, *, graph_uid: str, root_id: str | None = None):
         # Empty board — welcome.snapshot will be {}.
@@ -67,10 +71,37 @@ class _FakeGraphStore:
         self.delete_link_calls.append(link_id)
 
 
-def _build_app(*, user_uid: str = "u1", role: str = "owner") -> tuple[TestClient, FastAPI]:
+class _FakeUserBillingStore:
+    """Stub UserBillingStore — only `get_user_billing` is consulted by
+    the capacity check. A None return means the owner has no billing
+    row, which the capacity module treats as the free-tier cap (5)."""
+
+    def __init__(self, plan: str | None = None):
+        # If `plan` is None, we behave as "no row" (free default).
+        self.plan = plan
+
+    async def get_user_billing(self, user_uid: str):
+        if self.plan is None:
+            return None
+        # Lightweight stand-in for UserBilling — only `.plan` is read.
+        class _Billing:
+            pass
+        b = _Billing()
+        b.plan = self.plan
+        return b
+
+
+def _build_app(
+    *,
+    user_uid: str = "u1",
+    role: str = "owner",
+    owner_uid: str = "u1",
+    plan: str | None = None,
+) -> tuple[TestClient, FastAPI]:
     app = FastAPI()
     app.include_router(router)
-    app.graph_store = _FakeGraphStore(role=role)
+    app.graph_store = _FakeGraphStore(role=role, owner_uid=owner_uid)
+    app.user_billing_store = _FakeUserBillingStore(plan=plan)
     app.redis_store = _FakeRedisStore()
     app.collab_rooms = RoomRegistry()
 
@@ -162,14 +193,18 @@ def test_ws_rejects_ticket_for_different_board():
 # WebSocket relay happy path
 # ---------------------------------------------------------------------------
 
-def _mint_tickets(app, **bindings):
-    """Helper to mint many tickets in one synchronous block."""
+def _mint_tickets(app, role: str = "member", **bindings):
+    """Helper to mint many tickets in one synchronous block.
+
+    `role` defaults to "member" so tests of edit paths keep working
+    without changes; viewer / owner tests pass it explicitly.
+    """
     import asyncio
     loop = asyncio.new_event_loop()
     try:
         return {
             label: loop.run_until_complete(
-                mint_ticket(app.redis_store, user_id=user_id, board_id=board_id)
+                mint_ticket(app.redis_store, user_id=user_id, board_id=board_id, role=role)
             )
             for label, (user_id, board_id) in bindings.items()
         }
@@ -310,3 +345,108 @@ def test_ws_drops_room_after_last_disconnect():
     # TestClient is synchronous, but the server's `finally` runs before the
     # context manager returns, so the cleanup has already happened by here.
     assert "b1" not in app.collab_rooms._rooms
+
+
+# ---------------------------------------------------------------------------
+# Slice 2: role on the ticket + viewer reject + room-capacity cap
+# ---------------------------------------------------------------------------
+
+def test_ticket_response_carries_user_role():
+    """The mint endpoint returns the user's role on the board."""
+    client, _ = _build_app(role="viewer")
+
+    response = client.post("/boards/b1/collab/ticket")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["data"]["role"] == "viewer"
+
+
+def test_ticket_mint_404s_for_unaffiliated_user():
+    """A user with no role on the board cannot mint a ticket."""
+    client, _ = _build_app(role=None)
+
+    response = client.post("/boards/b1/collab/ticket")
+
+    assert response.status_code == 404
+
+
+def test_ws_viewer_op_is_rejected_with_op_rejected():
+    """A viewer connecting and sending `op` receives `op-rejected`; the
+    underlying GraphStore is never touched."""
+    client, app = _build_app(role="viewer")
+    tickets = _mint_tickets(app, role="viewer", t=("u1", "b1"))
+
+    with client.websocket_connect(f"/boards/b1/collab?ticket={tickets['t']}") as ws:
+        _drain_welcome(ws)
+        ws.send_json({
+            "kind": "op",
+            "client_seq": 1,
+            "batch": {
+                "id": "b1",
+                "clientId": "viewer",
+                "origin": "local",
+                "ops": [{"type": "node.update", "id": "n1", "patch": {"x": 1, "y": 2}, "prev": {}}],
+            },
+        })
+        ack = ws.receive_json()
+
+    assert ack["kind"] == "op-rejected"
+    assert ack["client_seq"] == 1
+    assert ack["reason"] == "read-only"
+    # The graph store was NOT touched.
+    assert len(app.graph_store.patch_calls) == 0
+
+
+def test_ws_member_op_still_applies_normally():
+    """Members still get the standard op-applied + peer-op pair (no regression)."""
+    client, app = _build_app(role="member")
+    tickets = _mint_tickets(app, t=("u1", "b1"))
+
+    with client.websocket_connect(f"/boards/b1/collab?ticket={tickets['t']}") as ws:
+        _drain_welcome(ws)
+        ws.send_json({
+            "kind": "op",
+            "client_seq": 1,
+            "batch": {
+                "id": "b1",
+                "clientId": "alice",
+                "origin": "local",
+                "ops": [{"type": "node.update", "id": "n1", "patch": {"x": 1, "y": 2}, "prev": {}}],
+            },
+        })
+        ack = ws.receive_json()
+
+    assert ack["kind"] == "op-applied"
+    assert ack["seq"] == 1
+    assert len(app.graph_store.patch_calls) == 1
+
+
+def test_ws_room_full_closes_sixth_join_on_free_plan():
+    """Free-tier owners cap their rooms at 5 actors; the 6th gets 4429."""
+    from contextlib import ExitStack
+    from starlette.websockets import WebSocketDisconnect
+
+    client, app = _build_app(role="member", plan="free")  # cap = 5
+
+    # Pre-mint 6 tickets (each can only be consumed once).
+    tickets = [
+        _mint_tickets(app, **{f"t{i}": (f"u{i}", "b1")})[f"t{i}"]
+        for i in range(6)
+    ]
+
+    with ExitStack() as stack:
+        for tok in tickets[:5]:
+            ws = stack.enter_context(client.websocket_connect(f"/boards/b1/collab?ticket={tok}"))
+            _drain_welcome(ws)
+
+        # Sixth joiner — server should accept, see the cap, and close
+        # with 4429 before the welcome is sent.
+        raised = False
+        try:
+            with client.websocket_connect(f"/boards/b1/collab?ticket={tickets[5]}") as ws6:
+                ws6.receive_json()
+        except WebSocketDisconnect as exc:
+            raised = True
+            assert exc.code == 4429
+        assert raised, "expected room-full close on 6th joiner"
