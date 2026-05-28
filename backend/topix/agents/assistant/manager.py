@@ -9,6 +9,7 @@ from collections.abc import AsyncGenerator
 from topix.agents.assistant.auto_model import classify_auto_model_complexity
 from topix.agents.assistant.plan import Plan
 from topix.agents.config import AssistantManagerConfig
+from topix.collab.agent_bridge import AgentBoardBridge
 from topix.agents.datatypes.context import ReasoningContext
 from topix.agents.datatypes.model_enum import ModelEnum
 from topix.agents.datatypes.outputs import CreateNoteOutput, LinkNotesOutput, WriteNoteOutput
@@ -65,6 +66,7 @@ class AssistantManager:
         graph_uid: str | None = None,
         root_id: str | None = None,
         auto_mode: bool = False,
+        agent_bridge: AgentBoardBridge | None = None,
     ) -> AssistantManager:
         """Create an instance of AssistantManager from configuration."""
         config_ = config.model_copy(deep=True)
@@ -78,6 +80,7 @@ class AssistantManager:
             graph_store=graph_store,
             graph_uid=graph_uid,
             root_id=root_id,
+            agent_bridge=agent_bridge,
         )
 
         return cls(

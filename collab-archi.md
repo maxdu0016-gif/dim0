@@ -6,6 +6,7 @@
 
 **Goals**
 
+- **One mutation path for all editing.** The collab transport (WS + server-applier) is the *only* way to mutate a board — for solo users and for collaborative sessions alike. A solo editor is just a "room of size 1." There is no on/off toggle and no parallel REST save loop.
 - Multi-user concurrent editing of a Dim0 board across machines / networks.
 - Live remote cursors, selection, and edit-locks per node.
 - Inline text co-editing without overwrites (real CRDT semantics).
@@ -19,6 +20,7 @@
 - Permissions finer than current board-level ACL (read/write/owner).
 - Operational transform / full CRDT for the scene graph — only for inline text.
 - Cross-board collaboration sessions.
+- A "use REST only" fallback for editing — the collab transport is the only edit path. The WS being down is treated as a connection-state problem ([§7](#7-connection-state)), not a feature flag to flip.
 
 ---
 
@@ -182,6 +184,8 @@ Mapping:
 
 The applier holds `room.apply_lock` for sequencing + broadcast ordering; the underlying `GraphStore` calls use per-note locks they already own. After applying, the room broadcasts `peer-op` with the assigned seq.
 
+**Embed-skip fast path.** `patch_note` compares `merged.to_embeddable()` to the existing note's. If equal — i.e. the patch only touched position/size/z/style/color and didn't change any searchable text — it routes to `ContentStore.update_payload_only`, which bypasses the OpenAI embedder. This is critical: the room's `apply_lock` is held *across* this call, so a synchronous embed call would block every other op in the room for ~100ms per spatial mutation. With embed-skip, spatial ops apply in ~5ms (Qdrant payload write only). See [decision 2026-05-28 — embed-skip](#14-decision-log).
+
 ### 5.4 WebSocket authentication (ticket-based)
 
 Browsers cannot attach `Authorization:` headers to a WS upgrade. The existing API uses JWT via `OAuth2PasswordBearer` ([backend/topix/api/utils/security.py:27](backend/topix/api/utils/security.py#L27)) which does not transfer cleanly. We use a short-lived one-shot ticket:
@@ -293,38 +297,26 @@ While frozen, ping with exponential backoff: 1s → 2s → 4s → 8s → 15s cap
 
 ## 8. Client-side changes
 
-### 7.1 New: `use-ws-collab.ts`
+### 8.1 `use-ws-collab.ts` (the only sync adapter)
 
-Replaces `use-broadcast-collab.ts`. Same shape:
+Mounted unconditionally for every editable board — no on/off toggle. Internals:
 
-```ts
-useWsCollab({
-  store,
-  boardId,
-  rootId,
-  user,
-  enabled,
-})
-```
+- Opens `wss://.../boards/{boardId}/collab?ticket=…` after fetching a one-shot ticket.
+- Implements canvas-harness `SyncAdapter`: `sendBatch` → `{ kind: "op", client_seq, batch }`; `onBatch` dispatched from `peer-op`.
+- Tracks `seq` (`lastServerSeq` updated on every `welcome` / `peer-op` / `op-applied`) for the Phase 1c reconnect catch-up.
+- **Outbound coalesce window (75ms).** `sendBatch` enqueues rather than sending immediately; the timer flushes the union of pending batches into one wire `op`. Caps typing-burst load and stays well below perceptual "live" latency. `destroy()` flushes synchronously so a teardown right after an edit doesn't drop work. See [decision 2026-05-28 — coalesce window](#14-decision-log).
 
-Internals:
+### 8.2 Y-binding wiring (Phase 4b only)
 
-- Opens `wss://.../boards/{boardId}/collab`.
-- Implements `SyncAdapter` over the socket: `sendBatch` → `{ kind: "op" }`; `onBatch` from `peer-op`.
-- Calls `attachSync(store, adapter)` — same as Phase 0.
-- Tracks `seq`, reconnects with exponential backoff + `since_seq`.
+Each text-editable node view lazily creates / fetches a y-doc and binds TipTap. Non-editing peers read the shadow text from the snapshot. Deferred behind the v1 ship gate.
 
-### 7.2 Y-binding wiring
+### 8.3 No save loop
 
-Each note view that becomes editable lazily creates / fetches the y-doc and binds TipTap. Non-editing peers don't need the y-doc — they read the shadow text from the snapshot.
+`useBoardDebouncedSave` is dormant by design — the server is the only writer. The hook is kept (with an `enabled: false` toggle) for back-compat during transition but will be deleted once Phase 2 lands and the agent's REST mutation path is gone.
 
-### 7.3 Save loop
+### 8.4 Auth
 
-Wrap the existing `useDebouncedSave` call in `if (!collabEnabled)`. When collab is on, the server is the writer.
-
-### 7.4 Auth
-
-WS upgrade carries the existing JWT in `Sec-WebSocket-Protocol` or a one-shot token. Reuse `clearTokens` / refresh logic from `webui/src/features/signin/auth-storage.ts`.
+WS upgrade exchanges a short-lived one-shot ticket minted via `POST /boards/{id}/collab/ticket`. Ticket validation hits the existing `verify_board_member` ACL. JWT lifetime is decoupled from socket lifetime — the ticket *was* the auth event; revocation (logout, plan downgrade) surfaces via `kick`.
 
 ---
 
@@ -336,28 +328,46 @@ WS upgrade carries the existing JWT in `Sec-WebSocket-Protocol` or a one-shot to
 
 `feat/board-collab-spike`. BroadcastChannel adapter, presence, remote cursors. ~250 LOC. Opt-in via `localStorage["dim0:collab"] = "broadcast"`.
 
-### Phase 1a — WS endpoint + room + relay only
+### Phase 1a ✅ — WS endpoint + room + relay (DONE, commit `ad28cc1`)
 
-- FastAPI WS endpoint `/api/v1/boards/{board_id}/collab`.
+- FastAPI WS endpoint `WS /boards/{graph_id}/collab` + `POST /boards/{graph_id}/collab/ticket` for one-shot auth.
 - In-process `Room` registry + sockets + presence relay.
-- Sequencer (single-worker `seq += 1`).
-- Snapshot on hello (call existing snapshot builder).
-- No persistence yet: server is a pass-through.
+- Frontend `use-ws-collab` adapter implementing the canvas-harness `SyncAdapter`.
 
-**~400 LOC backend, ~200 LOC client adapter, ~2-3 days.**
+**~600 LOC backend, ~300 LOC client. Shipped in ~1 day.**
 
-Exit criteria: two browsers on different machines see each other's cursors and op edits round-trip via server, but a refresh loses changes.
+### §7 ✅ — Connection-state subsystem (DONE, commit `174b55f`)
 
-### Phase 1b — server op applier + persistence
+- `GET /utils/ping` liveness endpoint.
+- Pure state machine fusing `navigator.onLine` + WS state + ping result, with two-strike escalation and backoff recovery.
+- Non-dismissible offline overlay; wired into `apiFetch` and the WS close handler.
 
-- Inverse-convert layer (`backend/.../collab/apply_ops.py`).
-- `apply_batch` under `room.apply_lock`.
-- Client save loop gated off when collab enabled.
-- Late-joiner snapshot reads from live GraphStore.
+**~650 LOC across backend + frontend.**
 
-**~600 LOC backend, ~50 LOC client (gate save loop), ~3-5 days.**
+### Phase 1b ✅ — server op applier + persistence (DONE, commit `48c4d6d`)
 
-Exit criteria: refresh keeps changes. Two peers edit, one leaves, comes back, sees the merged result.
+- Inverse-convert layer at [backend/topix/collab/apply_ops.py](backend/topix/collab/apply_ops.py).
+- `apply_batch` under `room.apply_lock`; `welcome { seq, snapshot }` sent under the same lock so a racing `peer-op` cannot precede it.
+- Client save loop dormant when `useWsCollab` is mounted.
+- Late-joiner snapshot reads from live `GraphStore` via [snapshot.py](backend/topix/collab/snapshot.py).
+- Embed-skip fast path in `patch_note` for spatial mutations (§5.3).
+- Outbound 75ms coalesce window in the WS adapter (§8.1).
+
+**~600 LOC backend, ~50 LOC client. Shipped in ~1 day.**
+
+Exit met: refresh keeps changes; two peers edit, one leaves, comes back, sees the merged result.
+
+### Phase 2 — agent integration *(critical-path, next)*
+
+> Promoted from polish to **critical-path**: with "collab always on" (§1), an
+> agent that mutates `GraphStore` directly produces edits no connected browser
+> ever sees. Cannot ship collab without this.
+
+- Agent worker emits ops to the room as a "system" client when it would have called `graph_store.patch_note / add_notes / delete_node` directly.
+- Existing board-tool calls in [backend/topix/agents/notes/tools.py](backend/topix/agents/notes/tools.py) re-route through a "system room client" facade that produces canvas-harness ops.
+- Room sequences agent ops like any peer; peers receive them as `peer-op` with an `is_system` flag in the batch for UI distinction.
+
+**~300 LOC backend, ~50 LOC client (visual "agent is editing" badge), ~3-4 days.**
 
 ### Phase 1c — reconnect + since_seq
 
@@ -365,15 +375,7 @@ Exit criteria: refresh keeps changes. Two peers edit, one leaves, comes back, se
 - Client tracks highest seq, sends `since_seq` on hello.
 - Server replays missed ops or sends full snapshot if outside ring.
 
-**~150 LOC backend, ~100 LOC client, ~1-2 days.**
-
-### Phase 2 — agent integration
-
-- Agent worker opens a WS as a "system" client when emitting board ops.
-- Existing agent → board bridge stops mutating GraphStore directly; emits ops to the room instead.
-- Room sequences them like any client.
-
-**~300 LOC backend, ~50 LOC client (visual "agent is editing" badge), ~3-4 days.**
+**~150 LOC backend, ~100 LOC client, ~1-2 days.** Order can swap with Phase 2; both are smaller than they look.
 
 ### Phase 3 — edit locks + UX polish
 
@@ -421,17 +423,17 @@ Decide between three forks based on what we see:
 
 ### Totals
 
-| | LOC | Days | Cumulative |
+| | LOC | Estimate | Actual |
 | --- | --- | --- | --- |
-| 1a | 600 | 2-3 | 1 week |
-| 1b | 650 | 3-5 | 2 weeks |
-| 1c | 250 | 1-2 | 2 weeks |
-| 2 (agent) | 350 | 3-4 | 3 weeks |
-| 3 (polish) | 350 | 3-5 | 3-4 weeks |
-| **v1 ship gate (1a–3)** | **~2200** | **12-19 days** | **3-4 weeks** |
-| 4a (`patch-text`, conditional) | 450 | 2-3 | +1 week |
-| 4b (Yjs, conditional) | 900 | 5-7 | +1-2 weeks |
-| 5 (scale, conditional) | 400 | 3-5 | +1 week |
+| 1a (✅) | 600 + 300 | 2-3 days | shipped 1 day |
+| §7 connection (✅) | 650 | 1-2 days | shipped 1 day |
+| 1b (✅) | 1338 (incl. embed-skip + coalesce) | 3-5 days | shipped 1 day |
+| **2 (agent) — next** | 350 | 3-4 days | — |
+| 1c (reconnect) | 250 | 1-2 days | — |
+| 3 (polish) | 350 | 3-5 days | — |
+| 4a (`patch-text`, conditional) | 450 | 2-3 days | — |
+| 4b (Yjs, conditional) | 900 | 5-7 days | — |
+| 5 (scale, conditional) | 400 | 3-5 days | — |
 
 ---
 
@@ -467,14 +469,16 @@ Ordered by "most likely to bite, hardest to recover from."
 - Instrument: log when two `set-text` ops for the same `node_id` land within 500ms. If the rate is non-trivial, that's the signal to ship Phase 4a (`patch-text` CAS).
 - Phase 4a is a 2-3 day escape hatch; Phase 4b (Yjs) only if 4a is still insufficient.
 
-### Risk 4 — Agent edits + collab interaction *(promoted to correctness blocker)*
+### Risk 4 — Agent edits + collab interaction *(actively blocking)*
 
-**The problem.** Today the agent calls `graph_store.add_notes / patch_note` *directly, synchronously inside the agent turn* ([backend/topix/agents/notes/tools.py](backend/topix/agents/notes/tools.py) → [backend/topix/store/graph.py](backend/topix/store/graph.py)). If we keep that path AND enable collab, the per-note locks prevent data corruption — but the room is never told, so **no `peer-op` is broadcast**. Connected humans never see the agent's edit until they refresh. This is not polish; it's a correctness bug the moment collab is on.
+**The problem.** Today the agent calls `graph_store.add_notes / patch_note` *directly, synchronously inside the agent turn* ([backend/topix/agents/notes/tools.py](backend/topix/agents/notes/tools.py) → [backend/topix/store/graph.py](backend/topix/store/graph.py)). With Phase 1b shipped, per-note locks prevent data corruption — but the room is never told, so **no `peer-op` is broadcast**. Connected humans never see the agent's edit until they refresh.
+
+With "collab always on" (§1), this isn't a "risk" anymore — it's a **bug that exists right now in commit `48c4d6d`** for any account that uses agents during a live collab session.
 
 **Mitigation.**
-- **Phase 2 (agent integration) is a hard precondition for shipping collab to any account that uses agents.** Not optional, not deferrable.
-- Reject direct GraphStore mutations from the agent bridge once collab is enabled (assert + log). The bridge must emit ops to the room instead.
-- Tests: agent emits 20 ops, two peers connected, both see them in correct order with the agent's "system" presence.
+- **Phase 2 is the fix.** Until it ships, agents are a known-broken interaction inside collab sessions. Hide agent-driven boards from collab beta access until then.
+- After Phase 2: the existing direct `graph_store.*` call sites in [agents/notes/tools.py](backend/topix/agents/notes/tools.py) re-route through a "system room client" that emits ops just like a human browser. Same wire shape; the only differentiator is an `is_system` flag the UI uses to label the cursor / batch.
+- Tests: agent emits 20 ops, two peers connected, both see them in correct order with the agent identified as the originator.
 
 ### Risk 5 — Sequencer correctness under multi-worker
 
@@ -497,10 +501,22 @@ Ordered by "most likely to bite, hardest to recover from."
 
 Malicious client sends 10k ops/sec. Server should rate-limit per `client_id` and `kick` over the threshold.
 
+### Risk 8 — OpenAI embed cost inside the apply hot path
+
+**The problem.** `GraphStore.patch_note` updates the Qdrant vector for every patch, which used to mean an OpenAI embed call (~100ms) inside `room.apply_lock`. Every drag-move would block the room for ~100ms; every typed character would burn one paid OpenAI request.
+
+**Mitigation (shipped).**
+- [GraphStore.patch_note](backend/topix/store/graph.py) now compares `merged.to_embeddable()` to the existing note. Equal → `ContentStore.update_payload_only` (no embed). Different → full re-embed.
+- WS adapter [outbound coalesce window](webui/src/features/board/harness/canvas/use-ws-collab.ts) merges burst batches into a single wire `op` over 75ms — fewer apply calls, fewer embed calls in the worst case.
+- Spatial ops (drag/resize/z/color) now apply in ~5ms under the lock.
+
+**Remaining risk.** Text edits still re-embed each apply. Phase 4a (`patch-text` CAS) or 4b (Yjs) would let us debounce embeds per text-bearing node on the server.
+
 ---
 
 ## 11. What we cut from v1
 
+- **An "edit without collab" mode.** No graceful "REST only" fallback. WS down = app frozen by the connection-state subsystem (§7).
 - **Permissions per-element.** Whole-board ACL only.
 - **Cursor following / "go to peer".** Phase 4+ nice-to-have.
 - **Comments / threads.** Separate feature, not collab transport.
@@ -573,6 +589,8 @@ These cost a few hours of forethought, not a rewrite. They keep the door open wi
 2. Do agent ops carry a `system: true` flag in presence so the UI can render them distinctively (different cursor, "Agent is editing")?
 3. Should we expose a "read-only viewer" join mode that subscribes without sending ops? (Cheap to add at Phase 1a — server just rejects `op` from `role: viewer` clients.)
 4. What's the trigger for Phase 4a (`patch-text`) vs Phase 4b (Yjs)? Draft threshold: 4a if we see >2% of sessions hit concurrent-`set-text`-on-same-node within 500ms; 4b only if 4a's rejection rate climbs above ~10% (meaning rebases are happening constantly).
+5. When do we drop the REST `GET /boards/{id}` from the load path in favor of using `welcome.snapshot` directly? The data is already there; we'd save one HTTP round-trip on board open. Probably right after Phase 1c (so we can rely on reconnect to recover the snapshot if a hiccup happens during open).
+6. When do we sunset the legacy REST mutation endpoints (`POST/PATCH/DELETE /boards/{id}/notes`, …) entirely? They become unused once Phase 2 ships and the agent emits ops through the room. Removing them tightens the security surface but is a versioned API break.
 
 ---
 
@@ -589,6 +607,9 @@ These cost a few hours of forethought, not a rewrite. They keep the door open wi
 - **2026-05-28** — Hedge for a possible future offline-first pivot: reserve `crdt-update` message kind in the wire protocol (§4) and keep the client's conflict backend swappable. Rationale: a few hours of forethought now avoids a contract change later. The actual offline pivot remains out of scope; see §12 for the cost analysis.
 - **2026-05-28** — WS auth uses a one-shot Redis-backed ticket (§5.4) rather than carrying the JWT in `Sec-WebSocket-Protocol`. Rationale: cleaner alignment with the existing `OAuth2PasswordBearer` flow, short ticket TTL bounds replay risk, and Redis is already in the infrastructure.
 - **2026-05-28** — Op applier targets the existing `GraphStore` API (`add_notes` / `patch_note` / `delete_node` / `add_links` / `remove_link`). Rationale: per-note locking and Qdrant+Postgres dual-write are already implemented there; the room only needs to own sequencing and broadcast ordering.
+- **2026-05-28** — **Collab is the only edit path.** No on/off toggle, no parallel REST save loop, no per-user opt-in. A solo editor is just a "room of size 1." Rationale: the dual-path architecture (REST save loop alongside WS) had two failure modes — split-brain races on save + agent-vs-human silent desync — and they couldn't both be fixed without unifying. Unifying also removes a feature flag (`useCollabMode()`) and lets every Phase 1b correctness invariant apply universally. **Side effect: Phase 2 (agent integration) becomes critical-path for shipping rather than polish.**
+- **2026-05-28** — **Embed-skip fast path in `patch_note`.** Compare `merged.to_embeddable()` to the existing note; equal → `ContentStore.update_payload_only` (no OpenAI). Different → full re-embed. Rationale: every drag-move was hitting OpenAI for no semantic reason and blocking `room.apply_lock` for ~100ms each. Now ~5ms.
+- **2026-05-28** — **75ms outbound coalesce window in the WS adapter.** Buffer local `sendBatch` calls and merge their ops into one wire `op` message. Rationale: typing-burst commits would each hit the server's apply lock individually; coalescing collapses N keystrokes into 1 message + 1 embed. 75ms is below perceptual "live" threshold for peers (Google Docs uses ~200ms, Figma ~50ms).
 
 ---
 

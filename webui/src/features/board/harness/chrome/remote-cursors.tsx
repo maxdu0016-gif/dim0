@@ -11,10 +11,8 @@ import { useCamera, usePresence } from "@canvas-harness/react"
  * Cursor rendering is pure overlay — no canvas hits, no selection.
  * If a peer's `cursor` is null (they've left the surface) we skip them.
  *
- * Phase 0 spike: paired with `useBroadcastCollab` for same-browser
- * multi-tab demos. Same component will work over the Phase 1
- * WebSocket transport with no changes — it only reads from
- * `store.presence`, transport-agnostic.
+ * Transport-agnostic — only reads from `store.presence`, which the WS
+ * adapter (`use-ws-collab`) populates.
  */
 export const RemoteCursors = memo(function RemoteCursors() {
   const camera = useCamera()

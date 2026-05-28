@@ -37,7 +37,7 @@ import {
 import { LinearView, ListView } from "../views"
 import { boardNodeTypes, useRenderCustomNodeView } from "../node-types"
 import { hydrateBoardStore } from "../persist/snapshot-load"
-import { useBoardDebouncedSave, type SaveStatus } from "../persist/use-debounced-save"
+import type { SaveStatus } from "../persist/use-debounced-save"
 import { useBoardAppStore } from "../store/board-app-store"
 import { createBoardStore } from "../store/create-board-store"
 import { useBoardTheme } from "../theme/use-board-theme"
@@ -50,8 +50,6 @@ import { useHydrateIconNodes } from "./use-hydrate-icon-nodes"
 import { usePresentationMode } from "./use-presentation-mode"
 import { useStampNewEdges } from "./use-stamp-new-edges"
 import { useStyleMemory } from "./use-style-memory"
-import { useBroadcastCollab } from "./use-broadcast-collab"
-import { useCollabMode } from "./use-collab-flag"
 import { useLocalPresence } from "./use-local-presence"
 import { useWsCollab } from "./use-ws-collab"
 import { useThumbnailCapture } from "./use-thumbnail-capture"
@@ -135,18 +133,12 @@ export function HarnessCanvas() {
   useThumbnailCapture(store, boardId, ready, theme.minimap)
   usePresentationMode(store, wrapRef, rendererRef)
 
-  // Phase 0 collab spike — same-browser tab-to-tab via BroadcastChannel.
-  // Gated by localStorage "dim0:collab" === "broadcast"; off by default.
-  const collabMode = useCollabMode()
-  const collabEnabled = collabMode !== "off" && ready
-  // In `ws` collab mode the server is the sole writer — turn off the
-  // local REST save loop so the same edit isn't persisted twice.
-  const saveStatus = useBoardDebouncedSave(store, boardId, ready, {
-    enabled: collabMode !== "ws",
-  })
-  useBroadcastCollab(store, boardId, rootId, collabMode === "broadcast" && ready)
-  useWsCollab(store, boardId, collabMode === "ws" && ready)
-  useLocalPresence(store, wrapRef, collabEnabled)
+  // Collab is the only edit path (collab-archi §1). The WS adapter is
+  // mounted unconditionally; presence + local cursor tracking go with it.
+  // The server is the sole writer — no local REST save loop.
+  const saveStatus: SaveStatus = "saved"
+  useWsCollab(store, boardId, ready)
+  useLocalPresence(store, wrapRef, ready)
 
   const styleMemory = useStyleMemory(store)
   const { handleCreateDrag, handleClick } = useCreateHandlers(store, boardId, rootId, styleMemory)

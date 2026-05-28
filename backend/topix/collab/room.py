@@ -95,6 +95,17 @@ class RoomRegistry:
         client = await room.add(socket, user_id)
         return room, client
 
+    def get(self, board_id: str) -> Room | None:
+        """Return the live Room for `board_id` or `None` if no one's connected.
+
+        Used by the agent bridge to decide whether to broadcast: when the
+        board has no listeners, the bridge skips the broadcast and just
+        persists. Reading `self._rooms` synchronously is safe — Python's
+        GIL makes single-attribute access atomic, and a stale read just
+        means a missed (or extra) broadcast attempt, not data corruption.
+        """
+        return self._rooms.get(board_id)
+
     async def leave(self, room: Room, client: Client) -> None:
         """Remove a client; drop the room from the registry if it's now empty."""
         remaining = await room.remove(client)
