@@ -1,13 +1,16 @@
-"""Tests for AgentBoardBridge — server-side mutations should both
-persist via GraphStore *and* broadcast a `peer-op` to live peers in
-the relevant Room."""
+"""Tests for AgentBoardBridge.
+
+Server-side mutations should both persist via GraphStore *and*
+broadcast a `peer-op` to live peers in the relevant Room.
+"""
 
 import asyncio
 import json
+
 from typing import Any
 
 from topix.collab.agent_bridge import AGENT_CLIENT_ID, AgentBoardBridge
-from topix.collab.room import Room, RoomRegistry
+from topix.collab.room import RoomRegistry
 from topix.datatypes.note.link import Link
 from topix.datatypes.note.note import Note
 from topix.datatypes.resource import RichText
@@ -15,9 +18,11 @@ from topix.datatypes.resource import RichText
 
 class _FakeSocket:
     def __init__(self):
+        """Init."""
         self.sent: list[str] = []
 
     async def send_text(self, raw: str) -> None:
+        """Send text."""
         self.sent.append(raw)
 
 
@@ -25,6 +30,7 @@ class _RecordingGraphStore:
     """Records each backing call for the bridge's persist step."""
 
     def __init__(self):
+        """Init."""
         self.add_notes_calls: list[list[Note]] = []
         self.patch_calls: list[dict[str, Any]] = []
         self.delete_node_calls: list[dict[str, Any]] = []
@@ -35,23 +41,29 @@ class _RecordingGraphStore:
         self.patch_returns: Note | None = None
 
     async def add_notes(self, *, nodes):
+        """Add notes."""
         self.add_notes_calls.append(nodes)
 
     async def patch_note(self, *, node_id, data, user_uid):
+        """Patch note."""
         self.patch_calls.append({"node_id": node_id, "data": data, "user_uid": user_uid})
         return self.patch_returns or Note(id=node_id, graph_uid="b1")
 
     async def delete_node(self, *, node_id, user_uid):
+        """Delete node."""
         self.delete_node_calls.append({"node_id": node_id, "user_uid": user_uid})
 
     async def add_links(self, *, links):
+        """Add links."""
         self.add_links_calls.append(links)
 
     async def delete_link(self, *, link_id):
+        """Delete link."""
         self.delete_link_calls.append(link_id)
 
 
 def _make_note(note_id: str = "n1") -> Note:
+    """Make note."""
     return Note(
         id=note_id,
         graph_uid="b1",
@@ -61,6 +73,7 @@ def _make_note(note_id: str = "n1") -> Note:
 
 
 async def test_add_notes_persists_and_broadcasts_when_room_exists():
+    """Add notes persists and broadcasts when room exists."""
     registry = RoomRegistry()
     store = _RecordingGraphStore()
     bridge = AgentBoardBridge(graph_store=store, registry=registry)
@@ -101,6 +114,7 @@ async def test_no_broadcast_when_no_room_exists():
 
 
 async def test_patch_note_broadcasts_node_update():
+    """Patch note broadcasts node update."""
     registry = RoomRegistry()
     store = _RecordingGraphStore()
     bridge = AgentBoardBridge(graph_store=store, registry=registry)
@@ -130,9 +144,11 @@ async def test_patch_note_broadcasts_node_update():
 
 
 async def test_patch_note_with_unsupported_patch_still_persists():
-    """A patch dict that has no scene-graph-primitive fields persists
-    but produces an empty wire patch — the bridge skips the broadcast
-    (no observable op for peers)."""
+    """Patch with no scene-graph fields persists but skips the broadcast.
+
+    Such a patch produces an empty wire patch, so the bridge sends no
+    `peer-op` (no observable op for peers).
+    """
     registry = RoomRegistry()
     store = _RecordingGraphStore()
     bridge = AgentBoardBridge(graph_store=store, registry=registry)
@@ -153,6 +169,7 @@ async def test_patch_note_with_unsupported_patch_still_persists():
 
 
 async def test_delete_node_broadcasts_node_remove():
+    """Delete node broadcasts node remove."""
     registry = RoomRegistry()
     store = _RecordingGraphStore()
     bridge = AgentBoardBridge(graph_store=store, registry=registry)
@@ -168,6 +185,7 @@ async def test_delete_node_broadcasts_node_remove():
 
 
 async def test_add_links_broadcasts_edge_add():
+    """Add links broadcasts edge add."""
     registry = RoomRegistry()
     store = _RecordingGraphStore()
     bridge = AgentBoardBridge(graph_store=store, registry=registry)
@@ -186,6 +204,7 @@ async def test_add_links_broadcasts_edge_add():
 
 
 async def test_seq_is_monotonic_per_room():
+    """Seq is monotonic per room."""
     registry = RoomRegistry()
     store = _RecordingGraphStore()
     bridge = AgentBoardBridge(graph_store=store, registry=registry)
@@ -202,8 +221,10 @@ async def test_seq_is_monotonic_per_room():
 
 
 async def test_broadcast_runs_under_same_lock_as_seq_assignment():
-    """Concurrent bridge calls must produce strictly increasing seqs
-    and per-peer-ordered peer-op frames."""
+    """Concurrent bridge calls must serialize cleanly.
+
+    Strictly increasing seqs and per-peer-ordered peer-op frames.
+    """
     registry = RoomRegistry()
     store = _RecordingGraphStore()
     bridge = AgentBoardBridge(graph_store=store, registry=registry)

@@ -1,5 +1,4 @@
-"""Server-side bridge that lets the agent appear to other peers as a
-client of the collab room.
+"""Server-side bridge that lets the agent appear as a room client.
 
 The agent runs in-process, not over a WebSocket — but with "collab is
 the only edit path" (collab-archi §1) every mutation must produce a
@@ -18,6 +17,7 @@ post-mutation snapshot via the welcome handshake.
 import json
 import logging
 import time
+
 from typing import Any
 
 from topix.collab.note_to_wire import (
@@ -30,7 +30,6 @@ from topix.datatypes.note.link import Link
 from topix.datatypes.note.note import Note
 from topix.store.graph import GraphStore
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -38,8 +37,7 @@ AGENT_CLIENT_ID = "agent"
 
 
 class AgentBoardBridge:
-    """Mutates the board via GraphStore *and* broadcasts a peer-op so
-    connected browsers see the change in real time.
+    """Mutate the board via GraphStore and broadcast the matching peer-op.
 
     Public surface mirrors the subset of `GraphStore` that agent tools
     actually call. Each method:
@@ -50,6 +48,7 @@ class AgentBoardBridge:
     """
 
     def __init__(self, graph_store: GraphStore, registry: RoomRegistry):
+        """Wrap the given graph_store + room registry."""
         self._graph_store = graph_store
         self._registry = registry
 

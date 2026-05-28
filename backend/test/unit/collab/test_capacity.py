@@ -2,8 +2,6 @@
 
 from unittest.mock import AsyncMock
 
-import pytest
-
 from topix.collab.capacity import (
     DEFAULT_CAP,
     cap_for_plan,
@@ -12,11 +10,13 @@ from topix.collab.capacity import (
 
 
 def test_cap_for_plan_known_tiers():
+    """Cap for plan known tiers."""
     assert cap_for_plan("free") == 5
     assert cap_for_plan("plus") == 20
 
 
 def test_cap_for_plan_unknown_or_none_uses_free_default():
+    """Cap for plan unknown or none uses free default."""
     assert cap_for_plan(None) == DEFAULT_CAP
     assert cap_for_plan("enterprise") == DEFAULT_CAP
     assert cap_for_plan("") == DEFAULT_CAP
@@ -24,12 +24,15 @@ def test_cap_for_plan_unknown_or_none_uses_free_default():
 
 class _Billing:
     def __init__(self, plan):
+        """Init."""
         self.plan = plan
 
 
 async def test_get_room_cap_uses_owners_plan_not_joiners():
-    """Capacity is derived from the BOARD'S OWNER's plan, regardless
-    of which user is currently joining."""
+    """Capacity comes from the board's owner, not the joining user.
+
+    Looks up the owner's plan regardless of which user is connecting.
+    """
     graph_store = AsyncMock()
     graph_store.get_owner_uid = AsyncMock(return_value="alice")
     billing_store = AsyncMock()

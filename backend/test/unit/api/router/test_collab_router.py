@@ -72,9 +72,11 @@ class _FakeGraphStore:
 
 
 class _FakeUserBillingStore:
-    """Stub UserBillingStore — only `get_user_billing` is consulted by
-    the capacity check. A None return means the owner has no billing
-    row, which the capacity module treats as the free-tier cap (5)."""
+    """Stub UserBillingStore — only `get_user_billing` is consulted.
+
+    A None return means the owner has no billing row, which the
+    capacity module treats as the free-tier cap (5).
+    """
 
     def __init__(self, plan: str | None = None):
         # If `plan` is None, we behave as "no row" (free default).
@@ -194,7 +196,7 @@ def test_ws_rejects_ticket_for_different_board():
 # ---------------------------------------------------------------------------
 
 def _mint_tickets(app, role: str = "member", **bindings):
-    """Helper to mint many tickets in one synchronous block.
+    """Mint many tickets in one synchronous block.
 
     `role` defaults to "member" so tests of edit paths keep working
     without changes; viewer / owner tests pass it explicitly.
@@ -246,9 +248,10 @@ def test_ws_relays_presence_between_peers():
 
 
 def test_ws_op_message_sequences_and_broadcasts_peer_op():
-    """An incoming `op` is applied via apply_batch, assigned a seq,
-    broadcast as `peer-op` to other clients, and acked back to the
-    sender as `op-applied`.
+    """An incoming `op` is sequenced, applied, broadcast, and acked.
+
+    Verifies the full flow: `apply_batch` runs, a seq is assigned, a
+    `peer-op` reaches other clients, and the sender gets `op-applied`.
     """
     client, app = _build_app()
     tickets = _mint_tickets(app, t1=("u1", "b1"), t2=("u2", "b1"))
@@ -372,8 +375,11 @@ def test_ticket_mint_404s_for_unaffiliated_user():
 
 
 def test_ws_viewer_op_is_rejected_with_op_rejected():
-    """A viewer connecting and sending `op` receives `op-rejected`; the
-    underlying GraphStore is never touched."""
+    """A viewer's `op` is bounced with `op-rejected`.
+
+    Connecting works; sending `op` returns `op-rejected` and the
+    underlying GraphStore is never touched.
+    """
     client, app = _build_app(role="viewer")
     tickets = _mint_tickets(app, role="viewer", t=("u1", "b1"))
 
@@ -425,6 +431,7 @@ def test_ws_member_op_still_applies_normally():
 def test_ws_room_full_closes_sixth_join_on_free_plan():
     """Free-tier owners cap their rooms at 5 actors; the 6th gets 4429."""
     from contextlib import ExitStack
+
     from starlette.websockets import WebSocketDisconnect
 
     client, app = _build_app(role="member", plan="free")  # cap = 5

@@ -1,5 +1,7 @@
-"""Server-side op applier — translates canvas-harness wire ops into
-existing `GraphStore` mutations.
+"""Server-side op applier.
+
+Translates canvas-harness wire ops into existing `GraphStore`
+mutations.
 
 Scope (Phase 1b first cut):
   - node.update for the scene-graph primitives (x, y, w, h, z, angle,
@@ -21,6 +23,7 @@ Deferred (still log + return `unsupported`):
 
 import logging
 import math
+
 from typing import Any, Literal
 
 from pydantic import BaseModel
@@ -29,7 +32,6 @@ from topix.datatypes.note.link import Link
 from topix.datatypes.note.note import Note
 from topix.store.graph import GraphStore
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -37,9 +39,12 @@ RAD_TO_DEG = 180.0 / math.pi
 
 
 class WireOpResult(BaseModel):
-    """Outcome of applying one op. `applied=True` means the DB write
-    happened; `applied=False` means the op was unsupported but the
-    relay should still broadcast it to peers (best-effort)."""
+    """Outcome of applying one op.
+
+    `applied=True` means the DB write happened; `applied=False` means
+    the op was unsupported but the relay should still broadcast it to
+    peers (best-effort).
+    """
 
     applied: bool
     op_type: str
@@ -71,7 +76,7 @@ async def apply_batch(
     return results
 
 
-async def _apply_one(
+async def _apply_one(  # noqa: C901 — dispatcher across op kinds; readability beats trimming branches
     *,
     graph_store: GraphStore,
     board_id: str,
@@ -145,11 +150,11 @@ async def _apply_one(
 
 
 def _node_patch_to_note_data(patch: dict[str, Any]) -> dict[str, Any]:
-    """Convert a canvas-harness `Partial<Node>` patch into the snake_case
-    Note patch dict that `graph_store.patch_note` expects.
+    """Convert a canvas-harness `Partial<Node>` patch into a Note patch dict.
 
-    Only handles the scene-graph primitives that ship in Phase 1b's first
-    cut. Style / data depth lands incrementally.
+    Only handles the scene-graph primitives that ship in Phase 1b's
+    first cut (`x, y, w, h, z, angle, content`). Style / data depth
+    lands incrementally.
     """
     properties: dict[str, Any] = {}
     if "x" in patch or "y" in patch:

@@ -7,6 +7,7 @@ lazily on first join and torn down when the last client leaves.
 """
 
 import asyncio
+import json
 import logging
 import uuid
 
@@ -106,11 +107,38 @@ class Room:
                 # over one failed send.
                 logger.debug("collab broadcast send failed", exc_info=True)
 
+    async def kick_user(self, user_id: str, *, reason: str) -> int:
+        """Send `kick { reason }` to every socket owned by `user_id`, then close.
+
+        Returns the number of sockets kicked (zero if the user has no
+        live sessions in this room). Multi-tab users get every tab
+        kicked — we iterate by `user_id`, not by `client_id`. We don't
+        pop the clients from `self.clients` here; the per-socket WS
+        handler's `finally` block calls `registry.leave` on its own
+        when the close lands.
+        """
+        async with self.lock:
+            victims = [c for c in self.clients.values() if c.user_id == user_id]
+        frame = json.dumps({"kind": "kick", "reason": reason})
+        kicked = 0
+        for c in victims:
+            try:
+                await c.socket.send_text(frame)
+            except Exception:
+                logger.debug("collab kick frame send failed", exc_info=True)
+            try:
+                await c.socket.close(code=1000, reason=reason)
+            except Exception:
+                logger.debug("collab kick socket close failed", exc_info=True)
+            kicked += 1
+        return kicked
+
 
 class RoomRegistry:
     """Lazily-created per-board Room instances for one worker process."""
 
     def __init__(self) -> None:
+        """Initialize an empty registry — rooms are created on first join."""
         self._rooms: dict[str, Room] = {}
         self._lock = asyncio.Lock()
 

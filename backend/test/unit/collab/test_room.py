@@ -11,10 +11,12 @@ class FakeSocket:
     """Stand-in for fastapi.WebSocket — only `send_text` is exercised."""
 
     def __init__(self, *, fail: bool = False):
+        """Build a fake socket; `fail=True` makes `send_text` raise."""
         self.sent: list[str] = []
         self.fail = fail
 
     async def send_text(self, raw: str) -> None:
+        """Record the frame or raise when `fail` is set."""
         if self.fail:
             raise RuntimeError("dead socket")
         self.sent.append(raw)

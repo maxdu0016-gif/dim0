@@ -25,8 +25,7 @@ import logging
 
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Path, Query, Request, Response, WebSocket, WebSocketDisconnect, status
-from fastapi import Depends
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, Response, WebSocket, WebSocketDisconnect, status
 
 from topix.api.utils.decorators import with_standard_response
 from topix.api.utils.security import get_current_user_uid

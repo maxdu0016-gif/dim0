@@ -16,11 +16,11 @@ extra tabs the same user opens. The agent does NOT count: it uses
 """
 
 import logging
+
 from typing import Final
 
 from topix.store.graph import GraphStore
 from topix.store.user_billing import UserBillingStore
-
 
 logger = logging.getLogger(__name__)
 

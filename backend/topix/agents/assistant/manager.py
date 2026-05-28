@@ -9,7 +9,6 @@ from collections.abc import AsyncGenerator
 from topix.agents.assistant.auto_model import classify_auto_model_complexity
 from topix.agents.assistant.plan import Plan
 from topix.agents.config import AssistantManagerConfig
-from topix.collab.agent_bridge import AgentBoardBridge
 from topix.agents.datatypes.context import ReasoningContext
 from topix.agents.datatypes.model_enum import ModelEnum
 from topix.agents.datatypes.outputs import CreateNoteOutput, LinkNotesOutput, WriteNoteOutput
@@ -25,6 +24,7 @@ from topix.agents.notes.layout import rearrange_created_notes
 from topix.agents.run import AgentRunner
 from topix.agents.sessions import AssistantSession
 from topix.agents.utils.text import post_process_url_citations
+from topix.collab.agent_bridge import AgentBoardBridge
 from topix.datatypes.chat.chat import Message
 from topix.datatypes.property import ReasoningProperty, TextProperty
 from topix.datatypes.resource import RichText

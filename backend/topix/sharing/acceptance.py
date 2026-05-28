@@ -16,7 +16,6 @@ from topix.store.postgres.graph_user import (
 )
 from topix.store.postgres.user import get_user_id_by_uid
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -25,7 +24,7 @@ _ROLE_RANK = {"viewer": 1, "member": 2, "owner": 3}
 
 
 def _wins(candidate: str, existing: str | None) -> bool:
-    """True if `candidate` strictly outranks `existing`."""
+    """Return True iff `candidate` strictly outranks `existing`."""
     if existing is None:
         return True
     return _ROLE_RANK.get(candidate, 0) > _ROLE_RANK.get(existing, 0)

@@ -29,6 +29,8 @@ from topix.store.postgres.graph_user import (
     get_graph_role_by_user_uid,
     get_owner_uid_by_graph_uid,
     list_graphs_by_user_uid,
+    list_members_for_graph,
+    remove_user_from_graph_by_uid,
 )
 from topix.store.postgres.pool import create_pool
 from topix.store.qdrant.store import ContentStore
@@ -454,6 +456,18 @@ class GraphStore:
         """Return the user_uid of the board's owner, or None when missing."""
         async with self._pg_pool.acquire() as conn:
             return await get_owner_uid_by_graph_uid(conn, graph_uid)
+
+    async def list_members(self, graph_uid: str) -> list[dict]:
+        """Owner-facing list of `(user_uid, email, role, joined_at)`."""
+        async with self._pg_pool.acquire() as conn:
+            return await list_members_for_graph(conn, graph_uid)
+
+    async def remove_member(self, graph_uid: str, user_uid: str) -> int:
+        """Drop one graph_user row. Returns the row count removed (0 or 1)."""
+        async with self._pg_pool.acquire() as conn:
+            return await remove_user_from_graph_by_uid(
+                conn, user_uid=user_uid, graph_uid=graph_uid,
+            )
 
     async def get_graph_role(self, graph_uid: str, user_uid: str) -> str | None:
         """Return user's graph role, or None if user has no access."""

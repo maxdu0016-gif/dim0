@@ -178,9 +178,11 @@ async def test_combined_position_and_content_takes_full_path() -> None:
 
 @pytest.mark.asyncio
 async def test_patch_with_identical_text_still_skips_embed() -> None:
-    """A patch that nominally touches content but doesn't change its
-    value still skips the embed — `to_embeddable()` equality is what
-    matters, not whether the dict had a `content` key."""
+    """Patches whose embeddable text is unchanged take the fast path.
+
+    `to_embeddable()` equality is what matters, not whether the patch
+    dict had a `content` key.
+    """
     store = _build_store()
     note = _build_note()
     store.get_nodes = AsyncMock(return_value=[note])

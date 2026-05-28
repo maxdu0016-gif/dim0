@@ -110,6 +110,37 @@ async def get_graph_role_by_user_uid(
     return await conn.fetchval(query, graph_id, user_id)
 
 
+async def list_members_for_graph(
+    conn: asyncpg.Connection,
+    graph_uid: str,
+) -> list[dict]:
+    """Return the members of a board for the owner's "People with access" UI.
+
+    Ordered owner → member → viewer, alphabetical by email within each
+    group. Each row carries `(user_uid, email, role, joined_at)`.
+    """
+    rows = await conn.fetch(
+        "SELECT u.uid AS user_uid, u.email, gu.role, gu.created_at AS joined_at "
+        "FROM graph_user gu "
+        "JOIN users u ON u.id = gu.user_id "
+        "JOIN graphs g ON g.id = gu.graph_id "
+        "WHERE g.uid = $1 "
+        "ORDER BY "
+        " CASE gu.role WHEN 'owner' THEN 0 WHEN 'member' THEN 1 ELSE 2 END, "
+        " LOWER(u.email)",
+        graph_uid,
+    )
+    return [
+        {
+            "user_uid": row["user_uid"],
+            "email": row["email"],
+            "role": row["role"],
+            "joined_at": row["joined_at"].isoformat() if row["joined_at"] else None,
+        }
+        for row in rows
+    ]
+
+
 async def get_owner_uid_by_graph_uid(
     conn: asyncpg.Connection,
     graph_uid: str,

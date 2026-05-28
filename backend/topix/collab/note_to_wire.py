@@ -9,11 +9,11 @@ via attachSync's remote-batch path.
 """
 
 import math
+
 from typing import Any
 
 from topix.datatypes.note.link import Link
 from topix.datatypes.note.note import Note
-
 
 DEG_TO_RAD = math.pi / 180.0
 
@@ -70,9 +70,8 @@ def link_to_wire_edge(link: Link) -> dict[str, Any]:
     }
 
 
-def patch_data_to_wire_patch(data: dict[str, Any]) -> dict[str, Any]:
-    """Translate a Dim0 patch_note `data` dict into a canvas-harness
-    `Partial<Node>` patch.
+def patch_data_to_wire_patch(data: dict[str, Any]) -> dict[str, Any]:  # noqa: C901 — wide field-by-field translator
+    """Translate a Dim0 patch_note `data` dict into a `Partial<Node>` wire patch.
 
     Inverse of `_node_patch_to_note_data` in apply_ops.py. Only handles
     the scene-graph primitives shipped in Phase 1b — style / data depth
@@ -116,8 +115,11 @@ def patch_data_to_wire_patch(data: dict[str, Any]) -> dict[str, Any]:
 
 
 def _properties_minus_lifted(props) -> dict[str, Any]:
-    """Strip the three lifted properties (position, size, z) so they
-    don't shadow `node.x/y/w/h/z` in the wire payload."""
+    """Strip the three lifted properties before serializing to wire.
+
+    Removes position/size/z so they don't shadow `node.x/y/w/h/z` in
+    the wire payload.
+    """
     dumped = props.model_dump(exclude_none=True)
     dumped.pop("node_position", None)
     dumped.pop("node_size", None)
@@ -126,8 +128,11 @@ def _properties_minus_lifted(props) -> dict[str, Any]:
 
 
 def _canvas_type_for(note: Note) -> str:
-    """Mirror the client's `dim0TypeToCanvas`: documents get the
-    'document' canvas type; everything else uses style.type as-is."""
+    """Mirror the client's `dim0TypeToCanvas` mapping.
+
+    Documents get the `'document'` canvas type; everything else uses
+    `style.type` as-is.
+    """
     if note.type == "document":
         return "document"
     return str(note.style.type) if note.style and note.style.type else "rect"

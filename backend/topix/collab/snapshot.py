@@ -37,11 +37,12 @@ async def read_snapshot_payload(
     board_id: str,
     root_id: str | None = None,
 ) -> dict[str, Any]:
-    """Read the board graph and dump it to JSON. No locking — the
-    caller decides whether the read needs to be serialized.
+    """Read the board graph and dump it to JSON.
 
-    Returns `{}` when the board has no graph yet or the read raises;
-    we'd rather emit an empty welcome than crash the WS handshake.
+    No locking — the caller decides whether the read needs to be
+    serialized. Returns `{}` when the board has no graph yet or the
+    read raises; we'd rather emit an empty welcome than crash the WS
+    handshake.
     """
     try:
         graph = await graph_store.get_graph(graph_uid=board_id, root_id=root_id)
@@ -58,12 +59,12 @@ async def build_welcome_snapshot(
     board_id: str,
     root_id: str | None = None,
 ) -> SnapshotEnvelope:
-    """Convenience: acquires `room.lock`, reads `(seq, graph)`, releases.
+    """Acquire `room.lock`, read `(seq, graph)`, release.
 
-    Used by tests and ad-hoc callers. The WS handler inlines lock +
-    welcome-send instead of using this — it must keep the lock held
-    *through* the send so a concurrent op can't broadcast a `peer-op`
-    ahead of the joiner's `welcome`.
+    Convenience wrapper used by tests and ad-hoc callers. The WS
+    handler inlines lock + welcome-send instead of using this — it
+    must keep the lock held *through* the send so a concurrent op
+    can't broadcast a `peer-op` ahead of the joiner's `welcome`.
     """
     async with room.lock:
         seq = room.seq

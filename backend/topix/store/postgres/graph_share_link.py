@@ -38,8 +38,10 @@ async def insert_share_link(
 async def get_active_link(
     conn: asyncpg.Connection, *, token: str,
 ) -> dict | None:
-    """Look up an unrevoked link by token. Returns a dict with
-    `(graph_uid, role)` or `None` when the token is unknown or revoked.
+    """Look up an unrevoked link by token.
+
+    Returns a dict with `(graph_uid, role)` or `None` when the token
+    is unknown or revoked.
     """
     row = await conn.fetchrow(
         "SELECT g.uid AS graph_uid, l.role "

@@ -1,5 +1,6 @@
-"""Board sharing module — share-link mint / consume / revoke and the
-membership-acceptance flow.
+"""Board sharing module.
+
+Share-link mint / consume / revoke and the membership-acceptance flow.
 
 Companion to [topix.collab](../collab/__init__.py):
   * `collab` is the real-time transport (how concurrent editors coordinate).

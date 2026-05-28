@@ -1,12 +1,12 @@
-"""Sharing router — share-link mint / list / revoke + accept + preview.
+"""Sharing router.
 
-Member-management endpoints (`GET /boards/{id}/members`,
-`DELETE /boards/{id}/members/{user_id}`) and the revoke-triggers-kick
-behavior land in Slice 3.
+Share-link mint / list / revoke + accept + preview + member list /
+remove (with live kick).
 """
 
 import logging
-from typing import Annotated, Literal
+
+from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Request, Response
 
@@ -17,7 +17,6 @@ from topix.api.utils.security import (
 )
 from topix.sharing import acceptance, links
 from topix.store.graph import GraphStore
-
 
 logger = logging.getLogger(__name__)
 
@@ -140,6 +139,77 @@ async def preview_share_link(
     if info is None:
         raise HTTPException(status_code=404, detail="Share link not found or revoked")
     return {"graph_uid": info["graph_uid"], "role": info["role"]}
+
+
+@router.get("/boards/{graph_id}/members/", include_in_schema=False)
+@router.get("/boards/{graph_id}/members")
+@with_standard_response
+async def list_board_members(
+    response: Response,
+    request: Request,
+    graph_id: Annotated[str, Path(description="Graph ID")],
+    user_id: Annotated[str, Depends(get_current_user_uid)],
+    _: Annotated[None, Depends(verify_board_owner)],
+):
+    """Owner-only listing of everyone with access to this board.
+
+    Returns owner first, then members, then viewers, alphabetical by
+    email within each group. Used by the share dialog's "People with
+    access" panel.
+    """
+    store: GraphStore = request.app.graph_store
+    members = await store.list_members(graph_id)
+    return {"members": members}
+
+
+@router.delete("/boards/{graph_id}/members/{user_uid}/", include_in_schema=False)
+@router.delete("/boards/{graph_id}/members/{user_uid}")
+@with_standard_response
+async def remove_board_member(
+    response: Response,
+    request: Request,
+    graph_id: Annotated[str, Path(description="Graph ID")],
+    user_uid: Annotated[str, Path(description="UID of the user to remove")],
+    user_id: Annotated[str, Depends(get_current_user_uid)],
+    _: Annotated[None, Depends(verify_board_owner)],
+):
+    """Owner-only: drop a user's access AND kick their live sockets.
+
+    Refuses to remove the owner (400 — "owner cannot be removed").
+    For unknown / not-yet-member users, returns 404. On success, drops
+    the `graph_user` row, then iterates the room's live clients and
+    closes any belonging to that user with `kick { reason:
+    "access-revoked" }`.
+    """
+    store: GraphStore = request.app.graph_store
+
+    # Defensive: the owner cannot be self-removed or removed by another
+    # caller (the latter is impossible here since this is owner-only,
+    # but the same endpoint will guard if we ever extend it).
+    target_role = await store.get_graph_role(graph_uid=graph_id, user_uid=user_uid)
+    if target_role == "owner":
+        raise HTTPException(
+            status_code=400,
+            detail="The board owner cannot be removed. Transfer ownership first.",
+        )
+
+    removed = await store.remove_member(graph_id, user_uid)
+    if removed == 0:
+        raise HTTPException(status_code=404, detail="User is not a member of this board")
+
+    # Best-effort live kick — pull the live Room if any, send `kick`
+    # to every socket belonging to the removed user.
+    registry = request.app.collab_rooms
+    room = registry.get(graph_id)
+    kicked = 0
+    if room is not None:
+        kicked = await room.kick_user(user_uid, reason="access-revoked")
+        logger.info(
+            "share: removed user=%s from board=%s; kicked %d live session(s)",
+            user_uid, graph_id, kicked,
+        )
+
+    return {"removed": True, "kicked_sessions": kicked}
 
 
 @router.post("/share-links/{token}/accept/", include_in_schema=False)

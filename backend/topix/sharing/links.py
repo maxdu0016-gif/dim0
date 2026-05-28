@@ -6,12 +6,12 @@ expected role values) so the postgres layer stays pure SQL.
 """
 
 import secrets
+
 from typing import Literal
 
 import asyncpg
 
 from topix.store.postgres import graph_share_link as gsl
-
 
 ShareRole = Literal["member", "viewer"]
 
