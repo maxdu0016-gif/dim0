@@ -121,6 +121,7 @@ type InboundMessage =
   | { kind: "welcome"; seq: number; snapshot: unknown }
   | { kind: "peer-op"; seq: number; batch: OpBatch }
   | { kind: "op-applied"; seq: number; client_seq: number }
+  | { kind: "op-rejected"; client_seq: number; reason?: string }
   | { kind: "presence"; clientId: ClientId; state: PresenceState }
   | { kind: "presence-leave"; clientId: ClientId }
   | { kind: "hello"; clientId: ClientId }
@@ -243,6 +244,16 @@ const createWebSocketSyncAdapter = ({
     }
     if (msg.kind === "op-applied") {
       if (msg.seq > lastServerSeq) lastServerSeq = msg.seq
+      return
+    }
+    if (msg.kind === "op-rejected") {
+      // The server bounced our op (most commonly: a viewer trying to
+      // mutate). The user-facing surface is the read-only banner +
+      // any toast wired at a higher level; we just log here. The
+      // local store keeps the optimistic mutation — refresh wins.
+      console.warn(
+        `collab: op rejected client_seq=${msg.client_seq} reason=${msg.reason ?? "(none)"}`,
+      )
       return
     }
     if (msg.kind === "presence") {
