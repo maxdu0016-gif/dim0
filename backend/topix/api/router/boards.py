@@ -182,6 +182,10 @@ async def get_graph(
     return {
         "graph": graph.model_dump(exclude_none=True),
         "can_edit": can_edit,
+        # `role` is one of "owner" | "member" | "viewer" | None
+        # (None for public-visibility boards a non-member is viewing).
+        # The frontend uses this to gate the Share button (owner-only).
+        "role": role,
     }
 
 

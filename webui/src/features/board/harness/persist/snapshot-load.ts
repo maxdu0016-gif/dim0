@@ -1,5 +1,5 @@
 import type { CanvasStore, Node } from "@canvas-harness/core"
-import { getBoard } from "@/features/board/api/get-board"
+import { getBoard, type BoardRole } from "@/features/board/api/get-board"
 import type { Graph } from "@/features/board/types/board"
 import { linkToEdge } from "../convert/link-to-edge"
 import { noteToNode } from "../convert/note-to-node"
@@ -8,6 +8,7 @@ import { noteToNode } from "../convert/note-to-node"
 export type HydrateResult = {
   graph: Graph
   canEdit: boolean
+  role: BoardRole
 }
 
 
@@ -36,12 +37,12 @@ export const hydrateBoardStore = async (
   },
 ): Promise<HydrateResult> => {
   const { boardId, rootId, isCancelled } = opts
-  const { graph, canEdit } = await getBoard(boardId, rootId)
+  const { graph, canEdit, role } = await getBoard(boardId, rootId)
 
   // Bail before any conversion or store mutation if a newer scope has
   // taken over. We still return the fetched graph so the caller's
   // (also-cancelled) `.then` doesn't NPE in unusual shapes.
-  if (isCancelled?.()) return { graph, canEdit }
+  if (isCancelled?.()) return { graph, canEdit, role }
 
   const notes = graph.nodes ?? []
   const links = graph.edges ?? []
@@ -63,5 +64,5 @@ export const hydrateBoardStore = async (
   })
   store.clearHistory()
 
-  return { graph, canEdit }
+  return { graph, canEdit, role }
 }

@@ -37,6 +37,7 @@ import {
 import { LinearView, ListView } from "../views"
 import { boardNodeTypes, useRenderCustomNodeView } from "../node-types"
 import { hydrateBoardStore } from "../persist/snapshot-load"
+import { ShareButton } from "@/features/sharing/share-button"
 import type { SaveStatus } from "../persist/use-debounced-save"
 import { useBoardAppStore } from "../store/board-app-store"
 import { createBoardStore } from "../store/create-board-store"
@@ -78,6 +79,7 @@ export function HarnessCanvas() {
   const canEdit = useBoardAppStore((s) => s.canEdit)
   const setIsLoading = useBoardAppStore((s) => s.setIsLoading)
   const setCanEdit = useBoardAppStore((s) => s.setCanEdit)
+  const setBoardRole = useBoardAppStore((s) => s.setBoardRole)
   const setBoardLabel = useBoardAppStore((s) => s.setBoardLabel)
   const setBoardVisibility = useBoardAppStore((s) => s.setBoardVisibility)
 
@@ -218,9 +220,10 @@ export function HarnessCanvas() {
       rootId: rootId ?? undefined,
       isCancelled: () => cancelled,
     })
-      .then(({ graph, canEdit }) => {
+      .then(({ graph, canEdit, role }) => {
         if (cancelled) return
         setCanEdit(canEdit)
+        setBoardRole(role)
         setBoardLabel(graph.label ?? "")
         if (graph.visibility === "private" || graph.visibility === "public") {
           setBoardVisibility(graph.visibility)
@@ -354,6 +357,7 @@ function HarnessCanvasInner({
       */}
       <HarnessToolbar />
       <HarnessSaveStatus status={saveStatus} />
+      <ShareButton />
       <NodeSurfaceHost />
       <SlidesSheet />
       <PresentationOverlay />
