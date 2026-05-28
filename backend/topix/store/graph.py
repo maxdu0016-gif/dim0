@@ -446,11 +446,15 @@ class GraphStore:
             hard_delete=hard_delete
         )
 
-    async def list_graphs(self, user_uid: str) -> list[Graph]:
-        """List all graphs' ids and labels for a user."""
+    async def list_graphs(self, user_uid: str) -> list[tuple[Graph, str, str | None]]:
+        """List the user's boards with their per-board role + owner email.
+
+        Returns one tuple per accessible board: `(graph, role, owner_email)`.
+        The role drives the sidebar's "My boards" / "Shared with me"
+        split; owner_email surfaces as a hint on shared rows.
+        """
         async with self._pg_pool.acquire() as conn:
-            graphs = await list_graphs_by_user_uid(conn, user_uid)
-        return graphs
+            return await list_graphs_by_user_uid(conn, user_uid)
 
     async def get_owner_uid(self, graph_uid: str) -> str | None:
         """Return the user_uid of the board's owner, or None when missing."""

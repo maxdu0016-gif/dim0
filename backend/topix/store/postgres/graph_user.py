@@ -42,33 +42,55 @@ async def add_user_to_graph_by_uid(
 async def list_graphs_by_user_uid(
     conn: asyncpg.Connection,
     user_uid: str
-) -> list[Graph]:
-    """Return list of (graph_uid, role) for all graphs the user has access to."""
+) -> list[tuple[Graph, str, str | None]]:
+    """List every board the user can access; one row per (board, user).
+
+    Returns a tuple per row: `(graph, role, owner_email)`.
+      - `role` is the user's role on that board ("owner" | "member" | "viewer").
+      - `owner_email` is the email of the board's owner, or `None` if the
+         board has no owner row (shouldn't happen but defensive).
+
+    Used by the sidebar's "My boards" / "Shared with me" split — the
+    role discriminator drives the bucketing, and owner_email surfaces
+    in the tooltip on shared rows.
+    """
     user_id = await get_user_id_by_uid(conn, user_uid)
     if user_id is None:
         return []
 
+    # Self-join to also pull the OWNER's email per row. LEFT JOIN so a
+    # board with a missing owner row still shows up (defensive).
     query = (
-        "SELECT g.id, g.uid, g.label, g.readonly, g.thumbnail, g.created_at, g.updated_at, g.deleted_at "
+        "SELECT g.id, g.uid, g.label, g.readonly, g.thumbnail, "
+        "       g.created_at, g.updated_at, g.deleted_at, "
+        "       gu.role AS user_role, "
+        "       owner_u.email AS owner_email "
         "FROM graph_user gu JOIN graphs g ON gu.graph_id = g.id "
+        "LEFT JOIN graph_user owner_gu "
+        "  ON owner_gu.graph_id = g.id AND owner_gu.role = 'owner' "
+        "LEFT JOIN users owner_u ON owner_u.id = owner_gu.user_id "
         "WHERE gu.user_id = $1 "
         "AND g.deleted_at IS NULL "
         "ORDER BY COALESCE(g.updated_at, g.created_at) DESC"
     )
     rows = await conn.fetch(query, user_id)
 
-    # List of graph objects
     return [
-        Graph(
-            id=row['id'],
-            uid=row['uid'],
-            label=row['label'],
-            readonly=row['readonly'],
-            thumbnail=row['thumbnail'],
-            created_at=row['created_at'].isoformat() if row['created_at'] else None,
-            updated_at=row['updated_at'].isoformat() if row['updated_at'] else None,
-            deleted_at=row['deleted_at'].isoformat() if row['deleted_at'] else None
-        ) for row in rows
+        (
+            Graph(
+                id=row['id'],
+                uid=row['uid'],
+                label=row['label'],
+                readonly=row['readonly'],
+                thumbnail=row['thumbnail'],
+                created_at=row['created_at'].isoformat() if row['created_at'] else None,
+                updated_at=row['updated_at'].isoformat() if row['updated_at'] else None,
+                deleted_at=row['deleted_at'].isoformat() if row['deleted_at'] else None,
+            ),
+            row['user_role'],
+            row['owner_email'],
+        )
+        for row in rows
     ]
 
 
