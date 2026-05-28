@@ -1,6 +1,7 @@
 export { CanvasContextMenu } from "./canvas-context-menu"
 export { NodeSurfaceHost } from "./node-surface-host"
 export { PresentationControls } from "./presentation-controls"
+export { RemoteCursors } from "./remote-cursors"
 export { HarnessSaveStatus } from "./save-status"
 export { SlidesPanel } from "./slides-panel"
 export { StyleSidebar } from "./style-panel"

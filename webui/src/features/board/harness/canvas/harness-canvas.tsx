@@ -30,6 +30,7 @@ import {
   HarnessViewportControls,
   NodeSurfaceHost,
   PresentationControls,
+  RemoteCursors,
   SlidesPanel,
   StyleSidebar,
 } from "../chrome"
@@ -49,6 +50,9 @@ import { useHydrateIconNodes } from "./use-hydrate-icon-nodes"
 import { usePresentationMode } from "./use-presentation-mode"
 import { useStampNewEdges } from "./use-stamp-new-edges"
 import { useStyleMemory } from "./use-style-memory"
+import { useBroadcastCollab } from "./use-broadcast-collab"
+import { useCollabEnabled } from "./use-collab-flag"
+import { useLocalPresence } from "./use-local-presence"
 import { useThumbnailCapture } from "./use-thumbnail-capture"
 import { useViewportPersistence } from "./use-viewport-persistence"
 import { HarnessWrapRefProvider } from "./wrap-ref-provider"
@@ -130,6 +134,12 @@ export function HarnessCanvas() {
   useThemeColorProjection(store, ready)
   useThumbnailCapture(store, boardId, ready, theme.minimap)
   usePresentationMode(store, wrapRef, rendererRef)
+
+  // Phase 0 collab spike — same-browser tab-to-tab via BroadcastChannel.
+  // Gated by localStorage "dim0:collab" === "broadcast"; off by default.
+  const collabEnabled = useCollabEnabled() && ready
+  useBroadcastCollab(store, boardId, rootId, collabEnabled)
+  useLocalPresence(store, wrapRef, collabEnabled)
 
   const styleMemory = useStyleMemory(store)
   const { handleCreateDrag, handleClick } = useCreateHandlers(store, boardId, rootId, styleMemory)
@@ -331,6 +341,7 @@ function HarnessCanvasInner({
           />
           <HarnessViewportControls />
           <StyleSidebar />
+          <RemoteCursors />
         </>
       ) : viewMode === "files" ? (
         <LinearView />
