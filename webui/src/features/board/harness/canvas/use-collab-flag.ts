@@ -2,26 +2,32 @@ import { useSyncExternalStore } from "react"
 
 
 /**
- * Phase 0 collab toggle — checked client-side from localStorage so we
- * can flip it without rebuilding. Set
+ * Phase 0/1 collab toggle — checked client-side from localStorage so we
+ * can flip transport without rebuilding. Set
  *
- *   localStorage.setItem("dim0:collab", "broadcast")
+ *   localStorage.setItem("dim0:collab", "broadcast")  // same-browser multi-tab
+ *   localStorage.setItem("dim0:collab", "ws")         // cross-machine via server
  *
- * in the devtools console to enable same-browser multi-tab collab,
- * then refresh both tabs. Set to anything else (or clear) to disable.
+ * in the devtools console to enable, then refresh.
+ * Set to anything else (or clear) to disable.
  *
- * Replaced in Phase 1+ by a user-/board-level setting once the WS
- * transport lands.
+ * Replaced by a user-/board-level setting once collab graduates from
+ * preview.
  */
 const STORAGE_KEY = "dim0:collab"
 
 
-const read = (): boolean => {
-  if (typeof window === "undefined") return false
+export type CollabMode = "off" | "broadcast" | "ws"
+
+
+const read = (): CollabMode => {
+  if (typeof window === "undefined") return "off"
   try {
-    return window.localStorage.getItem(STORAGE_KEY) === "broadcast"
+    const v = window.localStorage.getItem(STORAGE_KEY)
+    if (v === "broadcast" || v === "ws") return v
+    return "off"
   } catch {
-    return false
+    return "off"
   }
 }
 
@@ -36,5 +42,12 @@ const subscribe = (notify: () => void): (() => void) => {
 }
 
 
-export const useCollabEnabled = (): boolean =>
-  useSyncExternalStore(subscribe, read, () => false)
+export const useCollabMode = (): CollabMode =>
+  useSyncExternalStore(subscribe, read, () => "off")
+
+
+/**
+ * Back-compat boolean helper for callers that only care whether some
+ * form of collab is active.
+ */
+export const useCollabEnabled = (): boolean => useCollabMode() !== "off"

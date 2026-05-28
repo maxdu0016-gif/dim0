@@ -51,8 +51,9 @@ import { usePresentationMode } from "./use-presentation-mode"
 import { useStampNewEdges } from "./use-stamp-new-edges"
 import { useStyleMemory } from "./use-style-memory"
 import { useBroadcastCollab } from "./use-broadcast-collab"
-import { useCollabEnabled } from "./use-collab-flag"
+import { useCollabMode } from "./use-collab-flag"
 import { useLocalPresence } from "./use-local-presence"
+import { useWsCollab } from "./use-ws-collab"
 import { useThumbnailCapture } from "./use-thumbnail-capture"
 import { useViewportPersistence } from "./use-viewport-persistence"
 import { HarnessWrapRefProvider } from "./wrap-ref-provider"
@@ -137,8 +138,10 @@ export function HarnessCanvas() {
 
   // Phase 0 collab spike — same-browser tab-to-tab via BroadcastChannel.
   // Gated by localStorage "dim0:collab" === "broadcast"; off by default.
-  const collabEnabled = useCollabEnabled() && ready
-  useBroadcastCollab(store, boardId, rootId, collabEnabled)
+  const collabMode = useCollabMode()
+  const collabEnabled = collabMode !== "off" && ready
+  useBroadcastCollab(store, boardId, rootId, collabMode === "broadcast" && ready)
+  useWsCollab(store, boardId, collabMode === "ws" && ready)
   useLocalPresence(store, wrapRef, collabEnabled)
 
   const styleMemory = useStyleMemory(store)
