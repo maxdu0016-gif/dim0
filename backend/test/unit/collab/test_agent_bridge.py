@@ -349,6 +349,33 @@ async def test_add_links_falls_back_to_zero_offset_when_node_missing():
     }
 
 
+async def test_bridge_broadcast_lands_in_ring_buffer():
+    """Agent broadcasts are recorded in `Room._buffer` for reconnect catch-up.
+
+    Without this, a peer reconnecting via `since_seq` after the agent
+    ran would miss the agent's ops entirely (the buffer would only
+    contain human-initiated batches). Locks down that the bridge
+    integrates with the same ring used by the WS op handler.
+    """
+    registry = RoomRegistry()
+    store = _RecordingGraphStore()
+    bridge = AgentBoardBridge(graph_store=store, registry=registry)
+
+    sock = _FakeSocket()
+    room, _ = await registry.join("b1", sock, "u1")
+
+    await bridge.add_notes(board_id="b1", notes=[_make_note("n1")])
+
+    async with room.lock:
+        buffered = room.batches_since_unlocked(0)
+
+    assert buffered is not None
+    assert len(buffered) == 1
+    assert buffered[0]["clientId"] == AGENT_CLIENT_ID
+    # The buffered batch is the same shape that was broadcast.
+    assert buffered[0]["ops"][0]["type"] == "node.add"
+
+
 async def test_seq_is_monotonic_per_room():
     """Seq is monotonic per room."""
     registry = RoomRegistry()

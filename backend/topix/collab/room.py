@@ -11,11 +11,19 @@ import json
 import logging
 import uuid
 
+from collections import deque
 from dataclasses import dataclass, field
+from typing import Any
 
 from fastapi import WebSocket
 
 logger = logging.getLogger(__name__)
+
+
+# Per-room cap on the in-memory ring of recent broadcasts. 500 batches
+# covers ~5 minutes of heavy collab activity; reconnects that drift
+# further fall back to a full snapshot rebuild (1c.2).
+ROOM_BUFFER_CAP = 500
 
 
 @dataclass
@@ -48,17 +56,46 @@ class Room:
     op. Survives the lifetime of the in-process Room; rooms reset to 0
     on first creation (acceptable for Phase 1b — Phase 1c may pin it
     to a Redis INCR for cross-restart durability).
+
+    `_buffer` is a per-room ring of recent `(seq, batch)` entries used
+    for `since_seq` catch-up on reconnect (Phase 1c.2). Capped at
+    `ROOM_BUFFER_CAP`; drifted reconnects fall back to snapshot mode.
+    Always mutated under `lock`.
     """
 
     board_id: str
     clients: dict[str, Client] = field(default_factory=dict)
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
     seq: int = 0
+    _buffer: deque[tuple[int, dict[str, Any]]] = field(
+        default_factory=lambda: deque(maxlen=ROOM_BUFFER_CAP),
+    )
 
     def next_seq_unlocked(self) -> int:
         """Caller must hold `self.lock`. Assigns the next monotonic seq."""
         self.seq += 1
         return self.seq
+
+    def remember_batch_unlocked(self, seq: int, batch: dict[str, Any]) -> None:
+        """Caller must hold `self.lock`. Records a broadcast batch in the ring."""
+        self._buffer.append((seq, batch))
+
+    def batches_since_unlocked(self, since_seq: int) -> list[dict[str, Any]] | None:
+        """Caller must hold `self.lock`. Slice `(since_seq, room.seq]` from the ring.
+
+        Returns the ordered list of batches the joiner needs to catch up,
+        or `None` when the requested seq predates the ring's oldest entry
+        (caller should fall back to snapshot mode).
+        """
+        if not self._buffer:
+            # Empty ring + since_seq matches current seq → nothing to do (live).
+            # Empty ring + since_seq behind current seq → drift past buffer.
+            return [] if since_seq >= self.seq else None
+        oldest_seq = self._buffer[0][0]
+        if since_seq < oldest_seq - 1:
+            # Requested resume point is older than what we've kept.
+            return None
+        return [batch for (s, batch) in self._buffer if s > since_seq]
 
     async def add(
         self,

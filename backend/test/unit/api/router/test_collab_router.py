@@ -281,6 +281,114 @@ def _async_return(value):
     return _inner()
 
 
+# ---------------------------------------------------------------------------
+# Phase 1c.2 — since_seq welcome dispatch (live / catch-up / snapshot)
+# ---------------------------------------------------------------------------
+
+def test_ws_welcome_live_mode_when_since_seq_matches_room_seq():
+    """`since_seq >= room.seq` → `mode=live`, no payload.
+
+    Most common reconnect case for a fast network blip: client knows the
+    same seq the server knows, no work to do.
+    """
+    client, app = _build_app()
+    tickets = _mint_tickets(app, t1=("u1", "b1"))
+    with client.websocket_connect(
+        f"/boards/b1/collab?ticket={tickets['t1']}&since_seq=0"
+    ) as ws:
+        welcome = ws.receive_json()
+        assert welcome["mode"] == "live"
+        assert welcome["seq"] == 0
+        assert "snapshot" not in welcome
+        assert "batches" not in welcome
+
+
+def test_ws_welcome_catch_up_mode_replays_buffered_batches():
+    """Reconnect with `since_seq < room.seq` → `mode=catch-up` with batches.
+
+    Drives the full flow: client A connects, emits two ops, client B
+    reconnects with since_seq=1 and gets the second op replayed.
+    """
+    client, app = _build_app()
+    tickets = _mint_tickets(app, t1=("u1", "b1"), t2=("u2", "b1"))
+
+    with client.websocket_connect(f"/boards/b1/collab?ticket={tickets['t1']}") as sender:
+        _drain_welcome(sender)
+        # Bump room.seq to 2 via two ops.
+        for nid in ("n1", "n2"):
+            sender.send_json({
+                "kind": "op",
+                "client_seq": 1,
+                "batch": {
+                    "id": f"batch-{nid}",
+                    "clientId": "alice",
+                    "origin": "local",
+                    "ops": [{"type": "node.update", "id": nid, "patch": {"x": 1}, "prev": {}}],
+                },
+            })
+            sender.receive_json()  # drain op-applied
+
+        # Reconnect a peer with since_seq=1; should get just the second batch.
+        with client.websocket_connect(
+            f"/boards/b1/collab?ticket={tickets['t2']}&since_seq=1"
+        ) as peer:
+            welcome = peer.receive_json()
+            assert welcome["mode"] == "catch-up"
+            assert welcome["seq"] == 2
+            assert len(welcome["batches"]) == 1
+            assert welcome["batches"][0]["id"] == "batch-n2"
+
+
+def test_ws_welcome_falls_back_to_snapshot_when_since_seq_drifts_past_ring():
+    """`since_seq` older than the ring's oldest entry → snapshot fallback.
+
+    Simulates a long-disconnected peer reconnecting after the buffer
+    has rotated past their last-known seq. The server still serves a
+    correct welcome — just a more expensive one.
+    """
+    # We can't easily fill 500 batches in a test; instead, exploit the
+    # boundary: any `since_seq` more than 1 less than the oldest in the
+    # ring triggers the fallback. With seq=2 and a ring containing
+    # batches at seqs 1 and 2, `since_seq=-100` is past the floor.
+    # We use an empty ring + `since_seq < room.seq` to trigger the same
+    # path: `batches_since_unlocked` returns None when the buffer is
+    # empty AND since_seq is behind room.seq.
+    client, app = _build_app()
+    tickets = _mint_tickets(app, t1=("u1", "b1"))
+
+    # Pre-advance seq without populating the buffer — this is
+    # artificial but exercises the "drifted past floor" path
+    # deterministically.
+    import asyncio
+    async def _pump_seq():
+        room, _ = await app.collab_rooms.join(
+            "b1", _NullSocket(), "system",
+        )
+        async with room.lock:
+            room.next_seq_unlocked()
+            room.next_seq_unlocked()
+            room.next_seq_unlocked()
+        return room
+
+    asyncio.new_event_loop().run_until_complete(_pump_seq())
+
+    with client.websocket_connect(
+        f"/boards/b1/collab?ticket={tickets['t1']}&since_seq=0"
+    ) as ws:
+        welcome = ws.receive_json()
+        # since_seq=0 < room.seq=3 but buffer is empty → snapshot.
+        assert welcome["mode"] == "snapshot"
+        assert welcome["seq"] == 3
+        assert welcome["snapshot"] == {}
+
+
+class _NullSocket:
+    """Stand-in socket so we can bump `room.seq` without a real WS upgrade."""
+
+    async def send_text(self, _raw: str) -> None:
+        return None
+
+
 def test_ws_relays_presence_between_peers():
     """A `presence` frame is still relayed verbatim through the room."""
     client, app = _build_app()

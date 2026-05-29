@@ -122,7 +122,11 @@ export const useWsCollab = (
         editing: null,
       })
 
-      const url = `${wsBaseFromApiUrl(API_URL)}/boards/${boardId}/collab?ticket=${encodeURIComponent(ticket)}`
+      // `since_seq` rides the URL so the server can dispatch the welcome
+      // mode at connect time — `hello` wouldn't arrive until after the
+      // welcome had already been sent. Omitted on first connect.
+      const sinceSeqParam = lastSeq > 0 ? `&since_seq=${lastSeq}` : ""
+      const url = `${wsBaseFromApiUrl(API_URL)}/boards/${boardId}/collab?ticket=${encodeURIComponent(ticket)}${sinceSeqParam}`
       const adapter = createWebSocketSyncAdapter({
         url,
         clientId: store.clientId,
@@ -632,10 +636,7 @@ const createWebSocketSyncAdapter = ({
       // from the welcome's graph payload. Authoritative — overrides
       // whatever the REST load left in the store, which closes the
       // cold-start race where peer-ops broadcast between REST load and
-      // WS room-join would otherwise be lost. The graph payload is
-      // pydantic-dumped server-side and shares its shape with
-      // `getBoard`, so we route it through the same `applyGraphToStore`
-      // converter used for first paint.
+      // WS room-join would otherwise be lost.
       if (msg.mode === "snapshot" && msg.snapshot) {
         try {
           applyGraphToStore(store, msg.snapshot)
@@ -643,7 +644,19 @@ const createWebSocketSyncAdapter = ({
           console.warn("collab: failed to apply welcome snapshot", err)
         }
       }
-      // Phase 1c.2 will add `mode === "catch-up"` with `msg.batches`.
+      // Phase 1c.2: catch-up mode delivers the slice of batches the
+      // peer missed while disconnected. Route them through the same
+      // pipeline a live peer-op uses — color theme normalization +
+      // edge-endpoint defaults — then dispatch to batch listeners.
+      // `mode === "live"` carries nothing; the client just continues.
+      if (msg.mode === "catch-up" && msg.batches) {
+        for (const batch of msg.batches) {
+          if (batch.clientId === clientId) continue
+          normalizeBatchColorsForLocalTheme(batch)
+          patchMissingEdgeEndpoints(batch, store)
+          for (const cb of batchListeners) cb(batch)
+        }
+      }
       // Signal the outer reconnect loop that we've successfully
       // handshaked — resets the attempt counter and transitions
       // the chrome status pill to "live".

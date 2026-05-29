@@ -86,6 +86,14 @@ async def collab_ws(
     websocket: WebSocket,
     graph_id: Annotated[str, Path(description="Graph ID")],
     ticket: Annotated[str | None, Query(description="One-shot auth ticket")] = None,
+    since_seq: Annotated[
+        int | None,
+        Query(
+            description="Highest seq the client has previously observed; "
+            "set on reconnect for catch-up mode. Omit on first connect.",
+            ge=0,
+        ),
+    ] = None,
 ):
     """Per-board relay socket.
 
@@ -142,25 +150,22 @@ async def collab_ws(
         graph_id, user_id, role, client.client_id,
     )
 
-    # Welcome handshake — read seq + snapshot AND send the welcome
-    # while holding the room lock, so a racing op-handler can't queue
-    # a `peer-op` on this socket before the welcome lands.
+    # Welcome handshake — dispatch under the room lock so a racing
+    # op-handler can't queue a `peer-op` on this socket before the
+    # welcome lands. Phase 1c.2: three modes based on `since_seq`:
     #
-    # `mode` discriminates the welcome variant for the client. Phase 1c.1
-    # introduces `"snapshot"` (full graph dump on first connect — the
-    # client nukes its local store and replays). Phase 1c.2 adds
-    # `"catch-up"` (replay since_seq → room.seq from the ring buffer) and
-    # `"live"` (peer is already up to date).
+    #   - `None` (first connect)              → snapshot
+    #   - >= room.seq (already current)       → live (no payload)
+    #   - in buffer range (`since_seq < seq`) → catch-up batches
+    #   - past buffer floor (drifted)         → snapshot fallback
     try:
-        async with room.lock:
-            seq = room.seq
-            snapshot = await read_snapshot_payload(graph_store=graph_store, board_id=graph_id)
-            await websocket.send_json({
-                "kind": "welcome",
-                "mode": "snapshot",
-                "seq": seq,
-                "snapshot": snapshot,
-            })
+        await _send_welcome(
+            websocket=websocket,
+            room=room,
+            graph_store=graph_store,
+            board_id=graph_id,
+            since_seq=since_seq,
+        )
     except Exception:
         logger.exception("collab welcome send failed board=%s", graph_id)
         await registry.leave(room, client)
@@ -185,6 +190,67 @@ async def collab_ws(
     finally:
         await registry.leave(room, client)
         logger.info("collab leave board=%s client=%s", graph_id, client.client_id)
+
+
+async def _send_welcome(
+    *,
+    websocket: WebSocket,
+    room: Room,
+    graph_store,
+    board_id: str,
+    since_seq: int | None,
+) -> None:
+    """Send the welcome frame appropriate to the client's `since_seq`.
+
+    Acquires `room.lock` for the duration so a peer-op broadcast can't
+    interleave between the seq read and the welcome send — the joining
+    client never observes a seq earlier than its welcome's seq.
+    """
+    async with room.lock:
+        seq = room.seq
+        # First connect → full snapshot.
+        if since_seq is None:
+            snapshot = await read_snapshot_payload(
+                graph_store=graph_store, board_id=board_id,
+            )
+            await websocket.send_json({
+                "kind": "welcome",
+                "mode": "snapshot",
+                "seq": seq,
+                "snapshot": snapshot,
+            })
+            return
+
+        # Already up-to-date — no payload needed.
+        if since_seq >= seq:
+            await websocket.send_json({
+                "kind": "welcome",
+                "mode": "live",
+                "seq": seq,
+            })
+            return
+
+        # Within the ring's reach → catch-up.
+        batches = room.batches_since_unlocked(since_seq)
+        if batches is not None:
+            await websocket.send_json({
+                "kind": "welcome",
+                "mode": "catch-up",
+                "seq": seq,
+                "batches": batches,
+            })
+            return
+
+        # Drifted past the buffer floor → fall back to a full snapshot.
+        snapshot = await read_snapshot_payload(
+            graph_store=graph_store, board_id=board_id,
+        )
+        await websocket.send_json({
+            "kind": "welcome",
+            "mode": "snapshot",
+            "seq": seq,
+            "snapshot": snapshot,
+        })
 
 
 async def _handle_message(
@@ -235,6 +301,9 @@ async def _handle_message(
                 user_id=user_id,
                 ops=ops,
             )
+            # Record in the ring so a reconnecting peer can catch up via
+            # `since_seq` without a full snapshot rebuild (Phase 1c.2).
+            room.remember_batch_unlocked(seq, batch)
             peer_op = json.dumps({"kind": "peer-op", "seq": seq, "batch": batch})
             # Send under the lock so peer-op ordering across peers
             # matches the seq order. Head-of-line latency to one peer

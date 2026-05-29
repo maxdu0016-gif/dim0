@@ -176,17 +176,21 @@ class AgentBoardBridge:
             return
         async with room.lock:
             seq = room.next_seq_unlocked()
+            batch = {
+                "id": f"agent-{seq}",
+                "clientId": AGENT_CLIENT_ID,
+                "ts": int(time.time() * 1000),
+                "origin": "remote",
+                "ops": ops,
+                "is_system": True,
+            }
+            # Record in the ring so a reconnecting peer can catch up on
+            # agent-emitted broadcasts without a full snapshot rebuild.
+            room.remember_batch_unlocked(seq, batch)
             peer_op = json.dumps({
                 "kind": "peer-op",
                 "seq": seq,
-                "batch": {
-                    "id": f"agent-{seq}",
-                    "clientId": AGENT_CLIENT_ID,
-                    "ts": int(time.time() * 1000),
-                    "origin": "remote",
-                    "ops": ops,
-                    "is_system": True,
-                },
+                "batch": batch,
             })
             for c in list(room.clients.values()):
                 try:
