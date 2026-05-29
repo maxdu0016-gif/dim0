@@ -142,7 +142,7 @@ export function HarnessCanvas() {
   // mounted unconditionally; presence + local cursor tracking go with it.
   // The server is the sole writer — no local REST save loop.
   const saveStatus: SaveStatus = "saved"
-  useWsCollab(store, boardId, ready)
+  useWsCollab(store, boardId, ready, rootId)
   useLocalPresence(store, wrapRef, ready)
 
   const styleMemory = useStyleMemory(store)

@@ -239,6 +239,52 @@ def test_ws_sends_welcome_with_seq_and_snapshot_on_connect():
         assert welcome["snapshot"] == {}
 
 
+def test_ws_welcome_snapshot_respects_root_id_query_param():
+    """The welcome snapshot is scoped to the client's `root_id`.
+
+    Regression: WS welcome used to call `get_graph(root_id=None)` even
+    when the user was viewing a folder, so the snapshot would carry
+    the whole board and the client-side `applyGraphToStore` would
+    replace the folder view with whole-board content. Pinning the
+    parameter pass-through here means a future refactor can't drop
+    the threading silently.
+    """
+    client, app = _build_app()
+    captured: dict = {}
+
+    async def _capture_get_graph(*, graph_uid, root_id=None):
+        captured["graph_uid"] = graph_uid
+        captured["root_id"] = root_id
+        return None  # empty graph; we only care about the call args
+
+    app.graph_store.get_graph = _capture_get_graph
+
+    tickets = _mint_tickets(app, t1=("u1", "b1"))
+    with client.websocket_connect(
+        f"/boards/b1/collab?ticket={tickets['t1']}&root_id=folder-42"
+    ) as ws:
+        ws.receive_json()  # drain welcome
+    assert captured["graph_uid"] == "b1"
+    assert captured["root_id"] == "folder-42"
+
+
+def test_ws_welcome_snapshot_omits_root_id_by_default():
+    """No `root_id` query → snapshot reads the whole board (root_id=None)."""
+    client, app = _build_app()
+    captured: dict = {}
+
+    async def _capture_get_graph(*, graph_uid, root_id=None):
+        captured["root_id"] = root_id
+        return None
+
+    app.graph_store.get_graph = _capture_get_graph
+
+    tickets = _mint_tickets(app, t1=("u1", "b1"))
+    with client.websocket_connect(f"/boards/b1/collab?ticket={tickets['t1']}") as ws:
+        ws.receive_json()
+    assert captured["root_id"] is None
+
+
 def test_ws_welcome_snapshot_carries_graph_payload():
     """Welcome snapshot includes the dumped Graph when one exists.
 

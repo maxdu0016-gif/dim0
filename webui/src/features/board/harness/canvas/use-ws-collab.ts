@@ -59,6 +59,7 @@ export const useWsCollab = (
   store: CanvasStore,
   boardId: string | null,
   enabled: boolean,
+  rootId?: string | null,
 ): void => {
   const userEmail = useAppStore((s) => s.userEmail)
   const userId = useAppStore((s) => s.userId)
@@ -127,8 +128,14 @@ export const useWsCollab = (
       // `since_seq` rides the URL so the server can dispatch the welcome
       // mode at connect time — `hello` wouldn't arrive until after the
       // welcome had already been sent. Omitted on first connect.
+      //
+      // `root_id` also rides the URL when the user is viewing a folder
+      // so the welcome snapshot is scoped to the same view REST loaded.
+      // Without it the WS welcome would carry the whole board and
+      // overwrite the folder-scoped store.
       const sinceSeqParam = lastSeq > 0 ? `&since_seq=${lastSeq}` : ""
-      const url = `${wsBaseFromApiUrl(API_URL)}/boards/${boardId}/collab?ticket=${encodeURIComponent(ticket)}${sinceSeqParam}`
+      const rootIdParam = rootId ? `&root_id=${encodeURIComponent(rootId)}` : ""
+      const url = `${wsBaseFromApiUrl(API_URL)}/boards/${boardId}/collab?ticket=${encodeURIComponent(ticket)}${sinceSeqParam}${rootIdParam}`
       const adapter = createWebSocketSyncAdapter({
         url,
         clientId: store.clientId,
@@ -187,7 +194,7 @@ export const useWsCollab = (
       teardown = null
       resetCollabConnState()
     }
-  }, [store, boardId, enabled, userName, userId, userEmail])
+  }, [store, boardId, enabled, userName, userId, userEmail, rootId])
 }
 
 
@@ -655,17 +662,17 @@ const createWebSocketSyncAdapter = ({
     }
     if (msg.kind === "welcome") {
       lastServerSeq = msg.seq
-      // Phase 1c.1: snapshot mode rebuilds the canvas-harness store
-      // from the welcome's graph payload. Authoritative — overrides
-      // whatever the REST load left in the store, which closes the
-      // cold-start race where peer-ops broadcast between REST load and
-      // WS room-join would otherwise be lost.
+      // Phase 1c.1: snapshot mode reconciles the canvas-harness store
+      // against the welcome's graph payload. Uses `mode: "merge"` —
+      // diff against current store state and apply minimal changes,
+      // never wipe — so a server-side DB hiccup that yields `{}`
+      // doesn't blank the canvas, and so the REST-loaded state is
+      // preserved when the welcome is equivalent. Undo history stays
+      // intact across reconnects.
       //
       // The server ships Pydantic's raw `model_dump()` (snake_case);
       // `applyGraphToStore` uses the same converters as the REST path,
-      // which expect camelCase. Without this translation every node
-      // lands at (0,0) with no style — exactly the regression that
-      // caught us on first ship. Mirrors the `camelcaseKeys` call in
+      // which expect camelCase. Mirrors the `camelcaseKeys` call in
       // `getBoard`.
       if (msg.mode === "snapshot" && msg.snapshot) {
         try {
@@ -673,7 +680,7 @@ const createWebSocketSyncAdapter = ({
             msg.snapshot as unknown as Record<string, unknown>,
             { deep: true },
           ) as unknown as Graph
-          applyGraphToStore(store, graph)
+          applyGraphToStore(store, graph, { mode: "merge" })
         } catch (err) {
           console.warn("collab: failed to apply welcome snapshot", err)
         }

@@ -94,6 +94,15 @@ async def collab_ws(  # noqa: C901 — accept/auth/join/welcome/loop is a single
             ge=0,
         ),
     ] = None,
+    root_id: Annotated[
+        str | None,
+        Query(
+            description="Folder scope of the client's current view. Mirrors "
+            "the REST `getBoard` query: when set, the welcome snapshot is "
+            "scoped to nodes under this parent so the WS hand-off doesn't "
+            "replace a folder view with the whole-board contents.",
+        ),
+    ] = None,
 ):
     """Per-board relay socket.
 
@@ -165,6 +174,7 @@ async def collab_ws(  # noqa: C901 — accept/auth/join/welcome/loop is a single
             client_id=client.client_id,
             graph_store=graph_store,
             board_id=graph_id,
+            root_id=root_id,
             since_seq=since_seq,
         )
     except Exception:
@@ -217,6 +227,7 @@ async def _send_welcome(
     client_id: str,
     graph_store,
     board_id: str,
+    root_id: str | None,
     since_seq: int | None,
 ) -> None:
     """Send the welcome frame appropriate to the client's `since_seq`.
@@ -236,7 +247,7 @@ async def _send_welcome(
         # First connect → full snapshot.
         if since_seq is None:
             snapshot = await read_snapshot_payload(
-                graph_store=graph_store, board_id=board_id,
+                graph_store=graph_store, board_id=board_id, root_id=root_id,
             )
             await websocket.send_json({
                 "kind": "welcome",

@@ -100,6 +100,90 @@ describe("hydrateBoardStore — cancel safety", () => {
     expect(store.getAllEdges()).toHaveLength(0)
   })
 
+  it("applyGraphToStore mode=merge is a no-op on empty graph (preserves store)", () => {
+    // Regression: server returns `{}` from `read_snapshot_payload`
+    // whenever `get_graph` returns None (DB hiccup, board not yet
+    // committed). Replace mode would wipe the canvas; merge must skip.
+    const store = createBoardStore()
+    store.addNode(seedNode("survives"))
+    expect(store.getAllNodes()).toHaveLength(1)
+
+    applyGraphToStore(store, emptyGraph(), { mode: "merge" })
+
+    // Pre-existing node was preserved, not wiped.
+    expect(store.getAllNodes()).toHaveLength(1)
+    expect(store.getAllNodes()[0].id as unknown as string).toBe("survives")
+  })
+
+  it("applyGraphToStore mode=replace wipes the store on empty graph", () => {
+    // Replace mode is the first-load REST path — it must clear stale
+    // state from a previous scope. This is the opposite contract from
+    // merge mode and the reason the two modes exist.
+    const store = createBoardStore()
+    store.addNode(seedNode("gone"))
+    expect(store.getAllNodes()).toHaveLength(1)
+
+    applyGraphToStore(store, emptyGraph(), { mode: "replace" })
+
+    expect(store.getAllNodes()).toHaveLength(0)
+  })
+
+  it("applyGraphToStore mode=merge updates existing nodes in place and removes absent ones", () => {
+    // Merge mode is used by the WS welcome handler. It should reconcile
+    // the store toward the snapshot WITHOUT a wholesale wipe — selection
+    // and focus stay attached to the same node ids, and the React
+    // listener doesn't see a remove+add cycle for every untouched node.
+    const store = createBoardStore()
+    // Pre-existing state: keep "n1", remove "n2", add "n3", update n1's position.
+    store.addNode({ ...seedNode("n1"), x: 0, y: 0 })
+    store.addNode({ ...seedNode("n2"), x: 100, y: 100 })
+
+    const graph: Graph = {
+      ...emptyGraph(),
+      nodes: [
+        {
+          id: "n1",
+          type: "note",
+          version: 1,
+          graphUid: "b1",
+          properties: {
+            nodePosition: { type: "position", position: { x: 50, y: 50 } },
+            nodeSize: { type: "size", size: { width: 10, height: 10 } },
+            nodeZIndex: { type: "number", number: 0 },
+          },
+          style: { type: "rectangle" },
+          createdAt: "2026-01-01T00:00:00",
+        } as never,
+        {
+          id: "n3",
+          type: "note",
+          version: 1,
+          graphUid: "b1",
+          properties: {
+            nodePosition: { type: "position", position: { x: 300, y: 300 } },
+            nodeSize: { type: "size", size: { width: 10, height: 10 } },
+            nodeZIndex: { type: "number", number: 0 },
+          },
+          style: { type: "rectangle" },
+          createdAt: "2026-01-01T00:00:00",
+        } as never,
+      ],
+    } as Graph
+
+    applyGraphToStore(store, graph, { mode: "merge" })
+
+    const byId = new Map(
+      store.getAllNodes().map((n) => [n.id as unknown as string, n]),
+    )
+    // n2 was absent → removed.
+    expect(byId.has("n2")).toBe(false)
+    // n1 was present → updated in place.
+    expect(byId.get("n1")?.x).toBe(50)
+    expect(byId.get("n1")?.y).toBe(50)
+    // n3 was new → added.
+    expect(byId.get("n3")?.x).toBe(300)
+  })
+
   it("applyGraphToStore expects camelCase keys — node positions land correctly", () => {
     // Regression: WS welcome ships Pydantic's `model_dump()` which is
     // snake_case; the use-ws-collab handler runs `camelcaseKeys` first
