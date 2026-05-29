@@ -100,6 +100,41 @@ describe("hydrateBoardStore — cancel safety", () => {
     expect(store.getAllEdges()).toHaveLength(0)
   })
 
+  it("applyGraphToStore expects camelCase keys — node positions land correctly", () => {
+    // Regression: WS welcome ships Pydantic's `model_dump()` which is
+    // snake_case; the use-ws-collab handler runs `camelcaseKeys` first
+    // before calling this. Without the conversion every note's
+    // `node_position` is invisible to `noteToNode`, defaulting to
+    // (0,0) → all nodes stack at the origin. This test exercises the
+    // post-conversion contract: camelCase in, positions preserved.
+    const store = createBoardStore()
+    const graph: Graph = {
+      ...emptyGraph(),
+      nodes: [
+        {
+          id: "n1",
+          type: "note",
+          version: 1,
+          graphUid: "b1",
+          properties: {
+            nodePosition: { type: "position", position: { x: 150, y: 220 } },
+            nodeSize: { type: "size", size: { width: 200, height: 100 } },
+            nodeZIndex: { type: "number", number: 0 },
+          },
+          style: { type: "rectangle" },
+          createdAt: "2026-01-01T00:00:00",
+        } as never,
+      ],
+    } as Graph
+
+    applyGraphToStore(store, graph)
+
+    const [node] = store.getAllNodes()
+    expect(node).toBeDefined()
+    expect(node.x).toBe(150)
+    expect(node.y).toBe(220)
+  })
+
   it("respects cancellation between two interleaved hydrates", async () => {
     // Two hydrates in flight; first one will be cancelled, second wins.
     const aResolvers: { resolve?: () => void } = {}

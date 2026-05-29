@@ -13,6 +13,7 @@ import {
   type SyncAdapter,
   type Vec2,
 } from "@canvas-harness/core"
+import camelcaseKeys from "camelcase-keys"
 import { mintCollabTicket } from "@/features/board/api/collab-ticket"
 import { API_URL } from "@/config/api"
 import { notifyWsClose } from "@/features/connection/connection-state"
@@ -659,9 +660,20 @@ const createWebSocketSyncAdapter = ({
       // whatever the REST load left in the store, which closes the
       // cold-start race where peer-ops broadcast between REST load and
       // WS room-join would otherwise be lost.
+      //
+      // The server ships Pydantic's raw `model_dump()` (snake_case);
+      // `applyGraphToStore` uses the same converters as the REST path,
+      // which expect camelCase. Without this translation every node
+      // lands at (0,0) with no style — exactly the regression that
+      // caught us on first ship. Mirrors the `camelcaseKeys` call in
+      // `getBoard`.
       if (msg.mode === "snapshot" && msg.snapshot) {
         try {
-          applyGraphToStore(store, msg.snapshot)
+          const graph = camelcaseKeys(
+            msg.snapshot as unknown as Record<string, unknown>,
+            { deep: true },
+          ) as unknown as Graph
+          applyGraphToStore(store, graph)
         } catch (err) {
           console.warn("collab: failed to apply welcome snapshot", err)
         }
