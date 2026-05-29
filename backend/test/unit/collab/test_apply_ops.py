@@ -261,6 +261,60 @@ async def test_node_add_constructs_note_with_board_id_and_position():
     assert (pos.x, pos.y) == (100.0, 100.0)
 
 
+async def test_node_add_falls_back_to_wire_type_when_style_type_missing():
+    """When `data.styleType` is absent, translate the wire `type` back to Dim0.
+
+    Defense-in-depth: a legacy / buggy client could ship a wire `node.add`
+    without `data.styleType`. Without this fallback, the persisted Note's
+    `style.type` would default to `"rectangle"` (Dim0 default) even when
+    the wire said `type="ellipse"` — a silent data corruption that
+    breaks REST round-trip on the next snapshot load.
+    """
+    store = _RecordingGraphStore()
+    op = {
+        "type": "node.add",
+        "node": {
+            "id": "n1",
+            "x": 0, "y": 0, "w": 200, "h": 80, "z": 0,
+            "angle": 0,
+            # NB: `type` uses canvas-harness vocabulary; `data.styleType`
+            # is intentionally omitted to exercise the fallback.
+            "type": "ellipse",
+            "data": {"noteType": "note", "version": 1},
+        },
+    }
+
+    results = await apply_batch(graph_store=store, board_id="b1", user_id="u1", ops=[op])
+
+    assert results[0].applied is True
+    [note] = store.add_notes_calls[0]
+    assert note.style.type == "ellipse"
+
+
+async def test_node_add_wire_type_rect_maps_back_to_rectangle():
+    """`type="rect"` (canvas-harness) → `style.type = "rectangle"` (Dim0).
+
+    Inverse of the four shape renames in `_DIM0_TO_CANVAS_TYPE`.
+    """
+    store = _RecordingGraphStore()
+    op = {
+        "type": "node.add",
+        "node": {
+            "id": "n1",
+            "x": 0, "y": 0, "w": 200, "h": 80, "z": 0,
+            "angle": 0,
+            "type": "rect",
+            "data": {"noteType": "note", "version": 1},
+        },
+    }
+
+    results = await apply_batch(graph_store=store, board_id="b1", user_id="u1", ops=[op])
+
+    assert results[0].applied is True
+    [note] = store.add_notes_calls[0]
+    assert note.style.type == "rectangle"
+
+
 # ---------------------------------------------------------------------------
 # edge.* — Link round-trip
 # ---------------------------------------------------------------------------

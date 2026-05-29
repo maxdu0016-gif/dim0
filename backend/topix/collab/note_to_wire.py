@@ -18,6 +18,42 @@ from topix.datatypes.note.note import Note
 DEG_TO_RAD = math.pi / 180.0
 
 
+# IMPORTANT: keep in sync with webui/src/features/board/harness/convert/
+# node-type.ts (`DIM0_TO_CANVAS`). Four Dim0 enum values are renamed for
+# canvas-harness's built-in shapes; the remaining 14 entries are 1:1 (built-in
+# names or custom `defineNode` registrations on the client). A drift here
+# breaks WS rendering for peers — agent-generated rectangles render
+# invisible on the receiver because canvas-harness has no built-in
+# called "rectangle".
+_DIM0_TO_CANVAS_TYPE: dict[str, str] = {
+    # Four renames — Dim0 vs canvas-harness shape vocabulary.
+    "rectangle": "rect",
+    "layered-rectangle": "layered-rect",
+    "layered-circle": "layered-ellipse",
+    "slide": "frame",
+    # Identity — canvas-harness built-ins with the same string.
+    "ellipse": "ellipse",
+    "diamond": "diamond",
+    "tag": "tag",
+    "capsule": "capsule",
+    "thought-cloud": "thought-cloud",
+    "layered-diamond": "layered-diamond",
+    "soft-diamond": "soft-diamond",
+    "text": "text",
+    "image": "image",
+    "icon": "icon",
+    # Identity — client-registered custom types via `defineNode`.
+    "folder": "folder",
+    "sheet": "sheet",
+    "code-sandbox": "code-sandbox",
+    "widget": "widget",
+}
+
+# Inverse map for the inbound persistence fallback (apply_ops.py). Auto-
+# generated so it can't drift from `_DIM0_TO_CANVAS_TYPE`.
+_CANVAS_TO_DIM0_TYPE: dict[str, str] = {v: k for k, v in _DIM0_TO_CANVAS_TYPE.items()}
+
+
 # Mapping of Dim0 LinkStyle (snake_case) → canvas-harness EdgeStyle
 # (camelCase). Pairs match the client's `dim0LinkStyleToCanvas`.
 _EDGE_STYLE_KEY_MAP: dict[str, str] = {
@@ -262,9 +298,15 @@ def _properties_minus_lifted(props) -> dict[str, Any]:
 def _canvas_type_for(note: Note) -> str:
     """Mirror the client's `dim0TypeToCanvas` mapping.
 
-    Documents get the `'document'` canvas type; everything else uses
-    `style.type` as-is.
+    Documents get the `'document'` canvas type; every other Dim0 style
+    type is translated through `_DIM0_TO_CANVAS_TYPE`. Unknown values
+    pass through unchanged so future Dim0 additions don't blow up the
+    wire — they'll render as unregistered custom types on the receiver
+    until the client-side map catches up.
     """
     if note.type == "document":
         return "document"
-    return str(note.style.type) if note.style and note.style.type else "rect"
+    if note.style and note.style.type:
+        raw = str(note.style.type)
+        return _DIM0_TO_CANVAS_TYPE.get(raw, raw)
+    return "rect"

@@ -28,6 +28,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel
 
+from topix.collab.note_to_wire import _CANVAS_TO_DIM0_TYPE
 from topix.datatypes.note.link import Link
 from topix.datatypes.note.note import Note
 from topix.store.graph import GraphStore
@@ -267,7 +268,13 @@ def _wire_node_to_note(node: dict[str, Any], *, board_id: str) -> Note | None:
     if "content" in node:
         note_dict["content"] = {"markdown": str(node["content"] or "")}
 
-    style_type = data_field.get("styleType")
+    # Prefer `data.styleType` (the Dim0 enum value the client embeds for
+    # round-trip fidelity). Fall back to translating the wire `type`
+    # (canvas-harness vocabulary) back to Dim0 via the inverse map — keeps
+    # `LinkStyle.type` schema-valid if a future op omits styleType.
+    style_type = data_field.get("styleType") or _CANVAS_TO_DIM0_TYPE.get(
+        str(node.get("type", "")),
+    )
     if style_type:
         note_dict["style"] = {"type": style_type}
     angle = node.get("angle")
