@@ -17,7 +17,7 @@ vi.mock("@/features/board/api/get-board", () => ({
 
 // Import the SUT after the mock is registered so its closure uses the
 // mocked `getBoard`.
-import { hydrateBoardStore } from "./snapshot-load"
+import { applyGraphToStore, hydrateBoardStore } from "./snapshot-load"
 
 
 const seedNode = (id: string): Node => ({
@@ -83,6 +83,21 @@ describe("hydrateBoardStore — cancel safety", () => {
     // store mutation entirely.
     expect(store.getAllNodes()).toHaveLength(1)
     expect(store.getAllNodes()[0].id as unknown as string).toBe("survives")
+  })
+
+  it("applyGraphToStore is callable standalone — used by the WS welcome path", () => {
+    // The Phase 1c.1 WS welcome handler replays the snapshot directly
+    // into the store via `applyGraphToStore`, no REST fetch involved.
+    // This test pins that contract: pre-existing local state is wiped,
+    // the snapshot's nodes/edges are loaded fresh.
+    const store = createBoardStore()
+    store.addNode(seedNode("stale-from-rest"))
+    expect(store.getAllNodes()).toHaveLength(1)
+
+    applyGraphToStore(store, emptyGraph())
+
+    expect(store.getAllNodes()).toHaveLength(0)
+    expect(store.getAllEdges()).toHaveLength(0)
   })
 
   it("respects cancellation between two interleaved hydrates", async () => {

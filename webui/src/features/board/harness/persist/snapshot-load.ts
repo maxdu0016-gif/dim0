@@ -13,6 +13,34 @@ export type HydrateResult = {
 
 
 /**
+ * Replace the store's contents with a Graph payload (REST-shaped notes /
+ * links). One `store.batch(...)` so the swap is atomic from the
+ * subscriber's perspective. History is cleared — neither snapshot loads
+ * nor WS welcome rebuilds should be undoable. Extracted from
+ * `hydrateBoardStore` so the WS welcome handler can replay a snapshot
+ * onto the store without re-fetching from REST.
+ */
+export const applyGraphToStore = (store: CanvasStore, graph: Graph): void => {
+  const notes = graph.nodes ?? []
+  const links = graph.edges ?? []
+
+  const nodes = notes.map(noteToNode)
+  const nodesById = new Map<string, Node>(
+    nodes.map((n) => [n.id as unknown as string, n]),
+  )
+  const edges = links.map((l) => linkToEdge(l, nodesById))
+
+  store.batch(() => {
+    for (const e of store.getAllEdges()) store.removeEdge(e.id)
+    for (const n of store.getAllNodes()) store.removeNode(n.id)
+    for (const n of nodes) store.addNode(n)
+    for (const e of edges) store.addEdge(e)
+  })
+  store.clearHistory()
+}
+
+
+/**
  * Fetch a board from the API and load its nodes / edges into the
  * canvas-harness store. Wrapped in one batch (so the initial paint
  * doesn't trigger N renders) and the history stack is cleared after
@@ -44,25 +72,7 @@ export const hydrateBoardStore = async (
   // (also-cancelled) `.then` doesn't NPE in unusual shapes.
   if (isCancelled?.()) return { graph, canEdit, role }
 
-  const notes = graph.nodes ?? []
-  const links = graph.edges ?? []
-
-  const nodes = notes.map(noteToNode)
-  const nodesById = new Map<string, Node>(
-    nodes.map((n) => [n.id as unknown as string, n]),
-  )
-  const edges = links.map((l) => linkToEdge(l, nodesById))
-
-  // Clear any prior scene (scope changes need a clean slate) then load fresh.
-  // Subscribers (incl. the debounced save) should be gated on a `ready` flag
-  // so these ops don't generate spurious REST calls — see use-debounced-save.
-  store.batch(() => {
-    for (const e of store.getAllEdges()) store.removeEdge(e.id)
-    for (const n of store.getAllNodes()) store.removeNode(n.id)
-    for (const n of nodes) store.addNode(n)
-    for (const e of edges) store.addEdge(e)
-  })
-  store.clearHistory()
+  applyGraphToStore(store, graph)
 
   return { graph, canEdit, role }
 }

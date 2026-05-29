@@ -222,15 +222,63 @@ def _drain_welcome(ws) -> dict:
 
 
 def test_ws_sends_welcome_with_seq_and_snapshot_on_connect():
-    """First frame to a freshly-connected peer is `welcome { seq, snapshot }`."""
+    """First frame to a freshly-connected peer is `welcome { mode, seq, snapshot }`.
+
+    Phase 1c.1 introduced the `mode` discriminator so the client can
+    dispatch on the welcome variant — first connect always sends
+    `"snapshot"` (full graph dump for the authoritative store rebuild).
+    """
     client, app = _build_app()
     tickets = _mint_tickets(app, t1=("u1", "b1"))
 
     with client.websocket_connect(f"/boards/b1/collab?ticket={tickets['t1']}") as ws:
         welcome = ws.receive_json()
         assert welcome["kind"] == "welcome"
+        assert welcome["mode"] == "snapshot"
         assert welcome["seq"] == 0
         assert welcome["snapshot"] == {}
+
+
+def test_ws_welcome_snapshot_carries_graph_payload():
+    """Welcome snapshot includes the dumped Graph when one exists.
+
+    The client uses this payload to nuke + replay its canvas-harness
+    store on first connect. Without a payload (the empty-board case
+    above), the client just clears the store.
+    """
+    client, app = _build_app()
+    # Replace the graph response with a populated graph stub.
+
+    class _Graph:
+        def __init__(self, payload):
+            self._payload = payload
+
+        def model_dump(self, **_):
+            return self._payload
+
+    payload = {
+        "uid": "b1",
+        "type": "graph",
+        "readonly": False,
+        "visibility": "private",
+        "createdAt": "2025-01-01T00:00:00",
+        "nodes": [{"id": "n1", "type": "note"}],
+        "edges": [],
+    }
+    app.graph_store.get_graph = lambda *, graph_uid, root_id=None: _async_return(_Graph(payload))
+
+    tickets = _mint_tickets(app, t1=("u1", "b1"))
+    with client.websocket_connect(f"/boards/b1/collab?ticket={tickets['t1']}") as ws:
+        welcome = ws.receive_json()
+        assert welcome["mode"] == "snapshot"
+        assert welcome["snapshot"] == payload
+
+
+def _async_return(value):
+    """Tiny coroutine that returns `value` — wraps a sync stub for awaitable APIs."""
+    async def _inner():
+        return value
+    return _inner()
 
 
 def test_ws_relays_presence_between_peers():

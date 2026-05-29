@@ -16,7 +16,9 @@ import {
 import { mintCollabTicket } from "@/features/board/api/collab-ticket"
 import { API_URL } from "@/config/api"
 import { notifyWsClose } from "@/features/connection/connection-state"
+import type { Graph } from "@/features/board/types/board"
 import { useAppStore } from "@/store"
+import { applyGraphToStore } from "../persist/snapshot-load"
 import {
   adaptEdgeColors,
   adaptNodeColors,
@@ -387,10 +389,10 @@ type OutboundMessage =
   | { kind: "op"; client_seq: number; batch: OpBatch }
   | { kind: "presence"; clientId: ClientId; state: PresenceState }
   | { kind: "presence-leave"; clientId: ClientId }
-  | { kind: "hello"; clientId: ClientId }
+  | { kind: "hello"; clientId: ClientId; since_seq?: number | null }
 
 type InboundMessage =
-  | { kind: "welcome"; seq: number; snapshot: unknown }
+  | { kind: "welcome"; mode?: "snapshot" | "catch-up" | "live"; seq: number; snapshot?: Graph; batches?: OpBatch[] }
   | { kind: "peer-op"; seq: number; batch: OpBatch }
   | { kind: "op-applied"; seq: number; client_seq: number }
   | { kind: "op-rejected"; client_seq: number; reason?: string }
@@ -519,10 +521,23 @@ const createWebSocketSyncAdapter = ({
       return
     }
     if (msg.kind === "welcome") {
-      // Phase 1b: the initial board state is still loaded via REST so
-      // we ignore `snapshot` here — it duplicates state the store has.
-      // We track `seq` for Phase 1c's reconnect catch-up.
       lastServerSeq = msg.seq
+      // Phase 1c.1: snapshot mode rebuilds the canvas-harness store
+      // from the welcome's graph payload. Authoritative — overrides
+      // whatever the REST load left in the store, which closes the
+      // cold-start race where peer-ops broadcast between REST load and
+      // WS room-join would otherwise be lost. The graph payload is
+      // pydantic-dumped server-side and shares its shape with
+      // `getBoard`, so we route it through the same `applyGraphToStore`
+      // converter used for first paint.
+      if (msg.mode === "snapshot" && msg.snapshot) {
+        try {
+          applyGraphToStore(store, msg.snapshot)
+        } catch (err) {
+          console.warn("collab: failed to apply welcome snapshot", err)
+        }
+      }
+      // Phase 1c.2 will add `mode === "catch-up"` with `msg.batches`.
       return
     }
     if (msg.kind === "peer-op") {

@@ -145,12 +145,19 @@ async def collab_ws(
     # Welcome handshake — read seq + snapshot AND send the welcome
     # while holding the room lock, so a racing op-handler can't queue
     # a `peer-op` on this socket before the welcome lands.
+    #
+    # `mode` discriminates the welcome variant for the client. Phase 1c.1
+    # introduces `"snapshot"` (full graph dump on first connect — the
+    # client nukes its local store and replays). Phase 1c.2 adds
+    # `"catch-up"` (replay since_seq → room.seq from the ring buffer) and
+    # `"live"` (peer is already up to date).
     try:
         async with room.lock:
             seq = room.seq
             snapshot = await read_snapshot_payload(graph_store=graph_store, board_id=graph_id)
             await websocket.send_json({
                 "kind": "welcome",
+                "mode": "snapshot",
                 "seq": seq,
                 "snapshot": snapshot,
             })
