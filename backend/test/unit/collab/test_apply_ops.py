@@ -519,6 +519,96 @@ async def test_edge_add_pulls_canonical_colors_from_stored_colors():
     assert link.style.text_color == "#111111"
 
 
+async def test_edge_add_persists_attached_endpoint_local_offset():
+    """A user-drawn edge stores its `localOffset` so it doesn't snap to center.
+
+    Regression: the inbound WS path used to read only `nodeId` from the
+    endpoint, dropping `localOffset` on the floor. On the next reload
+    `linkToEdge` then fell through to the (w/2, h/2) default and every
+    edge endpoint snapped to the node's center — the bug surfaced from
+    smoke testing after collab became the sole writer.
+    """
+    store = _RecordingGraphStore()
+    op = {
+        "type": "edge.add",
+        "edge": {
+            "id": "e1",
+            "source": {"nodeId": "n1", "localOffset": {"x": 50, "y": 30}},
+            "target": {"nodeId": "n2", "localOffset": {"x": 180, "y": 10}},
+        },
+    }
+
+    results = await apply_batch(graph_store=store, board_id="b1", user_id="u1", ops=[op])
+
+    assert results[0].applied is True
+    [link] = store.add_links_calls[0]
+    assert link.source == "n1"
+    assert link.target == "n2"
+    # `is_local_offset` is set on both endpoints — disambiguates from
+    # the legacy world-coord interpretation when read back.
+    assert link.properties.start_point.is_local_offset is True
+    assert link.properties.start_point.position.x == 50.0
+    assert link.properties.start_point.position.y == 30.0
+    assert link.properties.end_point.is_local_offset is True
+    assert link.properties.end_point.position.x == 180.0
+    assert link.properties.end_point.position.y == 10.0
+
+
+async def test_edge_add_persists_free_endpoint_world_point():
+    """A free-floating endpoint persists as `source == ""` + world-coord position.
+
+    Inbound WS used to reject free endpoints entirely (no `nodeId` →
+    early return). Now we flatten them to the empty-string sentinel +
+    world-coord `start_point`/`end_point` with `is_local_offset=False`,
+    matching the REST round-trip convention.
+    """
+    store = _RecordingGraphStore()
+    op = {
+        "type": "edge.add",
+        "edge": {
+            "id": "e1",
+            "source": {"nodeId": "n1", "localOffset": {"x": 100, "y": 50}},
+            "target": {"worldPoint": {"x": 800, "y": 400}},
+        },
+    }
+
+    results = await apply_batch(graph_store=store, board_id="b1", user_id="u1", ops=[op])
+
+    assert results[0].applied is True
+    [link] = store.add_links_calls[0]
+    assert link.source == "n1"
+    assert link.target == ""    # empty-string sentinel for free
+    assert link.properties.end_point.is_local_offset is False
+    assert link.properties.end_point.position.x == 800.0
+    assert link.properties.end_point.position.y == 400.0
+
+
+async def test_edge_update_endpoint_change_carries_local_offset():
+    """An `edge.update` that moves an endpoint persists the new `localOffset`.
+
+    Used when the user drags an attached endpoint to a different
+    position on the same node (or onto a different node entirely).
+    Without this the new position is lost on reload.
+    """
+    store = _RecordingGraphStore()
+    op = {
+        "type": "edge.update",
+        "id": "e1",
+        "patch": {
+            "target": {"nodeId": "n3", "localOffset": {"x": 25, "y": 75}},
+        },
+        "prev": {},
+    }
+
+    results = await apply_batch(graph_store=store, board_id="b1", user_id="u1", ops=[op])
+
+    assert results[0].applied is True
+    [call] = store.update_link_calls
+    assert call["data"]["target"] == "n3"
+    assert call["data"]["properties"]["end_point"]["position"] == {"x": 25.0, "y": 75.0}
+    assert call["data"]["properties"]["end_point"]["is_local_offset"] is True
+
+
 async def test_edge_add_carries_midpoint_onto_link_properties():
     """A freshly-drawn edge with a curve persists the midpoint on create."""
     store = _RecordingGraphStore()

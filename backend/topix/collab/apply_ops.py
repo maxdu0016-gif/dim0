@@ -278,25 +278,77 @@ def _wire_node_to_note(node: dict[str, Any], *, board_id: str) -> Note | None:
         return None
 
 
-def _wire_edge_to_link(edge: dict[str, Any], *, board_id: str) -> Link | None:
+def _wire_end_to_endpoint(
+    wire_end: dict[str, Any] | None,
+) -> tuple[str | None, dict[str, Any] | None]:
+    """Translate one wire EdgeEnd to a Dim0 `(source_id, position_property)` pair.
+
+    canvas-harness's `EdgeEnd` is a discriminated union:
+      - Attached:    `{ nodeId, localOffset: {x, y} }` → `(nodeId, {position, is_local_offset=True})`
+      - Free:        `{ worldPoint: {x, y} }`           → `("", {position, is_local_offset=False})`
+
+    Dim0 flattens this to `Link.source: str` (empty-string sentinel for
+    free) plus `Link.properties.start_point: PositionProperty | None`.
+    Without this translation, the inbound WS path keeps only `nodeId`
+    and drops `localOffset` on the floor — every interactively-drawn
+    edge then renders at the node's center after the next reload.
+
+    Returns `(None, None)` when the wire shape is unrecognized so the
+    caller can decide whether to skip the field or reject the op.
+    """
+    if not isinstance(wire_end, dict):
+        return None, None
+
+    if "nodeId" in wire_end:
+        node_id = wire_end["nodeId"]
+        if not isinstance(node_id, str):
+            return None, None
+        offset = wire_end.get("localOffset")
+        if isinstance(offset, dict) and "x" in offset and "y" in offset:
+            return node_id, {
+                "type": "position",
+                "position": {"x": float(offset["x"]), "y": float(offset["y"])},
+                "is_local_offset": True,
+            }
+        # Attached endpoint without localOffset — keep the link
+        # buildable but defer to the client's fallback (node center).
+        return node_id, None
+
+    if "worldPoint" in wire_end:
+        world = wire_end["worldPoint"]
+        if isinstance(world, dict) and "x" in world and "y" in world:
+            return "", {
+                "type": "position",
+                "position": {"x": float(world["x"]), "y": float(world["y"])},
+                "is_local_offset": False,
+            }
+
+    return None, None
+
+
+def _wire_edge_to_link(edge: dict[str, Any], *, board_id: str) -> Link | None:  # noqa: C901 — wide field-by-field translator
     """Construct a `Link` from a wire `Edge` payload (best-effort).
 
-    Canvas-harness Edges carry `source: { nodeId }` / `target: { nodeId }`
-    endpoints; Dim0 stores them as flat node-id strings on `Link.source`
-    / `Link.target`. We also persist `pathStyle`, edge label (`content`
-    → `Link.label.markdown`), and the camelCase EdgeStyle fields the
-    client sends.
+    canvas-harness Edges carry endpoints as a discriminated union of
+    attached (`{nodeId, localOffset}`) and free (`{worldPoint}`). We
+    flatten both to Dim0's schema: `Link.source/target` (with the
+    empty-string sentinel for free) plus
+    `Link.properties.start_point/end_point` (the position with the
+    right `is_local_offset` flag).
     """
     link_id = edge.get("id")
     if not isinstance(link_id, str):
         return None
 
-    src = edge.get("source") or {}
-    dst = edge.get("target") or {}
-
-    source_id = src.get("nodeId") or edge.get("sourceId")
-    target_id = dst.get("nodeId") or edge.get("targetId")
-    if not source_id or not target_id:
+    source_id, start_point = _wire_end_to_endpoint(edge.get("source"))
+    target_id, end_point = _wire_end_to_endpoint(edge.get("target"))
+    # Fall back to the legacy flat-id wire shape (`sourceId`/`targetId`)
+    # before rejecting — keeps any stragglers building.
+    if source_id is None:
+        source_id = edge.get("sourceId") if isinstance(edge.get("sourceId"), str) else None
+    if target_id is None:
+        target_id = edge.get("targetId") if isinstance(edge.get("targetId"), str) else None
+    if source_id is None or target_id is None:
         return None
 
     link_dict: dict[str, Any] = {
@@ -305,15 +357,23 @@ def _wire_edge_to_link(edge: dict[str, Any], *, board_id: str) -> Link | None:
         "source": source_id,
         "target": target_id,
     }
+    properties: dict[str, Any] = {}
+    if start_point is not None:
+        properties["start_point"] = start_point
+    if end_point is not None:
+        properties["end_point"] = end_point
+    midpoint = _extract_midpoint(edge)
+    if midpoint is not None:
+        properties["edge_control_point"] = midpoint
+    if properties:
+        link_dict["properties"] = properties
+
     style = _edge_wire_to_link_style(edge)
     if style:
         link_dict["style"] = style
     label_markdown = edge.get("content")
     if isinstance(label_markdown, str) and label_markdown:
         link_dict["label"] = {"markdown": label_markdown}
-    midpoint = _extract_midpoint(edge)
-    if midpoint is not None:
-        link_dict["properties"] = {"edge_control_point": midpoint}
 
     try:
         return Link.model_validate(link_dict)
@@ -322,22 +382,31 @@ def _wire_edge_to_link(edge: dict[str, Any], *, board_id: str) -> Link | None:
         return None
 
 
-def _edge_patch_to_link_data(patch: dict[str, Any]) -> dict[str, Any]:
-    """Translate `Partial<Edge>` to a `update_link` data dict.
+def _edge_patch_to_link_data(patch: dict[str, Any]) -> dict[str, Any]:  # noqa: C901 — wide field-by-field translator
+    """Translate `Partial<Edge>` to an `update_link` data dict.
 
-    Handles endpoint changes (`source / target`), the curve control
-    midpoint (`_midpoint`, computed client-side from the cubic-bezier
-    control points before the op is sent — keeps the server stateless,
-    no node-position lookup needed), `pathStyle`, edge label
-    (`content` → `label.markdown`), and the camelCase EdgeStyle subset.
+    Handles endpoint changes (both branches of the EdgeEnd union — see
+    `_wire_end_to_endpoint`), the curve control midpoint (`_midpoint`,
+    computed client-side from the cubic-bezier control points before
+    the op is sent — keeps the server stateless, no node-position
+    lookup needed), `pathStyle`, edge label (`content` → `label.markdown`),
+    and the camelCase EdgeStyle subset.
     """
     data: dict[str, Any] = {}
-    src = patch.get("source")
-    if isinstance(src, dict) and "nodeId" in src:
-        data["source"] = src["nodeId"]
-    dst = patch.get("target")
-    if isinstance(dst, dict) and "nodeId" in dst:
-        data["target"] = dst["nodeId"]
+    properties: dict[str, Any] = {}
+
+    if "source" in patch:
+        source_id, start_point = _wire_end_to_endpoint(patch.get("source"))
+        if source_id is not None:
+            data["source"] = source_id
+        if start_point is not None:
+            properties["start_point"] = start_point
+    if "target" in patch:
+        target_id, end_point = _wire_end_to_endpoint(patch.get("target"))
+        if target_id is not None:
+            data["target"] = target_id
+        if end_point is not None:
+            properties["end_point"] = end_point
 
     style = _edge_wire_to_link_style(patch)
     if style:
@@ -351,7 +420,9 @@ def _edge_patch_to_link_data(patch: dict[str, Any]) -> dict[str, Any]:
 
     midpoint = _extract_midpoint(patch)
     if midpoint is not None:
-        data.setdefault("properties", {})["edge_control_point"] = midpoint
+        properties["edge_control_point"] = midpoint
+    if properties:
+        data["properties"] = properties
     return data
 
 

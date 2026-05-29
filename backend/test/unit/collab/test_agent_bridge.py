@@ -302,6 +302,74 @@ async def test_add_links_broadcasts_full_edge_shape():
     }
 
 
+async def test_link_to_wire_uses_saved_local_offset_over_node_center():
+    """The wire's `localOffset` reflects the stored `start_point` position.
+
+    Regression check: `link_to_wire_edge` used to ignore the stored
+    position entirely and always default to node center via
+    `node_sizes`. That meant edges with a user-chosen attachment
+    point (e.g., top-edge of a box) lost their position the moment
+    the agent or any other server-side path broadcast them.
+    """
+    from topix.collab.note_to_wire import link_to_wire_edge
+    from topix.datatypes.note.link import Link, LinkProperties
+    from topix.datatypes.property import PositionProperty
+
+    link = Link(
+        source="a",
+        target="b",
+        graph_uid="b1",
+        properties=LinkProperties(
+            start_point=PositionProperty(
+                position=PositionProperty.Position(x=50, y=30),
+                is_local_offset=True,
+            ),
+            end_point=PositionProperty(
+                position=PositionProperty.Position(x=180, y=10),
+                is_local_offset=True,
+            ),
+        ),
+    )
+
+    wire = link_to_wire_edge(link, node_sizes={"a": (200, 100), "b": (200, 100)})
+
+    # Stored localOffset wins over the (w/2, h/2) center fallback.
+    assert wire["source"] == {"nodeId": "a", "localOffset": {"x": 50.0, "y": 30.0}}
+    assert wire["target"] == {"nodeId": "b", "localOffset": {"x": 180.0, "y": 10.0}}
+
+
+async def test_link_to_wire_emits_world_point_for_free_endpoint():
+    """A Link with empty-string source ships `{worldPoint}` on the wire.
+
+    Companion to the inbound side: free endpoints now make a full
+    round-trip through the WS path without being silently dropped.
+    """
+    from topix.collab.note_to_wire import link_to_wire_edge
+    from topix.datatypes.note.link import Link, LinkProperties
+    from topix.datatypes.property import PositionProperty
+
+    link = Link(
+        source="",   # free
+        target="b",  # attached
+        graph_uid="b1",
+        properties=LinkProperties(
+            start_point=PositionProperty(
+                position=PositionProperty.Position(x=900, y=500),
+                is_local_offset=False,
+            ),
+            end_point=PositionProperty(
+                position=PositionProperty.Position(x=100, y=50),
+                is_local_offset=True,
+            ),
+        ),
+    )
+
+    wire = link_to_wire_edge(link, node_sizes={"b": (200, 100)})
+
+    assert wire["source"] == {"worldPoint": {"x": 900.0, "y": 500.0}}
+    assert wire["target"] == {"nodeId": "b", "localOffset": {"x": 100.0, "y": 50.0}}
+
+
 async def test_add_links_defaults_path_style_to_bezier():
     """A link without an explicit path_style still ships `pathStyle: 'bezier'`."""
     registry = RoomRegistry()

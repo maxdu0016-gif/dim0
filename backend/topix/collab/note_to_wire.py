@@ -176,10 +176,16 @@ def link_to_wire_edge(
         style_dict.pop(key, None)
     wire_style = {_snake_to_camel(k): v for k, v in style_dict.items()}
 
+    # `Link.properties` is typed as the parent `ResourceProperties`; the
+    # endpoint fields live on the `LinkProperties` subclass. Use getattr
+    # so a Link constructed without going through `model_validate` (e.g.
+    # in tests, or any pre-LinkProperties row) doesn't blow up here.
+    start_point = getattr(link.properties, "start_point", None)
+    end_point = getattr(link.properties, "end_point", None)
     edge: dict[str, Any] = {
         "id": link.id,
-        "source": _attached_end(link.source, node_sizes),
-        "target": _attached_end(link.target, node_sizes),
+        "source": _link_end_to_wire(link.source, start_point, node_sizes),
+        "target": _link_end_to_wire(link.target, end_point, node_sizes),
         "pathStyle": path_style,
         "z": 0,
         "groups": list(group_ids),
@@ -202,11 +208,41 @@ def link_to_wire_edge(
     return edge
 
 
-def _attached_end(
+def _link_end_to_wire(
     node_id: str,
+    stored_point,
     node_sizes: dict[str, tuple[float, float]] | None,
 ) -> dict[str, Any]:
-    """Build the canvas-harness EdgeEnd `{nodeId, localOffset}` dict."""
+    """Translate one Dim0 Link endpoint to a canvas-harness EdgeEnd.
+
+    Mirrors the inverse `_wire_end_to_endpoint` in `apply_ops.py`.
+    Three cases on the outbound path:
+
+      1. Empty `node_id` (free-floating) — emit `{worldPoint}`. Reads
+         the world coords off `stored_point.position`.
+      2. Attached + `stored_point.position` present — emit
+         `{nodeId, localOffset}` using the stored offset, regardless
+         of `is_local_offset` (the flag is a hint about interpretation,
+         not the source of truth for the position).
+      3. Attached + no stored position — fall back to node center via
+         `node_sizes`, then to `(0, 0)`. Without this, canvas-harness
+         crashes in `projectEndToWorld` on `undefined.x`.
+    """
+    pos = getattr(stored_point, "position", None) if stored_point else None
+    if not node_id:
+        # Free-floating — world coords. Default to origin if we have
+        # neither a saved world point nor a falsy node id; the peer
+        # will still render something (free edge at world (0, 0)).
+        if pos is not None:
+            return {"worldPoint": {"x": float(pos.x), "y": float(pos.y)}}
+        return {"worldPoint": {"x": 0.0, "y": 0.0}}
+
+    if pos is not None:
+        return {
+            "nodeId": node_id,
+            "localOffset": {"x": float(pos.x), "y": float(pos.y)},
+        }
+
     if node_sizes is not None:
         size = node_sizes.get(node_id)
         if size is not None:
