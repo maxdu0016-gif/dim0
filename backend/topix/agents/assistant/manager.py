@@ -48,6 +48,7 @@ class AssistantManager:
         graph_store: GraphStore | None = None,
         graph_uid: str | None = None,
         root_id: str | None = None,
+        agent_bridge: AgentBoardBridge | None = None,
     ):
         """Init method."""
         self.plan_agent = plan_agent
@@ -55,6 +56,7 @@ class AssistantManager:
         self.graph_store = graph_store
         self.graph_uid = graph_uid
         self.root_id = root_id
+        self.agent_bridge = agent_bridge
 
     @classmethod
     def from_config(
@@ -89,6 +91,7 @@ class AssistantManager:
             graph_store=graph_store,
             graph_uid=graph_uid,
             root_id=root_id,
+            agent_bridge=agent_bridge,
         )
 
     def _set_plan_model(self, model: str) -> None:
@@ -197,6 +200,7 @@ class AssistantManager:
                 created_ids,
                 created_link_ids=created_link_ids,
                 root_id=self.root_id,
+                agent_bridge=self.agent_bridge,
             )
         except Exception:
             logger.exception(
