@@ -54,24 +54,39 @@ _DIM0_TO_CANVAS_TYPE: dict[str, str] = {
 _CANVAS_TO_DIM0_TYPE: dict[str, str] = {v: k for k, v in _DIM0_TO_CANVAS_TYPE.items()}
 
 
-# Mapping of Dim0 LinkStyle (snake_case) → canvas-harness EdgeStyle
-# (camelCase). Pairs match the client's `dim0LinkStyleToCanvas`.
-_EDGE_STYLE_KEY_MAP: dict[str, str] = {
-    "stroke_color": "strokeColor",
-    "stroke_width": "strokeWidth",
-    "stroke_style": "strokeStyle",
-    "background_color": "backgroundColor",
-    "roughness": "roughness",
-    "roundness": "roundness",
-    "opacity": "opacity",
-    "font_family": "fontFamily",
-    "font_size": "fontSize",
-    "text_align": "textAlign",
-    "text_color": "textColor",
-    "text_style": "textStyle",
-    "source_arrowhead": "sourceArrowhead",
-    "target_arrowhead": "targetArrowhead",
-}
+# Lifted / dropped Dim0 style keys — handled out-of-band before the
+# remaining fields auto-translate snake_case → camelCase for the wire.
+#   - `type`: discriminator; goes onto wire `data.styleType` instead.
+#   - `angle`: lifted to `Node.angle` / not carried on EdgeStyle.
+#   - `group_ids`: lifted to `Node.groups` / `Edge.groups`.
+#   - `fill_style`: canvas-harness's Style has no `fillStyle` field
+#     (solid-only per migration-canvas-harness §3.3).
+#   - `path_style`: lifted to `Edge.pathStyle` (LinkStyle only).
+_LIFTED_OR_DROPPED_STYLE_KEYS: frozenset[str] = frozenset({
+    "type", "angle", "group_ids", "fill_style", "path_style",
+})
+
+
+def _snake_to_camel(s: str) -> str:
+    """Convert `stroke_color` → `strokeColor`.
+
+    Symmetric with `_camel_to_snake` for the closed-set Dim0 style
+    vocabulary (single underscore-separated lowercase words). Used to
+    bridge Dim0 LinkStyle / Style (snake_case) ↔ canvas-harness Style /
+    EdgeStyle (camelCase) without maintaining a hand-written map.
+    """
+    head, *tail = s.split("_")
+    return head + "".join(p[:1].upper() + p[1:] for p in tail if p)
+
+
+def _camel_to_snake(s: str) -> str:
+    """Convert `strokeColor` → `stroke_color`. Inverse of `_snake_to_camel`."""
+    out: list[str] = []
+    for i, ch in enumerate(s):
+        if ch.isupper() and i > 0:
+            out.append("_")
+        out.append(ch.lower())
+    return "".join(out)
 
 
 def note_to_wire_node(note: Note) -> dict[str, Any]:
@@ -89,6 +104,13 @@ def note_to_wire_node(note: Note) -> dict[str, Any]:
     style_dict: dict[str, Any] = note.style.model_dump(exclude_none=True)
     angle_deg = style_dict.pop("angle", 0) or 0
     style_type = style_dict.pop("type", None)
+    group_ids = style_dict.pop("group_ids", []) or []
+    # canvas-harness's `Style` has no `fillStyle` — Dim0 ships solid-only
+    # per migration-canvas-harness §3.3. Drop the rest of the lifted /
+    # dropped fields, then auto-convert remaining snake_case keys.
+    for key in _LIFTED_OR_DROPPED_STYLE_KEYS:
+        style_dict.pop(key, None)
+    wire_style = {_snake_to_camel(k): v for k, v in style_dict.items()}
 
     data: dict[str, Any] = {
         "noteType": note.type,
@@ -101,6 +123,9 @@ def note_to_wire_node(note: Note) -> dict[str, Any]:
         # round-trips them via nodeToNote.
         "properties": _properties_minus_lifted(props),
     }
+    stored = _note_stored_colors(note)
+    if stored:
+        data["_storedColors"] = stored
 
     return {
         "id": note.id,
@@ -111,8 +136,9 @@ def note_to_wire_node(note: Note) -> dict[str, Any]:
         "h": float(size.height),
         "z": float(props.node_z_index.number),
         "angle": float(angle_deg) * DEG_TO_RAD,
+        "groups": list(group_ids),
         "content": note.content.markdown if note.content else "",
-        "style": style_dict,
+        "style": wire_style,
         "data": {k: v for k, v in data.items() if v is not None},
     }
 
@@ -146,19 +172,9 @@ def link_to_wire_edge(
     )
     path_style = style_dict.pop("path_style", "bezier") or "bezier"
     group_ids = style_dict.pop("group_ids", []) or []
-    # Lifted onto Edge.angle in canvas-harness (edges don't have rotation
-    # in our model — drop it).
-    style_dict.pop("angle", None)
-    # Discriminator — canvas-harness EdgeStyle has no `type`.
-    style_dict.pop("type", None)
-    # Dim0 carries fill_style for solid-only edges; canvas-harness drops
-    # it (see migration-canvas-harness §3.3).
-    style_dict.pop("fill_style", None)
-
-    wire_style: dict[str, Any] = {}
-    for snake, camel in _EDGE_STYLE_KEY_MAP.items():
-        if snake in style_dict:
-            wire_style[camel] = style_dict[snake]
+    for key in _LIFTED_OR_DROPPED_STYLE_KEYS:
+        style_dict.pop(key, None)
+    wire_style = {_snake_to_camel(k): v for k, v in style_dict.items()}
 
     edge: dict[str, Any] = {
         "id": link.id,
@@ -179,7 +195,7 @@ def link_to_wire_edge(
         # build cubic controls with its own endpoint world coords.
         edge["_midpoint"] = midpoint
 
-    stored = _link_stored_colors(link)
+    stored = _style_stored_colors(link.style)
     if stored:
         edge["data"] = {"_storedColors": stored}
 
@@ -216,26 +232,29 @@ def _link_midpoint(link: Link) -> dict[str, float] | None:
         return None
 
 
-def _link_stored_colors(link: Link) -> dict[str, str] | None:
-    """Build the `_storedColors` payload from canonical LinkStyle colors.
+def _style_stored_colors(style) -> dict[str, str] | None:
+    """Build the `_storedColors` payload from a Dim0 Style / LinkStyle.
 
-    Mirrors the client's `pickStoredEdgeColors` — `backgroundColor`,
-    `strokeColor`, `textColor` in camelCase. The server has no concept
-    of "stored vs adapted"; we treat Dim0's raw style colors as the
-    canonical light-theme values (which is what the client also sends
-    via `_storedColors`).
+    Mirrors the client's `pickStoredColors / pickStoredEdgeColors`:
+    canonical light-theme `backgroundColor / strokeColor / textColor`
+    in camelCase, used by the receiver's `adaptNodeColors /
+    adaptEdgeColors` to project for the local theme.
     """
-    style = link.style
     if style is None:
         return None
     out: dict[str, str] = {}
-    if style.stroke_color:
+    if getattr(style, "stroke_color", None):
         out["strokeColor"] = style.stroke_color
-    if style.background_color:
+    if getattr(style, "background_color", None):
         out["backgroundColor"] = style.background_color
-    if style.text_color:
+    if getattr(style, "text_color", None):
         out["textColor"] = style.text_color
     return out or None
+
+
+def _note_stored_colors(note: Note) -> dict[str, str] | None:
+    """Build the `_storedColors` payload for a Note's style."""
+    return _style_stored_colors(note.style)
 
 
 def patch_data_to_wire_patch(data: dict[str, Any]) -> dict[str, Any]:  # noqa: C901 — wide field-by-field translator

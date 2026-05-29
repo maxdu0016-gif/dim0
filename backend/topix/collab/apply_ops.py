@@ -28,7 +28,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel
 
-from topix.collab.note_to_wire import _CANVAS_TO_DIM0_TYPE
+from topix.collab.note_to_wire import _CANVAS_TO_DIM0_TYPE, _camel_to_snake
 from topix.datatypes.note.link import Link
 from topix.datatypes.note.note import Note
 from topix.store.graph import GraphStore
@@ -37,26 +37,6 @@ logger = logging.getLogger(__name__)
 
 
 RAD_TO_DEG = 180.0 / math.pi
-
-
-# Inverse of `_EDGE_STYLE_KEY_MAP` in note_to_wire.py — canvas-harness
-# EdgeStyle (camelCase) → Dim0 LinkStyle (snake_case).
-_EDGE_STYLE_KEY_MAP_INV: dict[str, str] = {
-    "strokeColor": "stroke_color",
-    "strokeWidth": "stroke_width",
-    "strokeStyle": "stroke_style",
-    "backgroundColor": "background_color",
-    "roughness": "roughness",
-    "roundness": "roundness",
-    "opacity": "opacity",
-    "fontFamily": "font_family",
-    "fontSize": "font_size",
-    "textAlign": "text_align",
-    "textColor": "text_color",
-    "textStyle": "text_style",
-    "sourceArrowhead": "source_arrowhead",
-    "targetArrowhead": "target_arrowhead",
-}
 
 
 class WireOpResult(BaseModel):
@@ -391,9 +371,8 @@ def _edge_wire_to_link_style(payload: dict[str, Any]) -> dict[str, Any]:
 
     wire_style = payload.get("style")
     if isinstance(wire_style, dict):
-        for camel, snake in _EDGE_STYLE_KEY_MAP_INV.items():
-            if camel in wire_style:
-                out[snake] = wire_style[camel]
+        for camel, value in wire_style.items():
+            out[_camel_to_snake(camel)] = value
 
     canonical = _extract_canonical_colors(payload.get("data"))
     for k, v in canonical.items():

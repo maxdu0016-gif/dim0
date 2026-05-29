@@ -12,11 +12,13 @@ import pytest
 from topix.collab.note_to_wire import (
     _CANVAS_TO_DIM0_TYPE,
     _DIM0_TO_CANVAS_TYPE,
+    _camel_to_snake,
+    _snake_to_camel,
     note_to_wire_node,
 )
 from topix.datatypes.file.document import Document
 from topix.datatypes.note.note import Note
-from topix.datatypes.note.style import NodeType, Style
+from topix.datatypes.note.style import NodeType, StrokeStyle, Style
 
 
 def _note_with_style_type(style_type: NodeType) -> Note:
@@ -110,6 +112,110 @@ def test_document_takes_precedence_over_style_type() -> None:
     doc = Document(id="n1", graph_uid="b1", style=Style(type=NodeType.RECTANGLE))
     wire = note_to_wire_node(doc)
     assert wire["type"] == "document"
+
+
+# ---------------------------------------------------------------------------
+# Snake ↔ camel case helpers
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize(
+    ("snake", "camel"),
+    [
+        ("stroke_color", "strokeColor"),
+        ("stroke_width", "strokeWidth"),
+        ("background_color", "backgroundColor"),
+        ("font_family", "fontFamily"),
+        ("source_arrowhead", "sourceArrowhead"),
+        ("opacity", "opacity"),  # single word — identity
+        ("text", "text"),
+    ],
+)
+def test_snake_to_camel_round_trip(snake: str, camel: str) -> None:
+    """`_snake_to_camel` matches the closed-set Dim0 ↔ canvas-harness vocabulary."""
+    assert _snake_to_camel(snake) == camel
+    assert _camel_to_snake(camel) == snake
+
+
+# ---------------------------------------------------------------------------
+# Node style on the wire — Dim0 snake_case → canvas-harness camelCase
+# ---------------------------------------------------------------------------
+
+def test_wire_style_is_camel_case_with_dim0_values() -> None:
+    """All Dim0 LinkStyle fields appear on the wire under their camelCase keys.
+
+    Without this translation, canvas-harness reads `style.strokeColor` →
+    undefined → theme default, which is what produced the "peer sees a
+    generic blue rectangle instead of the agent's intended palette" bug.
+    """
+    note = Note(
+        id="n1", graph_uid="b1",
+        style=Style(
+            type=NodeType.RECTANGLE,
+            stroke_color="#222222",
+            stroke_width=4,
+            stroke_style=StrokeStyle.DASHED,
+            background_color="#ffeebb",
+            roughness=0.3,
+            roundness=2.0,
+            opacity=80,
+            text_color="#0a0a0a",
+        ),
+    )
+
+    wire = note_to_wire_node(note)
+    style = wire["style"]
+
+    assert style["strokeColor"] == "#222222"
+    assert style["strokeWidth"] == 4
+    assert style["strokeStyle"] == "dashed"
+    assert style["backgroundColor"] == "#ffeebb"
+    assert style["roughness"] == 0.3
+    assert style["roundness"] == 2.0
+    assert style["opacity"] == 80
+    assert style["textColor"] == "#0a0a0a"
+    # Lifted / dropped fields never appear in the wire style.
+    assert "type" not in style
+    assert "angle" not in style
+    assert "fillStyle" not in style
+    assert "fill_style" not in style
+    assert "groupIds" not in style
+    assert "group_ids" not in style
+
+
+def test_wire_node_ships_stored_colors_for_theme_adaptation() -> None:
+    """Canonical colors land on `data._storedColors` so peers can re-adapt.
+
+    Mirrors the edge-side `_storedColors` convention — receiver projects
+    these through `adaptNodeColors` for its local theme. Without this
+    field, dark-mode peers would render the originator's light-mode
+    palette as-is (white-on-white or black-on-black, depending on the
+    pick).
+    """
+    note = Note(
+        id="n1", graph_uid="b1",
+        style=Style(
+            type=NodeType.RECTANGLE,
+            stroke_color="#000",
+            background_color="#fff",
+            text_color="#123",
+        ),
+    )
+    wire = note_to_wire_node(note)
+    assert wire["data"]["_storedColors"] == {
+        "strokeColor": "#000",
+        "backgroundColor": "#fff",
+        "textColor": "#123",
+    }
+
+
+def test_wire_node_lifts_group_ids_onto_node_groups() -> None:
+    """`style.group_ids` is lifted onto `Node.groups` per canvas-harness model."""
+    note = Note(
+        id="n1", graph_uid="b1",
+        style=Style(type=NodeType.RECTANGLE, group_ids=["g1", "g2"]),
+    )
+    wire = note_to_wire_node(note)
+    assert wire["groups"] == ["g1", "g2"]
 
 
 def test_unknown_style_type_passes_through_unchanged() -> None:
