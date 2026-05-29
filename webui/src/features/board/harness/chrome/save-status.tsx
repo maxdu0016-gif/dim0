@@ -21,8 +21,10 @@ const STATUS_CLASS: Record<SaveStatus, string> = {
 
 
 /**
- * Save-status pill. Empty render when idle so the pill disappears
- * between edits instead of squatting "Saved" forever.
+ * Save-status label. Plain text — save is just a status, not an
+ * interactive surface, so no border / background / shadow. Empty
+ * render when idle so the label disappears between edits instead of
+ * squatting "Saved" forever.
  *
  * Layout is owned by the caller — the host (`harness-canvas.tsx`)
  * places this inside a top-right flex container alongside the
@@ -32,14 +34,11 @@ export function HarnessSaveStatus({ status }: { status: SaveStatus }) {
   const label = STATUS_LABEL[status]
   if (!label) return null
   return (
-    <div
-      className={cn(
-        "rounded-md border border-border bg-background/95 px-2 py-1 text-xs shadow-sm backdrop-blur",
-        STATUS_CLASS[status],
-      )}
+    <span
+      className={cn("px-1 text-xs", STATUS_CLASS[status])}
       aria-live="polite"
     >
       {label}
-    </div>
+    </span>
   )
 }

@@ -1,17 +1,19 @@
 import { useState } from "react"
 
-import { Button } from "@/components/ui/button"
+import { ShareIcon } from "@/components/icons"
 import { useBoardAppStore } from "@/features/board/harness/store/board-app-store"
 import { ShareDialog } from "./share-dialog"
 
 
 /**
- * "Share" button shown next to the save-status pill at the canvas
+ * "Share" button shown next to the save-status label at the canvas
  * top-right. Visible only when the signed-in user's role on the
  * current board is `"owner"` — non-owner editors and viewers don't see it.
  *
- * Layout is owned by the host (`harness-canvas.tsx`) which places this
- * inside a flex container alongside `<HarnessSaveStatus>`.
+ * Styling mirrors the toolbar's active/hover pattern (transparent
+ * default, secondary on hover) wrapped in the same pill chrome the
+ * top-right surfaces use elsewhere (border + backdrop-blurred bg +
+ * subtle shadow).
  */
 export function ShareButton() {
   const boardId = useBoardAppStore((s) => s.boardId)
@@ -26,14 +28,19 @@ export function ShareButton() {
 
   return (
     <>
-      <Button
-        variant="secondary"
-        size="sm"
+      <button
+        type="button"
         onClick={() => setOpen(true)}
         aria-label="Share this board"
+        className={
+          "flex items-center gap-1.5 rounded-md border border-border bg-background/95 px-2.5 py-1 " +
+          "text-xs font-medium text-card-foreground shadow-sm backdrop-blur " +
+          "transition-colors hover:bg-secondary hover:text-secondary-foreground"
+        }
       >
+        <ShareIcon className="size-3.5 shrink-0" />
         Share
-      </Button>
+      </button>
       <ShareDialog
         boardId={boardId}
         boardLabel={boardLabel}
