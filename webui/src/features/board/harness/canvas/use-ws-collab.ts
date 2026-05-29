@@ -1,6 +1,7 @@
 import { useEffect } from "react"
 import {
   attachSync,
+  midpointToCubicControls,
   type CanvasStore,
   type ClientId,
   type Edge,
@@ -10,6 +11,7 @@ import {
   type PresencePatch,
   type PresenceState,
   type SyncAdapter,
+  type Vec2,
 } from "@canvas-harness/core"
 import { mintCollabTicket } from "@/features/board/api/collab-ticket"
 import { API_URL } from "@/config/api"
@@ -188,14 +190,66 @@ const rewriteEdgeStyle = (target: Partial<Edge>, mode: "light" | "dark"): void =
 const patchMissingEdgeEndpoints = (batch: OpBatch, store: CanvasStore): void => {
   for (const op of batch.ops) {
     if (op.type === "edge.add") {
-      patchEdgeEnd((op.edge as Edge).source, store)
-      patchEdgeEnd((op.edge as Edge).target, store)
+      const edge = op.edge as Edge & { _midpoint?: Vec2 }
+      patchEdgeEnd(edge.source, store)
+      patchEdgeEnd(edge.target, store)
+      // pathStyle is non-optional on Edge — canvas-harness's `samplesFor`
+      // returns undefined when it's missing, then `edgeAABBFromSamples`
+      // crashes on `.length`. Default to bezier (matches Dim0's
+      // LinkStyle.path_style default).
+      if (!edge.pathStyle) edge.pathStyle = "bezier"
+      // Server ships the curve midpoint as `_midpoint` (world coords)
+      // and lets the receiver compute cubic controls with its own
+      // endpoint world coords. Symmetric to `enrichBatchWithMidpoint`
+      // outbound. Skip when controls are already provided by the
+      // sender.
+      if (edge._midpoint && !edge.control) {
+        expandMidpointToControl(edge, store)
+      }
+      delete edge._midpoint
     } else if (op.type === "edge.update") {
-      const patch = op.patch as Partial<Edge>
+      const patch = op.patch as Partial<Edge> & { _midpoint?: Vec2 }
       if (patch.source) patchEdgeEnd(patch.source, store)
       if (patch.target) patchEdgeEnd(patch.target, store)
+      if (patch._midpoint && !patch.control) {
+        expandUpdateMidpointToControl(op.id, patch, store)
+      }
+      delete patch._midpoint
     }
   }
+}
+
+
+const expandMidpointToControl = (
+  edge: Edge & { _midpoint?: Vec2 },
+  store: CanvasStore,
+): void => {
+  const midpoint = edge._midpoint
+  if (!midpoint) return
+  const sourceWorld = endpointWorld(edge.source, store)
+  const targetWorld = endpointWorld(edge.target, store)
+  if (!sourceWorld || !targetWorld) return
+  const { c1, c2 } = midpointToCubicControls(sourceWorld, midpoint, targetWorld)
+  edge.control = [c1, c2]
+}
+
+
+const expandUpdateMidpointToControl = (
+  edgeId: Edge["id"],
+  patch: Partial<Edge> & { _midpoint?: Vec2 },
+  store: CanvasStore,
+): void => {
+  const midpoint = patch._midpoint
+  if (!midpoint) return
+  const existing = store.getEdge(edgeId)
+  const sourceEnd = patch.source ?? existing?.source
+  const targetEnd = patch.target ?? existing?.target
+  if (!sourceEnd || !targetEnd) return
+  const sourceWorld = endpointWorld(sourceEnd, store)
+  const targetWorld = endpointWorld(targetEnd, store)
+  if (!sourceWorld || !targetWorld) return
+  const { c1, c2 } = midpointToCubicControls(sourceWorld, midpoint, targetWorld)
+  patch.control = [c1, c2]
 }
 
 

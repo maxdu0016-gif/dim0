@@ -38,6 +38,26 @@ logger = logging.getLogger(__name__)
 RAD_TO_DEG = 180.0 / math.pi
 
 
+# Inverse of `_EDGE_STYLE_KEY_MAP` in note_to_wire.py — canvas-harness
+# EdgeStyle (camelCase) → Dim0 LinkStyle (snake_case).
+_EDGE_STYLE_KEY_MAP_INV: dict[str, str] = {
+    "strokeColor": "stroke_color",
+    "strokeWidth": "stroke_width",
+    "strokeStyle": "stroke_style",
+    "backgroundColor": "background_color",
+    "roughness": "roughness",
+    "roundness": "roundness",
+    "opacity": "opacity",
+    "fontFamily": "font_family",
+    "fontSize": "font_size",
+    "textAlign": "text_align",
+    "textColor": "text_color",
+    "textStyle": "text_style",
+    "sourceArrowhead": "source_arrowhead",
+    "targetArrowhead": "target_arrowhead",
+}
+
+
 class WireOpResult(BaseModel):
     """Outcome of applying one op.
 
@@ -276,7 +296,9 @@ def _wire_edge_to_link(edge: dict[str, Any], *, board_id: str) -> Link | None:
 
     Canvas-harness Edges carry `source: { nodeId }` / `target: { nodeId }`
     endpoints; Dim0 stores them as flat node-id strings on `Link.source`
-    / `Link.target`.
+    / `Link.target`. We also persist `pathStyle`, edge label (`content`
+    → `Link.label.markdown`), and the camelCase EdgeStyle fields the
+    client sends.
     """
     link_id = edge.get("id")
     if not isinstance(link_id, str):
@@ -296,6 +318,12 @@ def _wire_edge_to_link(edge: dict[str, Any], *, board_id: str) -> Link | None:
         "source": source_id,
         "target": target_id,
     }
+    style = _edge_wire_to_link_style(edge)
+    if style:
+        link_dict["style"] = style
+    label_markdown = edge.get("content")
+    if isinstance(label_markdown, str) and label_markdown:
+        link_dict["label"] = {"markdown": label_markdown}
     midpoint = _extract_midpoint(edge)
     if midpoint is not None:
         link_dict["properties"] = {"edge_control_point": midpoint}
@@ -310,10 +338,11 @@ def _wire_edge_to_link(edge: dict[str, Any], *, board_id: str) -> Link | None:
 def _edge_patch_to_link_data(patch: dict[str, Any]) -> dict[str, Any]:
     """Translate `Partial<Edge>` to a `update_link` data dict.
 
-    Handles endpoint changes (`source / target`) and the curve control
+    Handles endpoint changes (`source / target`), the curve control
     midpoint (`_midpoint`, computed client-side from the cubic-bezier
     control points before the op is sent — keeps the server stateless,
-    no node-position lookup needed). Style / label / path-style deferred.
+    no node-position lookup needed), `pathStyle`, edge label
+    (`content` → `label.markdown`), and the camelCase EdgeStyle subset.
     """
     data: dict[str, Any] = {}
     src = patch.get("source")
@@ -323,10 +352,47 @@ def _edge_patch_to_link_data(patch: dict[str, Any]) -> dict[str, Any]:
     if isinstance(dst, dict) and "nodeId" in dst:
         data["target"] = dst["nodeId"]
 
+    style = _edge_wire_to_link_style(patch)
+    if style:
+        data["style"] = style
+
+    if "content" in patch:
+        markdown = patch.get("content")
+        data["label"] = (
+            {"markdown": str(markdown)} if isinstance(markdown, str) and markdown else None
+        )
+
     midpoint = _extract_midpoint(patch)
     if midpoint is not None:
         data.setdefault("properties", {})["edge_control_point"] = midpoint
     return data
+
+
+def _edge_wire_to_link_style(payload: dict[str, Any]) -> dict[str, Any]:
+    """Build a Dim0 LinkStyle patch dict from a wire `Edge` / `Partial<Edge>`.
+
+    Pulls `pathStyle` off the top level (lifted on canvas-harness's
+    `Edge`), the camelCase EdgeStyle fields off `style`, and canonical
+    colors off `data._storedColors`. Returns an empty dict when nothing
+    is set so callers can decide whether to skip the style key.
+    """
+    out: dict[str, Any] = {}
+
+    path_style = payload.get("pathStyle")
+    if isinstance(path_style, str):
+        out["path_style"] = path_style
+
+    wire_style = payload.get("style")
+    if isinstance(wire_style, dict):
+        for camel, snake in _EDGE_STYLE_KEY_MAP_INV.items():
+            if camel in wire_style:
+                out[snake] = wire_style[camel]
+
+    canonical = _extract_canonical_colors(payload.get("data"))
+    for k, v in canonical.items():
+        out[k] = v
+
+    return out
 
 
 def _extract_midpoint(payload: dict[str, Any]) -> dict[str, Any] | None:

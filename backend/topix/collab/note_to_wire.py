@@ -18,6 +18,26 @@ from topix.datatypes.note.note import Note
 DEG_TO_RAD = math.pi / 180.0
 
 
+# Mapping of Dim0 LinkStyle (snake_case) → canvas-harness EdgeStyle
+# (camelCase). Pairs match the client's `dim0LinkStyleToCanvas`.
+_EDGE_STYLE_KEY_MAP: dict[str, str] = {
+    "stroke_color": "strokeColor",
+    "stroke_width": "strokeWidth",
+    "stroke_style": "strokeStyle",
+    "background_color": "backgroundColor",
+    "roughness": "roughness",
+    "roundness": "roundness",
+    "opacity": "opacity",
+    "font_family": "fontFamily",
+    "font_size": "fontSize",
+    "text_align": "textAlign",
+    "text_color": "textColor",
+    "text_style": "textStyle",
+    "source_arrowhead": "sourceArrowhead",
+    "target_arrowhead": "targetArrowhead",
+}
+
+
 def note_to_wire_node(note: Note) -> dict[str, Any]:
     """Build a canvas-harness `Node`-shaped dict from a Dim0 Note.
 
@@ -68,20 +88,66 @@ def link_to_wire_edge(
 ) -> dict[str, Any]:
     """Build a canvas-harness `Edge`-shaped dict from a Dim0 Link.
 
-    canvas-harness's `EdgeEnd` for an attached endpoint requires BOTH
-    `nodeId` AND `localOffset` — without the offset, the projection
-    code crashes on `undefined.x` when computing world coords. We
-    default to node center `(w/2, h/2)` to match the client's load-time
-    `linkToEdge` convention. When `node_sizes` is missing or the
-    relevant node isn't there, we fall back to `(0, 0)` so the wire
-    still has a valid shape (renders at the node's top-left corner —
-    visually off but no crash).
+    Ships the full Edge contract so the receiver renders the agent's /
+    peer's intent without waiting for a snapshot reload. Mirrors the
+    client's `linkToEdge` in `webui/.../convert/link-to-edge.ts`.
+
+    `pathStyle` is non-optional in canvas-harness's `Edge` type — the
+    geometry cache (`samplesFor`) returns `undefined` without it and
+    `edgeAABBFromSamples` then crashes on `.length`. We fall back to
+    `"bezier"` matching Dim0's `LinkStyle.path_style` default.
+
+    `localOffset` on attached endpoints also must exist — defaults to
+    node center `(w/2, h/2)` when `node_sizes` provides the size, or
+    `(0, 0)` as a last-resort fallback.
+
+    The control midpoint is shipped as `_midpoint` (world coords); the
+    receiver runs `midpointToCubicControls` to get the curve. Keeps the
+    server stateless on geometry.
     """
-    return {
+    style_dict: dict[str, Any] = (
+        link.style.model_dump(exclude_none=True) if link.style else {}
+    )
+    path_style = style_dict.pop("path_style", "bezier") or "bezier"
+    group_ids = style_dict.pop("group_ids", []) or []
+    # Lifted onto Edge.angle in canvas-harness (edges don't have rotation
+    # in our model — drop it).
+    style_dict.pop("angle", None)
+    # Discriminator — canvas-harness EdgeStyle has no `type`.
+    style_dict.pop("type", None)
+    # Dim0 carries fill_style for solid-only edges; canvas-harness drops
+    # it (see migration-canvas-harness §3.3).
+    style_dict.pop("fill_style", None)
+
+    wire_style: dict[str, Any] = {}
+    for snake, camel in _EDGE_STYLE_KEY_MAP.items():
+        if snake in style_dict:
+            wire_style[camel] = style_dict[snake]
+
+    edge: dict[str, Any] = {
         "id": link.id,
         "source": _attached_end(link.source, node_sizes),
         "target": _attached_end(link.target, node_sizes),
+        "pathStyle": path_style,
+        "z": 0,
+        "groups": list(group_ids),
     }
+    if wire_style:
+        edge["style"] = wire_style
+    if link.label and link.label.markdown:
+        edge["content"] = link.label.markdown
+
+    midpoint = _link_midpoint(link)
+    if midpoint is not None:
+        # Sent under `_midpoint` (not `control`) so the receiver can
+        # build cubic controls with its own endpoint world coords.
+        edge["_midpoint"] = midpoint
+
+    stored = _link_stored_colors(link)
+    if stored:
+        edge["data"] = {"_storedColors": stored}
+
+    return edge
 
 
 def _attached_end(
@@ -98,6 +164,42 @@ def _attached_end(
                 "localOffset": {"x": w / 2.0, "y": h / 2.0},
             }
     return {"nodeId": node_id, "localOffset": {"x": 0.0, "y": 0.0}}
+
+
+def _link_midpoint(link: Link) -> dict[str, float] | None:
+    """Pull the world-coord midpoint off Link.properties.edge_control_point."""
+    cp = getattr(link.properties, "edge_control_point", None)
+    if cp is None:
+        return None
+    pos = getattr(cp, "position", None)
+    if pos is None:
+        return None
+    try:
+        return {"x": float(pos.x), "y": float(pos.y)}
+    except (AttributeError, TypeError, ValueError):
+        return None
+
+
+def _link_stored_colors(link: Link) -> dict[str, str] | None:
+    """Build the `_storedColors` payload from canonical LinkStyle colors.
+
+    Mirrors the client's `pickStoredEdgeColors` — `backgroundColor`,
+    `strokeColor`, `textColor` in camelCase. The server has no concept
+    of "stored vs adapted"; we treat Dim0's raw style colors as the
+    canonical light-theme values (which is what the client also sends
+    via `_storedColors`).
+    """
+    style = link.style
+    if style is None:
+        return None
+    out: dict[str, str] = {}
+    if style.stroke_color:
+        out["strokeColor"] = style.stroke_color
+    if style.background_color:
+        out["backgroundColor"] = style.background_color
+    if style.text_color:
+        out["textColor"] = style.text_color
+    return out or None
 
 
 def patch_data_to_wire_patch(data: dict[str, Any]) -> dict[str, Any]:  # noqa: C901 — wide field-by-field translator

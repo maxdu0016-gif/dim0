@@ -237,6 +237,90 @@ async def test_add_links_broadcasts_edge_add():
     }
 
 
+async def test_add_links_broadcasts_full_edge_shape():
+    """edge.add carries pathStyle, label, style, groups, and _storedColors.
+
+    canvas-harness's `Edge` requires `pathStyle` (non-optional) — without
+    it, `samplesFor` returns undefined and `edgeAABBFromSamples` crashes
+    on `.length`. The agent path also ships content (label), the
+    EdgeStyle camelCase subset, and `_storedColors` for theme adaptation
+    on the receiver.
+    """
+    from topix.datatypes.note.style import (
+        Arrowhead,
+        LinkStyle,
+        PathStyle,
+        StrokeStyle,
+    )
+
+    registry = RoomRegistry()
+    store = _RecordingGraphStore()
+    store.nodes_by_uid["a"] = _make_note("a", w=200, h=100)
+    store.nodes_by_uid["b"] = _make_note("b", w=200, h=100)
+    bridge = AgentBoardBridge(graph_store=store, registry=registry)
+
+    sock = _FakeSocket()
+    await registry.join("b1", sock, "u1")
+
+    link = Link(
+        source="a",
+        target="b",
+        graph_uid="b1",
+        label=RichText(markdown="connector"),
+        style=LinkStyle(
+            stroke_color="#0a0a0a",
+            stroke_width=3,
+            stroke_style=StrokeStyle.DASHED,
+            text_color="#222222",
+            path_style=PathStyle.STRAIGHT,
+            source_arrowhead=Arrowhead.BARB,
+            target_arrowhead=Arrowhead.ARROW_FILLED,
+            group_ids=["g1"],
+        ),
+    )
+    await bridge.add_links(board_id="b1", links=[link])
+
+    msg = json.loads(sock.sent[0])
+    edge = msg["batch"]["ops"][0]["edge"]
+    assert edge["pathStyle"] == "straight"
+    assert edge["content"] == "connector"
+    assert edge["groups"] == ["g1"]
+    assert edge["style"]["strokeColor"] == "#0a0a0a"
+    assert edge["style"]["strokeWidth"] == 3
+    assert edge["style"]["strokeStyle"] == "dashed"
+    assert edge["style"]["textColor"] == "#222222"
+    assert edge["style"]["sourceArrowhead"] == "barb"
+    assert edge["style"]["targetArrowhead"] == "arrow-filled"
+    # Lifted onto Edge.pathStyle — not duplicated inside `style`.
+    assert "pathStyle" not in edge["style"]
+    # Canonical colors mirror the canvas-harness Node convention so the
+    # receiver can re-adapt for its local theme.
+    assert edge["data"]["_storedColors"] == {
+        "strokeColor": "#0a0a0a",
+        "backgroundColor": "#00000000",
+        "textColor": "#222222",
+    }
+
+
+async def test_add_links_defaults_path_style_to_bezier():
+    """A link without an explicit path_style still ships `pathStyle: 'bezier'`."""
+    registry = RoomRegistry()
+    store = _RecordingGraphStore()
+    store.nodes_by_uid["a"] = _make_note("a", w=100, h=100)
+    store.nodes_by_uid["b"] = _make_note("b", w=100, h=100)
+    bridge = AgentBoardBridge(graph_store=store, registry=registry)
+
+    sock = _FakeSocket()
+    await registry.join("b1", sock, "u1")
+
+    link = Link(source="a", target="b", graph_uid="b1")
+    await bridge.add_links(board_id="b1", links=[link])
+
+    msg = json.loads(sock.sent[0])
+    edge = msg["batch"]["ops"][0]["edge"]
+    assert edge["pathStyle"] == "bezier"
+
+
 async def test_add_links_falls_back_to_zero_offset_when_node_missing():
     """If `get_nodes` doesn't return a node, localOffset falls back to (0, 0).
 

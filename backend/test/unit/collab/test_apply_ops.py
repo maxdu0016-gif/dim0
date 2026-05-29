@@ -347,6 +347,124 @@ async def test_edge_update_persists_midpoint_to_control_point():
     assert store.update_link_calls == [{"link_id": "e1", "data": expected}]
 
 
+async def test_edge_add_persists_label_and_style_and_path_style():
+    """An edge.add with content + style + pathStyle round-trips into the Link.
+
+    Mirrors the client's outbound wire shape (camelCase EdgeStyle); the
+    server snake_cases the fields back onto `LinkStyle` and saves
+    `content` as `Link.label.markdown`.
+    """
+    store = _RecordingGraphStore()
+    op = {
+        "type": "edge.add",
+        "edge": {
+            "id": "e1",
+            "source": {"nodeId": "n1"},
+            "target": {"nodeId": "n2"},
+            "pathStyle": "straight",
+            "content": "labeled edge",
+            "style": {
+                "strokeColor": "#ff0000",
+                "strokeWidth": 3,
+                "strokeStyle": "dashed",
+                "sourceArrowhead": "barb",
+                "targetArrowhead": "arrow-filled",
+            },
+        },
+    }
+
+    results = await apply_batch(graph_store=store, board_id="b1", user_id="u1", ops=[op])
+
+    assert results[0].applied is True
+    [link] = store.add_links_calls[0]
+    assert link.label is not None
+    assert link.label.markdown == "labeled edge"
+    assert link.style.path_style == "straight"
+    assert link.style.stroke_color == "#ff0000"
+    assert link.style.stroke_width == 3
+    assert link.style.stroke_style == "dashed"
+    assert link.style.source_arrowhead == "barb"
+    assert link.style.target_arrowhead == "arrow-filled"
+
+
+async def test_edge_update_persists_label_and_path_style():
+    """An edge.update with content + pathStyle propagates to update_link.
+
+    `content` becomes `label.markdown`; `pathStyle` ends up nested under
+    the `style` patch dict (snake_case).
+    """
+    store = _RecordingGraphStore()
+    op = {
+        "type": "edge.update",
+        "id": "e1",
+        "patch": {
+            "content": "renamed",
+            "pathStyle": "polyline",
+            "style": {"textColor": "#222222"},
+        },
+        "prev": {},
+    }
+
+    results = await apply_batch(graph_store=store, board_id="b1", user_id="u1", ops=[op])
+
+    assert results[0].applied is True
+    [call] = store.update_link_calls
+    assert call["link_id"] == "e1"
+    assert call["data"]["label"] == {"markdown": "renamed"}
+    assert call["data"]["style"] == {
+        "path_style": "polyline",
+        "text_color": "#222222",
+    }
+
+
+async def test_edge_update_clears_label_when_content_empty():
+    """An empty `content` patch clears the label (deep-merge sets None)."""
+    store = _RecordingGraphStore()
+    op = {
+        "type": "edge.update",
+        "id": "e1",
+        "patch": {"content": ""},
+        "prev": {},
+    }
+
+    results = await apply_batch(graph_store=store, board_id="b1", user_id="u1", ops=[op])
+
+    assert results[0].applied is True
+    [call] = store.update_link_calls
+    assert call["data"]["label"] is None
+
+
+async def test_edge_add_pulls_canonical_colors_from_stored_colors():
+    """`data._storedColors` on edge.add overrides display-adapted style colors.
+
+    Symmetric to the node-side `_storedColors` handling — keeps the
+    user's canonical pick in the DB regardless of the sender's theme.
+    """
+    store = _RecordingGraphStore()
+    op = {
+        "type": "edge.add",
+        "edge": {
+            "id": "e1",
+            "source": {"nodeId": "n1"},
+            "target": {"nodeId": "n2"},
+            "style": {"strokeColor": "#display-adapted"},
+            "data": {
+                "_storedColors": {
+                    "strokeColor": "#0a0a0a",
+                    "textColor": "#111111",
+                },
+            },
+        },
+    }
+
+    results = await apply_batch(graph_store=store, board_id="b1", user_id="u1", ops=[op])
+
+    assert results[0].applied is True
+    [link] = store.add_links_calls[0]
+    assert link.style.stroke_color == "#0a0a0a"
+    assert link.style.text_color == "#111111"
+
+
 async def test_edge_add_carries_midpoint_onto_link_properties():
     """A freshly-drawn edge with a curve persists the midpoint on create."""
     store = _RecordingGraphStore()
