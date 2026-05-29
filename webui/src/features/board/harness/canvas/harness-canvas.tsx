@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/sheet"
 import {
   CanvasContextMenu,
+  HarnessCollabStatus,
   HarnessSaveStatus,
   HarnessToolbar,
   HarnessViewportControls,
@@ -377,6 +378,7 @@ function HarnessCanvasInner({
         — the container is invisible when empty.
       */}
       <div className="absolute right-3 top-3 z-50 flex items-center gap-2">
+        <HarnessCollabStatus />
         <HarnessSaveStatus status={saveStatus} />
         <ShareButton />
       </div>

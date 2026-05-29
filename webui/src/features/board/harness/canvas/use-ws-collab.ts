@@ -20,6 +20,13 @@ import type { Graph } from "@/features/board/types/board"
 import { useAppStore } from "@/store"
 import { applyGraphToStore } from "../persist/snapshot-load"
 import {
+  MAX_RECONNECT_ATTEMPTS,
+  computeBackoffMs,
+  getCollabConnState,
+  resetCollabConnState,
+  setCollabConnState,
+} from "./collab-reconnect"
+import {
   adaptEdgeColors,
   adaptNodeColors,
   applyColorsToEdgeStyle,
@@ -58,16 +65,50 @@ export const useWsCollab = (
   useEffect(() => {
     if (!enabled || !boardId) return
 
+    // Outer reconnect loop. The adapter is recreated on each attempt;
+    // `lastSeq` carries the highest seen seq across attempts so the
+    // reconnect's `hello.since_seq` is accurate. `attempt` resets on
+    // every successful welcome — the chain has to clear the welcome
+    // handshake, not just open the socket, to count as a recovery.
     let cancelled = false
     let teardown: (() => void) | null = null
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null
+    let attempt = 0
+    let lastSeq = 0
+    setCollabConnState("connecting")
+
+    const cancelReconnect = () => {
+      if (reconnectTimer !== null) {
+        clearTimeout(reconnectTimer)
+        reconnectTimer = null
+      }
+    }
+
+    const scheduleReconnect = () => {
+      if (cancelled) return
+      if (attempt >= MAX_RECONNECT_ATTEMPTS) {
+        setCollabConnState("failed")
+        return
+      }
+      const delay = computeBackoffMs(attempt)
+      attempt += 1
+      setCollabConnState("reconnecting")
+      reconnectTimer = setTimeout(() => {
+        reconnectTimer = null
+        void setup()
+      }, delay)
+    }
 
     const setup = async () => {
+      if (cancelled) return
+      setCollabConnState("connecting")
       let ticket: string
       try {
         const res = await mintCollabTicket(boardId)
         ticket = res.ticket
       } catch (err) {
         console.warn("collab: failed to mint ticket", err)
+        scheduleReconnect()
         return
       }
       if (cancelled) return
@@ -87,6 +128,26 @@ export const useWsCollab = (
         clientId: store.clientId,
         initialPresence: store.presence.getLocal(),
         store,
+        sinceSeq: lastSeq > 0 ? lastSeq : null,
+        onWelcome: (seq) => {
+          lastSeq = seq
+          attempt = 0
+          setCollabConnState("live")
+        },
+        onClose: (code, seqAtClose) => {
+          lastSeq = seqAtClose
+          // Detach the dead adapter before scheduling the next attempt
+          // so attachSync isn't trying to push to a closed socket.
+          teardown?.()
+          teardown = null
+          if (cancelled) return
+          if (code === 1000 || code === 1001) {
+            // Clean close — leave state as live if user navigated;
+            // the cleanup path resets to idle on unmount.
+            return
+          }
+          scheduleReconnect()
+        },
       })
       const detachSync = attachSync(store, adapter)
 
@@ -96,12 +157,29 @@ export const useWsCollab = (
       }
     }
 
-    setup()
+    // Visibility-change: when the tab is foregrounded after being
+    // backgrounded long enough for the WS to die, retry immediately
+    // instead of waiting out the current backoff. Mobile Safari does
+    // this aggressively (~5 min); the user's perception is "I opened
+    // the tab back up and it just worked."
+    const onVisibilityChange = () => {
+      if (document.visibilityState !== "visible") return
+      if (getCollabConnState() !== "reconnecting") return
+      cancelReconnect()
+      attempt = 0
+      void setup()
+    }
+    document.addEventListener("visibilitychange", onVisibilityChange)
+
+    void setup()
 
     return () => {
       cancelled = true
+      cancelReconnect()
+      document.removeEventListener("visibilitychange", onVisibilityChange)
       teardown?.()
       teardown = null
+      resetCollabConnState()
     }
   }, [store, boardId, enabled, userName, userId, userEmail])
 }
@@ -413,6 +491,22 @@ type WebSocketSyncOptions = {
    * endpoint world coords).
    */
   store: CanvasStore
+  /**
+   * Highest server seq this client has previously seen — sent on
+   * `hello { since_seq }` so a reconnecting peer can catch up on
+   * missed peer-ops without a full snapshot rebuild. Pass `null` on
+   * first connect.
+   */
+  sinceSeq?: number | null
+  /** Fired after `welcome` is applied; receives the welcome's seq. */
+  onWelcome?: (seq: number) => void
+  /**
+   * Fired on `close`, with the close code and the highest seq the
+   * adapter saw before going down. The outer reconnect loop uses this
+   * to decide whether to schedule a retry and what `sinceSeq` to send
+   * on the next attempt.
+   */
+  onClose?: (code: number, lastSeq: number) => void
 }
 
 
@@ -428,6 +522,9 @@ const createWebSocketSyncAdapter = ({
   clientId,
   initialPresence,
   store,
+  sinceSeq,
+  onWelcome,
+  onClose,
 }: WebSocketSyncOptions): SyncAdapter => {
   const ws = new WebSocket(url)
   const batchListeners = new Set<(batch: OpBatch) => void>()
@@ -439,9 +536,11 @@ const createWebSocketSyncAdapter = ({
   // Local monotonic counter so the client can match `op-applied` acks
   // back to outgoing ops. Server stamps the global `seq` separately.
   let clientSeq = 0
-  // Highest server `seq` we've observed — used as `since_seq` on
-  // reconnect (Phase 1c) and to detect out-of-order delivery.
-  let lastServerSeq = 0
+  // Highest server `seq` we've observed. Seeded from the caller's
+  // `sinceSeq` so reconnect attempts pick up where the previous
+  // adapter left off; the outer loop also reads this back on close
+  // so the next attempt can send the right `since_seq`.
+  let lastServerSeq = sinceSeq ?? 0
 
   // Outbound coalesce window — buffer local op batches for a brief
   // window and merge their ops into a single wire message. Caps
@@ -502,7 +601,14 @@ const createWebSocketSyncAdapter = ({
   ws.addEventListener("open", () => {
     if (!openSent) {
       openSent = true
-      send({ kind: "hello", clientId })
+      // `since_seq` is the highest server-stamped seq we've ever seen
+      // on this client. On first connect it's null → server replies
+      // with `mode: "snapshot"`. On reconnect it's the last-known seq
+      // so the server can decide between catch-up / live / fresh
+      // snapshot (Phase 1c.2 wires this on the server side; the
+      // wire shape is already defined here).
+      const sinceSeqOut = lastServerSeq > 0 ? lastServerSeq : null
+      send({ kind: "hello", clientId, since_seq: sinceSeqOut })
       if (lastLocalPresence) {
         send({ kind: "presence", clientId, state: lastLocalPresence })
       }
@@ -538,6 +644,10 @@ const createWebSocketSyncAdapter = ({
         }
       }
       // Phase 1c.2 will add `mode === "catch-up"` with `msg.batches`.
+      // Signal the outer reconnect loop that we've successfully
+      // handshaked — resets the attempt counter and transitions
+      // the chrome status pill to "live".
+      onWelcome?.(msg.seq)
       return
     }
     if (msg.kind === "peer-op") {
@@ -601,6 +711,10 @@ const createWebSocketSyncAdapter = ({
       console.warn(`collab: ws closed code=${e.code} reason=${e.reason || "(none)"}`)
     }
     notifyWsClose(e.code)
+    // Hand the last known seq back to the outer reconnect loop so the
+    // next attempt's `since_seq` is accurate. The outer loop also
+    // decides whether to schedule a retry based on the close code.
+    onClose?.(e.code, lastServerSeq)
   })
 
   const onPageHide = () => {
