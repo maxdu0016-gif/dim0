@@ -287,39 +287,20 @@ describe("reconnect harness", () => {
 
   it("sinceSeq passes the highest observed seq across reconnect attempts", () => {
     const seenSinceSeqs: Array<number | null> = []
-    const { created } = (() => {
-      const c: FakeAdapter[] = []
-      return {
-        factory: (callbacks: {
-          onWelcome: (seq: number) => void
-          onClose: (code: number, seqAtClose: number) => void
-          sinceSeq: number | null
-        }) => {
-          seenSinceSeqs.push(callbacks.sinceSeq)
-          const adapter: FakeAdapter = {
-            fireWelcome: (seq) => callbacks.onWelcome(seq),
-            fireClose: (code, seqAtClose) => callbacks.onClose(code, seqAtClose),
-            teardownCalls: 0,
-          }
-          c.push(adapter)
-          return adapter
-        },
-        created: c,
-      }
-    })()
+    const created: FakeAdapter[] = []
 
-    const h = runHarness({
-      adapterFactory: (callbacks) => {
-        seenSinceSeqs.push(callbacks.sinceSeq)
-        const adapter: FakeAdapter = {
-          fireWelcome: (seq) => callbacks.onWelcome(seq),
-          fireClose: (code, seqAtClose) => callbacks.onClose(code, seqAtClose),
-          teardownCalls: 0,
-        }
-        created.push(adapter)
-        return adapter
-      },
-    })
+    const factory: RunHarnessOpts["adapterFactory"] = (callbacks) => {
+      seenSinceSeqs.push(callbacks.sinceSeq)
+      const adapter: FakeAdapter = {
+        fireWelcome: (seq) => callbacks.onWelcome(seq),
+        fireClose: (code, seqAtClose) => callbacks.onClose(code, seqAtClose),
+        teardownCalls: 0,
+      }
+      created.push(adapter)
+      return adapter
+    }
+
+    const h = runHarness({ adapterFactory: factory })
 
     // First adapter: sinceSeq=null (first connect).
     expect(seenSinceSeqs[seenSinceSeqs.length - 1]).toBeNull()
