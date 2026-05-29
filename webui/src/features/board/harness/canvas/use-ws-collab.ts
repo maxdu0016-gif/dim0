@@ -171,6 +171,49 @@ const rewriteEdgeStyle = (target: Partial<Edge>, mode: "light" | "dark"): void =
 
 
 /**
+ * Patch any attached EdgeEnd that arrived without a `localOffset`.
+ *
+ * canvas-harness crashes in `projectEndToWorld → nodeLocalToWorld` if
+ * an attached endpoint has only `{nodeId}` — the missing `localOffset`
+ * is read as `undefined.x`. Server-side conversion now defaults the
+ * offset to node center, but this in-receiver pass is the safety net:
+ * legacy payloads, future bypasses, or a server bug can't take the
+ * tab down.
+ *
+ * If the receiver's local store has the referenced node, default to
+ * center `(w/2, h/2)`. If not (race with a not-yet-applied node.add),
+ * default to `(0, 0)` so the projection succeeds — the edge endpoint
+ * will visually sit at the node's top-left until the next refresh.
+ */
+const patchMissingEdgeEndpoints = (batch: OpBatch, store: CanvasStore): void => {
+  for (const op of batch.ops) {
+    if (op.type === "edge.add") {
+      patchEdgeEnd((op.edge as Edge).source, store)
+      patchEdgeEnd((op.edge as Edge).target, store)
+    } else if (op.type === "edge.update") {
+      const patch = op.patch as Partial<Edge>
+      if (patch.source) patchEdgeEnd(patch.source, store)
+      if (patch.target) patchEdgeEnd(patch.target, store)
+    }
+  }
+}
+
+
+const patchEdgeEnd = (end: unknown, store: CanvasStore): void => {
+  if (!end || typeof end !== "object") return
+  const e = end as { nodeId?: string; localOffset?: { x: number; y: number } }
+  if (!("nodeId" in e) || !e.nodeId) return
+  if (e.localOffset && typeof e.localOffset.x === "number") return
+  const node = store.getNode(e.nodeId as Edge["source"] extends { nodeId: infer N } ? N : never)
+  if (node) {
+    e.localOffset = { x: node.w / 2, y: node.h / 2 }
+  } else {
+    e.localOffset = { x: 0, y: 0 }
+  }
+}
+
+
+/**
  * Collapse repeat update ops on the same target into one.
  *
  * canvas-harness emits a `store.updateEdge` / `store.updateNode` PER
@@ -438,6 +481,11 @@ const createWebSocketSyncAdapter = ({
       // store and paint as a dark color on a white canvas (and vice
       // versa). See [color-adapter.ts] for the projection rules.
       normalizeBatchColorsForLocalTheme(msg.batch)
+      // Defense-in-depth: any attached EdgeEnd without a localOffset
+      // would crash canvas-harness's `projectEndToWorld` on
+      // `undefined.x`. Server-side `link_to_wire_edge` defaults to
+      // node center, but a stray legacy payload could still slip in.
+      patchMissingEdgeEndpoints(msg.batch, store)
       for (const cb of batchListeners) cb(msg.batch)
       return
     }

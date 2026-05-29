@@ -12,7 +12,8 @@ from typing import Any
 from topix.collab.agent_bridge import AGENT_CLIENT_ID, AgentBoardBridge
 from topix.collab.room import RoomRegistry
 from topix.datatypes.note.link import Link
-from topix.datatypes.note.note import Note
+from topix.datatypes.note.note import Note, NoteProperties
+from topix.datatypes.property import SizeProperty
 from topix.datatypes.resource import RichText
 
 
@@ -39,6 +40,9 @@ class _RecordingGraphStore:
         # patch_note returns the post-merge note; we just echo the
         # data dict back wrapped in a Note for tests to inspect.
         self.patch_returns: Note | None = None
+        # nodes_by_uid powers get_nodes() — tests that exercise the
+        # bridge's edge-endpoint resolver populate this.
+        self.nodes_by_uid: dict[str, Note] = {}
 
     async def add_notes(self, *, nodes):
         """Add notes."""
@@ -61,14 +65,28 @@ class _RecordingGraphStore:
         """Delete link."""
         self.delete_link_calls.append(link_id)
 
+    async def get_nodes(self, node_ids):
+        """Return the requested notes (used by the bridge's endpoint resolver)."""
+        return [self.nodes_by_uid[uid] for uid in node_ids if uid in self.nodes_by_uid]
 
-def _make_note(note_id: str = "n1") -> Note:
-    """Make note."""
+
+def _make_note(note_id: str = "n1", *, w: float | None = None, h: float | None = None) -> Note:
+    """Build a Note for tests.
+
+    Optionally seeds `node_size` for the endpoint-resolver path in
+    `bridge.add_links`.
+    """
+    properties = None
+    if w is not None or h is not None:
+        properties = NoteProperties(
+            node_size=SizeProperty(size=SizeProperty.Size(width=w or 300, height=h or 100)),
+        )
     return Note(
         id=note_id,
         graph_uid="b1",
         label=RichText(markdown="Hi"),
         content=RichText(markdown="body"),
+        properties=properties or NoteProperties(),
     )
 
 
@@ -185,9 +203,18 @@ async def test_delete_node_broadcasts_node_remove():
 
 
 async def test_add_links_broadcasts_edge_add():
-    """Add links broadcasts edge add."""
+    """add_links broadcasts edge.add with localOffset defaulted to node center.
+
+    Without `localOffset`, canvas-harness's projectEndToWorld crashes
+    on `undefined.x`. The bridge resolves source/target node sizes
+    via get_nodes and defaults the offset to `(w/2, h/2)`.
+    """
     registry = RoomRegistry()
     store = _RecordingGraphStore()
+    # Seed the recording store with notes whose node_size we can
+    # exercise in the resolver.
+    store.nodes_by_uid["a"] = _make_note("a", w=200, h=100)
+    store.nodes_by_uid["b"] = _make_note("b", w=400, h=80)
     bridge = AgentBoardBridge(graph_store=store, registry=registry)
 
     sock = _FakeSocket()
@@ -198,9 +225,44 @@ async def test_add_links_broadcasts_edge_add():
 
     assert store.add_links_calls == [[link]]
     msg = json.loads(sock.sent[0])
-    assert msg["batch"]["ops"][0]["type"] == "edge.add"
-    assert msg["batch"]["ops"][0]["edge"]["source"] == {"nodeId": "a"}
-    assert msg["batch"]["ops"][0]["edge"]["target"] == {"nodeId": "b"}
+    op = msg["batch"]["ops"][0]
+    assert op["type"] == "edge.add"
+    assert op["edge"]["source"] == {
+        "nodeId": "a",
+        "localOffset": {"x": 100.0, "y": 50.0},
+    }
+    assert op["edge"]["target"] == {
+        "nodeId": "b",
+        "localOffset": {"x": 200.0, "y": 40.0},
+    }
+
+
+async def test_add_links_falls_back_to_zero_offset_when_node_missing():
+    """If `get_nodes` doesn't return a node, localOffset falls back to (0, 0).
+
+    Avoids crashing the wire path when an agent emits a link to a node
+    the server can't immediately resolve (race / inconsistent state).
+    """
+    registry = RoomRegistry()
+    store = _RecordingGraphStore()  # nodes_by_uid intentionally empty
+    bridge = AgentBoardBridge(graph_store=store, registry=registry)
+
+    sock = _FakeSocket()
+    await registry.join("b1", sock, "u1")
+
+    link = Link(source="missing", target="also-missing", graph_uid="b1")
+    await bridge.add_links(board_id="b1", links=[link])
+
+    msg = json.loads(sock.sent[0])
+    op = msg["batch"]["ops"][0]
+    assert op["edge"]["source"] == {
+        "nodeId": "missing",
+        "localOffset": {"x": 0.0, "y": 0.0},
+    }
+    assert op["edge"]["target"] == {
+        "nodeId": "also-missing",
+        "localOffset": {"x": 0.0, "y": 0.0},
+    }
 
 
 async def test_seq_is_monotonic_per_room():

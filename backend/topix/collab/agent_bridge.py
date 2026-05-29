@@ -108,8 +108,51 @@ class AgentBoardBridge:
             if link.graph_uid is None:
                 link.graph_uid = board_id
         await self._graph_store.add_links(links=links)
-        ops = [{"type": "edge.add", "edge": link_to_wire_edge(link)} for link in links]
+
+        # Resolve source/target node sizes so the wire edge carries
+        # `localOffset: {w/2, h/2}` — canvas-harness crashes on an
+        # attached endpoint without a localOffset.
+        endpoint_ids = {
+            uid
+            for link in links
+            for uid in (link.source, link.target)
+            if uid
+        }
+        node_sizes = await self._resolve_node_sizes(endpoint_ids)
+
+        ops = [
+            {"type": "edge.add", "edge": link_to_wire_edge(link, node_sizes=node_sizes)}
+            for link in links
+        ]
         await self._broadcast(board_id=board_id, ops=ops)
+
+    async def _resolve_node_sizes(
+        self, node_ids: set[str],
+    ) -> dict[str, tuple[float, float]]:
+        """Lookup `(w, h)` for the given node ids from the GraphStore.
+
+        Used to default edge endpoint `localOffset` to node center for
+        agent-emitted links (the agent doesn't track endpoint offsets
+        itself; the convention is "point at the node's center").
+        Missing nodes are silently dropped from the returned map;
+        callers fall back to `(0, 0)`.
+        """
+        if not node_ids:
+            return {}
+        try:
+            notes = await self._graph_store.get_nodes(list(node_ids))
+        except Exception:
+            logger.exception("agent bridge node-size lookup failed ids=%s", node_ids)
+            return {}
+        result: dict[str, tuple[float, float]] = {}
+        for note in notes:
+            size = getattr(note.properties, "node_size", None)
+            inner = getattr(size, "size", None) if size is not None else None
+            w = getattr(inner, "width", None)
+            h = getattr(inner, "height", None)
+            if w is not None and h is not None:
+                result[note.id] = (float(w), float(h))
+        return result
 
     async def delete_link(self, *, board_id: str, link_id: str) -> None:
         """Delete a link; broadcasts `edge.remove`."""

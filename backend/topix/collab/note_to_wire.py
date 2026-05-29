@@ -61,13 +61,43 @@ def note_to_wire_node(note: Note) -> dict[str, Any]:
     }
 
 
-def link_to_wire_edge(link: Link) -> dict[str, Any]:
-    """Build a canvas-harness `Edge`-shaped dict from a Dim0 Link."""
+def link_to_wire_edge(
+    link: Link,
+    *,
+    node_sizes: dict[str, tuple[float, float]] | None = None,
+) -> dict[str, Any]:
+    """Build a canvas-harness `Edge`-shaped dict from a Dim0 Link.
+
+    canvas-harness's `EdgeEnd` for an attached endpoint requires BOTH
+    `nodeId` AND `localOffset` — without the offset, the projection
+    code crashes on `undefined.x` when computing world coords. We
+    default to node center `(w/2, h/2)` to match the client's load-time
+    `linkToEdge` convention. When `node_sizes` is missing or the
+    relevant node isn't there, we fall back to `(0, 0)` so the wire
+    still has a valid shape (renders at the node's top-left corner —
+    visually off but no crash).
+    """
     return {
         "id": link.id,
-        "source": {"nodeId": link.source},
-        "target": {"nodeId": link.target},
+        "source": _attached_end(link.source, node_sizes),
+        "target": _attached_end(link.target, node_sizes),
     }
+
+
+def _attached_end(
+    node_id: str,
+    node_sizes: dict[str, tuple[float, float]] | None,
+) -> dict[str, Any]:
+    """Build the canvas-harness EdgeEnd `{nodeId, localOffset}` dict."""
+    if node_sizes is not None:
+        size = node_sizes.get(node_id)
+        if size is not None:
+            w, h = size
+            return {
+                "nodeId": node_id,
+                "localOffset": {"x": w / 2.0, "y": h / 2.0},
+            }
+    return {"nodeId": node_id, "localOffset": {"x": 0.0, "y": 0.0}}
 
 
 def patch_data_to_wire_patch(data: dict[str, Any]) -> dict[str, Any]:  # noqa: C901 — wide field-by-field translator
