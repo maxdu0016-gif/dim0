@@ -82,6 +82,7 @@ export const useWsCollab = (
         url,
         clientId: store.clientId,
         initialPresence: store.presence.getLocal(),
+        store,
       })
       const detachSync = attachSync(store, adapter)
 
@@ -170,6 +171,108 @@ const rewriteEdgeStyle = (target: Partial<Edge>, mode: "light" | "dark"): void =
 
 
 /**
+ * Collapse repeat update ops on the same target into one.
+ *
+ * canvas-harness emits a `store.updateEdge` / `store.updateNode` PER
+ * pointermove for the edge-midpoint and node-resize gestures (see the
+ * lib's use-interaction-gesture.ts). The receiver doesn't need each
+ * intermediate value — the final patch is all that matters for
+ * visual sync. We keep the EARLIEST `prev` (the gesture's starting
+ * point so conflict detection still has a meaningful anchor) and
+ * shallow-merge the patches in arrival order (last value wins per
+ * field). Non-update ops pass through untouched and in order.
+ */
+const dedupeRepeatUpdates = (ops: Op[]): Op[] => {
+  const out: Op[] = []
+  const indexByKey = new Map<string, number>()
+  for (const op of ops) {
+    if (op.type === "node.update" || op.type === "edge.update") {
+      const key = `${op.type}:${op.id as unknown as string}`
+      const prevIdx = indexByKey.get(key)
+      if (prevIdx !== undefined) {
+        // Reuse the earlier slot — merge new patch on top, keep
+        // earliest `prev`. The op union forces us through `any` here.
+        const earlier = out[prevIdx] as { patch: Record<string, unknown> }
+        const incoming = op as { patch: Record<string, unknown> }
+        earlier.patch = { ...earlier.patch, ...incoming.patch }
+        continue
+      }
+      indexByKey.set(key, out.length)
+      out.push(op)
+      continue
+    }
+    out.push(op)
+  }
+  return out
+}
+
+
+/**
+ * Compute the on-curve midpoint world point from cubic-bezier control
+ * points and attach it as `_midpoint` so the server can persist it
+ * directly into `LinkProperties.edge_control_point`.
+ *
+ * Inverse of canvas-harness's `midpointToCubicControls`: with symmetric
+ * c1 = c2 = c the curve at t=0.5 passes through `(S + T + 6·c) / 8`.
+ * We do the math client-side so the server stays stateless (no need
+ * to look up node positions just to recompute geometry).
+ */
+const enrichBatchWithMidpoint = (batch: OpBatch, store: CanvasStore): void => {
+  for (const op of batch.ops) {
+    if (op.type === "edge.add") {
+      attachEdgeMidpoint(op.edge as Edge & { _midpoint?: { x: number; y: number } }, op.edge, store)
+    } else if (op.type === "edge.update") {
+      attachEdgeMidpoint(
+        op.patch as Partial<Edge> & { _midpoint?: { x: number; y: number } },
+        store.getEdge(op.id) ?? null,
+        store,
+        op.patch,
+      )
+    }
+  }
+}
+
+
+const attachEdgeMidpoint = (
+  target: Partial<Edge> & { _midpoint?: { x: number; y: number } },
+  baseEdge: Edge | null,
+  store: CanvasStore,
+  patchOverride?: Partial<Edge>,
+): void => {
+  const control = (patchOverride?.control ?? target.control ?? baseEdge?.control) as
+    | ReadonlyArray<{ x: number; y: number }>
+    | undefined
+  if (!control || control.length === 0) return
+  // Source/target on the patch override take precedence (an endpoint
+  // change in the same batch); else read from the existing edge.
+  const sourceEnd = patchOverride?.source ?? baseEdge?.source
+  const targetEnd = patchOverride?.target ?? baseEdge?.target
+  if (!sourceEnd || !targetEnd) return
+  const sourceWorld = endpointWorld(sourceEnd, store)
+  const targetWorld = endpointWorld(targetEnd, store)
+  if (!sourceWorld || !targetWorld) return
+  const c = control[0]
+  target._midpoint = {
+    x: (sourceWorld.x + targetWorld.x + 6 * c.x) / 8,
+    y: (sourceWorld.y + targetWorld.y + 6 * c.y) / 8,
+  }
+}
+
+
+const endpointWorld = (
+  end: Edge["source"] | Edge["target"],
+  store: CanvasStore,
+): { x: number; y: number } | null => {
+  if ("nodeId" in end) {
+    const node = store.getNode(end.nodeId)
+    if (!node) return null
+    return { x: node.x + end.localOffset.x, y: node.y + end.localOffset.y }
+  }
+  return end.worldPoint
+}
+
+
+/**
  * Deterministic-ish HSL color per client. Same user across tabs gets
  * the same color; different users get different ones.
  */
@@ -204,6 +307,13 @@ type WebSocketSyncOptions = {
   url: string
   clientId: ClientId
   initialPresence?: PresenceState
+  /**
+   * Required for outbound enrichment — we look up node positions to
+   * compute the edge midpoint from the cubic-bezier control points
+   * (the server stores midpoint as a position; the math needs the
+   * endpoint world coords).
+   */
+  store: CanvasStore
 }
 
 
@@ -218,6 +328,7 @@ const createWebSocketSyncAdapter = ({
   url,
   clientId,
   initialPresence,
+  store,
 }: WebSocketSyncOptions): SyncAdapter => {
   const ws = new WebSocket(url)
   const batchListeners = new Set<(batch: OpBatch) => void>()
@@ -258,12 +369,18 @@ const createWebSocketSyncAdapter = ({
     // Concatenate ops in arrival order; server applies them sequentially
     // so causal intent is preserved. Use the latest batch's id/ts/origin
     // so the merged batch identifies as the most recent action.
+    const concatenated = pendingOps.flatMap((p) => p.batch.ops)
     const mergedBatch: OpBatch = {
       ...first.batch,
       id: last.batch.id,
       ts: last.batch.ts,
       origin: last.batch.origin,
-      ops: pendingOps.flatMap((p) => p.batch.ops),
+      // Collapse consecutive update ops on the same target so a 5-second
+      // edge-midpoint drag or node-resize doesn't ship 60+ wire ops for
+      // the same id. Each gesture's last patch carries the cumulative
+      // final state; the earliest `prev` is preserved for conflict
+      // detection.
+      ops: dedupeRepeatUpdates(concatenated),
     }
     // Take the most-recent client_seq — the server's op-applied for
     // that one implicitly acks the older ones (a single seq covers the
@@ -273,6 +390,10 @@ const createWebSocketSyncAdapter = ({
   }
 
   const queueOp = (client_seq: number, batch: OpBatch) => {
+    // Compute the edge midpoint once per batch from the local store
+    // (source/target endpoints + control[c1, c2]); the server stores
+    // the midpoint as a position. See `enrichBatchWithMidpoint`.
+    enrichBatchWithMidpoint(batch, store)
     pendingOps.push({ client_seq, batch })
     if (coalesceTimer === null) {
       coalesceTimer = setTimeout(flushPendingOps, COALESCE_MS)

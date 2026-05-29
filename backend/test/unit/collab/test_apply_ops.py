@@ -313,6 +313,62 @@ async def test_edge_update_endpoint_change():
     assert store.update_link_calls == [{"link_id": "e1", "data": {"target": "n3"}}]
 
 
+async def test_edge_update_persists_midpoint_to_control_point():
+    """Edge curve adjustments persist as `properties.edge_control_point`.
+
+    The wire carries a `_midpoint` field (the client computes it from
+    cubic-bezier control points before sending) so the server stays
+    stateless — no node-position lookup needed.
+    """
+    store = _RecordingGraphStore()
+    op = {
+        "type": "edge.update",
+        "id": "e1",
+        "patch": {
+            # canvas-harness Edge.control stays on the wire for peers
+            # to paint with; the server ignores it.
+            "control": [{"x": 50, "y": 10}, {"x": 50, "y": 10}],
+            "_midpoint": {"x": 50, "y": 25},
+        },
+        "prev": {},
+    }
+
+    results = await apply_batch(graph_store=store, board_id="b1", user_id="u1", ops=[op])
+
+    assert results[0].applied is True
+    expected = {
+        "properties": {
+            "edge_control_point": {
+                "type": "position",
+                "position": {"x": 50.0, "y": 25.0},
+            },
+        },
+    }
+    assert store.update_link_calls == [{"link_id": "e1", "data": expected}]
+
+
+async def test_edge_add_carries_midpoint_onto_link_properties():
+    """A freshly-drawn edge with a curve persists the midpoint on create."""
+    store = _RecordingGraphStore()
+    op = {
+        "type": "edge.add",
+        "edge": {
+            "id": "e1",
+            "source": {"nodeId": "n1"},
+            "target": {"nodeId": "n2"},
+            "control": [{"x": 100, "y": 50}, {"x": 100, "y": 50}],
+            "_midpoint": {"x": 100, "y": 60},
+        },
+    }
+
+    results = await apply_batch(graph_store=store, board_id="b1", user_id="u1", ops=[op])
+
+    assert results[0].applied is True
+    [link] = store.add_links_calls[0]
+    assert link.properties.edge_control_point.position.x == 100.0
+    assert link.properties.edge_control_point.position.y == 60.0
+
+
 # ---------------------------------------------------------------------------
 # Unsupported / batch behaviour
 # ---------------------------------------------------------------------------

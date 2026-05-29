@@ -290,13 +290,18 @@ def _wire_edge_to_link(edge: dict[str, Any], *, board_id: str) -> Link | None:
     if not source_id or not target_id:
         return None
 
+    link_dict: dict[str, Any] = {
+        "id": link_id,
+        "graph_uid": board_id,
+        "source": source_id,
+        "target": target_id,
+    }
+    midpoint = _extract_midpoint(edge)
+    if midpoint is not None:
+        link_dict["properties"] = {"edge_control_point": midpoint}
+
     try:
-        return Link.model_validate({
-            "id": link_id,
-            "graph_uid": board_id,
-            "source": source_id,
-            "target": target_id,
-        })
+        return Link.model_validate(link_dict)
     except Exception:
         logger.exception("collab failed to build Link id=%s", link_id)
         return None
@@ -305,8 +310,10 @@ def _wire_edge_to_link(edge: dict[str, Any], *, board_id: str) -> Link | None:
 def _edge_patch_to_link_data(patch: dict[str, Any]) -> dict[str, Any]:
     """Translate `Partial<Edge>` to a `update_link` data dict.
 
-    Today only handles endpoint changes — style / label / path style are
-    deferred to a follow-up.
+    Handles endpoint changes (`source / target`) and the curve control
+    midpoint (`_midpoint`, computed client-side from the cubic-bezier
+    control points before the op is sent — keeps the server stateless,
+    no node-position lookup needed). Style / label / path-style deferred.
     """
     data: dict[str, Any] = {}
     src = patch.get("source")
@@ -315,7 +322,36 @@ def _edge_patch_to_link_data(patch: dict[str, Any]) -> dict[str, Any]:
     dst = patch.get("target")
     if isinstance(dst, dict) and "nodeId" in dst:
         data["target"] = dst["nodeId"]
+
+    midpoint = _extract_midpoint(patch)
+    if midpoint is not None:
+        data.setdefault("properties", {})["edge_control_point"] = midpoint
     return data
+
+
+def _extract_midpoint(payload: dict[str, Any]) -> dict[str, Any] | None:
+    """Read the precomputed midpoint off a wire `Edge` / `Partial<Edge>`.
+
+    The client computes the midpoint world coords from
+    `cubicControlToMidpoint(source, target, control)` and attaches it
+    here so the server doesn't have to look up node positions to
+    rebuild it. Returns the PositionProperty-shaped dict ready to
+    drop onto `properties.edge_control_point`, or None if absent.
+    """
+    m = payload.get("_midpoint")
+    if not isinstance(m, dict):
+        return None
+    x = m.get("x")
+    y = m.get("y")
+    if x is None or y is None:
+        return None
+    try:
+        return {
+            "type": "position",
+            "position": {"x": float(x), "y": float(y)},
+        }
+    except (TypeError, ValueError):
+        return None
 
 
 # Type alias for places that want to talk about a single op_type literal.
