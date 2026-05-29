@@ -152,9 +152,13 @@ async def _apply_one(  # noqa: C901 — dispatcher across op kinds; readability 
 def _node_patch_to_note_data(patch: dict[str, Any]) -> dict[str, Any]:
     """Convert a canvas-harness `Partial<Node>` patch into a Note patch dict.
 
-    Only handles the scene-graph primitives that ship in Phase 1b's
-    first cut (`x, y, w, h, z, angle, content`). Style / data depth
-    lands incrementally.
+    Handles:
+      - Scene primitives: `x, y, w, h, z, angle, content`.
+      - Colors: pulled from `patch.data._storedColors` (canonical
+        light-theme hex; the receiver-side `style.*` carries a
+        theme-adapted display value we deliberately ignore).
+
+    Other style/data depth lands incrementally.
     """
     properties: dict[str, Any] = {}
     if "x" in patch or "y" in patch:
@@ -186,7 +190,37 @@ def _node_patch_to_note_data(patch: dict[str, Any]) -> dict[str, Any]:
         data.setdefault("style", {})["angle"] = float(patch["angle"]) * RAD_TO_DEG
     if "content" in patch:
         data["content"] = {"markdown": str(patch["content"] or "")}
+
+    style_color = _extract_canonical_colors(patch.get("data"))
+    if style_color:
+        style = data.setdefault("style", {})
+        for k, v in style_color.items():
+            style[k] = v
     return data
+
+
+def _extract_canonical_colors(node_data: Any) -> dict[str, str]:
+    """Pull canonical (light-theme) colors out of a wire Node's data.
+
+    Source of truth lives at `data._storedColors` — see
+    [webui color-adapter.ts] for the contract. Returns a Dim0-shaped
+    (snake_case) subset suitable for merging into `style`. Missing
+    fields are simply omitted so the deep-merge on the server side
+    leaves untouched colors alone.
+    """
+    if not isinstance(node_data, dict):
+        return {}
+    stored = node_data.get("_storedColors")
+    if not isinstance(stored, dict):
+        return {}
+    out: dict[str, str] = {}
+    if isinstance(stored.get("backgroundColor"), str):
+        out["background_color"] = stored["backgroundColor"]
+    if isinstance(stored.get("strokeColor"), str):
+        out["stroke_color"] = stored["strokeColor"]
+    if isinstance(stored.get("textColor"), str):
+        out["text_color"] = stored["textColor"]
+    return out
 
 
 def _wire_node_to_note(node: dict[str, Any], *, board_id: str) -> Note | None:
@@ -219,6 +253,16 @@ def _wire_node_to_note(node: dict[str, Any], *, board_id: str) -> Note | None:
     angle = node.get("angle")
     if angle is not None:
         note_dict.setdefault("style", {})["angle"] = float(angle) * RAD_TO_DEG
+
+    # Canonical colors from data._storedColors (set by the picker). The
+    # wire's `style.*` carries the sender's display-adapted value which
+    # we deliberately ignore — see use-ws-collab.ts for the inbound
+    # theme normalization on the client side.
+    canonical_colors = _extract_canonical_colors(data_field)
+    if canonical_colors:
+        style = note_dict.setdefault("style", {})
+        for k, v in canonical_colors.items():
+            style[k] = v
 
     try:
         return Note.model_validate(note_dict)

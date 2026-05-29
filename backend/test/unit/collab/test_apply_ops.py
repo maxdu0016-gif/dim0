@@ -118,6 +118,81 @@ async def test_node_update_content_writes_to_content_markdown():
     assert store.patch_calls[0]["data"]["content"] == {"markdown": "# Hi"}
 
 
+async def test_node_update_colors_persist_from_stored_colors():
+    """Colors persist from data._storedColors, not from `style.*`.
+
+    The picker writes canonical hex into `data._storedColors`; the
+    wire's `style.*` carries a (possibly dark-adapted) display value
+    we deliberately ignore on the server.
+    """
+    store = _RecordingGraphStore()
+    op = {
+        "type": "node.update",
+        "id": "n1",
+        "patch": {
+            # `style` here carries the SENDER's display-adapted hex
+            # (could be dark-mode). We deliberately ignore it.
+            "style": {"backgroundColor": "#1A2C5C"},
+            "data": {
+                "_storedColors": {
+                    "backgroundColor": "#3b82f6",
+                    "strokeColor": "#1e3a8a",
+                    "textColor": "#0a0a0a",
+                },
+            },
+        },
+        "prev": {},
+    }
+
+    await apply_batch(graph_store=store, board_id="b1", user_id="u1", ops=[op])
+
+    style = store.patch_calls[0]["data"]["style"]
+    assert style["background_color"] == "#3b82f6"
+    assert style["stroke_color"] == "#1e3a8a"
+    assert style["text_color"] == "#0a0a0a"
+
+
+async def test_node_update_without_stored_colors_does_not_emit_style_colors():
+    """Position-only patches don't emit a style update.
+
+    Without this, the embed-skip fast path in patch_note would
+    accidentally see a non-empty style dict and take the slow path.
+    """
+    store = _RecordingGraphStore()
+    op = {"type": "node.update", "id": "n1", "patch": {"x": 1, "y": 2}, "prev": {}}
+
+    await apply_batch(graph_store=store, board_id="b1", user_id="u1", ops=[op])
+
+    assert "style" not in store.patch_calls[0]["data"]
+
+
+async def test_node_add_carries_stored_colors_onto_style():
+    """`node.add` mirrors `node.update` for color persistence.
+
+    Canonical colors come from `data._storedColors`, not from the
+    (possibly dark-adapted) `node.style` field.
+    """
+    store = _RecordingGraphStore()
+    op = {
+        "type": "node.add",
+        "node": {
+            "id": "n1", "x": 0, "y": 0, "w": 200, "h": 80, "z": 0, "angle": 0,
+            "content": "",
+            "style": {"backgroundColor": "#1A2C5C"},
+            "data": {
+                "noteType": "note", "styleType": "rectangle", "version": 1,
+                "_storedColors": {"backgroundColor": "#3b82f6"},
+            },
+        },
+    }
+
+    results = await apply_batch(graph_store=store, board_id="b1", user_id="u1", ops=[op])
+
+    assert results[0].applied is True
+    [note] = store.add_notes_calls[0]
+    assert note.style.background_color == "#3b82f6"
+
+
 async def test_node_update_with_no_supported_fields_is_not_applied():
     """Node update with no supported fields is not applied."""
     store = _RecordingGraphStore()

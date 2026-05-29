@@ -3,6 +3,9 @@ import {
   attachSync,
   type CanvasStore,
   type ClientId,
+  type Edge,
+  type Node,
+  type Op,
   type OpBatch,
   type PresencePatch,
   type PresenceState,
@@ -12,6 +15,15 @@ import { mintCollabTicket } from "@/features/board/api/collab-ticket"
 import { API_URL } from "@/config/api"
 import { notifyWsClose } from "@/features/connection/connection-state"
 import { useAppStore } from "@/store"
+import {
+  adaptEdgeColors,
+  adaptNodeColors,
+  applyColorsToEdgeStyle,
+  applyColorsToStyle,
+  type StoredColors,
+  type StoredEdgeColors,
+} from "../theme/color-adapter"
+import { getBoardThemeMode } from "../theme/theme-mode-ref"
 
 
 /**
@@ -95,6 +107,66 @@ export const useWsCollab = (
  * `http://` → `ws://`, `https://` → `wss://`.
  */
 const wsBaseFromApiUrl = (apiUrl: string): string => apiUrl.replace(/^http/i, "ws")
+
+
+/**
+ * Cross-theme color fix: in-place rewrite `style.{bg,stroke,text}` on
+ * every node/edge op so they match the LOCAL theme regardless of the
+ * sender's theme. The canonical truth always lives in
+ * `data._storedColors` (canonical Tailwind hex); the receiver projects
+ * it through `adaptNodeColors / adaptEdgeColors` for paint.
+ *
+ * Mutates in place — the batch object is owned by us at this point
+ * (decoded from JSON moments ago) and `attachSync` reads style after
+ * we return.
+ */
+const normalizeBatchColorsForLocalTheme = (batch: OpBatch): void => {
+  const mode = getBoardThemeMode()
+  for (const op of batch.ops) {
+    rewriteOpColors(op, mode)
+  }
+}
+
+
+const rewriteOpColors = (op: Op, mode: "light" | "dark"): void => {
+  // `op` is one of canvas-harness's tagged unions; we mutate `node` or
+  // `patch` based on the variant. Reads/writes go through Partial<Node>
+  // / Partial<Edge> casts to avoid type-narrowing acrobatics.
+  if (op.type === "node.add") {
+    rewriteNodeStyle(op.node, mode)
+    return
+  }
+  if (op.type === "node.update") {
+    rewriteNodeStyle(op.patch as Partial<Node>, mode)
+    return
+  }
+  if (op.type === "edge.add") {
+    rewriteEdgeStyle(op.edge, mode)
+    return
+  }
+  if (op.type === "edge.update") {
+    rewriteEdgeStyle(op.patch as Partial<Edge>, mode)
+    return
+  }
+}
+
+
+const rewriteNodeStyle = (target: Partial<Node>, mode: "light" | "dark"): void => {
+  const data = target.data as { _storedColors?: StoredColors } | undefined
+  const stored = data?._storedColors
+  if (!stored) return
+  const display = adaptNodeColors(stored, mode)
+  target.style = applyColorsToStyle(target.style ?? {}, display)
+}
+
+
+const rewriteEdgeStyle = (target: Partial<Edge>, mode: "light" | "dark"): void => {
+  const data = target.data as { _storedColors?: StoredEdgeColors } | undefined
+  const stored = data?._storedColors
+  if (!stored) return
+  const display = adaptEdgeColors(stored, mode)
+  target.style = applyColorsToEdgeStyle(target.style ?? {}, display)
+}
 
 
 /**
@@ -239,6 +311,12 @@ const createWebSocketSyncAdapter = ({
       if (msg.seq > lastServerSeq) lastServerSeq = msg.seq
       // Self-echo is impossible (server excludes sender), but guard.
       if (msg.batch.clientId === clientId) return
+      // Re-derive `style.{bg,stroke,text}` from the canonical
+      // `_storedColors` field for the local theme. Without this, a
+      // dark-mode peer's adapted hex would land in a light-mode
+      // store and paint as a dark color on a white canvas (and vice
+      // versa). See [color-adapter.ts] for the projection rules.
+      normalizeBatchColorsForLocalTheme(msg.batch)
       for (const cb of batchListeners) cb(msg.batch)
       return
     }
