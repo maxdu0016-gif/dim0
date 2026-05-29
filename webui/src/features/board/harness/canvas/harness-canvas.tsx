@@ -155,42 +155,55 @@ export function HarnessCanvas() {
   const { onDragOver, onDrop } = useHarnessDropFiles(wrapRef, store, boardId, rootId, canEdit)
   const navigate = useNavigate()
 
-  // canvas-harness fires beginEdit on dbl-click of any node body. For
-  // custom node types we own the editing surface (sheet/code-sandbox/
-  // widget open via the panel; folder dbl-click navigates into the
-  // folder; document has no inline editor), so cancel the auto-fired
-  // beginEdit. Lib fires beginEdit BEFORE the consumer onDoubleClick,
-  // so cancel here runs synchronously in the same tick — no editor
-  // frame is rendered.
+  // Double-click dispatch.
   //
-  // Double-clicking on empty canvas in the select tool drops a text
-  // node and immediately enters edit mode — matches the playground's
-  // quick-text affordance.
+  // canvas-harness's <Canvas> dblclick handler runs BEFORE this consumer
+  // callback (see lib's Canvas.tsx) and already does the right thing
+  // for every hit kind: node body / edge body / edge label all call
+  // `beginEdit(targetId)`; midpoint-handle restores auto-route. So the
+  // consumer only needs to (a) override for Dim0's custom node types
+  // where the editing surface lives elsewhere, and (b) handle the
+  // "truly empty space" case by dropping a quick text node.
+  //
+  // Earlier this handler branched only on `"nodeId" in hit` and treated
+  // edge hits as empty space — which meant a dbl-click on an edge label
+  // would clobber the lib's just-started edge-label edit with a brand-new
+  // text node. The `if (hit) return` short-circuit (matching the
+  // playground) is what prevents that.
   const handleDoubleClick = useCallback(
     (e: CanvasPointerEvent): void => {
       const camera = store.getCamera()
       const hit = hitTestAny(store, e.world, camera.z)
 
-      if (hit && "nodeId" in hit) {
-        const node = store.getNode(hit.nodeId)
-        if (!node) return
-        if (!CUSTOM_NODE_TYPES.has(node.type)) return
-        store.cancelEdit()
-        if (node.type === "folder" && boardId) {
-          navigate({
-            to: "/boards/$id",
-            params: { id: boardId },
-            search: (prev: Record<string, unknown>) => ({
-              ...prev,
-              root_id: node.id,
-            }),
-          })
+      if (hit) {
+        if ("nodeId" in hit) {
+          // Override for custom node types where Dim0 owns the editing
+          // surface elsewhere (sheet / code-sandbox / widget open via
+          // panel; folder dbl-click navigates into the folder; document
+          // has no inline editor). Default node types fall through and
+          // keep the lib's inline editor.
+          const node = store.getNode(hit.nodeId)
+          if (node && CUSTOM_NODE_TYPES.has(node.type)) {
+            store.cancelEdit()
+            if (node.type === "folder" && boardId) {
+              navigate({
+                to: "/boards/$id",
+                params: { id: boardId },
+                search: (prev: Record<string, unknown>) => ({
+                  ...prev,
+                  root_id: node.id,
+                }),
+              })
+            }
+          }
         }
+        // Edge hits: lib already called `beginEdit(edgeId)` — that's
+        // exactly the edge-label editor we want. Nothing further to do.
         return
       }
 
-      // Empty space: quick text node + edit. Only in the select tool —
-      // other tools have their own click semantics.
+      // Truly-empty space: quick text node + edit. Only in the select
+      // tool — other tools have their own click semantics.
       if (e.tool !== "select" || !canEdit || !boardId) return
       const note = createDefaultNote({ boardId, nodeType: "text" })
       if (rootId) note.parentId = rootId
