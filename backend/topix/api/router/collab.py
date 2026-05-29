@@ -31,7 +31,7 @@ from topix.api.utils.decorators import with_standard_response
 from topix.api.utils.security import get_current_user_uid
 from topix.collab.apply_ops import apply_batch
 from topix.collab.capacity import get_room_cap_for_board
-from topix.collab.room import Client, Room, RoomRegistry
+from topix.collab.room import MAX_PRESENCE_PAYLOAD_BYTES, Client, Room, RoomRegistry
 from topix.collab.snapshot import read_snapshot_payload
 from topix.collab.tickets import consume_ticket, mint_ticket
 from topix.store.graph import GraphStore
@@ -82,7 +82,7 @@ async def mint_collab_ticket(
 
 
 @router.websocket("/{graph_id}/collab")
-async def collab_ws(
+async def collab_ws(  # noqa: C901 — accept/auth/join/welcome/loop is a single state machine, splitting hurts readability
     websocket: WebSocket,
     graph_id: Annotated[str, Path(description="Graph ID")],
     ticket: Annotated[str | None, Query(description="One-shot auth ticket")] = None,
@@ -162,6 +162,7 @@ async def collab_ws(
         await _send_welcome(
             websocket=websocket,
             room=room,
+            client_id=client.client_id,
             graph_store=graph_store,
             board_id=graph_id,
             since_seq=since_seq,
@@ -188,6 +189,23 @@ async def collab_ws(
     except Exception:
         logger.exception("collab socket error board=%s client=%s", graph_id, client.client_id)
     finally:
+        # 3.2: emit a synthetic `peer-presence-leave` to remaining peers
+        # so cursors / chip entries don't ghost when a socket dies
+        # without an explicit leave frame. The client itself sends one
+        # on `pagehide` for clean shutdowns; this covers crashes,
+        # network drops, and tab kills. Skipped when this socket never
+        # announced its `app_client_id` (it never showed up in the
+        # presence registry).
+        if client.app_client_id is not None:
+            async with room.lock:
+                had_presence = client.app_client_id in room.presence
+                room.clear_presence_unlocked(client.app_client_id)
+            if had_presence:
+                leave_frame = json.dumps({
+                    "kind": "presence-leave",
+                    "clientId": client.app_client_id,
+                })
+                await room.broadcast(leave_frame, exclude=client)
         await registry.leave(room, client)
         logger.info("collab leave board=%s client=%s", graph_id, client.client_id)
 
@@ -196,6 +214,7 @@ async def _send_welcome(
     *,
     websocket: WebSocket,
     room: Room,
+    client_id: str,
     graph_store,
     board_id: str,
     since_seq: int | None,
@@ -205,6 +224,12 @@ async def _send_welcome(
     Acquires `room.lock` for the duration so a peer-op broadcast can't
     interleave between the seq read and the welcome send — the joining
     client never observes a seq earlier than its welcome's seq.
+
+    Snapshot mode carries the current `presence` map so a freshly-
+    joining peer (or one rebuilding after a long drift) sees existing
+    peers immediately, instead of waiting for them to re-broadcast.
+    Catch-up + live skip it — those peers still have their local
+    presence state untouched.
     """
     async with room.lock:
         seq = room.seq
@@ -218,6 +243,9 @@ async def _send_welcome(
                 "mode": "snapshot",
                 "seq": seq,
                 "snapshot": snapshot,
+                "presence": room.presence_snapshot_unlocked(
+                    exclude_client_id=client_id,
+                ),
             })
             return
 
@@ -250,10 +278,13 @@ async def _send_welcome(
             "mode": "snapshot",
             "seq": seq,
             "snapshot": snapshot,
+            "presence": room.presence_snapshot_unlocked(
+                exclude_client_id=client_id,
+            ),
         })
 
 
-async def _handle_message(
+async def _handle_message(  # noqa: C901 — flat kind-dispatch reads better than further nesting
     *,
     websocket: WebSocket,
     raw: str,
@@ -326,5 +357,53 @@ async def _handle_message(
                         logger.debug("collab peer-op send failed", exc_info=True)
         return
 
-    # Non-op kinds (presence, hello, presence-leave): relay verbatim.
+    # Presence frames: validate, update the per-room registry, then relay.
+    # Storing presence server-side means a freshly-joining peer can see
+    # existing peers immediately via the welcome handshake instead of
+    # waiting for those peers to re-broadcast. Rejecting malformed frames
+    # before relay also keeps the protocol surface defensive (size cap +
+    # required fields).
+    if kind == "presence":
+        state = msg.get("state") if isinstance(msg, dict) else None
+        app_client_id = msg.get("clientId") if isinstance(msg, dict) else None
+        if not _is_valid_presence(app_client_id, state, raw):
+            logger.debug(
+                "collab presence rejected board=%s client=%s",
+                board_id, client.client_id,
+            )
+            return
+        async with room.lock:
+            room.update_presence_unlocked(str(app_client_id), state)
+        # Remember the peer's app-level clientId so the disconnect-side
+        # cleanup can clear the matching registry entry + emit a leave
+        # frame keyed correctly. Last-wins if a peer rebrands mid-session
+        # (no observed cases, but harmless).
+        client.app_client_id = str(app_client_id)
+        await room.broadcast(raw, exclude=client)
+        return
+
+    if kind == "presence-leave":
+        client_id = msg.get("clientId") if isinstance(msg, dict) else None
+        if isinstance(client_id, str):
+            async with room.lock:
+                room.clear_presence_unlocked(client_id)
+        await room.broadcast(raw, exclude=client)
+        return
+
+    # Other non-op kinds (hello, etc.): relay verbatim.
     await room.broadcast(raw, exclude=client)
+
+
+def _is_valid_presence(client_id, state, raw: str) -> bool:
+    """Reject malformed `presence` frames before they touch the registry.
+
+    Enforces a clientId string, a dict state, and a hard size cap so a
+    misbehaving client can't fill `Room.presence` with junk.
+    """
+    if not isinstance(client_id, str) or not client_id:
+        return False
+    if not isinstance(state, dict):
+        return False
+    if len(raw.encode("utf-8")) > MAX_PRESENCE_PAYLOAD_BYTES:
+        return False
+    return True

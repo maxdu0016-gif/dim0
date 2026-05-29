@@ -26,6 +26,7 @@ import {
   resetCollabConnState,
   setCollabConnState,
 } from "./collab-reconnect"
+import { createPresenceThrottle } from "./presence-throttle"
 import {
   adaptEdgeColors,
   adaptNodeColors,
@@ -474,7 +475,14 @@ type OutboundMessage =
   | { kind: "hello"; clientId: ClientId; since_seq?: number | null }
 
 type InboundMessage =
-  | { kind: "welcome"; mode?: "snapshot" | "catch-up" | "live"; seq: number; snapshot?: Graph; batches?: OpBatch[] }
+  | {
+      kind: "welcome"
+      mode?: "snapshot" | "catch-up" | "live"
+      seq: number
+      snapshot?: Graph
+      batches?: OpBatch[]
+      presence?: Record<string, PresenceState>
+    }
   | { kind: "peer-op"; seq: number; batch: OpBatch }
   | { kind: "op-applied"; seq: number; client_seq: number }
   | { kind: "op-rejected"; client_seq: number; reason?: string }
@@ -591,6 +599,20 @@ const createWebSocketSyncAdapter = ({
     pendingOps.length = 0
   }
 
+  // Presence throttle (3.2). Cursors fire on every pointermove which is
+  // ~60Hz; broadcasting them all-to-all is N² over peer count. Leading
+  // + trailing edge throttle to ~20Hz: peers see the cursor pop in
+  // immediately (leading), and a stopping cursor still lands its final
+  // position within one window (trailing). Non-cursor structural
+  // changes (selection, editing) ride the same throttle for simplicity
+  // — they're surfaced within ≤ 50ms which is below the perceptual
+  // threshold. Helper lives in `presence-throttle.ts` so the timer
+  // logic is unit-testable with fake timers.
+  const presenceThrottle = createPresenceThrottle<PresenceState>(
+    (state) => send({ kind: "presence", clientId, state }),
+    { windowMs: 50 },
+  )
+
   const queueOp = (client_seq: number, batch: OpBatch) => {
     // Compute the edge midpoint once per batch from the local store
     // (source/target endpoints + control[c1, c2]); the server stores
@@ -655,6 +677,18 @@ const createWebSocketSyncAdapter = ({
           normalizeBatchColorsForLocalTheme(batch)
           patchMissingEdgeEndpoints(batch, store)
           for (const cb of batchListeners) cb(batch)
+        }
+      }
+      // 3.2: snapshot welcome carries the current per-room presence
+      // map. Replay it through the canvas-harness presence slice so
+      // remote cursors / chip entries render immediately instead of
+      // waiting for each peer to re-broadcast on their next move.
+      // Skip our own clientId — applyRemote with our own id would
+      // create a duplicate "self" presence record.
+      if (msg.mode === "snapshot" && msg.presence) {
+        for (const [cid, state] of Object.entries(msg.presence)) {
+          if (cid === clientId) continue
+          store.presence.applyRemote(cid as ClientId, state)
         }
       }
       // Signal the outer reconnect loop that we've successfully
@@ -750,7 +784,7 @@ const createWebSocketSyncAdapter = ({
         clientId,
       }
       lastLocalPresence = state
-      send({ kind: "presence", clientId, state })
+      presenceThrottle.push(state)
     },
     onBatch(cb) {
       batchListeners.add(cb)
@@ -774,6 +808,9 @@ const createWebSocketSyncAdapter = ({
         coalesceTimer = null
       }
       flushPendingOps()
+      // Same for the presence throttle — drop pending without sending
+      // (a `presence-leave` is about to supersede whatever was queued).
+      presenceThrottle.cancel()
       if (ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ kind: "presence-leave", clientId }))
       }

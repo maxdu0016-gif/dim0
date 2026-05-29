@@ -182,6 +182,52 @@ async def test_registry_concurrent_joins_share_one_room():
     assert len(first_room.clients) == 10
 
 
+async def test_presence_registry_upsert_and_clear():
+    """`update_presence_unlocked` upserts; `clear_presence_unlocked` removes.
+
+    Locks down the contract `_handle_message` relies on — the registry
+    is keyed by the app-level clientId (e.g. "alice") not the server-
+    assigned UUID. A peer rebrand via a second `presence` frame
+    overwrites cleanly without leaving stale entries.
+    """
+    room = Room(board_id="b1")
+    async with room.lock:
+        room.update_presence_unlocked("alice", {"name": "Alice"})
+        room.update_presence_unlocked("bob", {"name": "Bob"})
+        assert room.presence == {"alice": {"name": "Alice"}, "bob": {"name": "Bob"}}
+
+        # Upsert overrides.
+        room.update_presence_unlocked("alice", {"name": "Alice Smith"})
+        assert room.presence["alice"] == {"name": "Alice Smith"}
+
+        # Clear is idempotent and only touches the requested key.
+        room.clear_presence_unlocked("alice")
+        room.clear_presence_unlocked("alice")
+        assert room.presence == {"bob": {"name": "Bob"}}
+
+
+async def test_presence_snapshot_excludes_caller():
+    """`presence_snapshot_unlocked` omits the joining peer's own entry.
+
+    Used by the welcome handshake — a reconnecting peer's local state
+    is already correct, no need to echo it back.
+    """
+    room = Room(board_id="b1")
+    async with room.lock:
+        room.update_presence_unlocked("alice", {"name": "Alice"})
+        room.update_presence_unlocked("bob", {"name": "Bob"})
+
+        full = room.presence_snapshot_unlocked()
+        assert set(full.keys()) == {"alice", "bob"}
+
+        excluded = room.presence_snapshot_unlocked(exclude_client_id="alice")
+        assert excluded == {"bob": {"name": "Bob"}}
+
+        # No exclude → returns a copy, not the live dict.
+        full["new"] = {"name": "Mallory"}
+        assert "new" not in room.presence
+
+
 @pytest.fixture(autouse=True)
 def _silence_logs(caplog):
     """Best-effort send failures log at DEBUG; keep the test output quiet."""

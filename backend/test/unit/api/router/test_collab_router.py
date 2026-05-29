@@ -389,6 +389,100 @@ class _NullSocket:
         return None
 
 
+# ---------------------------------------------------------------------------
+# Phase 3.2 — Per-room presence registry, welcome.presence map, leave on drop
+# ---------------------------------------------------------------------------
+
+def test_ws_welcome_snapshot_carries_presence_map():
+    """First-connect welcome includes other peers' last-known presence.
+
+    Without this, a freshly-joining peer wouldn't see remote cursors /
+    chip entries until each existing peer happened to send another
+    `presence` frame.
+    """
+    client, app = _build_app()
+    tickets = _mint_tickets(app, t1=("u1", "b1"), t2=("u2", "b1"))
+
+    with client.websocket_connect(f"/boards/b1/collab?ticket={tickets['t1']}") as ws1:
+        _drain_welcome(ws1)
+        # Establish ws1's presence in the room registry.
+        ws1.send_text(
+            '{"kind":"presence","clientId":"alice","state":{"name":"Alice","color":"#abc","cursor":null,"selection":[],"editing":null}}'
+        )
+
+        # ws2 joins fresh — should see ws1 in the welcome's presence map.
+        with client.websocket_connect(f"/boards/b1/collab?ticket={tickets['t2']}") as ws2:
+            welcome = ws2.receive_json()
+            assert welcome["mode"] == "snapshot"
+            assert "alice" in welcome["presence"]
+            assert welcome["presence"]["alice"]["name"] == "Alice"
+
+
+def test_ws_presence_frame_updates_per_room_registry():
+    """Inbound `presence` frames upsert the per-room state."""
+    client, app = _build_app()
+    tickets = _mint_tickets(app, t1=("u1", "b1"))
+
+    with client.websocket_connect(f"/boards/b1/collab?ticket={tickets['t1']}") as ws:
+        _drain_welcome(ws)
+        ws.send_text(
+            '{"kind":"presence","clientId":"alice","state":{"name":"Alice","color":"#fff"}}'
+        )
+        # Allow the server task to process the frame.
+        import time as _time
+        _time.sleep(0.05)
+        room = app.collab_rooms.get("b1")
+        assert room is not None
+        assert "alice" in room.presence
+
+
+def test_ws_disconnect_emits_synthetic_presence_leave():
+    """A socket drop emits a `presence-leave` frame to remaining peers.
+
+    Without this, peers' cursor overlays "ghost" — the dropped peer's
+    last cursor sits in place because no leave-frame ever arrived.
+    """
+    client, app = _build_app()
+    tickets = _mint_tickets(app, t1=("u1", "b1"), t2=("u2", "b1"))
+
+    with client.websocket_connect(f"/boards/b1/collab?ticket={tickets['t2']}") as ws2:
+        _drain_welcome(ws2)
+        with client.websocket_connect(f"/boards/b1/collab?ticket={tickets['t1']}") as ws1:
+            _drain_welcome(ws1)
+            ws1.send_text(
+                '{"kind":"presence","clientId":"alice","state":{"name":"Alice"}}'
+            )
+            # Drain the relayed presence on ws2.
+            ws2.receive_text()
+        # ws1 closed — ws2 should now receive a synthetic leave keyed by
+        # the app-level clientId ws1 announced via presence.
+        import json as _json
+        leave = _json.loads(ws2.receive_text())
+        assert leave["kind"] == "presence-leave"
+        assert leave["clientId"] == "alice"
+
+
+def test_ws_malformed_presence_is_rejected_not_relayed():
+    """Presence frames missing `state` or `clientId` are dropped server-side."""
+    client, app = _build_app()
+    tickets = _mint_tickets(app, t1=("u1", "b1"), t2=("u2", "b1"))
+
+    with client.websocket_connect(f"/boards/b1/collab?ticket={tickets['t2']}") as ws2:
+        _drain_welcome(ws2)
+        with client.websocket_connect(f"/boards/b1/collab?ticket={tickets['t1']}") as ws1:
+            _drain_welcome(ws1)
+            # Missing `state` field.
+            ws1.send_text('{"kind":"presence","clientId":"alice"}')
+            # Send something else after so we'd notice if the previous
+            # frame had been relayed (frames arrive in order).
+            ws1.send_text(
+                '{"kind":"presence","clientId":"alice","state":{"name":"Alice"}}'
+            )
+            relayed = ws2.receive_text()
+            # First-relayed frame is the well-formed one, not the malformed.
+            assert '"name":"Alice"' in relayed
+
+
 def test_ws_relays_presence_between_peers():
     """A `presence` frame is still relayed verbatim through the room."""
     client, app = _build_app()

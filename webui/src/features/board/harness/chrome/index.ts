@@ -1,5 +1,6 @@
 export { CanvasContextMenu } from "./canvas-context-menu"
 export { HarnessCollabStatus } from "./collab-status"
+export { HarnessPeerChip } from "./peer-chip"
 export { NodeSurfaceHost } from "./node-surface-host"
 export { PresentationControls } from "./presentation-controls"
 export { RemoteCursors } from "./remote-cursors"

@@ -26,6 +26,13 @@ logger = logging.getLogger(__name__)
 ROOM_BUFFER_CAP = 500
 
 
+# Max byte size of a single presence state payload (3.2). Defensive cap
+# against a malicious / buggy client pushing 100KB of garbage into
+# `Room.presence`. 4KB is comfortable for cursor + selection + editing
+# + an emoji-laden name.
+MAX_PRESENCE_PAYLOAD_BYTES = 4_096
+
+
 @dataclass
 class Client:
     """One connected socket inside a Room.
@@ -35,12 +42,19 @@ class Client:
     inside the WS handler — viewers receive everything but their own ops
     are rejected with `op-rejected`. Defaults to `"member"` for back-compat
     with call sites that pre-date Slice 2 of sharing Phase A.
+
+    `app_client_id` records the application-level `clientId` the peer
+    self-announced via its first `presence` (or `hello`) frame. Distinct
+    from `client_id` which is a server-assigned UUID. We need this to
+    clean up `Room.presence` and emit the matching `presence-leave` on
+    disconnect — the registry is keyed by the app clientId, not the UUID.
     """
 
     client_id: str
     user_id: str
     socket: WebSocket
     role: str = "member"
+    app_client_id: str | None = None
 
 
 @dataclass
@@ -70,6 +84,11 @@ class Room:
     _buffer: deque[tuple[int, dict[str, Any]]] = field(
         default_factory=lambda: deque(maxlen=ROOM_BUFFER_CAP),
     )
+    # Per-room presence snapshot — populated as each peer sends a
+    # `presence` frame, cleared on `presence-leave` / disconnect.
+    # Shipped in the welcome handshake so a newly-joining peer doesn't
+    # have to wait for existing peers to re-broadcast.
+    presence: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     def next_seq_unlocked(self) -> int:
         """Caller must hold `self.lock`. Assigns the next monotonic seq."""
@@ -79,6 +98,32 @@ class Room:
     def remember_batch_unlocked(self, seq: int, batch: dict[str, Any]) -> None:
         """Caller must hold `self.lock`. Records a broadcast batch in the ring."""
         self._buffer.append((seq, batch))
+
+    def update_presence_unlocked(
+        self, client_id: str, state: dict[str, Any],
+    ) -> None:
+        """Caller must hold `self.lock`. Upsert a peer's presence state."""
+        self.presence[client_id] = state
+
+    def clear_presence_unlocked(self, client_id: str) -> None:
+        """Caller must hold `self.lock`. Drop a peer's presence entry."""
+        self.presence.pop(client_id, None)
+
+    def presence_snapshot_unlocked(
+        self, *, exclude_client_id: str | None = None,
+    ) -> dict[str, dict[str, Any]]:
+        """Caller must hold `self.lock`. Dump of presence for the welcome map.
+
+        `exclude_client_id` omits the joining peer's own previous state
+        when present (e.g., a re-join after a quick reconnect — the
+        client's local state is already correct, no need to echo it).
+        """
+        if exclude_client_id is None:
+            return dict(self.presence)
+        return {
+            cid: state for cid, state in self.presence.items()
+            if cid != exclude_client_id
+        }
 
     def batches_since_unlocked(self, since_seq: int) -> list[dict[str, Any]] | None:
         """Caller must hold `self.lock`. Slice `(since_seq, room.seq]` from the ring.
