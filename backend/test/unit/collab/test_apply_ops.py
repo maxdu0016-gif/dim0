@@ -467,6 +467,36 @@ async def test_node_add_wire_type_rect_maps_back_to_rectangle():
     assert note.style.type == "rectangle"
 
 
+async def test_node_add_persists_style_roundness_from_wire():
+    """A pasted node with `roundness: 0` keeps that value through `node.add`.
+
+    Regression: `_wire_node_to_note` used to only read `styleType` /
+    `angle` / canonical colors from the wire — every other style field
+    fell to the pydantic default. Cross-board paste of a sharp node
+    (roundness=0) then came back rounded (roundness=3) on refresh.
+    """
+    store = _RecordingGraphStore()
+    op = {
+        "type": "node.add",
+        "node": {
+            "id": "n1",
+            "x": 0, "y": 0, "w": 200, "h": 80, "z": 0,
+            "angle": 0,
+            "type": "rect",
+            "style": {"roundness": 0, "strokeWidth": 4, "fontFamily": "serif"},
+            "data": {"noteType": "note", "styleType": "rectangle", "version": 1},
+        },
+    }
+
+    results = await apply_batch(graph_store=store, board_id="b1", user_id="u1", ops=[op])
+
+    assert results[0].applied is True
+    [note] = store.add_notes_calls[0]
+    assert note.style.roundness == 0
+    assert note.style.stroke_width == 4
+    assert note.style.font_family == "serif"
+
+
 # ---------------------------------------------------------------------------
 # edge.* — Link round-trip
 # ---------------------------------------------------------------------------

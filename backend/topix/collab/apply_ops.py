@@ -325,7 +325,7 @@ def _extract_canonical_colors(node_data: Any) -> dict[str, str]:
     return out
 
 
-def _wire_node_to_note(node: dict[str, Any], *, board_id: str) -> Note | None:
+def _wire_node_to_note(node: dict[str, Any], *, board_id: str) -> Note | None:  # noqa: C901 — wide field-by-field translator
     """Construct a server-side `Note` from a wire `Node` payload.
 
     Lossy on first pass: style / data are mostly defaulted by the Note
@@ -361,6 +361,20 @@ def _wire_node_to_note(node: dict[str, Any], *, board_id: str) -> Note | None:
     angle = node.get("angle")
     if angle is not None:
         note_dict.setdefault("style", {})["angle"] = float(angle) * RAD_TO_DEG
+
+    # Translate the wire `style` block (camelCase) to snake_case Dim0
+    # style fields. Without this, a paste of a node with `roundness: 0`
+    # would lose the explicit value — `_wire_node_to_note` used to read
+    # only `styleType`, `angle`, and canonical colors, so `Note.model_validate`
+    # filled `roundness` from the pydantic default (3). Mirrors the
+    # `_node_patch_to_note_data` logic for `node.update`.
+    wire_style = node.get("style")
+    if isinstance(wire_style, dict):
+        style = note_dict.setdefault("style", {})
+        for camel, value in wire_style.items():
+            if camel in _DISPLAY_COLOR_KEYS or camel == "angle":
+                continue
+            style[_camel_to_snake(camel)] = value
 
     # Canonical colors from data._storedColors (set by the picker). The
     # wire's `style.*` carries the sender's display-adapted value which
