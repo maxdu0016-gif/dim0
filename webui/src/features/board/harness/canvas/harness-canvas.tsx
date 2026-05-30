@@ -256,7 +256,7 @@ export function HarnessCanvas() {
     return () => {
       cancelled = true
     }
-  }, [boardId, rootId, store, setIsLoading, setCanEdit, setBoardLabel, setBoardVisibility])
+  }, [boardId, rootId, store, setIsLoading, setCanEdit, setBoardRole, setBoardLabel, setBoardVisibility])
 
   return (
     <CanvasProvider store={store}>
