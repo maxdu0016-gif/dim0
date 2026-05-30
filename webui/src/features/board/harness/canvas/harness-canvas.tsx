@@ -28,7 +28,6 @@ import {
   HarnessCollabStatus,
   HarnessPeerChip,
   HarnessReadonlyChip,
-  HarnessSaveStatus,
   HarnessToolbar,
   HarnessViewportControls,
   NodeSurfaceHost,
@@ -41,7 +40,6 @@ import { LinearView, ListView } from "../views"
 import { boardNodeTypes, useRenderCustomNodeView } from "../node-types"
 import { hydrateBoardStore } from "../persist/snapshot-load"
 import { ShareButton } from "@/features/sharing/share-button"
-import type { SaveStatus } from "../persist/use-debounced-save"
 import { useBoardAppStore } from "../store/board-app-store"
 import { createBoardStore } from "../store/create-board-store"
 import { useBoardTheme } from "../theme/use-board-theme"
@@ -140,8 +138,8 @@ export function HarnessCanvas() {
 
   // Collab is the only edit path (collab-archi §1). The WS adapter is
   // mounted unconditionally; presence + local cursor tracking go with it.
-  // The server is the sole writer — no local REST save loop.
-  const saveStatus: SaveStatus = "saved"
+  // The server is the sole writer — no local REST save loop, so no
+  // save-status pill either.
   useWsCollab(store, boardId, ready, rootId)
   useLocalPresence(store, wrapRef, ready)
 
@@ -271,7 +269,6 @@ export function HarnessCanvas() {
             theme={theme}
             tool={tool}
             viewMode={viewMode}
-            saveStatus={saveStatus}
             arrowDefaults={arrowDefaults}
             onCreateDrag={handleCreateDrag}
             onClick={handleClick}
@@ -302,7 +299,6 @@ type InnerProps = {
   theme: ReturnType<typeof useBoardTheme>
   tool: string
   viewMode: "board" | "files" | "list"
-  saveStatus: SaveStatus
   arrowDefaults: ArrowToolDefaults
   onCreateDrag: ReturnType<typeof useCreateHandlers>["handleCreateDrag"]
   onClick: ReturnType<typeof useCreateHandlers>["handleClick"]
@@ -315,7 +311,6 @@ function HarnessCanvasInner({
   theme,
   tool,
   viewMode,
-  saveStatus,
   arrowDefaults,
   onCreateDrag,
   onClick,
@@ -382,7 +377,6 @@ function HarnessCanvasInner({
         <HarnessPeerChip />
         <HarnessReadonlyChip />
         <HarnessCollabStatus />
-        <HarnessSaveStatus status={saveStatus} />
         <ShareButton />
       </div>
       <NodeSurfaceHost />
