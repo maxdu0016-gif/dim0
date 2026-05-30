@@ -159,6 +159,14 @@ export const useWsCollab = (
             // the cleanup path resets to idle on unmount.
             return
           }
+          // 4429 = WS_ROOM_FULL (server collab.py). The board is at the
+          // plan-tier concurrent-user cap; retrying won't help until a
+          // peer leaves. Surface a terminal state with a clear banner
+          // rather than spinning the reconnect loop forever.
+          if (code === WS_ROOM_FULL) {
+            setCollabConnState("room-full")
+            return
+          }
           scheduleReconnect()
         },
       })
@@ -203,6 +211,17 @@ export const useWsCollab = (
  * `http://` → `ws://`, `https://` → `wss://`.
  */
 const wsBaseFromApiUrl = (apiUrl: string): string => apiUrl.replace(/^http/i, "ws")
+
+
+/**
+ * WebSocket close codes the server can emit. Mirrors the constants in
+ * `backend/topix/api/router/collab.py` (must stay in sync).
+ *
+ * `WS_ROOM_FULL` (4429) fires when the board is at its plan-tier
+ * concurrent-user cap; reconnect won't help until a peer leaves, so
+ * the outer loop terminates instead of retrying.
+ */
+const WS_ROOM_FULL = 4429
 
 
 /**

@@ -97,6 +97,11 @@ const runHarness = (opts: RunHarnessOpts) => {
         teardown = null
         if (cancelled) return
         if (code === 1000 || code === 1001) return
+        // Mirror the real loop: 4429 (room-full) terminates instead of retrying.
+        if (code === 4429) {
+          setCollabConnState("room-full")
+          return
+        }
         scheduleReconnect()
       },
     })
@@ -252,6 +257,23 @@ describe("reconnect harness", () => {
     // No timer scheduled, state did NOT switch to reconnecting.
     expect(getCollabConnState()).toBe("live")
     expect(vi.getTimerCount()).toBe(0)
+    h.cancel()
+  })
+
+  it("room-full close (code 4429) terminates and does not schedule a reconnect", () => {
+    // Server emits 4429 when the board is at its plan-tier concurrent-
+    // user cap. Retrying won't help until someone leaves — the user
+    // needs to refresh later — so the outer loop transitions to a
+    // terminal "room-full" state and stops scheduling reconnects.
+    const { factory, created } = makeStubAdapterFactory()
+    const h = runHarness({ adapterFactory: factory })
+
+    // No welcome — the server closes during accept with 4429.
+    created[0].fireClose(4429, 0)
+    expect(getCollabConnState()).toBe("room-full")
+    expect(vi.getTimerCount()).toBe(0)
+    // No new adapter was constructed (i.e. no reconnect attempt).
+    expect(created.length).toBe(1)
     h.cancel()
   })
 

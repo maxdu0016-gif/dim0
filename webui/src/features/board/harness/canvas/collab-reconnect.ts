@@ -21,6 +21,7 @@ export type CollabConnState =
   | "live"          // welcome received, normal operation
   | "reconnecting"  // unexpected close, backoff pending
   | "failed"        // max reconnect attempts reached
+  | "room-full"     // server rejected with 4429 (board at plan-tier user cap)
 
 
 /**

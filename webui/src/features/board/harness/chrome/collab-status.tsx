@@ -2,21 +2,26 @@ import { cn } from "@/lib/utils"
 import { useCollabConnState } from "../canvas/collab-reconnect"
 
 
-const STATUS_LABEL: Record<"idle" | "connecting" | "live" | "reconnecting" | "failed", string> = {
+type StatusKey = "idle" | "connecting" | "live" | "reconnecting" | "failed" | "room-full"
+
+
+const STATUS_LABEL: Record<StatusKey, string> = {
   idle: "",
   connecting: "Connecting…",
   live: "",
   reconnecting: "Reconnecting…",
   failed: "Disconnected — refresh to retry",
+  "room-full": "Board is full — try again later",
 }
 
 
-const STATUS_CLASS: Record<"idle" | "connecting" | "live" | "reconnecting" | "failed", string> = {
+const STATUS_CLASS: Record<StatusKey, string> = {
   idle: "",
   connecting: "text-muted-foreground",
   live: "",
   reconnecting: "text-amber-600 dark:text-amber-400",
   failed: "text-destructive",
+  "room-full": "text-amber-600 dark:text-amber-400",
 }
 
 
