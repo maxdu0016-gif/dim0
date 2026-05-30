@@ -567,6 +567,69 @@ async def test_edge_add_constructs_link_with_endpoints():
     assert link.target == "n2"
 
 
+async def test_edge_add_carries_parent_id_from_data():
+    """An `edge.add` with `data.parentId` lands in `Link.parent_id`.
+
+    Regression: `_wire_edge_to_link` ignored `data.parentId`, so arrows
+    drawn inside a sub-folder got persisted with `parent_id` NULL and
+    appeared at the root board on refresh. Same shape of bug as
+    `_wire_node_to_note` already handled for nodes.
+    """
+    store = _RecordingGraphStore()
+    op = {
+        "type": "edge.add",
+        "edge": {
+            "id": "e1",
+            "source": {"nodeId": "n1"},
+            "target": {"nodeId": "n2"},
+            "data": {"parentId": "folder-1", "version": 1},
+        },
+    }
+
+    await apply_batch(graph_store=store, board_id="b1", user_id="u1", ops=[op])
+
+    [link] = store.add_links_calls[0]
+    assert link.parent_id == "folder-1"
+
+
+async def test_edge_update_parent_id_from_data_moves_to_top_level():
+    """An `edge.update` with `data.parentId` surfaces as a top-level move.
+
+    Regression: `_edge_patch_to_link_data` only read endpoint / style /
+    label / midpoint fields. Rescope updates from `useStampNewEdges`
+    were invisible server-side, so a pasted edge stayed at the source
+    `parent_id` on the DB.
+    """
+    store = _RecordingGraphStore()
+    op = {
+        "type": "edge.update",
+        "id": "e1",
+        "patch": {"data": {"parentId": "folder-2", "graphUid": "b1"}},
+        "prev": {},
+    }
+
+    await apply_batch(graph_store=store, board_id="b1", user_id="u1", ops=[op])
+
+    data = store.update_link_calls[0]["data"]
+    assert data["parent_id"] == "folder-2"
+    assert data["graph_uid"] == "b1"
+
+
+async def test_edge_update_parent_id_null_moves_to_root():
+    """An `edge.update` with `data.parentId: null` clears to root."""
+    store = _RecordingGraphStore()
+    op = {
+        "type": "edge.update",
+        "id": "e1",
+        "patch": {"data": {"parentId": None}},
+        "prev": {},
+    }
+
+    await apply_batch(graph_store=store, board_id="b1", user_id="u1", ops=[op])
+
+    assert store.update_link_calls[0]["data"]["parent_id"] is None
+
+
 async def test_edge_remove_dispatches_to_delete_link():
     """Edge remove dispatches to delete link."""
     store = _RecordingGraphStore()

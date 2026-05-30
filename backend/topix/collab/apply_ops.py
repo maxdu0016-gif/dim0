@@ -487,6 +487,13 @@ def _wire_edge_to_link(edge: dict[str, Any], *, board_id: str) -> Link | None:  
         "source": source_id,
         "target": target_id,
     }
+    # Lift Dim0 scope from wire `data`. `parentId` is set by the
+    # mindmap drain and by `useStampNewEdges` follow-up updates; without
+    # it edges drawn inside a sub-folder would persist with parent_id
+    # NULL and appear at the root on refresh.
+    data_field = edge.get("data") or {}
+    if isinstance(data_field, dict) and "parentId" in data_field:
+        link_dict["parent_id"] = data_field["parentId"]
     properties: dict[str, Any] = {}
     if start_point is not None:
         properties["start_point"] = start_point
@@ -553,6 +560,18 @@ def _edge_patch_to_link_data(patch: dict[str, Any]) -> dict[str, Any]:  # noqa: 
         properties["edge_control_point"] = midpoint
     if properties:
         data["properties"] = properties
+
+    # Same scope-on-update story as `_node_patch_to_note_data` — see
+    # the matching block there. Pasted edges and `useStampNewEdges`
+    # rescope updates carry `parentId`/`graphUid` on `data`; surface
+    # them so the deep-merge writes `parent_id` / `graph_uid` to the DB.
+    wire_data = patch.get("data")
+    if isinstance(wire_data, dict):
+        if "parentId" in wire_data:
+            data["parent_id"] = wire_data["parentId"]
+        if "graphUid" in wire_data:
+            data["graph_uid"] = wire_data["graphUid"]
+
     return data
 
 
