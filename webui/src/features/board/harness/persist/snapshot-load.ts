@@ -52,6 +52,15 @@ export const applyGraphToStore = (
       for (const e of edges) store.addEdge(e)
     })
     store.clearHistory()
+    // Replace mode signals a fresh board scope (the first-load REST
+    // path on board navigation). Drop any remote-presence entries
+    // accumulated from the previous board so the peer chip / remote
+    // cursor overlay don't show stale avatars for peers that aren't
+    // actually on the new board's WS room. The subsequent welcome
+    // (1c.1) repopulates with the new room's peer set.
+    for (const [clientId] of store.presence.getAll()) {
+      store.presence.applyRemote(clientId, null)
+    }
     return
   }
 

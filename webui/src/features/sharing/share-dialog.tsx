@@ -96,7 +96,14 @@ export function ShareDialog({ boardId, boardLabel, open, onOpenChange }: ShareDi
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
-        <DialogHeader>
+        {/*
+          `min-w-0` on the header lets the grid cell shrink to the
+          dialog's `max-w-lg` instead of expanding to the title's
+          intrinsic min-content width. Without it, a long board label
+          forces the dialog wider than its max and overflows the
+          viewport.
+        */}
+        <DialogHeader className="min-w-0">
           <DialogTitle className="truncate">
             Share &ldquo;{boardLabel || "Untitled board"}&rdquo;
           </DialogTitle>

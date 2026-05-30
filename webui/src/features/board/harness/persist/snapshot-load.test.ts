@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest"
-import { asNodeId, type Node } from "@canvas-harness/core"
+import { asClientId, asNodeId, type Node } from "@canvas-harness/core"
 import { createBoardStore } from "../store/create-board-store"
 import type { Graph } from "@/features/board/types/board"
 
@@ -126,6 +126,60 @@ describe("hydrateBoardStore — cancel safety", () => {
     applyGraphToStore(store, emptyGraph(), { mode: "replace" })
 
     expect(store.getAllNodes()).toHaveLength(0)
+  })
+
+  it("applyGraphToStore mode=replace clears remote presences from the previous board", () => {
+    // Regression: navigating board A → B used to leave board A's
+    // peer entries in `store.presence` because the WS adapter's
+    // cleanup only resets local presence. The peer chip + remote
+    // cursors then showed stale avatars on board B until those peers
+    // happened to send something. Replace mode now clears remote
+    // presences so the new welcome's `presence` map repopulates from
+    // a clean slate.
+    const store = createBoardStore()
+    store.presence.applyRemote(asClientId("alice"), {
+      clientId: asClientId("alice"),
+      name: "Alice",
+      color: "#abc",
+      cursor: null,
+      selection: [],
+      editing: null,
+    })
+    store.presence.applyRemote(asClientId("bob"), {
+      clientId: asClientId("bob"),
+      name: "Bob",
+      color: "#def",
+      cursor: null,
+      selection: [],
+      editing: null,
+    })
+    expect(store.presence.getAll().size).toBe(2)
+
+    applyGraphToStore(store, emptyGraph(), { mode: "replace" })
+
+    expect(store.presence.getAll().size).toBe(0)
+  })
+
+  it("applyGraphToStore mode=merge leaves remote presences alone (no clobber on reconnect)", () => {
+    // Merge mode runs on WS welcome (snapshot mode), which can fire
+    // during a reconnect mid-session. We must NOT wipe existing
+    // remote presences there — those are valid peers in the same
+    // room, and the welcome's `presence` map is added on top via
+    // `applyRemote` in use-ws-collab. Only replace mode (board nav)
+    // clears them.
+    const store = createBoardStore()
+    store.presence.applyRemote(asClientId("alice"), {
+      clientId: asClientId("alice"),
+      name: "Alice",
+      color: "#abc",
+      cursor: null,
+      selection: [],
+      editing: null,
+    })
+
+    applyGraphToStore(store, emptyGraph(), { mode: "merge" })
+
+    expect(store.presence.getAll().size).toBe(1)
   })
 
   it("applyGraphToStore mode=merge updates existing nodes in place and removes absent ones", () => {
