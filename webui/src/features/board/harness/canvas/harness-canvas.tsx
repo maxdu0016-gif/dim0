@@ -40,7 +40,6 @@ import {
 import { LinearView, ListView } from "../views"
 import { boardNodeTypes, useRenderCustomNodeView } from "../node-types"
 import { hydrateBoardStore } from "../persist/snapshot-load"
-import { ReadonlyBanner } from "@/features/sharing/readonly-banner"
 import { ShareButton } from "@/features/sharing/share-button"
 import type { SaveStatus } from "../persist/use-debounced-save"
 import { useBoardAppStore } from "../store/board-app-store"
@@ -386,7 +385,6 @@ function HarnessCanvasInner({
         <HarnessSaveStatus status={saveStatus} />
         <ShareButton />
       </div>
-      <ReadonlyBanner />
       <NodeSurfaceHost />
       <SlidesSheet />
       <PresentationOverlay />

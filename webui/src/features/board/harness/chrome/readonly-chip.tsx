@@ -7,9 +7,12 @@ import { useBoardAppStore } from "../store/board-app-store"
  * signed-in user is a viewer on the current board — the same gate
  * that hides the Share button.
  *
- * Wording is short by design (the row stays uncluttered); the existing
- * `ReadonlyBanner` carries the full explanation. Hidden in
- * presentation mode where the read-only state is implicit.
+ * Replaces the previous top-center floating banner. The shorter
+ * wording is on purpose — the server still rejects writes with
+ * `op-rejected reason="read-only"` if a viewer somehow tries; this
+ * chip is the user-facing reminder, not the enforcement.
+ *
+ * Hidden in presentation mode where the read-only state is implicit.
  */
 export function HarnessReadonlyChip() {
   const boardRole = useBoardAppStore((s) => s.boardRole)
