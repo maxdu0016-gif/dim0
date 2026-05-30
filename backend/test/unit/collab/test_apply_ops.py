@@ -118,6 +118,23 @@ async def test_node_update_content_writes_to_content_markdown():
     assert store.patch_calls[0]["data"]["content"] == {"markdown": "# Hi"}
 
 
+async def test_node_update_content_null_clears_to_empty_markdown():
+    """Undo of a first-time content set arrives as `content: null` over the wire.
+
+    canvas-harness 0.1.8 fixed `slicePrev` to substitute `null` for
+    `undefined` so the inverse op survives JSON serialization. The
+    server's content path must therefore accept `null` and persist
+    it as an explicit clear — empty markdown — instead of dropping
+    the field on the floor.
+    """
+    store = _RecordingGraphStore()
+    op = {"type": "node.update", "id": "n1", "patch": {"content": None}, "prev": {}}
+
+    await apply_batch(graph_store=store, board_id="b1", user_id="u1", ops=[op])
+
+    assert store.patch_calls[0]["data"]["content"] == {"markdown": ""}
+
+
 async def test_node_update_colors_persist_from_stored_colors():
     """Colors persist from data._storedColors, not from `style.*`.
 
@@ -478,6 +495,34 @@ async def test_edge_update_clears_label_when_content_empty():
         "type": "edge.update",
         "id": "e1",
         "patch": {"content": ""},
+        "prev": {},
+    }
+
+    results = await apply_batch(graph_store=store, board_id="b1", user_id="u1", ops=[op])
+
+    assert results[0].applied is True
+    [call] = store.update_link_calls
+    assert call["data"]["label"] is None
+
+
+async def test_edge_update_clears_label_when_content_null():
+    """Undo of a first-time label set arrives as `content: null` over the wire.
+
+    canvas-harness 0.1.8 fixed `slicePrev` to substitute `null` for
+    `undefined` so an inverse op like `patch: { content: null }`
+    survives `JSON.stringify` instead of becoming `patch: {}`. The
+    edge-label persistence path treats `null` identically to `""` —
+    both clear the label.
+
+    Without this contract, undoing a first-time edge-label edit
+    silently no-ops on every peer (the symptom of issue confirmed
+    after smoke).
+    """
+    store = _RecordingGraphStore()
+    op = {
+        "type": "edge.update",
+        "id": "e1",
+        "patch": {"content": None},
         "prev": {},
     }
 
