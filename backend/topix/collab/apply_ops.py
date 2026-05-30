@@ -292,6 +292,21 @@ def _node_patch_to_note_data(patch: dict[str, Any]) -> dict[str, Any]:  # noqa: 
         style = data.setdefault("style", {})
         for k, v in style_color.items():
             style[k] = v
+
+    # `parentId` / `graphUid` on `patch.data` reflect a scope move
+    # (e.g. paste rewrites them via `use-stamp-new-nodes` when the
+    # source folder/board differs from the user's current scope).
+    # Surface them at the top of the patch dict so `patch_notes`'s
+    # deep-merge overwrites the Note's `parent_id` / `graph_uid` —
+    # otherwise the move would only live in the client store and
+    # the note would snap back to its original location on refresh.
+    wire_data = patch.get("data")
+    if isinstance(wire_data, dict):
+        if "parentId" in wire_data:
+            data["parent_id"] = wire_data["parentId"]
+        if "graphUid" in wire_data:
+            data["graph_uid"] = wire_data["graphUid"]
+
     return data
 
 

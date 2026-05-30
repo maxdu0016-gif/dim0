@@ -299,6 +299,50 @@ async def test_node_update_colors_persist_from_stored_colors():
     assert style["text_color"] == "#0a0a0a"
 
 
+async def test_node_update_parent_id_from_data_moves_to_top_level():
+    """A `data.parentId` patch surfaces as a top-level `parent_id` move.
+
+    Regression: paste into a sub-folder fired a `node.update` with the
+    new `parentId` on `data`, but the translator only handed `data` /
+    `properties` to `patch_notes` — `parent_id` never reached the
+    deep-merge, so the DB kept the source folder. On refresh, the
+    pasted note reappeared in the source location.
+    """
+    store = _RecordingGraphStore()
+    op = {
+        "type": "node.update",
+        "id": "n1",
+        "patch": {"data": {"parentId": "folder-2", "graphUid": "b1"}},
+        "prev": {},
+    }
+
+    await apply_batch(graph_store=store, board_id="b1", user_id="u1", ops=[op])
+
+    data = store.patch_calls[0]["data"]
+    assert data["parent_id"] == "folder-2"
+    assert data["graph_uid"] == "b1"
+
+
+async def test_node_update_parent_id_null_moves_to_root():
+    """A `data.parentId: null` patch surfaces as `parent_id: None` (root).
+
+    Pasting a sub-folder note back at the root sends `parentId: null`
+    on the wire. Without this, deep-merge wouldn't clear the existing
+    `parent_id` and the note would stay in its old folder.
+    """
+    store = _RecordingGraphStore()
+    op = {
+        "type": "node.update",
+        "id": "n1",
+        "patch": {"data": {"parentId": None}},
+        "prev": {},
+    }
+
+    await apply_batch(graph_store=store, board_id="b1", user_id="u1", ops=[op])
+
+    assert store.patch_calls[0]["data"]["parent_id"] is None
+
+
 async def test_node_update_without_stored_colors_does_not_emit_style_colors():
     """Position-only patches don't emit a style update.
 
