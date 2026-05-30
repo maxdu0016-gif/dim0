@@ -27,6 +27,7 @@ import {
   CanvasContextMenu,
   HarnessCollabStatus,
   HarnessPeerChip,
+  HarnessReadonlyChip,
   HarnessSaveStatus,
   HarnessToolbar,
   HarnessViewportControls,
@@ -380,6 +381,7 @@ function HarnessCanvasInner({
       */}
       <div className="absolute right-3 top-3 z-50 flex items-center gap-2">
         <HarnessPeerChip />
+        <HarnessReadonlyChip />
         <HarnessCollabStatus />
         <HarnessSaveStatus status={saveStatus} />
         <ShareButton />
