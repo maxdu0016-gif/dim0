@@ -23,9 +23,11 @@ export const HarnessPeerChip = memo(function HarnessPeerChip() {
   const peers = [...remotes.values()].filter((p) => p.name)
   if (peers.length === 0) return null
 
-  // Avatar stack: up to 3 visible chips, "+N" overflow.
-  const visible = peers.slice(0, 3)
-  const overflow = peers.length - visible.length
+  // Avatar stack: keep the chip width fixed at 3 elements max. Show
+  // all peers when there are ≤ 3; otherwise reserve a slot for the
+  // overflow indicator (just a "+", since the popover lists names).
+  const hasOverflow = peers.length > 3
+  const visible = peers.slice(0, hasOverflow ? 2 : 3)
 
   return (
     <Popover>
@@ -47,8 +49,8 @@ export const HarnessPeerChip = memo(function HarnessPeerChip() {
               />
             ))}
           </div>
-          {overflow > 0 ? (
-            <span className="ml-1 text-muted-foreground">+{overflow}</span>
+          {hasOverflow ? (
+            <span className="ml-1 text-muted-foreground">+</span>
           ) : null}
         </button>
       </PopoverTrigger>
