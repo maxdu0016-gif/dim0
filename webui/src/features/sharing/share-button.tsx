@@ -33,9 +33,9 @@ export function ShareButton() {
         onClick={() => setOpen(true)}
         aria-label="Share this board"
         className={
-          "flex items-center gap-1.5 rounded-md border border-border bg-background/95 px-2.5 py-1 " +
-          "text-xs font-medium text-card-foreground shadow-sm backdrop-blur " +
-          "transition-colors hover:bg-secondary hover:text-secondary-foreground"
+          "flex items-center gap-1.5 rounded-md px-1.5 py-1 " +
+          "text-xs font-medium text-card-foreground " +
+          "transition-opacity hover:opacity-70"
         }
       >
         <ShareIcon className="size-3.5 shrink-0" />
