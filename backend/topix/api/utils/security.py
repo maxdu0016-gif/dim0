@@ -216,10 +216,17 @@ async def verify_board_read_access(
     user_id: Annotated[str, Depends(get_current_user_uid)],
     graph_id: Annotated[str, Path(description="Graph ID")],
 ) -> None:
-    """Verify that the user can read the board (member or public)."""
+    """Verify that the user can read the board.
+
+    Read access today is granted to: owners, members, viewers (all
+    three are real `graph_user` rows), and any user when the board is
+    public-visibility. Viewers without `viewer` here got 404 on every
+    board GET despite being legitimately shared with — broke the
+    entire view-only share-link path until they discover this dep.
+    """
     graph_store: GraphStore = request.app.graph_store
     role = await graph_store.get_graph_role(graph_uid=graph_id, user_uid=user_id)
-    if role in {"owner", "member"}:
+    if role in {"owner", "member", "viewer"}:
         return
 
     graph = await graph_store.get_graph_metadata(graph_uid=graph_id)
