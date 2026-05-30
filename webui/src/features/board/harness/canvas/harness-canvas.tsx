@@ -52,7 +52,7 @@ import { useHydrateIconNodes } from "./use-hydrate-icon-nodes"
 import { usePresentationMode } from "./use-presentation-mode"
 import { useBlockFolderCopy } from "./use-block-folder-copy"
 import { useStampNewEdges } from "./use-stamp-new-edges"
-import { useStampPastedNodes } from "./use-stamp-pasted-nodes"
+import { useStampNewNodes } from "./use-stamp-new-nodes"
 import { useStyleMemory } from "./use-style-memory"
 import { useLocalPresence } from "./use-local-presence"
 import { useWsCollab } from "./use-ws-collab"
@@ -132,7 +132,7 @@ export function HarnessCanvas() {
   useViewportPersistence(store, boardId, rootId, ready)
   useCenterFromUrl(store, wrapRef, ready)
   useStampNewEdges(store, boardId, rootId)
-  useStampPastedNodes(store, boardId, rootId)
+  useStampNewNodes(store, boardId, rootId)
   useBlockFolderCopy(store)
   useHarnessApplyMindMap(store, boardId, rootId)
   useHydrateIconNodes(store, boardId, rootId, ready)
