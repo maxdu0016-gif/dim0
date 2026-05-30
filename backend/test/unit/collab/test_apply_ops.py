@@ -20,6 +20,11 @@ class _RecordingGraphStore:
         self.add_links_calls: list = []
         self.update_link_calls: list = []
         self.delete_link_calls: list = []
+        # Bulk-shape recordings (for tests asserting on grouped dispatch).
+        self.patch_notes_bulk_calls: list = []
+        self.delete_nodes_bulk_calls: list = []
+        self.update_links_bulk_calls: list = []
+        self.delete_links_bulk_calls: list = []
 
     async def add_notes(self, nodes):
         """Add notes."""
@@ -44,6 +49,36 @@ class _RecordingGraphStore:
     async def delete_link(self, link_id):
         """Delete link."""
         self.delete_link_calls.append(link_id)
+
+    # ---- bulk methods used by apply_batch's grouped dispatch -----------
+    # These mirror the per-op recording so existing assertions on
+    # `patch_calls[0]["data"]` etc. keep working. Each (id, data) inside
+    # a bulk call lands as one record. Tests that want to assert on bulk
+    # shape can read the corresponding `*_bulk_calls` list.
+
+    async def patch_notes(self, updates, user_uid=None):
+        """Bulk patch notes — record per-item plus the bulk shape."""
+        self.patch_notes_bulk_calls.append({"updates": list(updates), "user_uid": user_uid})
+        for node_id, data in updates:
+            self.patch_calls.append({"node_id": node_id, "data": data, "user_uid": user_uid})
+
+    async def delete_nodes(self, node_ids, user_uid=None):
+        """Bulk delete nodes — record per-item plus the bulk shape."""
+        self.delete_nodes_bulk_calls.append({"node_ids": list(node_ids), "user_uid": user_uid})
+        for node_id in node_ids:
+            self.delete_node_calls.append({"node_id": node_id, "user_uid": user_uid})
+
+    async def update_links(self, updates):
+        """Bulk update links — record per-item plus the bulk shape."""
+        self.update_links_bulk_calls.append({"updates": list(updates)})
+        for link_id, data in updates:
+            self.update_link_calls.append({"link_id": link_id, "data": data})
+
+    async def delete_links(self, link_ids):
+        """Bulk delete links — record per-item plus the bulk shape."""
+        self.delete_links_bulk_calls.append({"link_ids": list(link_ids)})
+        for link_id in link_ids:
+            self.delete_link_calls.append(link_id)
 
 
 # ---------------------------------------------------------------------------
@@ -707,26 +742,153 @@ async def test_batch_keeps_processing_after_a_single_op_fails():
     assert len(store.delete_node_calls) == 1
 
 
-async def test_op_handler_exception_is_caught_per_op():
-    """Backing store exceptions are caught per op; batch continues.
+async def test_op_handler_exception_is_caught_per_bucket():
+    """A failing bulk dispatch fails every op in that bucket, others continue.
 
-    A raising op records as `applied=False` with the exception
-    message; subsequent ops are still applied.
+    Bulk dispatch is atomic from `apply_batch`'s perspective — when the
+    backing store raises we can't tell which specific op in the bucket
+    caused it without falling back to per-op apply, which would defeat
+    the batching optimization. So we mark every op in the failing
+    bucket as `applied=False` with the exception message, and let other
+    kinds proceed. The WS handler still broadcasts the original batch
+    regardless of apply results.
     """
 
     class _BoomStore(_RecordingGraphStore):
-        async def patch_note(self, node_id, data, user_uid):
-            """Patch note."""
+        async def patch_notes(self, updates, user_uid=None):
+            """Bulk patch raises — should fail every node.update op in the bucket."""
             raise RuntimeError("db down")
 
     store = _BoomStore()
     ops = [
         {"type": "node.update", "id": "n1", "patch": {"x": 1, "y": 2}, "prev": {}},
-        {"type": "node.remove", "node": {"id": "n2"}},
+        {"type": "node.update", "id": "n2", "patch": {"x": 3, "y": 4}, "prev": {}},
+        {"type": "node.remove", "node": {"id": "n3"}},
     ]
 
     results = await apply_batch(graph_store=store, board_id="b1", user_id="u1", ops=ops)
 
+    # Both updates fail with the same reason; the remove still applies.
     assert results[0].applied is False
     assert results[0].reason and "db down" in results[0].reason
-    assert results[1].applied is True
+    assert results[1].applied is False
+    assert results[1].reason and "db down" in results[1].reason
+    assert results[2].applied is True
+
+
+# ---------------------------------------------------------------------------
+# Grouped bulk dispatch — the win behind apply_batch's restructure.
+# ---------------------------------------------------------------------------
+
+async def test_homogeneous_node_add_batch_dispatches_as_one_bulk_call():
+    """1000 node.add ops should hit `add_notes` once, not 1000 times.
+
+    This is the core scaling fix — without grouping, a paste-1000-nodes
+    batch produces 1000 single-item embedding + Qdrant round-trips.
+    With grouping it's one embed call + one upsert.
+    """
+    store = _RecordingGraphStore()
+    ops = [
+        {
+            "type": "node.add",
+            "node": {
+                "id": f"n{i}",
+                "x": 0, "y": 0, "w": 200, "h": 80, "z": 0, "angle": 0,
+                "data": {"noteType": "note", "styleType": "rectangle", "version": 1},
+            },
+        }
+        for i in range(50)
+    ]
+
+    results = await apply_batch(graph_store=store, board_id="b1", user_id="u1", ops=ops)
+
+    assert all(r.applied for r in results)
+    # One bulk add_notes call with 50 notes — not 50 separate calls.
+    assert len(store.add_notes_calls) == 1
+    assert len(store.add_notes_calls[0]) == 50
+
+
+async def test_homogeneous_node_update_batch_dispatches_as_one_patch_notes_call():
+    """N node.updates collapse to one bulk patch_notes(updates) call."""
+    store = _RecordingGraphStore()
+    ops = [
+        {"type": "node.update", "id": f"n{i}", "patch": {"x": i, "y": i}, "prev": {}}
+        for i in range(20)
+    ]
+
+    await apply_batch(graph_store=store, board_id="b1", user_id="u1", ops=ops)
+
+    # One bulk call with 20 (id, data) pairs.
+    assert len(store.patch_notes_bulk_calls) == 1
+    assert len(store.patch_notes_bulk_calls[0]["updates"]) == 20
+    # user_uid threaded through so snapshots can attribute correctly.
+    assert store.patch_notes_bulk_calls[0]["user_uid"] == "u1"
+
+
+async def test_homogeneous_node_remove_batch_dispatches_as_one_delete_nodes_call():
+    """N node.removes collapse to one bulk delete_nodes(ids) call."""
+    store = _RecordingGraphStore()
+    ops = [
+        {"type": "node.remove", "node": {"id": f"n{i}"}}
+        for i in range(15)
+    ]
+
+    await apply_batch(graph_store=store, board_id="b1", user_id="u1", ops=ops)
+
+    assert len(store.delete_nodes_bulk_calls) == 1
+    assert len(store.delete_nodes_bulk_calls[0]["node_ids"]) == 15
+
+
+async def test_mixed_batch_groups_ops_by_kind_each_kind_one_bulk_call():
+    """An interleaved batch still collapses to ONE bulk call per kind.
+
+    Cross-kind execution order is deterministic (adds → updates →
+    edge.* → removes). Within a kind, input order is preserved so
+    same-id sequences (e.g., two updates on n1) merge correctly in
+    `patch_notes`.
+    """
+    store = _RecordingGraphStore()
+    _node = {"x": 0, "y": 0, "w": 10, "h": 10, "z": 0, "angle": 0}
+    _data = {"noteType": "note", "styleType": "rectangle", "version": 1}
+    ops = [
+        {"type": "node.add", "node": {"id": "n1", **_node, "data": _data}},
+        {"type": "node.update", "id": "n2", "patch": {"x": 5, "y": 5}, "prev": {}},
+        {"type": "node.add", "node": {"id": "n3", **_node, "data": _data}},
+        {"type": "node.update", "id": "n4", "patch": {"x": 9, "y": 9}, "prev": {}},
+        {"type": "node.remove", "node": {"id": "n5"}},
+    ]
+
+    results = await apply_batch(graph_store=store, board_id="b1", user_id="u1", ops=ops)
+
+    # Per-kind: one bulk call carrying all items of that kind.
+    assert len(store.add_notes_calls) == 1
+    assert len(store.add_notes_calls[0]) == 2     # n1, n3
+    assert len(store.patch_notes_bulk_calls) == 1
+    assert len(store.patch_notes_bulk_calls[0]["updates"]) == 2   # n2, n4
+    assert len(store.delete_nodes_bulk_calls) == 1
+    assert len(store.delete_nodes_bulk_calls[0]["node_ids"]) == 1  # n5
+    # All 5 results in input order, all applied.
+    assert [r.applied for r in results] == [True] * 5
+
+
+async def test_invalid_ops_excluded_from_bucket_dont_poison_bulk_dispatch():
+    """Per-op validation failure skips that op without failing the bucket.
+
+    Without this guarantee, a single malformed `node.update` in a 1000-
+    op batch would prevent the other 999 from being dispatched.
+    """
+    store = _RecordingGraphStore()
+    ops = [
+        {"type": "node.update", "id": "n1", "patch": {"x": 1, "y": 1}, "prev": {}},
+        {"type": "node.update", "patch": {"x": 2}, "prev": {}},  # missing id
+        {"type": "node.update", "id": "n3", "patch": {"x": 3, "y": 3}, "prev": {}},
+    ]
+
+    results = await apply_batch(graph_store=store, board_id="b1", user_id="u1", ops=ops)
+
+    # Middle op fails its own validation; flanking ops still applied.
+    assert [r.applied for r in results] == [True, False, True]
+    assert results[1].reason == "missing id"
+    # The single bulk patch_notes call only carried the two valid ops.
+    assert len(store.patch_notes_bulk_calls) == 1
+    assert len(store.patch_notes_bulk_calls[0]["updates"]) == 2

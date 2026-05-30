@@ -52,97 +52,177 @@ class WireOpResult(BaseModel):
     reason: str | None = None
 
 
-async def apply_batch(
+async def apply_batch(  # noqa: C901 — flat dispatch by op-kind reads better than further nesting
     *,
     graph_store: GraphStore,
     board_id: str,
     user_id: str,
     ops: list[dict[str, Any]],
 ) -> list[WireOpResult]:
-    """Apply a batch of wire ops in order. Returns one result per op."""
-    results: list[WireOpResult] = []
-    for op in ops:
+    """Apply a batch of wire ops, grouping by kind so each kind hits the GraphStore in a single bulk call.
+
+    For homogeneous batches (e.g. a paste of 1000 nodes, or a select-all
+    delete), the work collapses to ONE `add_notes`/`patch_notes`/
+    `delete_nodes` call rather than N per-op store calls — which itself
+    used to fan out to N OpenAI embed calls + N Qdrant upserts (each
+    `add_notes([1])` etc.). The single-call versions in `GraphStore`
+    batch the embedding and Qdrant work under the hood.
+
+    Cross-kind execution order is deterministic: adds → updates →
+    removes, nodes before edges. Adds-before-updates means an
+    in-batch update on a just-added node still sees it; updates-
+    before-removes means a removed node's history is preserved.
+
+    Per-op results stay 1:1 with input ops so tests can still assert
+    `results[i].applied` on a specific op. A failure during a bulk
+    dispatch fails every op in that bucket (logged once); per-op
+    validation failures (e.g. missing id, malformed wire shape) are
+    captured before bucketing so they don't poison the rest of the
+    bucket.
+    """
+    # Per-op slots in input order. None means "still needs dispatching";
+    # a real WireOpResult means "already decided" (e.g. early validation
+    # failure or unsupported op type).
+    results: list[WireOpResult | None] = [None] * len(ops)
+    node_adds: list[tuple[int, Note]] = []
+    node_updates: list[tuple[int, str, dict[str, Any]]] = []
+    node_removes: list[tuple[int, str]] = []
+    edge_adds: list[tuple[int, Link]] = []
+    edge_updates: list[tuple[int, str, dict[str, Any]]] = []
+    edge_removes: list[tuple[int, str]] = []
+
+    # Pass 1 — validate + bucket each op. Records early-failure results
+    # for ops that can't make it into a bucket.
+    for idx, op in enumerate(ops):
         op_type = op.get("type", "")
-        try:
-            result = await _apply_one(
-                graph_store=graph_store,
-                board_id=board_id,
-                user_id=user_id,
-                op=op,
-            )
-        except Exception as exc:
-            logger.exception("collab apply error type=%s err=%s", op_type, exc)
-            result = WireOpResult(applied=False, op_type=op_type, reason=str(exc))
-        results.append(result)
-    return results
+
+        if op_type == "node.add":
+            note = _wire_node_to_note(op.get("node") or {}, board_id=board_id)
+            if note is None:
+                results[idx] = WireOpResult(applied=False, op_type=op_type, reason="could not construct Note")
+            else:
+                node_adds.append((idx, note))
+            continue
+
+        if op_type == "node.update":
+            node_id = op.get("id")
+            if not isinstance(node_id, str):
+                results[idx] = WireOpResult(applied=False, op_type=op_type, reason="missing id")
+                continue
+            data = _node_patch_to_note_data(op.get("patch") or {})
+            if not data:
+                results[idx] = WireOpResult(applied=False, op_type=op_type, reason="no supported fields in patch")
+                continue
+            node_updates.append((idx, node_id, data))
+            continue
+
+        if op_type == "node.remove":
+            node = op.get("node") or {}
+            node_id = node.get("id") or op.get("id")
+            if not isinstance(node_id, str):
+                results[idx] = WireOpResult(applied=False, op_type=op_type, reason="missing id")
+            else:
+                node_removes.append((idx, node_id))
+            continue
+
+        if op_type == "edge.add":
+            link = _wire_edge_to_link(op.get("edge") or {}, board_id=board_id)
+            if link is None:
+                results[idx] = WireOpResult(applied=False, op_type=op_type, reason="could not construct Link")
+            else:
+                edge_adds.append((idx, link))
+            continue
+
+        if op_type == "edge.update":
+            link_id = op.get("id")
+            if not isinstance(link_id, str):
+                results[idx] = WireOpResult(applied=False, op_type=op_type, reason="missing id")
+                continue
+            data = _edge_patch_to_link_data(op.get("patch") or {})
+            if not data:
+                results[idx] = WireOpResult(applied=False, op_type=op_type, reason="no supported fields in patch")
+                continue
+            edge_updates.append((idx, link_id, data))
+            continue
+
+        if op_type == "edge.remove":
+            edge = op.get("edge") or {}
+            link_id = edge.get("id") or op.get("id")
+            if not isinstance(link_id, str):
+                results[idx] = WireOpResult(applied=False, op_type=op_type, reason="missing id")
+            else:
+                edge_removes.append((idx, link_id))
+            continue
+
+        # Deferred kinds (group.*, frame.reorder) — relayed by the WS
+        # handler regardless, but not persisted.
+        logger.info("collab unsupported op type=%s — relayed but not persisted", op_type)
+        results[idx] = WireOpResult(applied=False, op_type=op_type, reason="unsupported op type")
+
+    # Pass 2 — dispatch each non-empty bucket in dependency order.
+    await _dispatch_bucket(
+        results, "node.add", node_adds,
+        lambda items: graph_store.add_notes(nodes=[n for _, n in items]),
+    )
+    await _dispatch_bucket(
+        results, "node.update", node_updates,
+        lambda items: graph_store.patch_notes(
+            updates=[(node_id, data) for _, node_id, data in items],
+            user_uid=user_id,
+        ),
+    )
+    await _dispatch_bucket(
+        results, "edge.add", edge_adds,
+        lambda items: graph_store.add_links(links=[link for _, link in items]),
+    )
+    await _dispatch_bucket(
+        results, "edge.update", edge_updates,
+        lambda items: graph_store.update_links(
+            updates=[(link_id, data) for _, link_id, data in items],
+        ),
+    )
+    await _dispatch_bucket(
+        results, "edge.remove", edge_removes,
+        lambda items: graph_store.delete_links(link_ids=[link_id for _, link_id in items]),
+    )
+    await _dispatch_bucket(
+        results, "node.remove", node_removes,
+        lambda items: graph_store.delete_nodes(
+            node_ids=[node_id for _, node_id in items],
+            user_uid=user_id,
+        ),
+    )
+
+    return [r or WireOpResult(applied=True, op_type="") for r in results]
 
 
-async def _apply_one(  # noqa: C901 — dispatcher across op kinds; readability beats trimming branches
-    *,
-    graph_store: GraphStore,
-    board_id: str,
-    user_id: str,
-    op: dict[str, Any],
-) -> WireOpResult:
-    op_type = op.get("type", "")
+async def _dispatch_bucket(
+    results: list[WireOpResult | None],
+    op_type: str,
+    items: list[tuple[int, Any, ...]],  # type: ignore[misc]
+    dispatch,
+) -> None:
+    """Run a bulk dispatcher and write success/failure into the result slots.
 
-    if op_type == "node.update":
-        node_id = op.get("id")
-        patch = op.get("patch") or {}
-        if not isinstance(node_id, str):
-            return WireOpResult(applied=False, op_type=op_type, reason="missing id")
-        data = _node_patch_to_note_data(patch)
-        if not data:
-            return WireOpResult(applied=False, op_type=op_type, reason="no supported fields in patch")
-        await graph_store.patch_note(node_id=node_id, data=data, user_uid=user_id)
-        return WireOpResult(applied=True, op_type=op_type)
+    On exception, every op in this bucket fails with the same reason
+    (the bulk call is atomic from our perspective — we can't tell which
+    op caused the failure without falling back to per-op apply, which
+    would defeat the bulk optimization).
+    """
+    if not items:
+        return
+    try:
+        await dispatch(items)
+    except Exception as exc:
+        logger.exception("collab apply error bucket=%s n=%d err=%s", op_type, len(items), exc)
+        reason = str(exc)
+        for idx, *_ in items:
+            results[idx] = WireOpResult(applied=False, op_type=op_type, reason=reason)
+        return
+    for idx, *_ in items:
+        results[idx] = WireOpResult(applied=True, op_type=op_type)
 
-    if op_type == "node.remove":
-        node = op.get("node") or {}
-        node_id = node.get("id") or op.get("id")
-        if not isinstance(node_id, str):
-            return WireOpResult(applied=False, op_type=op_type, reason="missing id")
-        await graph_store.delete_node(node_id=node_id, user_uid=user_id)
-        return WireOpResult(applied=True, op_type=op_type)
 
-    if op_type == "node.add":
-        node = op.get("node") or {}
-        note = _wire_node_to_note(node, board_id=board_id)
-        if note is None:
-            return WireOpResult(applied=False, op_type=op_type, reason="could not construct Note")
-        await graph_store.add_notes(nodes=[note])
-        return WireOpResult(applied=True, op_type=op_type)
-
-    if op_type == "edge.add":
-        edge = op.get("edge") or {}
-        link = _wire_edge_to_link(edge, board_id=board_id)
-        if link is None:
-            return WireOpResult(applied=False, op_type=op_type, reason="could not construct Link")
-        await graph_store.add_links(links=[link])
-        return WireOpResult(applied=True, op_type=op_type)
-
-    if op_type == "edge.update":
-        link_id = op.get("id")
-        patch = op.get("patch") or {}
-        if not isinstance(link_id, str):
-            return WireOpResult(applied=False, op_type=op_type, reason="missing id")
-        data = _edge_patch_to_link_data(patch)
-        if not data:
-            return WireOpResult(applied=False, op_type=op_type, reason="no supported fields in patch")
-        await graph_store.update_link(link_id=link_id, data=data)
-        return WireOpResult(applied=True, op_type=op_type)
-
-    if op_type == "edge.remove":
-        edge = op.get("edge") or {}
-        link_id = edge.get("id") or op.get("id")
-        if not isinstance(link_id, str):
-            return WireOpResult(applied=False, op_type=op_type, reason="missing id")
-        await graph_store.delete_link(link_id=link_id)
-        return WireOpResult(applied=True, op_type=op_type)
-
-    # Deferred: group.upsert, group.remove, frame.reorder.
-    logger.info("collab unsupported op type=%s — relayed but not persisted", op_type)
-    return WireOpResult(applied=False, op_type=op_type, reason="unsupported op type")
 
 
 # ---------------------------------------------------------------------------

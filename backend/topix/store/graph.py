@@ -166,6 +166,76 @@ class GraphStore:
             )
         return merged_note
 
+    async def patch_notes(
+        self, updates: list[tuple[str, dict]], user_uid: str | None = None,
+    ) -> list[Note]:
+        """Bulk-patch multiple notes in one DB round-trip.
+
+        Semantics match `patch_note` per-row (validate against `Note` or
+        `Document`, embed-skip fast path, snapshot the pre-image), but
+        the work is amortized:
+
+          - **One** `get_nodes(ids)` for the full id set.
+          - In-memory merges per row.
+          - **One** `update_payload_only(...)` for the embed-skip rows
+            and **one** `update(...)` for the embed-required rows
+            (instead of N separate writes).
+
+        For a batch of 1000 user-coloured node.updates, this collapses
+        2000+ DB calls (N reads + N writes) into 2 calls. Snapshot writes
+        stay fire-and-forget via `_schedule_note_snapshot`.
+
+        Same-id duplicates within `updates` are applied in input order;
+        each merge sees the result of the previous one. Used by the
+        collab apply path when a coalesced batch carries multiple
+        updates targeting the same node id.
+
+        Returns the merged Notes in input order (skipping rows whose
+        target id wasn't found, which would correspond to a peer
+        racing a delete).
+        """
+        if not updates:
+            return []
+
+        # Single bulk read of every targeted id (preserves the input id
+        # order in a dict for deterministic merging).
+        unique_ids = list(dict.fromkeys(node_id for node_id, _ in updates))
+        existing_notes = await self.get_nodes(unique_ids)
+        by_id: dict[str, Note] = {n.id: n for n in existing_notes}
+
+        results: list[Note] = []
+        embed_skip_payloads: list[dict] = []
+        embed_required_payloads: list[dict] = []
+
+        for node_id, data in updates:
+            cur = by_id.get(node_id)
+            if cur is None:
+                continue
+            self._schedule_note_snapshot(cur, user_uid=user_uid)
+            merged_payload = self._deep_merge_dict(
+                cur.model_dump(exclude_none=False),
+                data,
+            )
+            merged_payload["id"] = node_id
+            model = Document if isinstance(cur, Document) else Note
+            merged_note = model.model_validate(merged_payload)
+            # Subsequent same-id updates in this batch see the result of
+            # this one — match per-op semantics for repeated patches.
+            by_id[node_id] = merged_note
+
+            dump = merged_note.model_dump(exclude_none=False)
+            if merged_note.to_embeddable() == cur.to_embeddable():
+                embed_skip_payloads.append(dump)
+            else:
+                embed_required_payloads.append(dump)
+            results.append(merged_note)
+
+        if embed_skip_payloads:
+            await self._content_store.update_payload_only(embed_skip_payloads)
+        if embed_required_payloads:
+            await self._content_store.update(embed_required_payloads)
+        return results
+
     async def update_node(self, node_id: str, data: dict, user_uid: str | None = None):
         """Update a node in the graph."""
         # TODO(folder): validate parent_id exists and belongs to the same graph.
@@ -224,6 +294,83 @@ class GraphStore:
         ))
         task.add_done_callback(_log_task_result)
 
+    async def delete_nodes(
+        self,
+        node_ids: list[str],
+        hard_delete: bool = True,
+        user_uid: str | None = None,
+    ) -> None:
+        """Bulk-delete multiple nodes (and all their descendants) in one round-trip.
+
+        Semantics match `delete_node` per-row but the work is amortized:
+
+          - **One** `get_nodes(ids)` for the full id set.
+          - **One** multi-root BFS via `get_nodes_descendants` instead
+            of N separate descendant walks.
+          - Snapshot writes scheduled via `_schedule_note_snapshot`
+            (fire-and-forget under the semaphore) — `delete_node` used
+            to await each snapshot synchronously, which was the
+            dominant cost on mass-deletes.
+          - **One** `_content_store.delete(all_ids)` and **one**
+            `delete_by_filters` for the chunk cleanup.
+
+        Wired by the collab apply path when a single batch contains
+        multiple `node.remove` ops (mass selection delete).
+        """
+        if not node_ids:
+            return
+
+        # Deduplicate — a peer racing two clients could conceivably ship
+        # the same id twice; filter early so descendants aren't walked
+        # twice from the same root.
+        unique_root_ids = list(dict.fromkeys(node_ids))
+        existing_roots = await self.get_nodes(unique_root_ids)
+        if not existing_roots:
+            return
+
+        descendants = await self.get_nodes_descendants(
+            [n.id for n in existing_roots],
+        )
+        all_to_delete: list[Note] = list(existing_roots) + list(descendants)
+        all_ids = [n.id for n in all_to_delete]
+
+        # Fire-and-forget snapshots — `delete_node` used to await each
+        # one synchronously, which dominated wall-time on mass deletes.
+        # The semaphore inside `_schedule_note_snapshot` bounds the
+        # concurrent OpenAI / pg traffic.
+        if self._note_revision_store is not None:
+            for n in all_to_delete:
+                self._schedule_note_snapshot(n, user_uid=user_uid)
+
+        await self._content_store.delete(all_ids, hard_delete=hard_delete)
+
+        # One filter-delete covers chunks for every removed node id.
+        def _log_task_result(task: asyncio.Task) -> None:
+            try:
+                task.result()
+            except Exception as e:
+                logger.exception(
+                    "Background delete_by_filters (bulk chunk cleanup) failed",
+                    exc_info=e,
+                )
+
+        task = asyncio.create_task(self._content_store.delete_by_filters(
+            filters=Filter(
+                must=[
+                    FieldCondition(
+                        key="document_uid",
+                        match=MatchAny(any=all_ids),
+                    ),
+                    FieldCondition(
+                        key="type",
+                        match=MatchValue(value="chunk"),
+                    ),
+                ]
+            ),
+            hard_delete=hard_delete,
+        ))
+        task.add_done_callback(_log_task_result)
+
     async def restore_latest_note_revision(self, node_id: str, user_uid: str | None = None) -> Note | None:
         """Undo the latest saved revision for a note and return the restored note."""
         if self._note_revision_store is None:
@@ -270,9 +417,59 @@ class GraphStore:
 
         await self._content_store.update([merged_payload])
 
+    async def update_links(self, updates: list[tuple[str, dict]]) -> None:
+        """Bulk-patch multiple links in one DB round-trip.
+
+        Mirrors `patch_notes`: single `get_links` for all ids, in-memory
+        merges (input order — same-id duplicates stack), single
+        `_content_store.update` write. Used by the collab apply path
+        when a batch carries multiple `edge.update` ops.
+        """
+        if not updates:
+            return
+        unique_ids = list(dict.fromkeys(link_id for link_id, _ in updates))
+        existing_links = await self.get_links(unique_ids)
+        by_id: dict[str, Link] = {link.id: link for link in existing_links}
+
+        merged_payloads: list[dict] = []
+        for link_id, data in updates:
+            cur = by_id.get(link_id)
+            if cur is None:
+                continue
+            merged = self._deep_merge_dict(
+                cur.model_dump(exclude_none=False),
+                data,
+            )
+            merged["id"] = link_id
+            # Re-validate as Link so subsequent same-id merges in this
+            # batch see the result of the previous one.
+            try:
+                merged_link = Link.model_validate(merged)
+            except Exception:
+                logger.exception("update_links: failed to validate merged link id=%s", link_id)
+                continue
+            by_id[link_id] = merged_link
+            merged_payloads.append(merged_link.model_dump(exclude_none=False))
+
+        if merged_payloads:
+            await self._content_store.update(merged_payloads)
+
     async def delete_link(self, link_id: str):
         """Delete a link from the graph."""
         await self._content_store.delete([link_id], hard_delete=True)
+
+    async def delete_links(self, link_ids: list[str]) -> None:
+        """Bulk-delete multiple links in one round-trip.
+
+        No descendant walk (links don't have children) and no snapshot
+        path (links aren't versioned in `NoteRevisionStore`), so this
+        collapses to a single `_content_store.delete(ids)` regardless
+        of N.
+        """
+        if not link_ids:
+            return
+        unique_ids = list(dict.fromkeys(link_ids))
+        await self._content_store.delete(unique_ids, hard_delete=True)
 
     async def get_links(self, link_ids: list[str]) -> list[Link]:
         """Retrieve links by their IDs."""
@@ -362,6 +559,67 @@ class GraphStore:
 
         path.reverse()
         return path
+
+    async def get_nodes_descendants(self, node_ids: list[str]) -> list[Note]:
+        """Multi-root BFS — return descendants for every id in `node_ids`.
+
+        Used by the bulk `delete_nodes` path so one round-trip per BFS
+        level covers all subtrees instead of N separate single-root
+        walks. Roots themselves are NOT included in the return; the
+        caller already has them.
+
+        Visit-once semantics ensure a node isn't returned twice when
+        two requested roots share a subtree.
+        """
+        if not node_ids:
+            return []
+        root_nodes = await self.get_nodes(node_ids)
+        if not root_nodes:
+            return []
+        # Group roots by graph_uid — descendants only exist within the
+        # same graph, and a multi-graph delete would be a bug anyway,
+        # but we guard against it.
+        graphs: dict[str | None, list[str]] = {}
+        for n in root_nodes:
+            graphs.setdefault(n.graph_uid, []).append(n.id)
+
+        all_descendants: list[Note] = []
+        for graph_uid, seed_ids in graphs.items():
+            if graph_uid is None:
+                continue
+            visited: set[str] = set(seed_ids)
+            frontier: list[str] = list(seed_ids)
+            while frontier:
+                results = await self._content_store.filt(
+                    filters=Filter(
+                        must=[
+                            FieldCondition(
+                                key="graph_uid",
+                                match=MatchValue(value=graph_uid),
+                            ),
+                            FieldCondition(
+                                key="type",
+                                match=MatchAny(any=["note", "document"]),
+                            ),
+                            FieldCondition(
+                                key="parent_id",
+                                match=MatchAny(any=frontier),
+                            ),
+                        ]
+                    )
+                )
+                next_frontier: list[str] = []
+                for result in results:
+                    node = result.resource
+                    if not isinstance(node, Note):
+                        continue
+                    if node.id in visited:
+                        continue
+                    visited.add(node.id)
+                    all_descendants.append(node)
+                    next_frontier.append(node.id)
+                frontier = next_frontier
+        return all_descendants
 
     async def get_node_descendants(self, node_id: str) -> list[Note]:
         """Return all descendants for a node using BFS on parent_id."""

@@ -70,6 +70,25 @@ class _FakeGraphStore:
     async def delete_link(self, *, link_id):
         self.delete_link_calls.append(link_id)
 
+    # Bulk methods — apply_batch now dispatches per-kind grouped. Each
+    # bulk call records one entry per item into the existing per-op
+    # lists so router-level assertions keep working unchanged.
+    async def patch_notes(self, *, updates, user_uid=None):
+        for node_id, data in updates:
+            self.patch_calls.append({"node_id": node_id, "data": data, "user_uid": user_uid})
+
+    async def delete_nodes(self, *, node_ids, user_uid=None):
+        for node_id in node_ids:
+            self.delete_node_calls.append({"node_id": node_id, "user_uid": user_uid})
+
+    async def update_links(self, *, updates):
+        for link_id, data in updates:
+            self.update_link_calls.append({"link_id": link_id, "data": data})
+
+    async def delete_links(self, *, link_ids):
+        for link_id in link_ids:
+            self.delete_link_calls.append(link_id)
+
 
 class _FakeUserBillingStore:
     """Stub UserBillingStore — only `get_user_billing` is consulted.
