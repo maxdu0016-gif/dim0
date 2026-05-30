@@ -8,6 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { WarningIcon } from "@/components/icons"
 import { Button } from "@/components/ui/button"
 
 import {
@@ -100,6 +101,24 @@ export function ShareDialog({ boardId, boardLabel, open, onOpenChange }: ShareDi
             Share &ldquo;{boardLabel || "Untitled board"}&rdquo;
           </DialogTitle>
         </DialogHeader>
+
+        {/*
+          Sharing is recursive: granting access to this board also grants
+          access to every sub-folder, sub-note, and embedded document
+          underneath. Surface that explicitly so the owner doesn't get
+          surprised by a peer seeing a private note they forgot was
+          nested in here.
+        */}
+        <div
+          role="note"
+          className="flex items-start gap-2 rounded-md border border-amber-300/60 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-500/40 dark:bg-amber-950/40 dark:text-amber-100"
+        >
+          <WarningIcon className="mt-0.5 size-4 shrink-0" weight="fill" />
+          <span>
+            Sharing this board also shares every sub-board and nested
+            note inside it. Move anything private out before inviting.
+          </span>
+        </div>
 
         <section className="flex flex-col gap-3">
           <div className="text-sm text-muted-foreground">Anyone with the link can:</div>

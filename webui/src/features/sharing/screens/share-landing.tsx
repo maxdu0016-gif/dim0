@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react"
+import { useQueryClient } from "@tanstack/react-query"
 import { useNavigate, useParams } from "@tanstack/react-router"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
 import { getAccessToken } from "@/features/signin/auth-storage"
+import { useAppStore } from "@/store"
 import { acceptShareLink, previewShareLink, type ShareRole } from "../api"
 
 
@@ -24,6 +26,8 @@ type Phase = "checking-auth" | "needs-signin" | "loading" | "ready" | "accepting
  */
 export function ShareLandingScreen() {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  const userId = useAppStore((s) => s.userId)
   const params = useParams({ strict: false }) as { token?: string }
   const token = params.token ?? ""
   const [phase, setPhase] = useState<Phase>("checking-auth")
@@ -77,6 +81,13 @@ export function ShareLandingScreen() {
         toast.success(
           `Added to board as ${result.role}.`,
         )
+      }
+      // Refresh the sidebar's "Shared with me" section — without
+      // this, the newly-accessible board doesn't show up until a
+      // full page reload. Triggered after the accept regardless of
+      // already_member, since membership-role can also change.
+      if (userId) {
+        queryClient.invalidateQueries({ queryKey: ["listBoards", userId] })
       }
       navigate({ to: "/boards/$id", params: { id: result.graph_uid } })
     } catch {
