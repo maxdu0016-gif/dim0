@@ -34,8 +34,8 @@ export const HarnessPeerChip = memo(function HarnessPeerChip() {
           type="button"
           aria-label={`${peers.length} ${peers.length === 1 ? "peer" : "peers"} online`}
           className={cn(
-            "flex items-center gap-1 rounded-md border border-border bg-background/95 px-2 py-1",
-            "text-xs shadow-sm backdrop-blur transition-colors hover:bg-muted",
+            "flex items-center gap-1 rounded-md px-1 py-1 text-xs",
+            "transition-opacity hover:opacity-80",
           )}
         >
           <div className="flex -space-x-1.5">
