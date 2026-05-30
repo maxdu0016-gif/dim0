@@ -230,16 +230,20 @@ async def _dispatch_bucket(
 # ---------------------------------------------------------------------------
 
 
-def _node_patch_to_note_data(patch: dict[str, Any]) -> dict[str, Any]:
+def _node_patch_to_note_data(patch: dict[str, Any]) -> dict[str, Any]:  # noqa: C901 — wide field-by-field translator
     """Convert a canvas-harness `Partial<Node>` patch into a Note patch dict.
 
     Handles:
       - Scene primitives: `x, y, w, h, z, angle, content`.
-      - Colors: pulled from `patch.data._storedColors` (canonical
-        light-theme hex; the receiver-side `style.*` carries a
-        theme-adapted display value we deliberately ignore).
-
-    Other style/data depth lands incrementally.
+      - Style: every camelCase field in `patch.style` translated to
+        snake_case Dim0, EXCEPT the display color fields
+        (`strokeColor / backgroundColor / textColor`) — those carry a
+        theme-adapted display value we deliberately ignore. The
+        canonical light-theme colors come in via `patch.data._storedColors`.
+        Without this style translation, picking `roundness: 0` (or
+        any other non-color style) on the panel sends an op the
+        server treats as "no supported fields" → DB never updates →
+        refresh shows the old value.
     """
     properties: dict[str, Any] = {}
     if "x" in patch or "y" in patch:
@@ -272,12 +276,29 @@ def _node_patch_to_note_data(patch: dict[str, Any]) -> dict[str, Any]:
     if "content" in patch:
         data["content"] = {"markdown": str(patch["content"] or "")}
 
+    wire_style = patch.get("style")
+    if isinstance(wire_style, dict):
+        style = data.setdefault("style", {})
+        for camel, value in wire_style.items():
+            # Skip display color fields — `_storedColors` carries the
+            # canonical light-theme value. Skip `angle` too since the
+            # explicit branch above already handles its degree conversion.
+            if camel in _DISPLAY_COLOR_KEYS or camel == "angle":
+                continue
+            style[_camel_to_snake(camel)] = value
+
     style_color = _extract_canonical_colors(patch.get("data"))
     if style_color:
         style = data.setdefault("style", {})
         for k, v in style_color.items():
             style[k] = v
     return data
+
+
+# Display-color keys arrive theme-adapted on the wire; the canonical
+# light-theme value comes via `data._storedColors`. Listed here so the
+# style translator can skip them without dropping other style fields.
+_DISPLAY_COLOR_KEYS = frozenset({"strokeColor", "backgroundColor", "textColor"})
 
 
 def _extract_canonical_colors(node_data: Any) -> dict[str, str]:

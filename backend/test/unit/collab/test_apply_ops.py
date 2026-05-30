@@ -170,6 +170,101 @@ async def test_node_update_content_null_clears_to_empty_markdown():
     assert store.patch_calls[0]["data"]["content"] == {"markdown": ""}
 
 
+async def test_node_update_style_roundness_persists():
+    """A style change like `roundness: 0` round-trips through the inbound path.
+
+    Regression: `_node_patch_to_note_data` used to only handle the
+    scene primitives (x/y/w/h/z/angle/content) and canonical colors
+    via `_storedColors` — every other style field on `patch.style`
+    was silently dropped, so picking "Sharp" (roundness=0) didn't
+    persist, and a refresh restored the default `roundness`. The
+    translator now camel→snake-translates the full `patch.style`
+    block (minus display color keys, which still come via
+    `_storedColors`).
+    """
+    store = _RecordingGraphStore()
+    op = {
+        "type": "node.update",
+        "id": "n1",
+        "patch": {"style": {"roundness": 0}},
+        "prev": {},
+    }
+
+    await apply_batch(graph_store=store, board_id="b1", user_id="u1", ops=[op])
+
+    assert store.patch_calls[0]["data"]["style"] == {"roundness": 0}
+
+
+async def test_node_update_style_strokes_and_fonts_persist():
+    """Multiple non-color style fields all translate camel→snake correctly."""
+    store = _RecordingGraphStore()
+    op = {
+        "type": "node.update",
+        "id": "n1",
+        "patch": {
+            "style": {
+                "strokeWidth": 4,
+                "strokeStyle": "dashed",
+                "fontFamily": "serif",
+                "fontSize": "L",
+                "textAlign": "left",
+                "opacity": 80,
+            },
+        },
+        "prev": {},
+    }
+
+    await apply_batch(graph_store=store, board_id="b1", user_id="u1", ops=[op])
+
+    assert store.patch_calls[0]["data"]["style"] == {
+        "stroke_width": 4,
+        "stroke_style": "dashed",
+        "font_family": "serif",
+        "font_size": "L",
+        "text_align": "left",
+        "opacity": 80,
+    }
+
+
+async def test_node_update_style_display_colors_ignored_in_favor_of_stored():
+    """Display color keys on patch.style are dropped — `_storedColors` wins.
+
+    The wire carries theme-adapted display colors on `style.*`; the
+    canonical values are on `data._storedColors`. The translator must
+    skip the display colors so a dark-mode peer's adapted hex doesn't
+    overwrite the canonical record.
+    """
+    store = _RecordingGraphStore()
+    op = {
+        "type": "node.update",
+        "id": "n1",
+        "patch": {
+            "style": {
+                "strokeColor": "#dadce0",     # dark-adapted, ignore
+                "backgroundColor": "#222",    # dark-adapted, ignore
+                "textColor": "#fafafa",       # dark-adapted, ignore
+                "roundness": 0,               # non-color, keep
+            },
+            "data": {
+                "_storedColors": {
+                    "strokeColor": "#000000",     # canonical, win
+                    "backgroundColor": "#ffffff", # canonical, win
+                    "textColor": "#111111",       # canonical, win
+                },
+            },
+        },
+        "prev": {},
+    }
+
+    await apply_batch(graph_store=store, board_id="b1", user_id="u1", ops=[op])
+
+    style = store.patch_calls[0]["data"]["style"]
+    assert style["stroke_color"] == "#000000"
+    assert style["background_color"] == "#ffffff"
+    assert style["text_color"] == "#111111"
+    assert style["roundness"] == 0
+
+
 async def test_node_update_colors_persist_from_stored_colors():
     """Colors persist from data._storedColors, not from `style.*`.
 
@@ -245,11 +340,16 @@ async def test_node_add_carries_stored_colors_onto_style():
     assert note.style.background_color == "#3b82f6"
 
 
-async def test_node_update_with_no_supported_fields_is_not_applied():
-    """Node update with no supported fields is not applied."""
+async def test_node_update_with_truly_empty_patch_is_not_applied():
+    """A wire patch with no extractable fields skips the DB write.
+
+    The "no supported fields" path is for patches that the translator
+    can't turn into a Note update (e.g., empty / unrecognized). Style
+    fields like `fontFamily` ARE supported now, so this test exercises
+    the empty-patch case explicitly.
+    """
     store = _RecordingGraphStore()
-    # `style: {fontFamily: ...}` — not yet supported by the first cut.
-    op = {"type": "node.update", "id": "n1", "patch": {"style": {"fontFamily": "serif"}}, "prev": {}}
+    op = {"type": "node.update", "id": "n1", "patch": {}, "prev": {}}
 
     results = await apply_batch(graph_store=store, board_id="b1", user_id="u1", ops=[op])
 

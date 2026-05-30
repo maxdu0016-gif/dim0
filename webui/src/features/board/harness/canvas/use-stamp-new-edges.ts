@@ -3,9 +3,25 @@ import type { CanvasStore } from "@canvas-harness/core"
 import {
   adaptEdgeColors,
   applyColorsToEdgeStyle,
-  pickStoredEdgeColors,
+  type StoredEdgeColors,
 } from "../theme/color-adapter"
 import { getBoardThemeMode } from "../theme/theme-mode-ref"
+
+
+/**
+ * Dim0 LinkStyle canonical-light defaults — mirror
+ * `backend/topix/datatypes/note/style.py:LinkStyle`. Used as the
+ * `_storedColors` fallback when a freshly-drawn edge has no prior
+ * stamp. We CAN'T read from `op.edge.style.*` because the arrow
+ * tool's defaults in dark mode are already theme-adapted (display
+ * values, not canonical), and stamping those as if they were
+ * canonical poisons the cross-theme sync (a light-mode peer would
+ * adapt them as identity and see the dark hex).
+ */
+const CANONICAL_EDGE_COLORS: StoredEdgeColors = {
+  strokeColor: "#292524",
+  textColor: "#000000",
+}
 
 
 /**
@@ -48,12 +64,19 @@ export const useStampNewEdges = (
         if (data.version !== undefined) continue
 
         const style = op.edge.style ?? {}
-        const storedColors = pickStoredEdgeColors(style)
+        // If the edge already carries `_storedColors` (e.g., the user
+        // picked colors via the style panel before drawing — the
+        // picker writes canonical values directly), trust them.
+        // Otherwise fall back to Dim0 LinkStyle canonical defaults —
+        // never read from `style.*`, since the arrow tool's dark-mode
+        // defaults are theme-adapted display values that look canonical
+        // to `pickStoredEdgeColors` but aren't.
+        const existingStored = data._storedColors as StoredEdgeColors | undefined
+        const storedColors: StoredEdgeColors = existingStored ?? CANONICAL_EDGE_COLORS
         const mode = getBoardThemeMode()
-        const nextStyle =
-          mode === "dark"
-            ? applyColorsToEdgeStyle(style, adaptEdgeColors(storedColors, "dark"))
-            : style
+        const displayColors =
+          mode === "dark" ? adaptEdgeColors(storedColors, "dark") : storedColors
+        const nextStyle = applyColorsToEdgeStyle(style, displayColors)
 
         store.updateEdge(op.edge.id, {
           style: nextStyle,
