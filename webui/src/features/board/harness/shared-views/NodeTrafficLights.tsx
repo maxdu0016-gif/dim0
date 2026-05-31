@@ -2,7 +2,7 @@ import { useRef } from "react"
 import { ArrowsOutSimpleIcon, XIcon } from "@phosphor-icons/react"
 import { DragGripIcon } from "@/components/icons"
 import { cn } from "@/lib/utils"
-import { useIsEmbeddedNodeView } from "./embedded-node-view-context"
+import { useEmbeddedDragHandle } from "./embedded-node-view-context"
 import { useStopCanvasGesture } from "./use-stop-canvas-gesture"
 
 
@@ -32,29 +32,30 @@ export type NodeTrafficLightsProps = {
  * system run select-and-drag. Red and green are real buttons that
  * stop canvas gestures so their clicks fire instead.
  *
- * In an embedded surface (e.g. Files cards) the parent owns drag and
- * delete, so the strip suppresses itself entirely.
+ * In an embedded surface (e.g. Files cards) the strip still renders,
+ * but its root absorbs drag-handle props from the embedding context
+ * (e.g. dnd-kit attributes/listeners) so it becomes the parent
+ * surface's reorder handle instead of a canvas-select target.
  */
 export function NodeTrafficLights({
   onDelete,
   onExpand,
   className,
 }: NodeTrafficLightsProps) {
-  const embedded = useIsEmbeddedNodeView()
+  const dragHandleProps = useEmbeddedDragHandle()
   const deleteRef = useRef<HTMLButtonElement>(null)
   const expandRef = useRef<HTMLButtonElement>(null)
   useStopCanvasGesture(deleteRef)
   useStopCanvasGesture(expandRef)
 
-  if (embedded) return null
-
   return (
     <div
+      {...dragHandleProps}
       title="Drag to move · click to select"
       className={cn(
         "pointer-events-auto absolute inset-x-0 top-0 z-30",
         "flex h-10 items-center px-3",
-        "cursor-grab active:cursor-grabbing",
+        "cursor-grab touch-none active:cursor-grabbing",
         className,
       )}
     >

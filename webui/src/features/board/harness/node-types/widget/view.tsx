@@ -46,10 +46,10 @@ export function WidgetView({ id }: WidgetViewProps) {
     >
       <div
         className={cn(
-          "absolute inset-0 flex flex-col overflow-hidden rounded-3xl border border-dashed border-border bg-background px-2 pb-2 pt-10",
+          "absolute inset-0 flex flex-col overflow-hidden rounded-2xl border border-dashed border-border bg-background px-2 pb-2 pt-10",
         )}
       >
-        <div className="relative h-full w-full overflow-hidden rounded-2xl border border-border/50 bg-background">
+        <div className="relative h-full w-full overflow-hidden rounded-xl border border-border/50 bg-background">
           {html && isInView ? (
             <WidgetIframe
               html={html}
