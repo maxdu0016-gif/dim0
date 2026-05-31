@@ -32,9 +32,16 @@ export const useViewportPersistence = (
   useEffect(() => {
     if (!boardId || !ready) return
     const key = viewportScopeKey(boardId, rootId)
-    if (restoredKeyRef.current === key) return
+    if (restoredKeyRef.current === key) {
+      console.log("[viewport] restore skip: already restored key=", key)
+      return
+    }
     const saved = loadViewport(key)
-    if (saved) store.setCamera(saved)
+    console.log("[viewport] restore attempt key=", key, "saved=", saved)
+    if (saved) {
+      store.setCamera(saved)
+      console.log("[viewport] restore: setCamera(", saved, ")")
+    }
     restoredKeyRef.current = key
   }, [store, boardId, rootId, ready])
 
@@ -45,14 +52,21 @@ export const useViewportPersistence = (
     if (!boardId) return
     const key = viewportScopeKey(boardId, rootId)
     let prevMode: InteractionState["mode"] = store.getInteractionState().mode
+    console.log("[viewport] save subscribe: key=", key, "initial prevMode=", prevMode)
 
     return store.subscribe("interaction", (state) => {
       const nextMode = state.mode
       const wasMoving = prevMode === "panning" || prevMode === "zooming"
       const isIdle = nextMode === "idle"
+      if (prevMode !== nextMode) {
+        // Only log actual mode transitions — pointer updates fire same-mode events constantly.
+        console.log("[viewport] mode", prevMode, "→", nextMode, "wasMoving=", wasMoving, "isIdle=", isIdle)
+      }
       prevMode = nextMode
       if (wasMoving && isIdle) {
-        saveViewport(key, store.getCamera())
+        const cam = store.getCamera()
+        console.log("[viewport] SAVE key=", key, "camera=", cam)
+        saveViewport(key, cam)
       }
     })
   }, [store, boardId, rootId])
