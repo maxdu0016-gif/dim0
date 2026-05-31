@@ -4,8 +4,8 @@ import { createContext, useContext } from "react"
 /**
  * True when a custom node's React view is mounted inside an embedded
  * surface (e.g. Files view cards) where the parent already owns drag
- * + selection. In that case the inner `NodeDragHandle` suppresses
- * itself so the card doesn't show two stacked grip icons.
+ * + selection. In that case the inner `NodeTrafficLights` cluster
+ * suppresses itself so the card doesn't show duplicated chrome.
  *
  * Provider lives in `embedded-node-view-provider.tsx`; this file holds
  * the context object + read hook so fast-refresh treats the JSX
