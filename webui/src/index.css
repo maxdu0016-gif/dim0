@@ -162,10 +162,10 @@
   --sidebar-accent-foreground: oklch(0.55 0.11 38);
   --sidebar-border:        oklch(0.88 0.003 95);
   --sidebar-ring:          oklch(0.55 0.11 38);
-  --sidebar-icon-1:        #3439c9;
-  --sidebar-icon-2:        #336d3f;
-  --sidebar-icon-3:        #965e30;
-  --sidebar-icon-4:        #a6395c;
+  --sidebar-icon-1:        oklch(0.448 0.216 272.1);  /* blue */
+  --sidebar-icon-2:        oklch(0.483 0.095 148.6);  /* green */
+  --sidebar-icon-3:        oklch(0.535 0.095 58.0);   /* sienna */
+  --sidebar-icon-4:        oklch(0.509 0.146 4.1);    /* rose */
 
   /* editor */
   --highlight-default:     oklch(0.973 0.071 103);
