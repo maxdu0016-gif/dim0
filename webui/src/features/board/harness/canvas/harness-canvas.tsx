@@ -282,7 +282,7 @@ export function HarnessCanvas() {
               rendererRef.current = r
             }}
           />
-          <CanvasContextMenu wrapRef={wrapRef} store={store} />
+          <CanvasContextMenu wrapRef={wrapRef} store={store} rendererRef={rendererRef} />
         </div>
       </HarnessWrapRefProvider>
     </CanvasProvider>
