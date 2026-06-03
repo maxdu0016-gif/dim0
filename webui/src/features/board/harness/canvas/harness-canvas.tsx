@@ -218,6 +218,7 @@ export function HarnessCanvas() {
       }
       const styled = applyStyleMemory(noteToNode(note), styleMemory)
       store.addNode(styled)
+      store.setSelection([styled.id as NodeId])
       store.beginEdit(styled.id as NodeId)
     },
     [store, boardId, rootId, canEdit, navigate, styleMemory],
