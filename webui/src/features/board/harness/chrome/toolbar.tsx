@@ -231,7 +231,10 @@ export function HarnessToolbar() {
                 className={isShape ? activeClass : inactiveClass}
               >
                 <div className="relative flex flex-col items-center gap-0.5">
-                  <ActiveShape className="size-4 shrink-0" />
+                  <ActiveShape
+                    className="size-4 shrink-0"
+                    weight={isShape ? "fill" : undefined}
+                  />
                   <ShortcutHint shortcut="S" />
                   <ChevronDownIcon className="absolute inset-x-0 -bottom-3.5 size-3 text-muted-foreground" />
                 </div>
@@ -268,7 +271,10 @@ export function HarnessToolbar() {
             className={tool === "arrow" ? activeClass : inactiveClass}
           >
             <div className="relative">
-              <ConnectorPathIcon className="size-4 shrink-0" />
+              <ConnectorPathIcon
+                className="size-4 shrink-0"
+                weight={tool === "arrow" ? "fill" : undefined}
+              />
               <ShortcutHint shortcut="A" />
             </div>
           </button>
@@ -286,7 +292,10 @@ export function HarnessToolbar() {
             className={tool === "text" ? activeClass : inactiveClass}
           >
             <div className="relative">
-              <TextTIcon className="size-4 shrink-0" />
+              <TextTIcon
+                className="size-4 shrink-0"
+                weight={tool === "text" ? "fill" : undefined}
+              />
               <ShortcutHint shortcut="T" />
             </div>
           </button>
@@ -304,7 +313,10 @@ export function HarnessToolbar() {
             className={tool === "sheet" ? activeClass : inactiveClass}
           >
             <div className="relative">
-              <NotepadIcon className="size-4 shrink-0" />
+              <NotepadIcon
+                className="size-4 shrink-0"
+                weight={tool === "sheet" ? "fill" : undefined}
+              />
               <ShortcutHint shortcut="N" />
             </div>
           </button>
