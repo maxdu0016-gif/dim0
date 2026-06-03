@@ -136,7 +136,7 @@ export function HarnessToolbar() {
                 aria-label="Change view"
                 className={activeClass}
               >
-                <ActiveViewIcon className="size-4 shrink-0" />
+                <ActiveViewIcon className="size-4 shrink-0" weight="fill" />
                 <span className="sr-only text-[10px] md:not-sr-only">
                   {activeView.label}
                 </span>
@@ -155,7 +155,10 @@ export function HarnessToolbar() {
                 onSelect={() => setViewMode(option.id)}
                 className="gap-2 text-sm"
               >
-                <Icon className="size-4 shrink-0" />
+                <Icon
+                  className="size-4 shrink-0"
+                  weight={option.id === viewMode ? "fill" : undefined}
+                />
                 <span>{option.label}</span>
               </DropdownMenuItem>
             )
