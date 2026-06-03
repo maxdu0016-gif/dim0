@@ -110,7 +110,12 @@ export const useCreateHandlers = (
         type: "size",
         size: { width: e.rect.w, height: e.rect.h },
       }
-      store.addNode(applyStyleMemory(noteToNode(note), styleMemory))
+      // Auto-select the freshly-created node so the user can
+      // immediately resize / style / move it without round-tripping
+      // through the select tool. Matches tldraw / excalidraw /
+      // figma. Same pattern at every single-node create path.
+      const id = store.addNode(applyStyleMemory(noteToNode(note), styleMemory))
+      store.setSelection([id])
     },
     [store, boardId, rootId, styleMemory],
   )
@@ -127,7 +132,8 @@ export const useCreateHandlers = (
         type: "position",
         position: { x: e.world.x - width / 2, y: e.world.y - height / 2 },
       }
-      store.addNode(applyStyleMemory(noteToNode(note), styleMemory))
+      const id = store.addNode(applyStyleMemory(noteToNode(note), styleMemory))
+      store.setSelection([id])
     },
     [store, boardId, rootId, styleMemory],
   )
