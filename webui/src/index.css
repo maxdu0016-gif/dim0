@@ -139,8 +139,8 @@
   /* brand & actions */
   --primary:               oklch(0.20 0.01 95);
   --primary-foreground:    oklch(0.97 0.006 95);
-  --secondary:             oklch(0.92 0.04 50);
-  --secondary-foreground:  oklch(0.38 0.10 38);
+  --secondary:             oklch(0.94 0.04 38);
+  --secondary-foreground:  oklch(0.55 0.11 38);
 
   /* chrome */
   --muted:                 oklch(0.94 0.008 95);
@@ -196,8 +196,8 @@
 
   --primary:               oklch(0.65 0.11 38);
   --primary-foreground:    oklch(0.13 0.002 45);
-  --secondary:             oklch(0.24 0.05 40);
-  --secondary-foreground:  oklch(0.86 0.08 45);
+  --secondary:             oklch(0.26 0.04 38);
+  --secondary-foreground:  oklch(0.80 0.11 38);
 
   --muted:                 oklch(0.23 0.002 45);
   --muted-foreground:      oklch(0.55 0.002 45);
