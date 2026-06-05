@@ -1,4 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
 import { useCanvasStore, useNode } from "@canvas-harness/react"
 import type { NodeId } from "@canvas-harness/core"
@@ -8,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { useGetNote } from "@/features/board/api/get-note"
 import { useGetNotePath } from "@/features/board/api/get-note-path"
 import { useUpdateNote } from "@/features/board/api/update-note"
+import { invalidateBoardContents } from "@/features/board/api/invalidate-board-contents"
 import { SheetEditor } from "@/features/board/components/sheet/sheet-editor"
 import {
   SheetBreadcrumb,
@@ -188,6 +190,8 @@ export const SheetPanel = memo(function SheetPanel({
 
   const currentIconValue = currentProperties?.iconData?.icon ?? null
 
+  const queryClient = useQueryClient()
+
   const handleIconChange = useCallback(
     (next: IconProperty["icon"] | null) => {
       const nextIconData: IconProperty = next ? { type: "icon", icon: next } : { type: "icon" }
@@ -202,18 +206,35 @@ export const SheetPanel = memo(function SheetPanel({
             properties: { ...prevProps, iconData: nextIconData },
           },
         })
+        // The REST `useUpdateNote` hook is the usual trigger for sidebar
+        // refresh; the local-store path bypasses it, so invalidate the
+        // boardContents query manually so the sidebar reflects the new
+        // icon without waiting for the 5-min stale clock.
+        if (boardId) {
+          invalidateBoardContents(boardId, undefined, queryClient)
+        }
         return
       }
       // REST path: send a fully-merged properties object so the backend
       // (and the optimistic cache spread in useUpdateNote) doesn't drop
-      // sibling property fields when replacing `properties`.
+      // sibling property fields when replacing `properties`. Sidebar
+      // invalidation happens via useUpdateNote.onSettled.
       const merged: NoteProperties = {
         ...(fetchedNote?.properties as NoteProperties),
         iconData: nextIconData,
       }
       persistRemote({ properties: merged })
     },
-    [isLocalNote, localNode?.data, nodeId, store, fetchedNote, persistRemote],
+    [
+      isLocalNote,
+      localNode?.data,
+      nodeId,
+      store,
+      fetchedNote,
+      persistRemote,
+      boardId,
+      queryClient,
+    ],
   )
 
   const handleDownloadMarkdown = useCallback(() => {
