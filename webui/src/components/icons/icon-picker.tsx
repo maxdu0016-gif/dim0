@@ -12,7 +12,7 @@ import {
 
 
 export type IconPickerValue = {
-  name: string | null
+  name: string
   color: string | null
 }
 
@@ -20,8 +20,15 @@ export type IconPickerValue = {
 export type IconPickerProps = {
   /** Currently selected icon (name + color) — drives selected ring + grid tint. */
   value?: IconPickerValue | null
-  /** Fires for icon clicks, color clicks, and "Remove". Always carries the full new state. */
+  /** Fires when an icon is committed (icon click, or color click while an icon is set). */
   onChange: (value: IconPickerValue) => void
+  /**
+   * Fires when the user explicitly clicks "Remove". Omit to hide the
+   * Remove button entirely. Kept distinct from `onChange` so a color
+   * click with no icon picked yet (a preview action) isn't confused
+   * with an explicit removal.
+   */
+  onRemove?: () => void
   className?: string
 }
 
@@ -31,16 +38,19 @@ const DEFAULT_COLOR = ICON_COLOR_PRESETS[0].value
 
 /**
  * Notion-style icon picker: search bar over a scrollable list of category
- * sections, with a color strip footer. Fully controlled — the parent holds
- * the icon name and color; every interaction emits a complete new value.
- * Intended to be mounted via React.lazy from consumers so the curated icon
- * set ships in its own chunk.
+ * sections, with a color strip footer. Intended to be mounted via React.lazy
+ * from consumers so the curated icon set ships in its own chunk.
+ *
+ * The active color is local state. It seeds from `value.color` on mount
+ * and propagates back through `onChange` only when an icon is actually
+ * committed (icon click, or color click while an icon is already set).
+ * That keeps "preview color while picking" separate from "save."
  */
-export const IconPicker = ({ value, onChange, className }: IconPickerProps) => {
+export const IconPicker = ({ value, onChange, onRemove, className }: IconPickerProps) => {
   const [query, setQuery] = useState("")
+  const [activeColor, setActiveColor] = useState<string | null>(value?.color ?? DEFAULT_COLOR)
 
   const selectedName = value?.name ?? null
-  const activeColor = value?.color ?? DEFAULT_COLOR
 
   const filtered = useMemo(
     () => filterPickerCategories(PICKER_CATEGORIES, query),
@@ -54,11 +64,13 @@ export const IconPicker = ({ value, onChange, className }: IconPickerProps) => {
   }
 
   const handleColorClick = (color: string | null) => {
-    onChange({ name: selectedName, color })
-  }
-
-  const handleRemove = () => {
-    onChange({ name: null, color: null })
+    setActiveColor(color)
+    // Only propagate when an icon is already committed — otherwise this
+    // is a preview-only adjustment that lives in local state until the
+    // user picks an icon (which then carries the color out via onChange).
+    if (selectedName !== null) {
+      onChange({ name: selectedName, color })
+    }
   }
 
   return (
@@ -100,9 +112,9 @@ export const IconPicker = ({ value, onChange, className }: IconPickerProps) => {
 
       <ColorStrip
         activeColor={activeColor}
-        canRemove={selectedName !== null}
+        canRemove={selectedName !== null && onRemove !== undefined}
         onColorClick={handleColorClick}
-        onRemove={handleRemove}
+        onRemove={onRemove ?? (() => {})}
       />
     </div>
   )
