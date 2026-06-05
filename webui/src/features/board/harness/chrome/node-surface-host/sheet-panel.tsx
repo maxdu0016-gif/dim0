@@ -8,8 +8,8 @@ import { NoteIconControl } from "@/components/icons/note-icon-control"
 import { Button } from "@/components/ui/button"
 import { useGetNote } from "@/features/board/api/get-note"
 import { useGetNotePath } from "@/features/board/api/get-note-path"
+import type { BoardContentItem } from "@/features/board/api/list-board-contents"
 import { useUpdateNote } from "@/features/board/api/update-note"
-import { invalidateBoardContents } from "@/features/board/api/invalidate-board-contents"
 import { SheetEditor } from "@/features/board/components/sheet/sheet-editor"
 import {
   SheetBreadcrumb,
@@ -196,6 +196,22 @@ export const SheetPanel = memo(function SheetPanel({
     (next: IconProperty["icon"] | null) => {
       const nextIconData: IconProperty = next ? { type: "icon", icon: next } : { type: "icon" }
 
+      // Optimistically patch the sidebar's cache so it reflects the new
+      // icon before persistence lands. Closes the WS-coalesce race on
+      // the local path (where a synchronous refetch would beat the
+      // 75 ms collab window) and the HTTP-round-trip flicker on the
+      // REST path. Every cached level under this board (root + any
+      // expanded folder) gets the matching item updated in place.
+      if (boardId) {
+        queryClient.setQueriesData<BoardContentItem[]>(
+          { queryKey: ["boardContents", boardId] },
+          (old) =>
+            old?.map((item) =>
+              item.id === nodeId ? { ...item, iconData: next } : item,
+            ),
+        )
+      }
+
       if (isLocalNote) {
         const prevData = (localNode?.data ?? {}) as Record<string, unknown>
         const prevProps =
@@ -206,19 +222,13 @@ export const SheetPanel = memo(function SheetPanel({
             properties: { ...prevProps, iconData: nextIconData },
           },
         })
-        // The REST `useUpdateNote` hook is the usual trigger for sidebar
-        // refresh; the local-store path bypasses it, so invalidate the
-        // boardContents query manually so the sidebar reflects the new
-        // icon without waiting for the 5-min stale clock.
-        if (boardId) {
-          invalidateBoardContents(boardId, undefined, queryClient)
-        }
         return
       }
       // REST path: send a fully-merged properties object so the backend
       // (and the optimistic cache spread in useUpdateNote) doesn't drop
-      // sibling property fields when replacing `properties`. Sidebar
-      // invalidation happens via useUpdateNote.onSettled.
+      // sibling property fields when replacing `properties`. The
+      // refetch in useUpdateNote.onSettled acts as the trust-but-verify
+      // step after the backend has confirmed the write.
       const merged: NoteProperties = {
         ...(fetchedNote?.properties as NoteProperties),
         iconData: nextIconData,
