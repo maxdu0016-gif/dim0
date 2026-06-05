@@ -6,6 +6,7 @@ import type { NodeId } from "@canvas-harness/core"
 import { CancelPlainIcon, DownloadIcon } from "@/components/icons"
 import { NoteIconControl } from "@/components/icons/note-icon-control"
 import { Button } from "@/components/ui/button"
+import { applyIconUpdateToBoardContents } from "@/features/board/api/apply-icon-update-to-board-contents"
 import { useGetNote } from "@/features/board/api/get-note"
 import { useGetNotePath } from "@/features/board/api/get-note-path"
 import type { BoardContentItem } from "@/features/board/api/list-board-contents"
@@ -205,10 +206,7 @@ export const SheetPanel = memo(function SheetPanel({
       if (boardId) {
         queryClient.setQueriesData<BoardContentItem[]>(
           { queryKey: ["boardContents", boardId] },
-          (old) =>
-            old?.map((item) =>
-              item.id === nodeId ? { ...item, iconData: next } : item,
-            ),
+          (old) => applyIconUpdateToBoardContents(old, nodeId, next),
         )
       }
 

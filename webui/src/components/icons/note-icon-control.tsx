@@ -5,6 +5,7 @@ import type { IconProperty } from "@/features/newsfeed/types/properties"
 import { LazyIconPicker } from "./icon-picker-lazy"
 import type { IconPickerValue } from "./icon-picker-lazy"
 import { IconPropertyView } from "./icon-property-view"
+import { iconToPickerValue, pickerValueToIcon } from "./picker-value-mapping"
 
 
 export type NoteIconControlProps = {
@@ -42,13 +43,10 @@ export const NoteIconControl = ({
 }: NoteIconControlProps) => {
   const [open, setOpen] = useState(false)
 
-  const pickerValue: IconPickerValue | null =
-    icon?.type === "phosphor"
-      ? { name: icon.name, color: icon.color ?? null }
-      : null
+  const pickerValue = iconToPickerValue(icon)
 
   const handlePickerChange = (value: IconPickerValue) => {
-    onChange({ type: "phosphor", name: value.name, color: value.color })
+    onChange(pickerValueToIcon(value))
   }
 
   const handleRemove = () => {
