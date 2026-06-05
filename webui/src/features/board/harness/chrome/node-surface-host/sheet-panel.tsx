@@ -3,6 +3,7 @@ import { useNavigate } from "@tanstack/react-router"
 import { useCanvasStore, useNode } from "@canvas-harness/react"
 import type { NodeId } from "@canvas-harness/core"
 import { CancelPlainIcon, DownloadIcon } from "@/components/icons"
+import { NoteIconControl } from "@/components/icons/note-icon-control"
 import { Button } from "@/components/ui/button"
 import { useGetNote } from "@/features/board/api/get-note"
 import { useGetNotePath } from "@/features/board/api/get-note-path"
@@ -14,7 +15,8 @@ import {
 } from "@/features/board/components/sheet/sheet-breadcrumb"
 import { SheetStackBackground } from "@/features/board/components/sheet/sheet-stack-background"
 import { createBoardPageProvider } from "@/features/board/providers/board-page-provider"
-import type { Note } from "@/features/board/types/note"
+import type { Note, NoteProperties } from "@/features/board/types/note"
+import type { IconProperty } from "@/features/newsfeed/types/properties"
 import type { NoteNodeData } from "../../convert/note-to-node"
 import { useBoardAppStore } from "../../store/board-app-store"
 
@@ -180,6 +182,40 @@ export const SheetPanel = memo(function SheetPanel({
     [isLocalNote, noteContent, nodeId, persistRemote, store],
   )
 
+  const currentProperties =
+    (localData.properties as Partial<NoteProperties> | undefined) ??
+    fetchedNote?.properties
+
+  const currentIconValue = currentProperties?.iconData?.icon ?? null
+
+  const handleIconChange = useCallback(
+    (next: IconProperty["icon"] | null) => {
+      const nextIconData: IconProperty = next ? { type: "icon", icon: next } : { type: "icon" }
+
+      if (isLocalNote) {
+        const prevData = (localNode?.data ?? {}) as Record<string, unknown>
+        const prevProps =
+          (prevData.properties as Partial<NoteProperties> | undefined) ?? {}
+        store.updateNode(nodeId as NodeId, {
+          data: {
+            ...prevData,
+            properties: { ...prevProps, iconData: nextIconData },
+          },
+        })
+        return
+      }
+      // REST path: send a fully-merged properties object so the backend
+      // (and the optimistic cache spread in useUpdateNote) doesn't drop
+      // sibling property fields when replacing `properties`.
+      const merged: NoteProperties = {
+        ...(fetchedNote?.properties as NoteProperties),
+        iconData: nextIconData,
+      }
+      persistRemote({ properties: merged })
+    },
+    [isLocalNote, localNode?.data, nodeId, store, fetchedNote, persistRemote],
+  )
+
   const handleDownloadMarkdown = useCallback(() => {
     if (!noteContent.trim()) return
 
@@ -272,7 +308,14 @@ export const SheetPanel = memo(function SheetPanel({
         parentNoteId={nodeId}
         className="min-h-0 flex-1"
         bodyHeader={
-          <div className="mx-auto max-w-[720px] pb-8">
+          <div className="group mx-auto max-w-[720px] pb-8">
+            <div className="mb-3 min-h-[40px]">
+              <NoteIconControl
+                icon={currentIconValue}
+                onChange={handleIconChange}
+              />
+            </div>
+
             {titleEditing ? (
               <input
                 ref={titleInputRef}
