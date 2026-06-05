@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import {
   filterPickerCategories,
+  ICON_COLOR_PRESETS,
   PICKER_CATEGORIES,
   PICKER_ICON_MAP,
   tokenizeIconName,
@@ -125,6 +126,46 @@ describe("PICKER_CATEGORIES integrity", () => {
       for (const icon of category.icons) {
         expect(icon.component, `${icon.name} has no component`).toBeTruthy()
       }
+    }
+  })
+})
+
+
+describe("ICON_COLOR_PRESETS", () => {
+  it("has at least 8 entries", () => {
+    expect(ICON_COLOR_PRESETS.length).toBeGreaterThanOrEqual(8)
+  })
+
+  it("has unique ids", () => {
+    const ids = ICON_COLOR_PRESETS.map((preset) => preset.id)
+
+    expect(new Set(ids).size).toBe(ids.length)
+  })
+
+  it("opens with a 'default' preset backed by a CSS variable (theme-adapted)", () => {
+    const first = ICON_COLOR_PRESETS[0]
+
+    expect(first.id).toBe("default")
+    expect(first.value).toMatch(/^var\(--/)
+  })
+
+  it("every preset has a label and a value (string or null)", () => {
+    for (const preset of ICON_COLOR_PRESETS) {
+      expect(preset.label, `${preset.id} missing label`).toBeTruthy()
+      expect(
+        preset.value === null || typeof preset.value === "string",
+        `${preset.id} value must be string|null`,
+      ).toBe(true)
+    }
+  })
+
+  it("non-default presets use a valid 6-digit hex (paper-adapted Tailwind)", () => {
+    const hexPattern = /^#[0-9a-fA-F]{6}$/
+
+    for (const preset of ICON_COLOR_PRESETS) {
+      if (preset.id === "default") continue
+      expect(preset.value, `${preset.id} value missing`).toBeTruthy()
+      expect(preset.value, `${preset.id} should be #xxxxxx, got ${preset.value}`).toMatch(hexPattern)
     }
   })
 })

@@ -3,27 +3,44 @@ import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 import {
   filterPickerCategories,
+  ICON_COLOR_PRESETS,
   PICKER_CATEGORIES,
+  type ColorPreset,
   type PickerCategory,
   type PickerIconEntry,
 } from "./picker-set"
 
 
+export type IconPickerValue = {
+  name: string | null
+  color: string | null
+}
+
+
 export type IconPickerProps = {
-  onSelect: (name: string) => void
-  selected?: string | null
+  /** Currently selected icon (name + color) — drives selected ring + grid tint. */
+  value?: IconPickerValue | null
+  /** Fires for icon clicks, color clicks, and "Remove". Always carries the full new state. */
+  onChange: (value: IconPickerValue) => void
   className?: string
 }
 
 
+const DEFAULT_COLOR = ICON_COLOR_PRESETS[0].value
+
+
 /**
  * Notion-style icon picker: search bar over a scrollable list of category
- * sections, each holding a dense grid of Phosphor icons. Intended to be
- * mounted via React.lazy from consumers so the curated icon set ships in
- * its own chunk.
+ * sections, with a color strip footer. Fully controlled — the parent holds
+ * the icon name and color; every interaction emits a complete new value.
+ * Intended to be mounted via React.lazy from consumers so the curated icon
+ * set ships in its own chunk.
  */
-export const IconPicker = ({ onSelect, selected, className }: IconPickerProps) => {
+export const IconPicker = ({ value, onChange, className }: IconPickerProps) => {
   const [query, setQuery] = useState("")
+
+  const selectedName = value?.name ?? null
+  const activeColor = value?.color ?? DEFAULT_COLOR
 
   const filtered = useMemo(
     () => filterPickerCategories(PICKER_CATEGORIES, query),
@@ -32,10 +49,22 @@ export const IconPicker = ({ onSelect, selected, className }: IconPickerProps) =
 
   const hasResults = filtered.some((category) => category.icons.length > 0)
 
+  const handleIconClick = (name: string) => {
+    onChange({ name, color: activeColor })
+  }
+
+  const handleColorClick = (color: string | null) => {
+    onChange({ name: selectedName, color })
+  }
+
+  const handleRemove = () => {
+    onChange({ name: null, color: null })
+  }
+
   return (
     <div
       className={cn(
-        "flex h-[420px] w-[360px] flex-col rounded-md border bg-popover text-popover-foreground shadow-md",
+        "flex h-[460px] w-[360px] flex-col rounded-md border bg-popover text-popover-foreground shadow-md",
         className,
       )}
     >
@@ -56,8 +85,9 @@ export const IconPicker = ({ onSelect, selected, className }: IconPickerProps) =
               <CategorySection
                 key={category.id}
                 category={category}
-                selected={selected}
-                onSelect={onSelect}
+                selectedName={selectedName}
+                activeColor={activeColor}
+                onSelect={handleIconClick}
               />
             ),
           )
@@ -67,6 +97,13 @@ export const IconPicker = ({ onSelect, selected, className }: IconPickerProps) =
           </div>
         )}
       </div>
+
+      <ColorStrip
+        activeColor={activeColor}
+        canRemove={selectedName !== null}
+        onColorClick={handleColorClick}
+        onRemove={handleRemove}
+      />
     </div>
   )
 }
@@ -74,12 +111,13 @@ export const IconPicker = ({ onSelect, selected, className }: IconPickerProps) =
 
 type CategorySectionProps = {
   category: PickerCategory
-  selected?: string | null
+  selectedName: string | null
+  activeColor: string | null
   onSelect: (name: string) => void
 }
 
 
-const CategorySection = ({ category, selected, onSelect }: CategorySectionProps) => {
+const CategorySection = ({ category, selectedName, activeColor, onSelect }: CategorySectionProps) => {
   return (
     <section className="mb-3 last:mb-0">
       <h3 className="mb-1 px-1 text-xs font-medium text-muted-foreground">
@@ -90,7 +128,8 @@ const CategorySection = ({ category, selected, onSelect }: CategorySectionProps)
           <IconCell
             key={icon.name}
             icon={icon}
-            isSelected={selected === icon.name}
+            isSelected={selectedName === icon.name}
+            color={activeColor}
             onSelect={onSelect}
           />
         ))}
@@ -103,11 +142,12 @@ const CategorySection = ({ category, selected, onSelect }: CategorySectionProps)
 type IconCellProps = {
   icon: PickerIconEntry
   isSelected: boolean
+  color: string | null
   onSelect: (name: string) => void
 }
 
 
-const IconCell = ({ icon, isSelected, onSelect }: IconCellProps) => {
+const IconCell = ({ icon, isSelected, color, onSelect }: IconCellProps) => {
   const Glyph = icon.component
 
   return (
@@ -116,9 +156,11 @@ const IconCell = ({ icon, isSelected, onSelect }: IconCellProps) => {
       title={icon.name}
       aria-label={icon.name}
       onClick={() => onSelect(icon.name)}
+      style={{ color: color ?? undefined }}
       className={cn(
-        "flex aspect-square items-center justify-center rounded-md text-foreground transition-colors hover:bg-accent hover:text-accent-foreground",
-        isSelected && "bg-accent text-accent-foreground ring-2 ring-ring",
+        "flex aspect-square items-center justify-center rounded-md transition-colors hover:bg-accent",
+        !color && "text-foreground",
+        isSelected && "bg-accent ring-2 ring-ring",
       )}
     >
       <Glyph size={20} weight="regular" />
@@ -127,3 +169,62 @@ const IconCell = ({ icon, isSelected, onSelect }: IconCellProps) => {
 }
 
 
+type ColorStripProps = {
+  activeColor: string | null
+  canRemove: boolean
+  onColorClick: (color: string | null) => void
+  onRemove: () => void
+}
+
+
+const ColorStrip = ({ activeColor, canRemove, onColorClick, onRemove }: ColorStripProps) => {
+  return (
+    <div className="flex items-center gap-1 border-t p-2">
+      <div className="flex flex-1 items-center gap-1">
+        {ICON_COLOR_PRESETS.map((preset) => (
+          <ColorChip
+            key={preset.id}
+            preset={preset}
+            isActive={preset.value === activeColor}
+            onClick={() => onColorClick(preset.value)}
+          />
+        ))}
+      </div>
+      {canRemove && (
+        <button
+          type="button"
+          onClick={onRemove}
+          className="ml-1 rounded px-2 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+        >
+          Remove
+        </button>
+      )}
+    </div>
+  )
+}
+
+
+type ColorChipProps = {
+  preset: ColorPreset
+  isActive: boolean
+  onClick: () => void
+}
+
+
+const ColorChip = ({ preset, isActive, onClick }: ColorChipProps) => {
+  return (
+    <button
+      type="button"
+      title={preset.label}
+      aria-label={preset.label}
+      aria-pressed={isActive}
+      onClick={onClick}
+      style={{ backgroundColor: preset.value ?? undefined }}
+      className={cn(
+        "h-5 w-5 rounded-full border border-border transition-transform hover:scale-110",
+        !preset.value && "bg-foreground",
+        isActive && "ring-2 ring-ring ring-offset-1 ring-offset-popover",
+      )}
+    />
+  )
+}

@@ -1,3 +1,4 @@
+import { TAILWIND_HEX } from "@/features/board/lib/colors/tailwind"
 import {
   AirplaneIcon,
   AirplaneTakeoffIcon,
@@ -664,6 +665,38 @@ export const tokenizeIconName = (name: string): string[] =>
     .toLowerCase()
     .split(/\s+/)
     .filter(Boolean)
+
+
+export type ColorPreset = {
+  id: string
+  label: string
+  /**
+   * Persisted as-is. Either a hex `#xxxxxx` (paper-adapted Tailwind palette)
+   * or a CSS variable reference like `var(--color-foreground)`. `null` means
+   * "no tint" — the renderer falls back to `currentColor`.
+   */
+  value: string | null
+}
+
+
+/**
+ * Curated Notion-style color palette for the icon picker. Hex values come
+ * from the project's paper-adapted Tailwind palette (TAILWIND_HEX) so they
+ * sit naturally next to node colors elsewhere in the app. The "default"
+ * preset uses a CSS variable so it follows the active theme automatically.
+ */
+export const ICON_COLOR_PRESETS: ReadonlyArray<ColorPreset> = [
+  { id: "default", label: "Default", value: "var(--color-foreground)" },
+  { id: "gray",    label: "Gray",    value: TAILWIND_HEX.gray[600] },
+  { id: "brown",   label: "Brown",   value: TAILWIND_HEX.brown[600] },
+  { id: "orange",  label: "Orange",  value: TAILWIND_HEX.orange[600] },
+  { id: "yellow",  label: "Yellow",  value: TAILWIND_HEX.yellow[600] },
+  { id: "green",   label: "Green",   value: TAILWIND_HEX.green[600] },
+  { id: "blue",    label: "Blue",    value: TAILWIND_HEX.blue[600] },
+  { id: "purple",  label: "Purple",  value: TAILWIND_HEX.purple[600] },
+  { id: "pink",    label: "Pink",    value: TAILWIND_HEX.pink[600] },
+  { id: "red",     label: "Red",     value: TAILWIND_HEX.red[600] },
+]
 
 
 /**

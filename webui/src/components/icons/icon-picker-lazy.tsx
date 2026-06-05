@@ -38,7 +38,7 @@ const IconPickerFallback = ({ className }: IconPickerFallbackProps) => {
   return (
     <div
       className={cn(
-        "flex h-[420px] w-[360px] animate-pulse flex-col rounded-md border bg-popover",
+        "flex h-[460px] w-[360px] animate-pulse flex-col rounded-md border bg-popover",
         className,
       )}
       aria-hidden="true"
@@ -47,4 +47,4 @@ const IconPickerFallback = ({ className }: IconPickerFallbackProps) => {
 }
 
 
-export type { IconPickerProps } from "./icon-picker"
+export type { IconPickerProps, IconPickerValue } from "./icon-picker"
