@@ -107,7 +107,7 @@ export function SheetView({ id }: SheetViewProps) {
           }
         }}
         className={cn(
-          "absolute inset-0 flex flex-col overflow-hidden rounded-2xl border border-border/60 bg-card text-left text-card-foreground shadow-md",
+          "absolute inset-0 flex flex-col overflow-hidden rounded-2xl border border-border bg-card text-left text-card-foreground shadow-md",
           "pointer-events-auto",
           !editing && canEdit ? "cursor-pointer" : "cursor-default",
         )}
@@ -125,7 +125,7 @@ export function SheetView({ id }: SheetViewProps) {
             </div>
           )}
           {(body || editing) && isInView ? (
-            <div className={cn("h-full", editing ? "pointer-events-auto" : "pointer-events-none")}>
+            <div className={editing ? "pointer-events-auto" : "pointer-events-none"}>
               <SheetInlineEditor
                 markdown={node.content ?? ""}
                 editable={editing}
