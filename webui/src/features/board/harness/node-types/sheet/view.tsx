@@ -95,6 +95,9 @@ export function SheetView({ id }: SheetViewProps) {
         }}
         onDoubleClick={(e) => {
           e.stopPropagation()
+          // Select the node (show handles) alongside entering edit — the
+          // body swallows pointerdown, so the lib's gesture never selects it.
+          store.setSelection([id])
           enterEdit()
         }}
         onKeyDown={(e) => {
