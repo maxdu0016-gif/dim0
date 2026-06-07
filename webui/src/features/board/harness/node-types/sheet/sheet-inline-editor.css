@@ -1,0 +1,21 @@
+/*
+ * Card-context overrides for the shared `.tiptap-editor` styles. We keep the
+ * `.tiptap-editor` class (so all the `.tiptap-editor .ProseMirror ...`
+ * typography matches the modal editor exactly) but drop the page-style
+ * padding and the 720px centered column — inside a sheet card the prose
+ * should fill the card and let the card own the padding.
+ */
+.sheet-inline-tiptap.tiptap-editor {
+  padding: 0;
+  height: 100%;
+}
+
+.sheet-inline-tiptap .ProseMirror {
+  max-width: none;
+  margin: 0;
+}
+
+/* Read-only preview: no caret, no editing affordances. */
+.sheet-inline-tiptap--readonly .ProseMirror {
+  cursor: inherit;
+}
