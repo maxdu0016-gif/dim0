@@ -57,11 +57,23 @@ export default defineConfig({
     host: "0.0.0.0",
     port: Number(process.env.MINI_APP_PORT) || 5174,
     strictPort: true,
+    // The iframe loads with sandbox="allow-scripts" (no allow-same-origin)
+    // → it has an opaque "null" origin → every module script it requests
+    // from us (@vite/client, @react-refresh, main.tsx, sucrase, the
+    // runtime CSS) is treated as cross-origin by the browser. Without
+    // explicit CORS the script fetches fail and the iframe stays empty.
+    //
+    // Echoing `origin: "*"` is safe in dev: the assets served here are
+    // public dev-runtime modules. In prod the static asset host
+    // (mini-app.<your-domain>) must send the same header — Phase 4
+    // hardening covers that side.
+    cors: { origin: "*" },
   },
   preview: {
     host: "0.0.0.0",
     port: Number(process.env.MINI_APP_PORT) || 5174,
     strictPort: true,
+    cors: { origin: "*" },
   },
   build: {
     outDir: path.resolve(__dirname, "dist-mini-app"),
