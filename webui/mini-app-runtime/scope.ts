@@ -20,6 +20,8 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
 
+import { host } from "./rpc"
+
 
 interface ScopeEntry {
   /** The actual JS value injected into the agent's code at runtime. */
@@ -80,6 +82,19 @@ export const MINI_APP_SCOPE: Record<string, ScopeEntry> = {
     value: cn,
     signature: "cn(...classes: (string | undefined | false)[]): string",
     doc: "Merge tailwind classes, with later classes winning conflicts.",
+  },
+
+  // Bridge into the host app. Methods round-trip through postMessage;
+  // see rpc.ts for the protocol. Agent reads `host.initialState` for
+  // persisted state on mount and writes via `host.saveState(...)`.
+  host: {
+    value: host,
+    signature:
+      "host.initialState: unknown; host.saveState(state); host.toast(message, level?); " +
+      "host.callTool(name, args); host.openNote(noteId)",
+    doc:
+      "RPC bridge to the host. saveState + toast work in v1; callTool + openNote " +
+      "exist but reject until the agent path is wired in Phase 3.",
   },
 }
 

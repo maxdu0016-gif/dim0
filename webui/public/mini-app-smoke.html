@@ -23,6 +23,12 @@ npm run dev:mini-app # runtime on $MINI_APP_PORT</pre>
 
   <p>Runtime origin: <code id="runtime-origin">(unset)</code></p>
 
+  <p>
+    <button onclick="localStorage.removeItem('mini-app-smoke-state'); location.reload()">
+      clear saved state &amp; reload
+    </button>
+  </p>
+
   <iframe id="frame" sandbox="allow-scripts"></iframe>
 
   <div class="log" id="log">waiting…</div>
@@ -50,24 +56,37 @@ npm run dev:mini-app # runtime on $MINI_APP_PORT</pre>
 
     frame.src = `${runtimeOrigin}/index.html`
 
-    // Hardcoded counter widget for Phase 1 verification. Uses Card,
-    // CardHeader, CardTitle, CardContent, Button + useState — all from
-    // MINI_APP_SCOPE. Updates here propagate to the iframe on next
-    // handshake.
+    // Counter widget for Phase 2 verification. Reads host.initialState
+    // for persisted value on mount, saves via host.saveState() on every
+    // change, and exercises host.toast() + the not-yet-implemented
+    // callTool stub so we can see rejections surface as alerts in the
+    // log box below.
     const COUNTER_SOURCE = `
       function Widget() {
-        const [count, setCount] = useState(0)
+        const [count, setCount] = useState(host.initialState ?? 0)
+        useEffect(() => { host.saveState(count) }, [count])
         return (
           <Card className="m-4 max-w-sm">
             <CardHeader>
-              <CardTitle>Counter</CardTitle>
+              <CardTitle>Counter (persisted)</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold mb-3">{count}</div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
                 <Button onClick={() => setCount(count - 1)} variant="outline">-</Button>
                 <Button onClick={() => setCount(count + 1)}>+</Button>
                 <Button onClick={() => setCount(0)} variant="ghost">reset</Button>
+                <Button onClick={() => host.toast("hello from the widget", "info")} variant="secondary">toast</Button>
+                <Button
+                  onClick={() => {
+                    host.callTool("search", { q: "x" }).catch((e) => {
+                      host.toast("callTool rejected: " + e.message, "error")
+                    })
+                  }}
+                  variant="ghost"
+                >
+                  try callTool
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -75,15 +94,54 @@ npm run dev:mini-app # runtime on $MINI_APP_PORT</pre>
       }
     `
 
+    // Mock host-side RPC handler. localStorage stands in for the real
+    // backend persistence that lands in commit 2.
+    const STORAGE_KEY = "mini-app-smoke-state"
+
+    function loadSavedState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY)
+        return raw == null ? null : JSON.parse(raw)
+      } catch {
+        return null
+      }
+    }
+
+    function handleRpc({ id, method, args }) {
+      let result, error
+      try {
+        if (method === "saveState") {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(args))
+          append(`saveState: ${JSON.stringify(args)}`, "ok")
+        } else if (method === "toast") {
+          append(`toast (${args.level ?? "info"}): ${args.message}`, "ok")
+        } else {
+          throw new Error(method + " not implemented in v1")
+        }
+      } catch (e) {
+        error = e?.message ?? String(e)
+      }
+      frame.contentWindow.postMessage(
+        { type: "mini-app:rpc-result", id, result, error },
+        runtimeOrigin,
+      )
+    }
+
     window.addEventListener("message", (e) => {
       if (e.origin !== runtimeOrigin) {
         append(`ignored message from foreign origin: ${e.origin}`, "err")
         return
       }
+
+      if (e.data && e.data.type === "mini-app:rpc") {
+        handleRpc(e.data)
+        return
+      }
+
       append(`message: ${JSON.stringify(e.data)}`, "ok")
+
       if (e.data && e.data.type === "mini-app:ready") {
         append("handshake OK — runtime is reachable cross-origin", "ok")
-        // Try to touch the iframe document — must throw cross-origin.
         try {
           // eslint-disable-next-line no-unused-expressions
           frame.contentDocument
@@ -91,12 +149,15 @@ npm run dev:mini-app # runtime on $MINI_APP_PORT</pre>
         } catch (err) {
           append(`parent.contentDocument throws (good): ${err.name}`, "ok")
         }
-        // Send the counter widget source so the iframe compiles + renders.
+        const savedState = loadSavedState()
+        if (savedState != null) {
+          append(`restoring savedState: ${JSON.stringify(savedState)}`, "ok")
+        }
         frame.contentWindow.postMessage(
-          { type: "mini-app:render", source: COUNTER_SOURCE },
+          { type: "mini-app:render", source: COUNTER_SOURCE, savedState },
           runtimeOrigin,
         )
-        append("sent mini-app:render with counter source — widget should appear above", "ok")
+        append("sent mini-app:render — widget should appear above", "ok")
       }
     })
 
