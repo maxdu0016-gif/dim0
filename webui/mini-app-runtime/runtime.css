@@ -16,13 +16,25 @@
 @import "../src/index.css";
 
 
-/* The runtime root element needs to fill the iframe so the host can
-   measure its scroll height for auto-resize (Phase 4). */
+/* The runtime root element fills the iframe so the host can
+   measure its scroll height for auto-resize. */
 html, body {
   margin: 0;
   padding: 0;
 }
 
+/* Center the agent's widget horizontally so cards like `max-w-3xl`
+   sit in the middle of the iframe instead of pinned to the left.
+   The `padding` gives breathing room from the iframe edges (the
+   canvas card already provides its own outer chrome).
+   `flex-direction: column` + `align-items: center` keeps horizontal
+   centering working even when the content is taller than the
+   viewport — taller widgets just overflow downward as expected. */
 #root {
   min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 16px;
+  box-sizing: border-box;
 }

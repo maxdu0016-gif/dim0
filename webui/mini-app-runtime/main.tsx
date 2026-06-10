@@ -134,16 +134,35 @@ if (globalThis.__MINI_APP_DEBUG__) {
 }
 
 
-// Auto-resize: watch the widget's body height and report it to the
-// host so the iframe (and eventually the canvas node, Phase 4) can
-// grow to fit. ResizeObserver fires on every content-size change,
-// including after React commits a state update that grows the DOM.
-// We measure body.scrollHeight rather than the observed contentRect
-// because the latter reports the body's *visible* box, which stays
-// constrained when the iframe parent is shorter than the content.
+// Auto-resize: watch the widget's content height and report it to
+// the host so the iframe (and eventually the canvas node, Phase 4)
+// can grow to fit. ResizeObserver fires on every content-size
+// change, including after React commits a state update that grows
+// the DOM.
+//
+// Measurement combines four metrics (documentElement vs body,
+// scrollHeight vs offsetHeight) and takes the max — mirroring the
+// approach in widget-document.ts:buildWidgetResizeScript. Single-
+// metric measurement (just body.scrollHeight) understates content
+// extent in layouts with sticky/absolute positioning, transforms,
+// or overflow containers; the 4-metric max is robust against those
+// quirks at near-zero cost.
 let lastReportedHeight = 0
+function measureContentHeight(): number {
+  const doc = document.documentElement
+  const body = document.body
+  return Math.ceil(
+    Math.max(
+      doc ? doc.scrollHeight : 0,
+      doc ? doc.offsetHeight : 0,
+      body ? body.scrollHeight : 0,
+      body ? body.offsetHeight : 0,
+    ),
+  )
+}
+
 function reportHeight() {
-  const height = document.body.scrollHeight
+  const height = measureContentHeight()
   if (height === lastReportedHeight || height <= 0) return
   lastReportedHeight = height
   window.parent.postMessage(
