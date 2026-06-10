@@ -18,6 +18,13 @@ import { CompileErrorCard, RuntimeErrorCard } from "./error-display"
 import { handleHostMessage, setHostInitialState } from "./rpc"
 import { MINI_APP_SCOPE_NAMES, MINI_APP_SCOPE_VALUES } from "./scope"
 import "./runtime.css"
+// Tailwind v4's browser build JIT-compiles utility classes at runtime
+// by scanning the live DOM. Critical for mini-apps: the agent's JSX is
+// a string at compile time, so the static @tailwindcss/vite plugin
+// can't see classes like `fill-amber-200` or `bg-sky-50` and they
+// never make it into the compiled CSS. The browser build picks them
+// up the moment React mounts the elements. Side-effect-only import.
+import "@tailwindcss/browser"
 
 
 const HOST_ORIGIN = import.meta.env.VITE_HOST_ORIGIN
