@@ -4,6 +4,7 @@ import { useCanvasStore } from "@canvas-harness/react"
 import { CodeSandboxView } from "./code-sandbox"
 import { DocumentView } from "./document"
 import { FolderView } from "./folder"
+import { MiniAppView } from "./mini-app"
 import { SheetView } from "./sheet"
 import { WidgetView } from "./widget"
 
@@ -18,6 +19,7 @@ const VIEW_REGISTRY: Readonly<Record<string, (props: { id: NodeId }) => ReactNod
   folder: FolderView,
   document: DocumentView,
   widget: WidgetView,
+  "mini-app": MiniAppView,
   "code-sandbox": CodeSandboxView,
   sheet: SheetView,
 }
