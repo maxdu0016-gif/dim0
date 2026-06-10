@@ -1,0 +1,28 @@
+/*
+ * Mini-app runtime stylesheet.
+ *
+ * Re-uses the host's `src/index.css` directly so the iframe ships the
+ * same Tailwind theme + tokens (parchment / dark / etc.). Bundled
+ * twice — once into the host bundle, once here — but the source of
+ * truth stays single.
+ *
+ * Phase 4 will sync the active theme via postMessage; for now the
+ * runtime inherits the parchment default declared on <html> by the
+ * theme bootstrap script in the host (or, in our case, the runtime's
+ * fresh DOM defaults to parchment because that's what @custom-variant
+ * picks when no data-mode is set).
+ */
+
+@import "../src/index.css";
+
+
+/* The runtime root element needs to fill the iframe so the host can
+   measure its scroll height for auto-resize (Phase 4). */
+html, body {
+  margin: 0;
+  padding: 0;
+}
+
+#root {
+  min-height: 100vh;
+}

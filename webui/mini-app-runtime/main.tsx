@@ -1,38 +1,74 @@
-// Mini-app iframe runtime entry — Phase 0 scaffolding.
+// Mini-app iframe runtime entry — Phase 1 (compile + render path).
 //
-// At this point the runtime does NOT compile or render anything. It
-// signals "ready" to the host once mounted and logs any message it
-// receives whose origin matches VITE_HOST_ORIGIN. Phase 1 wires sucrase
-// compile + the actual React render; Phase 2 adds the RPC bridge.
+// Listens for `mini-app:render` messages from the host, compiles the
+// agent's JSX source via sucrase, and mounts the resulting component
+// inside a React error boundary. Compile failures and render failures
+// show as inline error cards rather than tearing down the iframe.
 //
-// See mini-app-archi.md §9 for the target shape this file is growing
-// into across phases.
+// Phase 2 layers postMessage RPC on top of this; Phase 4 adds theme
+// propagation + auto-resize.
+
+import { StrictMode } from "react"
+import type { ReactNode } from "react"
+import { createRoot } from "react-dom/client"
+
+import { compileMiniApp } from "./compile"
+import { ErrorBoundary } from "./error-boundary"
+import { CompileErrorCard, RuntimeErrorCard } from "./error-display"
+import { MINI_APP_SCOPE_NAMES, MINI_APP_SCOPE_VALUES } from "./scope"
+import "./runtime.css"
+
 
 const HOST_ORIGIN = import.meta.env.VITE_HOST_ORIGIN
 
 if (!HOST_ORIGIN) {
-  // Fail loud at startup: a missing origin means every postMessage
-  // origin check would silently reject everything, which presents as
-  // "iframe loads but nothing happens" — the worst kind of bug to debug.
   throw new Error("VITE_HOST_ORIGIN not set at build time")
 }
 
 
-// Root marker so we know the runtime mounted at all. Phase 1 replaces
-// this with a real React root.
-const root = document.getElementById("root")
-if (root) {
-  root.textContent = "mini-app runtime ready (phase 0)"
-  root.style.font = "12px ui-monospace, SFMono-Regular, Menlo, monospace"
-  root.style.padding = "12px"
-  root.style.color = "#666"
+const rootEl = document.getElementById("root")
+if (!rootEl) throw new Error("missing #root element")
+const root = createRoot(rootEl)
+
+
+/**
+ * Build the scope map from the registry's parallel name/value arrays.
+ * The runtime passes the *values* positionally to `new Function` via
+ * compileMiniApp; we rebuild a name→value object here so call sites
+ * (and the agent's code, through the function's argument list) see a
+ * stable shape.
+ */
+function buildScope(): Record<string, unknown> {
+  return Object.fromEntries(
+    MINI_APP_SCOPE_NAMES.map((name, i) => [name, MINI_APP_SCOPE_VALUES[i]]),
+  )
+}
+
+
+function renderWidget(source: string) {
+  const result = compileMiniApp(source, buildScope())
+  if (!result.ok) {
+    root.render(<CompileErrorCard error={result.error} />)
+    return
+  }
+  const Widget = result.Component as () => ReactNode
+  root.render(
+    <StrictMode>
+      <ErrorBoundary fallback={(err) => <RuntimeErrorCard error={err} />}>
+        <Widget />
+      </ErrorBoundary>
+    </StrictMode>,
+  )
 }
 
 
 window.addEventListener("message", (event) => {
   if (event.origin !== HOST_ORIGIN) return
-  // Phase 0: just log. Phase 1 dispatches on event.data.type.
-  console.log("[mini-app-runtime] message from host:", event.data)
+  const msg = event.data as { type?: string; source?: string } | null
+  if (!msg || typeof msg !== "object") return
+  if (msg.type === "mini-app:render" && typeof msg.source === "string") {
+    renderWidget(msg.source)
+  }
 })
 
 
