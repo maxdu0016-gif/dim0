@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <!--
+      Content Security Policy locked down per mini-app-archi.md §11.
+      - `unsafe-eval` in `script-src` is required by sucrase + new Function;
+        the iframe sandbox + cross-origin treatment is the actual boundary.
+      - `connect-src` is rewritten per environment by miniAppCspPlugin in
+        vite.mini-app.config.ts: 'none' in prod (agent code cannot fetch
+        out at all), 'self' + ws:/wss: in dev so Vite's HMR works. The
+        placeholder is intentional — do not hardcode.
+      - `frame-ancestors` is set per-env via HTTP header in prod; the
+        meta-tag is omitted here because meta-tag CSP ignores frame-ancestors.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none';
+               script-src 'self' 'unsafe-eval';
+               style-src 'self' 'unsafe-inline';
+               img-src 'self' data: blob:;
+               font-src 'self' data:;
+               connect-src {{CSP_CONNECT_SRC}};"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Mini-app runtime</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/main.tsx"></script>
+  </body>
+</html>

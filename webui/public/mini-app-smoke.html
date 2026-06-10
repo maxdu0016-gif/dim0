@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>mini-app cross-origin smoke test</title>
+  <style>
+    body { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; padding: 24px; max-width: 720px; }
+    iframe { width: 100%; height: 120px; border: 1px solid #ccc; margin: 12px 0; }
+    .log { background: #f5f5f5; padding: 12px; min-height: 80px; white-space: pre-wrap; font-size: 12px; }
+    .ok  { color: #2a7a3b; }
+    .err { color: #b00020; }
+    code { background: #eee; padding: 1px 4px; }
+  </style>
+</head>
+<body>
+  <h1>Mini-app runtime — cross-origin smoke test</h1>
+  <p>
+    Loads the runtime in a sandboxed iframe and verifies the
+    <code>mini-app:ready</code> handshake. Run both Vite servers first:
+  </p>
+  <pre>npm run dev          # host on $APP_PORT
+npm run dev:mini-app # runtime on $MINI_APP_PORT</pre>
+
+  <p>Runtime origin: <code id="runtime-origin">(unset)</code></p>
+
+  <iframe id="frame" sandbox="allow-scripts"></iframe>
+
+  <div class="log" id="log">waiting…</div>
+
+  <script>
+    // The host bundle would normally read VITE_MINI_APP_ORIGIN at build
+    // time. This smoke page is plain HTML, so we hard-derive the runtime
+    // origin from a hash param or fall back to "same hostname, port+1".
+    // Keep it simple: use port 3176 by default (matches dev .env default).
+    const params = new URLSearchParams(location.hash.slice(1))
+    const runtimeOrigin =
+      params.get("runtime") ||
+      `${location.protocol}//${location.hostname}:3176`
+
+    document.getElementById("runtime-origin").textContent = runtimeOrigin
+
+    const frame = document.getElementById("frame")
+    const log = document.getElementById("log")
+    const lines = []
+    function append(line, cls) {
+      const entry = cls ? `[${cls}] ${line}` : line
+      lines.push(entry)
+      log.textContent = lines.join("\n")
+    }
+
+    frame.src = `${runtimeOrigin}/index.html`
+
+    window.addEventListener("message", (e) => {
+      if (e.origin !== runtimeOrigin) {
+        append(`ignored message from foreign origin: ${e.origin}`, "err")
+        return
+      }
+      append(`message: ${JSON.stringify(e.data)}`, "ok")
+      if (e.data && e.data.type === "mini-app:ready") {
+        append("handshake OK — runtime is reachable cross-origin", "ok")
+        // Try to touch the iframe document — must throw cross-origin.
+        try {
+          // eslint-disable-next-line no-unused-expressions
+          frame.contentDocument
+          append("parent.contentDocument accessible — sandbox/origin misconfigured!", "err")
+        } catch (err) {
+          append(`parent.contentDocument throws (good): ${err.name}`, "ok")
+        }
+      }
+    })
+
+    setTimeout(() => {
+      if (lines.length === 1) {
+        append("no message after 3s. Is the mini-app dev server running on " + runtimeOrigin + "?", "err")
+      }
+    }, 3000)
+  </script>
+</body>
+</html>
