@@ -67,8 +67,6 @@ export interface MiniAppMountProps {
   source: string
   /** Optional canvas-side className for sizing/spacing. */
   className?: string
-  /** Fallback height before the iframe reports its own. */
-  initialHeight?: number
 }
 
 
@@ -76,13 +74,17 @@ export function MiniAppMount({
   noteId,
   source,
   className,
-  initialHeight = 240,
 }: MiniAppMountProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const [iframeReady, setIframeReady] = useState(false)
   const [savedStateLoaded, setSavedStateLoaded] = useState(false)
   const savedStateRef = useRef<unknown>(undefined)
-  const [height, setHeight] = useState(initialHeight)
+  // contentHeight is the widget's reported natural height (from
+  // mini-app:resize). When >0, we use it directly; until then the
+  // iframe fills its parent so the user sees the widget at the
+  // canvas card's full size. Once auto-resize kicks in (Phase 4
+  // grows the canvas node too), this becomes the source of truth.
+  const [contentHeight, setContentHeight] = useState<number | null>(null)
 
   // Hydrate saved state from the backend. Failures fall through
   // silently — a network blip on load shouldn't block the widget from
@@ -127,7 +129,7 @@ export function MiniAppMount({
         }
         setIframeReady(true)
       },
-      onResize: (h) => setHeight(h),
+      onResize: (h) => setContentHeight(h),
     })
     window.addEventListener("message", handler)
     return () => window.removeEventListener("message", handler)
@@ -167,7 +169,15 @@ export function MiniAppMount({
       sandbox="allow-scripts allow-same-origin"
       src={`${RUNTIME_ORIGIN}/index.html`}
       title="mini-app"
-      style={{ width: "100%", height, border: 0, display: "block" }}
+      style={{
+        width: "100%",
+        // contentHeight wins when the runtime has reported its size;
+        // otherwise fill the parent so the widget is visible at the
+        // canvas card's natural size.
+        height: contentHeight ?? "100%",
+        border: 0,
+        display: "block",
+      }}
       className={className}
     />
   )

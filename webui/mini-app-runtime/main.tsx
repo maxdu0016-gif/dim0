@@ -132,3 +132,35 @@ window.parent.postMessage({ type: "mini-app:ready" }, HOST_ORIGIN)
 if (globalThis.__MINI_APP_DEBUG__) {
   globalThis.__MINI_APP_DEBUG__.readyPosted = true
 }
+
+
+// Auto-resize: watch the widget's body height and report it to the
+// host so the iframe (and eventually the canvas node, Phase 4) can
+// grow to fit. ResizeObserver fires on every content-size change,
+// including after React commits a state update that grows the DOM.
+// We measure body.scrollHeight rather than the observed contentRect
+// because the latter reports the body's *visible* box, which stays
+// constrained when the iframe parent is shorter than the content.
+let lastReportedHeight = 0
+function reportHeight() {
+  const height = document.body.scrollHeight
+  if (height === lastReportedHeight || height <= 0) return
+  lastReportedHeight = height
+  window.parent.postMessage(
+    { type: "mini-app:resize", height },
+    HOST_ORIGIN,
+  )
+}
+
+const resizeObserver = new ResizeObserver(() => reportHeight())
+resizeObserver.observe(document.body)
+
+// Also fire on every animation frame for the first second — covers
+// the post-mount React renders that update DOM after the iframe
+// becomes visible but before ResizeObserver settles.
+let framesLeft = 60
+function frameTick() {
+  reportHeight()
+  if (framesLeft-- > 0) requestAnimationFrame(frameTick)
+}
+requestAnimationFrame(frameTick)
