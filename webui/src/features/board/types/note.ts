@@ -89,6 +89,11 @@ export const DEFAULT_CODE_SANDBOX_WIDTH = 320
 export const DEFAULT_CODE_SANDBOX_HEIGHT = 320
 export const DEFAULT_WIDGET_WIDTH = 800
 export const DEFAULT_WIDGET_HEIGHT = 500
+// Mini-apps tend to be compact interactive cards (counters, todos, steppers).
+// Smaller default than the HTML widget; auto-resize via mini-app:resize will
+// grow them when content needs more room.
+export const DEFAULT_MINI_APP_WIDTH = 480
+export const DEFAULT_MINI_APP_HEIGHT = 320
 
 
 /**
@@ -108,6 +113,8 @@ export const createDefaultNoteProperties = ({ type = 'rectangle' }: { type?: Nod
     ? { width: DEFAULT_CODE_SANDBOX_WIDTH, height: DEFAULT_CODE_SANDBOX_HEIGHT }
     : type === 'widget'
     ? { width: DEFAULT_WIDGET_WIDTH, height: DEFAULT_WIDGET_HEIGHT }
+    : type === 'mini-app'
+    ? { width: DEFAULT_MINI_APP_WIDTH, height: DEFAULT_MINI_APP_HEIGHT }
     : type === 'ellipse' || type === 'layered-circle'
     ? { width: DEFAULT_ELLIPSE_NOTE_WIDTH, height: DEFAULT_ELLIPSE_NOTE_HEIGHT }
     : type === 'diamond' || type === 'soft-diamond' || type === 'layered-diamond'

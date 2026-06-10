@@ -1,0 +1,97 @@
+// On-canvas view for a mini-app note.
+//
+// Wraps the host-side MiniAppMount (which owns the sandboxed iframe,
+// state hydration, and RPC routing) with the standard canvas chrome:
+// traffic lights for delete/expand, a label caption below the card,
+// off-screen suspension via useIsInView so the iframe doesn't pin the
+// event loop on boards with many mini-apps.
+//
+// Mirrors the shape of WidgetView in node-types/widget/view.tsx — the
+// canvas chrome conventions live there.
+
+import { useRef } from "react"
+
+import { CursorClickIcon } from "@phosphor-icons/react"
+import { type NodeId } from "@canvas-harness/core"
+import { useCanvasStore, useNode } from "@canvas-harness/react"
+
+import { MiniAppMount } from "@/features/mini-app"
+import { cn } from "@/lib/utils"
+
+import type { NoteNodeData } from "../../convert/note-to-node"
+import {
+  NodeTitleCaption,
+  NodeTrafficLights,
+  useIsInView,
+} from "../../shared-views"
+import { useBoardAppStore } from "../../store/board-app-store"
+
+
+// Expanded-editor dialog for mini-apps is Phase 4 polish (see
+// mini-app-archi.md §17 "Phase 4"). v1 has no NodeSurfaceKind for
+// "mini-app" → onExpand is omitted from NodeTrafficLights below.
+
+
+export interface MiniAppViewProps {
+  id: NodeId
+}
+
+
+/**
+ * Canvas view for a mini-app note. Renders the iframe via MiniAppMount
+ * when the node is in view; otherwise shows a paused-state placeholder
+ * card so the rest of the board stays responsive.
+ */
+export function MiniAppView({ id }: MiniAppViewProps) {
+  const node = useNode(id)
+  const store = useCanvasStore()
+  const canEdit = useBoardAppStore((s) => s.canEdit)
+  const wrapRef = useRef<HTMLDivElement>(null)
+  const isInView = useIsInView(wrapRef, "200px")
+  if (!node) return null
+
+  const data = (node.data ?? {}) as Partial<NoteNodeData>
+  const label = data.label?.markdown
+  const source = node.content ?? ""
+
+  return (
+    <div
+      ref={wrapRef}
+      className="pointer-events-none relative h-full w-full select-none"
+    >
+      <div
+        className={cn(
+          "absolute inset-0 flex flex-col overflow-hidden rounded-2xl border border-dashed border-border bg-background px-2 pb-2 pt-10",
+        )}
+      >
+        <div className="relative h-full w-full overflow-hidden rounded-xl border border-border/50 bg-background">
+          {source && isInView ? (
+            <MiniAppMount
+              noteId={id as unknown as string}
+              source={source}
+              className="pointer-events-auto h-full w-full bg-transparent"
+            />
+          ) : (
+            <div className="flex h-full w-full flex-col items-center justify-center gap-2 px-4 text-center text-sm text-muted-foreground">
+              <CursorClickIcon className="size-5 shrink-0" />
+              <span>{source ? "Mini-app paused" : "Mini-app source will render here"}</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <NodeTrafficLights
+        onDelete={canEdit ? () => store.removeNode(id) : undefined}
+      />
+
+      <div className="pointer-events-auto absolute left-1/2 top-full z-20 mt-2 w-full -translate-x-1/2">
+        <NodeTitleCaption
+          nodeId={id}
+          label={label}
+          placeholder="Untitled mini-app"
+          textClassName="text-center text-sm font-handwriting text-foreground"
+        />
+      </div>
+    </div>
+  )
+}
