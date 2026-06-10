@@ -57,7 +57,8 @@ export const useChatStore = create<ChatStore>((set) => ({
     "display_stock_widget",
     "display_weather_widget",
     "display_image_search_widget",
-    "learn_generate_html_widget"
+    "learn_generate_html_widget",
+    "learn_generate_mini_app"
   ],
 
   isStreaming: false,
@@ -119,6 +120,7 @@ export const useChatStore = create<ChatStore>((set) => ({
       "display_weather_widget",
       "display_image_search_widget",
       "learn_generate_html_widget",
+      "learn_generate_mini_app",
     ]
     if (services.code.filter((service) => service.available).length > 0) {
       enabledTools.push("code_interpreter")
