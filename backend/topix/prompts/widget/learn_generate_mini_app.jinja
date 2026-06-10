@@ -1,0 +1,173 @@
+{% raw %}# SKILL (high priority)
+You are authoring a sandboxed interactive React mini-app for the board. Follow this skill over generic note-writing habits.
+
+Your goal is to produce one component and store it via `write_note(content_type="mini-app", content=<JSX source>)`.
+
+---
+
+## When to use a mini-app
+
+Pick mini-app over HTML widget when the artifact needs **interactive state** the user manipulates: a counter, a todo list, a stepper, a quiz, a small calculator, an algorithm visualizer with controls. For static visual explainers, the HTML widget skill is the right tool.
+
+Mini-apps live inside a sandboxed iframe on a different origin. Two consequences:
+- The agent cannot make the widget talk to the host's auth, cookies, storage, parent DOM, or your collab WS. It is genuinely isolated.
+- The widget *can* persist its own per-user state via `host.saveState(...)`, but can't reach any other host capability except the four `host.*` methods listed below.
+
+---
+
+## The exact contract
+
+You write **one** JSX source string. The runtime compiles it via sucrase and renders the component named `Widget` (or `App` as a fallback). Anything else is rejected at validate time.
+
+**Conventions:**
+- Define a top-level `function Widget() { ... }` or `const Widget = () => { ... }`.
+- Return a single React element from `Widget`.
+- TypeScript annotations are fine — sucrase strips them.
+- Do not write `import` statements. The runtime injects everything you may use as bare identifiers (see scope below).
+- Do not call `host.test(...)` — the testing harness lands in a later version.
+
+**Strict rules — these always reject:**
+- Referencing globals: `window`, `document`, `fetch`, `localStorage`, `setTimeout`, `setInterval`, `console` (except `console.log` during dev), `globalThis`, `parent`, `top`, `eval`, `Function`. They don't exist in this sandbox.
+- Importing anything. No `import "react"`, no `require(...)`.
+- Multiple files or named exports beyond `Widget`/`App`. One source string, one component.
+
+---
+
+## Scope (what the agent can use)
+
+Every identifier listed below is available as a bare name. Anything not listed is a `ReferenceError`.
+
+### React + hooks
+- `React` — only needed if you compose `React.createElement(...)` by hand. JSX works without referencing it explicitly.
+- `useState<T>(initial: T): [T, (next: T) => void]` — local widget state; persists for the iframe's lifetime.
+- `useMemo<T>(fn, deps): T`
+- `useEffect(fn, deps?): void`
+- `useCallback<F>(fn, deps): F`
+- `useRef<T>(initial: T): { current: T }`
+
+### Component library
+- `<Card className?>{children}</Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<CardFooter>`
+- `<Button variant? size? onClick?>{children}</Button>` — variants: `default | destructive | outline | secondary | ghost | link`
+
+### Helpers
+- `cn(...classes: (string | undefined | false)[]): string` — merge Tailwind classes, later classes win.
+
+### Host RPC
+- `host.initialState: unknown` — value the host stored for this user on this note via a previous `saveState`. `undefined` on first mount.
+- `host.saveState(state): Promise<void>` — persist the given JSON value for the current user on the current note. Use in a `useEffect`, fire-and-forget.
+- `host.toast(message: string, level?: "info" | "error"): Promise<void>` — flash a short message in the host app.
+- `host.callTool(name, args)` and `host.openNote(noteId)` — stubs in v1; will reject with "not implemented." Don't call them.
+
+---
+
+## Worked examples
+
+### Counter
+```jsx
+function Widget() {
+  const [count, setCount] = useState(host.initialState ?? 0)
+  useEffect(() => { host.saveState(count) }, [count])
+  return (
+    <Card className="p-4 max-w-sm">
+      <CardHeader><CardTitle>Counter</CardTitle></CardHeader>
+      <CardContent>
+        <div className="text-3xl font-bold mb-3">{count}</div>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setCount(count - 1)}>-</Button>
+          <Button onClick={() => setCount(count + 1)}>+</Button>
+          <Button variant="ghost" onClick={() => setCount(0)}>reset</Button>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+```
+
+### Todo list
+```jsx
+function Widget() {
+  const initial = host.initialState ?? { items: [], draft: "" }
+  const [state, setState] = useState(initial)
+  useEffect(() => { host.saveState(state) }, [state])
+
+  function addItem() {
+    if (!state.draft.trim()) return
+    setState({ items: [...state.items, { text: state.draft, done: false }], draft: "" })
+  }
+
+  function toggleItem(i) {
+    const next = state.items.map((it, j) => j === i ? { ...it, done: !it.done } : it)
+    setState({ ...state, items: next })
+  }
+
+  return (
+    <Card className="p-4 max-w-md">
+      <CardHeader><CardTitle>Todo</CardTitle></CardHeader>
+      <CardContent>
+        <div className="flex gap-2 mb-3">
+          <input
+            value={state.draft}
+            onChange={(e) => setState({ ...state, draft: e.target.value })}
+            onKeyDown={(e) => { if (e.key === "Enter") addItem() }}
+            className="flex-1 rounded-md border px-2 py-1 text-sm"
+            placeholder="add a task"
+          />
+          <Button onClick={addItem}>add</Button>
+        </div>
+        <ul className="space-y-1">
+          {state.items.map((it, i) => (
+            <li key={i} className="flex items-center gap-2">
+              <input type="checkbox" checked={it.done} onChange={() => toggleItem(i)} />
+              <span className={cn("text-sm", it.done && "line-through text-muted-foreground")}>{it.text}</span>
+            </li>
+          ))}
+          {state.items.length === 0 && <li className="text-sm text-muted-foreground">no items yet</li>}
+        </ul>
+      </CardContent>
+    </Card>
+  )
+}
+```
+
+### Stepper (no persistence — ephemeral state is fine too)
+```jsx
+function Widget() {
+  const steps = ["Buy ingredients", "Mix batter", "Bake at 180°C for 25min", "Cool + frost"]
+  const [i, setI] = useState(0)
+  return (
+    <Card className="p-4 max-w-sm">
+      <CardHeader><CardTitle>Step {i + 1} of {steps.length}</CardTitle></CardHeader>
+      <CardContent>
+        <p className="mb-3">{steps[i]}</p>
+        <div className="flex gap-2">
+          <Button variant="outline" disabled={i === 0} onClick={() => setI(i - 1)}>back</Button>
+          <Button disabled={i === steps.length - 1} onClick={() => setI(i + 1)}>next</Button>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+```
+
+---
+
+## Style guidelines
+
+- Default to compact widgets — `max-w-sm` for single-purpose, `max-w-md` for lists.
+- Use `Card` as the outer container so the widget feels native to the board.
+- Tailwind tokens follow the host theme (parchment + sienna defaults). Stick to semantic classes like `text-muted-foreground`, `border`, `bg-card`, not raw hex colors.
+- Don't add scroll containers — the host auto-resizes the iframe to fit content.
+
+---
+
+## Verification before you submit
+
+Walk through these in your head before calling `write_note`:
+
+1. The source declares `function Widget()` (or `const Widget = () => ...`) at the top level.
+2. Every identifier in the source is in the scope above OR is a JSX intrinsic (`div`, `span`, etc.) OR is locally defined in the function body.
+3. No `import`, no `window`, no `fetch`, no `setTimeout`.
+4. If the widget has persistent state, it reads from `host.initialState` on first render and writes via `host.saveState` on every change.
+
+If you can't tick all four, fix the source before submitting. The compile validator will reject anything that fails (1) or returns errors at parse time; the iframe's runtime error boundary catches anything that fails (2) at render time.
+{% endraw %}

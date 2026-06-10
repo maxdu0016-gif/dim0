@@ -18,3 +18,15 @@ learn_generate_html_widget_tool = ToolHandler.convert_func_to_tool(
     tool_name=AgentToolName.LEARN_GENERATE_HTML_WIDGET,
     tool_description=tool_descriptions.get(AgentToolName.LEARN_GENERATE_HTML_WIDGET, ""),
 )
+
+
+async def learn_generate_mini_app(_wrapper: RunContextWrapper[Context]) -> str:
+    """Load guidance for authoring sandboxed interactive React mini-apps."""
+    return render_prompt("widget/learn_generate_mini_app.jinja")
+
+
+learn_generate_mini_app_tool = ToolHandler.convert_func_to_tool(
+    learn_generate_mini_app,
+    tool_name=AgentToolName.LEARN_GENERATE_MINI_APP,
+    tool_description=tool_descriptions.get(AgentToolName.LEARN_GENERATE_MINI_APP, ""),
+)

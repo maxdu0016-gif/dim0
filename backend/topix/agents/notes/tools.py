@@ -27,10 +27,38 @@ from topix.datatypes.note.link import Link
 from topix.datatypes.note.style import NodeType
 from topix.datatypes.property import SizeProperty
 from topix.datatypes.resource import RichText
+from topix.mini_app import compile_mini_app_source
 from topix.store.graph import GraphStore
 
 
-def create_write_note_tool(
+async def _validate_mini_app_content(content: str) -> None:
+    """Reject a mini-app write whose source can't compile.
+
+    Runs the sucrase + widget-declaration check before the note is
+    persisted, so the agent's failed write surfaces a structured
+    ValueError it can correct on the next attempt (compile errors
+    include the line + column).
+
+    Bypasses the check for non-mini-app note types — callers pass
+    every content through here and let the function early-out on the
+    cheap case.
+    """
+    result = await compile_mini_app_source(content)
+    if result.ok:
+        return
+    err = result.error
+    if err is None:
+        raise ValueError("mini-app validation failed with no error detail")
+    parts = [f"mini-app {err.kind}: {err.message}"]
+    if err.line is not None:
+        loc = f"line {err.line}"
+        if err.column is not None:
+            loc += f", column {err.column}"
+        parts.append(f"at {loc}")
+    raise ValueError(" ".join(parts))
+
+
+def create_write_note_tool(  # noqa: C901 — branching is the whole job (create vs rewrite, sheet-resize, mini-app-validate); splitting would scatter cohesive logic
     graph_store: GraphStore,
     graph_uid: str,
     root_id: str | None = None,
@@ -67,6 +95,12 @@ def create_write_note_tool(
             note_id (str | None): Optional existing note id. Omit to create a new note.
 
         """
+        # mini-app notes are sandbox-rendered React; reject malformed
+        # JSX before persisting so the agent can correct in one tool
+        # round-trip (the error message includes line/col from sucrase).
+        if note_type == NodeType.MINI_APP:
+            await _validate_mini_app_content(content)
+
         if note_id is None:
             note = await build_note(
                 graph_store=graph_store,

@@ -16,6 +16,7 @@ Ask what shape the answer really has, then pick the lightest surface that carrie
 - long-form reference worth keeping → one `write_note(note_type="sheet")`
 - interactive/visual explainer (chart, flashcards, mini-slide, infographic) → `learn_generate_html_widget` then `write_note(note_type="widget")`
 - explicit user request for a chart, visual explainer, diagram, flashcards, or table → widget
+- interactive app with state the user manipulates (counter, todo, stepper, quiz, mini calculator, algorithm visualizer with controls) → `learn_generate_mini_app` then `write_note(note_type="mini-app")`
 - comparison of two or more things → widget table if dense, linked notes if sparse
 - single concrete fact with supporting context → one rectangle note, no links
 
@@ -52,6 +53,7 @@ Use only these tools:
 - `link_notes(source_id, target_id, label?)`: draw a directed arrow between two existing notes in the current board
 - `image_generation(prompt)`: create a new image
 - `learn_generate_html_widget`: load guidance before authoring a widget note
+- `learn_generate_mini_app`: load guidance before authoring a sandboxed interactive React mini-app
 - `display_stock_widget(symbol)`, `display_weather_widget(city)`, `display_image_search_widget(query)`: UI-only side effects
 
 ## TOOL DISCIPLINE
@@ -86,6 +88,7 @@ Note tools:
 Widgets and images:
 - `image_generation` only for explicit requests to create or generate a new image, logo, illustration, design, or diagram.
 - For HTML widget notes, first call `learn_generate_html_widget` to load skill instructions, then follow them when writing `note_type="widget"`.
+- For mini-app notes (interactive React with user-mutable state), first call `learn_generate_mini_app` to load skill instructions, then follow them when writing `note_type="mini-app"`. The server validates the JSX via sucrase and rejects malformed sources with line/col — fix and retry once if rejected.
 - `display_*_widget` tools are UI-only side effects and never evidence.
 - If a stock ticker is unknown, quickly `web_search` it first.
 
