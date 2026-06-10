@@ -29,7 +29,9 @@ npm run dev:mini-app # runtime on $MINI_APP_PORT</pre>
     </button>
   </p>
 
-  <iframe id="frame" sandbox="allow-scripts"></iframe>
+  <!-- See MiniAppMount in src/features/mini-app/mount.tsx for the
+       reasoning behind allow-same-origin alongside allow-scripts. -->
+  <iframe id="frame" sandbox="allow-scripts allow-same-origin"></iframe>
 
   <div class="log" id="log">waiting…</div>
 

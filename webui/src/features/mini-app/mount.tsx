@@ -35,6 +35,31 @@ import { fetchMiniAppState, saveMiniAppState } from "./state-client"
 const RUNTIME_ORIGIN = import.meta.env.VITE_MINI_APP_ORIGIN ?? ""
 
 
+// Dev-only host-side debug surface — pairs with the iframe's
+// __MINI_APP_DEBUG__. Lets us inspect from the board's devtools
+// whether the handshake is happening + what origin we expect.
+declare global {
+  var __MINI_APP_HOST_DEBUG__:
+    | {
+        runtimeOrigin: string
+        mounts: number
+        readyEventsReceived: number
+        rpcEventsReceived: number
+        lastReadyFrom?: string
+      }
+    | undefined
+}
+
+if (import.meta.env.DEV && typeof window !== "undefined") {
+  globalThis.__MINI_APP_HOST_DEBUG__ ??= {
+    runtimeOrigin: RUNTIME_ORIGIN,
+    mounts: 0,
+    readyEventsReceived: 0,
+    rpcEventsReceived: 0,
+  }
+}
+
+
 export interface MiniAppMountProps {
   /** The note id whose state we hydrate on mount and save on each change. */
   noteId: string
@@ -82,6 +107,9 @@ export function MiniAppMount({
   // Register the message listener. Recreated whenever noteId changes
   // so the closure captures the right one for saveState routing.
   useEffect(() => {
+    if (globalThis.__MINI_APP_HOST_DEBUG__) {
+      globalThis.__MINI_APP_HOST_DEBUG__.mounts += 1
+    }
     const handler = createMessageHandler({
       postToIframe: (msg) => {
         iframeRef.current?.contentWindow?.postMessage(msg, RUNTIME_ORIGIN)
@@ -92,7 +120,13 @@ export function MiniAppMount({
       saveState: saveMiniAppState,
       toastInfo: (m) => toast(m),
       toastError: (m) => toast.error(m),
-      onReady: () => setIframeReady(true),
+      onReady: () => {
+        if (globalThis.__MINI_APP_HOST_DEBUG__) {
+          globalThis.__MINI_APP_HOST_DEBUG__.readyEventsReceived += 1
+          globalThis.__MINI_APP_HOST_DEBUG__.lastReadyFrom = RUNTIME_ORIGIN
+        }
+        setIframeReady(true)
+      },
       onResize: (h) => setHeight(h),
     })
     window.addEventListener("message", handler)
@@ -119,7 +153,18 @@ export function MiniAppMount({
     <iframe
       ref={iframeRef}
       data-testid="mini-app-iframe"
-      sandbox="allow-scripts"
+      // `allow-same-origin` is included on purpose. Without it the iframe
+      // has an opaque "null" origin, which breaks (a) Vite's HMR module
+      // loading in dev — null-origin iframes can't load their own
+      // modules due to SOP — and (b) any client-side state the runtime
+      // needs (its own localStorage, etc.).
+      //
+      // Security is still preserved because the iframe is loaded from
+      // VITE_MINI_APP_ORIGIN, which is a different origin from the host
+      // (different port in dev, different subdomain in prod). The host
+      // → iframe boundary still blocks cross-origin DOM/cookie/storage
+      // access. The iframe still cannot remove its own sandbox.
+      sandbox="allow-scripts allow-same-origin"
       src={`${RUNTIME_ORIGIN}/index.html`}
       title="mini-app"
       style={{ width: "100%", height, border: 0, display: "block" }}

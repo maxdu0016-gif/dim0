@@ -27,6 +27,34 @@ if (!HOST_ORIGIN) {
 }
 
 
+// Dev-only debug surface for the iframe console. The console treats
+// inputs as classic scripts, so `import.meta` is unavailable from a
+// prompt — exposing a plain window global keeps the runtime
+// inspectable. Read in devtools as `__MINI_APP_DEBUG__`.
+declare global {
+  var __MINI_APP_DEBUG__:
+    | {
+        hostOrigin: string
+        runtimeOrigin: string
+        bootedAt: string
+        readyPosted: boolean
+        renderCount: number
+        lastIncoming?: { type?: unknown; origin?: string }
+      }
+    | undefined
+}
+
+if (import.meta.env.DEV) {
+  globalThis.__MINI_APP_DEBUG__ = {
+    hostOrigin: HOST_ORIGIN,
+    runtimeOrigin: window.location.origin,
+    bootedAt: new Date().toISOString(),
+    readyPosted: false,
+    renderCount: 0,
+  }
+}
+
+
 const rootEl = document.getElementById("root")
 if (!rootEl) throw new Error("missing #root element")
 const root = createRoot(rootEl)
@@ -47,6 +75,9 @@ function buildScope(): Record<string, unknown> {
 
 
 function renderWidget(source: string, savedState: unknown) {
+  if (globalThis.__MINI_APP_DEBUG__) {
+    globalThis.__MINI_APP_DEBUG__.renderCount += 1
+  }
   // The agent's component reads `host.initialState` (typically inside a
   // useState initializer) on first render. Set it before compile so the
   // first read sees the persisted value, not undefined.
@@ -69,6 +100,13 @@ function renderWidget(source: string, savedState: unknown) {
 
 
 window.addEventListener("message", (event) => {
+  if (globalThis.__MINI_APP_DEBUG__) {
+    const data = event.data as { type?: unknown } | null
+    globalThis.__MINI_APP_DEBUG__.lastIncoming = {
+      type: data?.type,
+      origin: event.origin,
+    }
+  }
   if (event.origin !== HOST_ORIGIN) return
   // Route RPC results back to their pending promises first — handle returns
   // true if it recognized + processed the message type, in which case we're
@@ -84,3 +122,6 @@ window.addEventListener("message", (event) => {
 
 
 window.parent.postMessage({ type: "mini-app:ready" }, HOST_ORIGIN)
+if (globalThis.__MINI_APP_DEBUG__) {
+  globalThis.__MINI_APP_DEBUG__.readyPosted = true
+}

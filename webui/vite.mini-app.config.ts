@@ -13,37 +13,17 @@ import path from "path"
 
 import tailwindcss from "@tailwindcss/vite"
 import react from "@vitejs/plugin-react-swc"
-import { defineConfig, type Plugin } from "vite"
+import { defineConfig } from "vite"
 
 
-/**
- * Swap CSP directives at index.html serve/build time. The meta-tag in the
- * HTML uses {{CSP_CONNECT_SRC}} / {{CSP_SCRIPT_SRC}} placeholders so dev
- * builds can allow Vite's HMR WebSocket without leaving prod open.
- *
- * - dev (`server` defined): allow `ws:` + `'self'` so Vite HMR connects.
- * - prod build: tighten to `'none'` — the iframe must not reach any
- *   network endpoint, period.
- */
-function miniAppCspPlugin(): Plugin {
-  return {
-    name: "mini-app-csp",
-    transformIndexHtml: {
-      order: "pre",
-      handler(html, ctx) {
-        const isDev = Boolean(ctx.server)
-        const connectSrc = isDev ? "'self' ws: wss:" : "'none'"
-        return html
-          .replace("{{CSP_CONNECT_SRC}}", connectSrc)
-      },
-    },
-  }
-}
+// CSP is intentionally not injected via index.html meta-tag (see the
+// long comment in mini-app-runtime/index.html). Phase 4 hardening
+// will move it to HTTP response headers from the asset host.
 
 
 export default defineConfig({
   root: path.resolve(__dirname, "mini-app-runtime"),
-  plugins: [react(), tailwindcss(), miniAppCspPlugin()],
+  plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
       // The runtime will pull a curated subset of host components into

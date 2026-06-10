@@ -3,25 +3,17 @@
   <head>
     <meta charset="utf-8" />
     <!--
-      Content Security Policy locked down per mini-app-archi.md §11.
-      - `unsafe-eval` in `script-src` is required by sucrase + new Function;
-        the iframe sandbox + cross-origin treatment is the actual boundary.
-      - `connect-src` is rewritten per environment by miniAppCspPlugin in
-        vite.mini-app.config.ts: 'none' in prod (agent code cannot fetch
-        out at all), 'self' + ws:/wss: in dev so Vite's HMR works. The
-        placeholder is intentional — do not hardcode.
-      - `frame-ancestors` is set per-env via HTTP header in prod; the
-        meta-tag is omitted here because meta-tag CSP ignores frame-ancestors.
+      Content Security Policy is intentionally NOT set as a meta-tag.
+      Why: the iframe loads with sandbox="allow-scripts" (no
+      allow-same-origin), giving it an opaque "null" origin. Browsers
+      then refuse to match `'self'` in script-src/style-src against
+      same-host scripts — so a meta-tag CSP with `'self'` blocks
+      everything including main.tsx. The iframe's sandbox attribute is
+      already the load-bearing security boundary; Phase 4 hardening
+      will move CSP to HTTP response headers from the asset host
+      where 'self' isn't ambiguous (production serves from a real
+      origin, not via meta-tag inside a sandboxed document).
     -->
-    <meta
-      http-equiv="Content-Security-Policy"
-      content="default-src 'none';
-               script-src 'self' 'unsafe-eval';
-               style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
-               img-src 'self' data: blob:;
-               font-src 'self' data: https://fonts.gstatic.com;
-               connect-src {{CSP_CONNECT_SRC}};"
-    />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Mini-app runtime</title>
     <link rel="stylesheet" href="/runtime.css" />
