@@ -27,11 +27,6 @@ import {
 import { useBoardAppStore } from "../../store/board-app-store"
 
 
-// Expanded-editor dialog for mini-apps is Phase 4 polish (see
-// mini-app-archi.md §17 "Phase 4"). v1 has no NodeSurfaceKind for
-// "mini-app" → onExpand is omitted from NodeTrafficLights below.
-
-
 export interface MiniAppViewProps {
   id: NodeId
 }
@@ -45,6 +40,7 @@ export interface MiniAppViewProps {
 export function MiniAppView({ id }: MiniAppViewProps) {
   const node = useNode(id)
   const store = useCanvasStore()
+  const openNodeSurface = useBoardAppStore((s) => s.openNodeSurface)
   const canEdit = useBoardAppStore((s) => s.canEdit)
   const wrapRef = useRef<HTMLDivElement>(null)
   const isInView = useIsInView(wrapRef, "200px")
@@ -82,6 +78,7 @@ export function MiniAppView({ id }: MiniAppViewProps) {
 
       <NodeTrafficLights
         onDelete={canEdit ? () => store.removeNode(id) : undefined}
+        onExpand={canEdit ? () => openNodeSurface(id as unknown as string, "mini-app") : undefined}
       />
 
       <div className="pointer-events-auto absolute left-1/2 top-full z-20 mt-2 w-full -translate-x-1/2">
