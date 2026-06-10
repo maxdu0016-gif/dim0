@@ -23,6 +23,13 @@ import { defineConfig } from "vite"
 
 export default defineConfig({
   root: path.resolve(__dirname, "mini-app-runtime"),
+  // Isolate the dep-optimize cache from the host's Vite server.
+  // Otherwise both servers race on webui/node_modules/.vite/deps/ —
+  // each one's startup invalidates the other's pre-bundled deps and
+  // the browser gets 504 "Outdated Optimize Dep" until you Ctrl+C
+  // both and restart in lockstep. With a dedicated dir this is a
+  // non-issue regardless of order or timing.
+  cacheDir: path.resolve(__dirname, "node_modules/.vite-mini-app"),
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
