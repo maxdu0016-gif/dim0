@@ -315,6 +315,12 @@ Pick lightness in `0.50`–`0.65`, chroma `0.10`–`0.20`, and a hue that fits t
 
 ---
 
+## Theming is automatic
+
+The iframe inherits the host's active palette + light/dark mode. When the user flips themes in the app, the widget retheme without remounting — your `useState` survives. The only thing you have to do is **stay inside the semantic palette** (above). Hardcoded hex values won't update on theme change, semantic tokens will.
+
+---
+
 ## Verification before you submit
 
 Walk through these in your head before calling `write_note`:

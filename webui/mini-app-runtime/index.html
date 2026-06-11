@@ -1,5 +1,13 @@
 <!doctype html>
-<html lang="en">
+<!--
+  Initial theme defaults live on <html> to match where the host writes
+  them (theme-provider.tsx). main.tsx overwrites these the moment the
+  first `mini-app:render` message arrives from the host, so this is
+  only the holding pattern between iframe load and the handshake. The
+  widget itself isn't painted until the render message lands, so the
+  user doesn't see a flash even if the host's active palette differs.
+-->
+<html lang="en" data-theme="parchment" data-mode="light">
   <head>
     <meta charset="utf-8" />
     <!--
@@ -28,7 +36,7 @@
     -->
     <script src="/config.js"></script>
   </head>
-  <body data-theme="parchment" data-mode="light">
+  <body>
     <div id="root"></div>
     <script type="module" src="/main.tsx"></script>
   </body>

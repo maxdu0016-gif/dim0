@@ -10,9 +10,12 @@
 //   3. When BOTH "ready" arrived AND the saved-state fetch settled
 //      (success OR failure — failure falls back to undefined), the host
 //      posts {type:"mini-app:render", source, savedState, theme}.
-//   4. iframe may post {type:"mini-app:rpc"} → host dispatches by method,
+//   4. Whenever the host's active theme/palette changes thereafter, the
+//      host posts {type:"mini-app:theme", theme}. The iframe applies
+//      data attributes only; no widget remount.
+//   5. iframe may post {type:"mini-app:rpc"} → host dispatches by method,
 //      replies with {type:"mini-app:rpc-result"}. See dispatch.ts.
-//   5. iframe may post {type:"mini-app:resize"} → host updates height.
+//   6. iframe may post {type:"mini-app:resize"} → host updates height.
 //
 // Security: the iframe is sandbox="allow-scripts" only, and the runtime
 // is served from a different origin (different port in dev, different
@@ -23,6 +26,8 @@
 import { useEffect, useRef, useState } from "react"
 
 import { toast } from "sonner"
+
+import { useTheme } from "@/components/theme-provider"
 
 import { createMessageHandler } from "./dispatch"
 import { fetchMiniAppState, saveMiniAppState } from "./state-client"
@@ -86,6 +91,11 @@ export function MiniAppMount({
   const [iframeReady, setIframeReady] = useState(false)
   const [savedStateLoaded, setSavedStateLoaded] = useState(false)
   const savedStateRef = useRef<unknown>(undefined)
+  // Pull the host's active theme so the iframe can mirror it. `themeId`
+  // is the palette ("parchment", "tokyo-night", …) and `resolvedTheme`
+  // collapses "system" mode down to a concrete "light" | "dark". Both
+  // map 1:1 to data attributes the iframe sets on its own <html>.
+  const { themeId, resolvedTheme } = useTheme()
   // contentHeight is the widget's reported natural height (from
   // mini-app:resize). When >0, we use it directly; until then the
   // iframe fills its parent so the user sees the widget at the
@@ -143,8 +153,10 @@ export function MiniAppMount({
   }, [noteId])
 
   // Once both signals are in (handshake + state fetched), kick off the
-  // render. Theme is hardcoded "light" for v1 — proper theme sync lands
-  // in Phase 4 (mini-app-archi.md §13).
+  // render. The theme payload is captured here too so the very first
+  // paint already matches the host palette / mode. Theme is intentionally
+  // NOT in this effect's dep list — flipping themes shouldn't trash the
+  // widget's React tree; see the dedicated mini-app:theme effect below.
   useEffect(() => {
     if (!iframeReady || !savedStateLoaded) return
     iframeRef.current?.contentWindow?.postMessage(
@@ -152,11 +164,29 @@ export function MiniAppMount({
         type: "mini-app:render",
         source,
         savedState: savedStateRef.current,
-        theme: "light",
+        theme: { id: themeId, mode: resolvedTheme },
       },
       RUNTIME_ORIGIN,
     )
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [iframeReady, savedStateLoaded, source])
+
+  // Live theme propagation. Re-posts `mini-app:theme` whenever the host
+  // theme changes so the iframe flips `data-theme`/`data-mode` on its
+  // own <html> without remounting the widget. Gated on iframeReady so we
+  // don't race the handshake; on first mount the render effect above
+  // already carries the same payload, so the iframe receives one render
+  // + one theme back-to-back — harmless, second is a no-op.
+  useEffect(() => {
+    if (!iframeReady) return
+    iframeRef.current?.contentWindow?.postMessage(
+      {
+        type: "mini-app:theme",
+        theme: { id: themeId, mode: resolvedTheme },
+      },
+      RUNTIME_ORIGIN,
+    )
+  }, [iframeReady, themeId, resolvedTheme])
 
   return (
     <iframe

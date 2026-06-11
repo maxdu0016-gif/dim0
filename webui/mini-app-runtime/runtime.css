@@ -6,14 +6,32 @@
  * twice — once into the host bundle, once here — but the source of
  * truth stays single.
  *
- * Phase 4 will sync the active theme via postMessage; for now the
- * runtime inherits the parchment default declared on <html> by the
- * theme bootstrap script in the host (or, in our case, the runtime's
- * fresh DOM defaults to parchment because that's what @custom-variant
- * picks when no data-mode is set).
+ * Active theme is synced from the host via postMessage:
+ *   - `mini-app:render` carries the current { id, mode } on first paint
+ *   - `mini-app:theme` flips data attributes on host theme changes
+ * The runtime writes both onto <html>; selectors in index.css
+ * (`[data-theme="X"][data-mode="Y"]`) take it from there.
  */
 
 @import "../src/index.css";
+
+/*
+ * Widen Tailwind's source scan to webui/src/ so utilities used by
+ * imported host components (Card, Button, Chart, …) appear in the
+ * iframe's compiled CSS. Without this, the iframe's vite root
+ * (`mini-app-runtime/`) only scans iframe-local files and emits a
+ * stripped utility set — `bg-card`, `bg-background`, `text-foreground`,
+ * etc. silently fall through to no-op, leaving cards transparent and
+ * outline buttons with currentColor (black) borders.
+ *
+ * `inline(...)` explicitly enumerates classes the AGENT may use at
+ * runtime but that aren't in any scanned source file — without it
+ * those classes can't be JIT'd inside the sandboxed iframe (the
+ * `@tailwindcss/browser` build doesn't know our @theme tokens).
+ */
+@source "../src";
+@source inline("{,hover:,focus:,dark:}{bg,text,border,ring}-{background,foreground,card,card-foreground,popover,popover-foreground,primary,primary-foreground,secondary,secondary-foreground,muted,muted-foreground,accent,accent-foreground,destructive,destructive-foreground,border,input,ring}");
+@source inline("font-{handwriting,mono,sans,serif,informal}");
 
 
 /* The runtime root element fills the iframe so the host can

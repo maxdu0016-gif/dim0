@@ -125,6 +125,23 @@ function renderWidget(source: string, savedState: unknown) {
 }
 
 
+// Apply the host's active theme by writing data attributes to <html>.
+// The shared src/index.css declares every palette × mode pair as
+// `[data-theme="X"][data-mode="Y"] { --background: ...; ... }`, so
+// flipping the attribute is enough to retheme CSS variables + Tailwind
+// utilities for the entire iframe document.
+function applyTheme(theme: unknown) {
+  if (!theme || typeof theme !== "object") return
+  const t = theme as { id?: unknown; mode?: unknown }
+  if (typeof t.id === "string") {
+    document.documentElement.dataset.theme = t.id
+  }
+  if (t.mode === "light" || t.mode === "dark") {
+    document.documentElement.dataset.mode = t.mode
+  }
+}
+
+
 window.addEventListener("message", (event) => {
   if (globalThis.__MINI_APP_DEBUG__) {
     const data = event.data as { type?: unknown } | null
@@ -139,10 +156,20 @@ window.addEventListener("message", (event) => {
   // done with this event.
   if (handleHostMessage(event.data)) return
 
-  const msg = event.data as { type?: string; source?: string; savedState?: unknown } | null
+  const msg = event.data as {
+    type?: string
+    source?: string
+    savedState?: unknown
+    theme?: unknown
+  } | null
   if (!msg || typeof msg !== "object") return
   if (msg.type === "mini-app:render" && typeof msg.source === "string") {
+    applyTheme(msg.theme)
     renderWidget(msg.source, msg.savedState)
+    return
+  }
+  if (msg.type === "mini-app:theme") {
+    applyTheme(msg.theme)
   }
 })
 
