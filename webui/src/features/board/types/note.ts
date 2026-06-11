@@ -65,6 +65,11 @@ export interface Note extends Record<string, unknown> {
 }
 
 
+// IMPORTANT: keep these constants in sync with `get_default_note_size`
+// in backend/topix/agents/notes/service.py. The frontend handles
+// canvas-toolbar creates; the backend handles agent-side `write_note`
+// creates. A drift between them means agent-created notes land at
+// different sizes than user-created ones.
 export const DEFAULT_RECTANGLE_NOTE_WIDTH = 320
 export const DEFAULT_RECTANGLE_NOTE_HEIGHT = 180
 export const DEFAULT_ELLIPSE_NOTE_WIDTH = 320
