@@ -55,7 +55,7 @@ Every identifier listed below is available as a bare name. Anything not listed i
   - **Shorthand (one series):** `data={[42, 58, 71]}` + `kind="line"`.
   - **Multi-series:** `datasets={[{ label: "Revenue", data: [...], color: "primary" }, ...]}`. Use either `data` OR `datasets`, never both.
   - `labels` default to `"0", "1", "2", ...` when omitted.
-  - Colors accept palette names (`"primary"`, `"destructive"`, `"chart-1"`...`"chart-5"`) or CSS literals (`"#abc123"`, `"var(--color-foo)"`).
+  - Colors take palette names (`"primary"`, `"destructive"`, `"chart-1"`…`"chart-5"`, `"card"`, `"muted"`, etc.) and re-theme automatically. Raw hex / `rgb()` is allowed but does **not** theme — see the Colors section below before reaching for it.
   - For `kind="pie"`: pass `data` as `[{ name: "A", value: 30 }, ...]`.
 
 - `<Graph nodes edges viewBox? height? />` — node-link diagram (pure SVG).
@@ -213,8 +213,11 @@ function Widget() {
   useEffect(() => { host.saveState(step) }, [step])
 
   const visited = ["A", "B", "C"].slice(0, step)
+  // Semantic palette names — "chart-1" highlights visited nodes, "card"
+  // is the resting fill. Both retheme automatically when the host flips
+  // dark/light or swaps palettes.
   const fillFor = (id) =>
-    visited.includes(id) ? "var(--color-chart-1)" : "var(--color-card)"
+    visited.includes(id) ? "chart-1" : "card"
 
   const nodes = [
     { id: "A", x: 30,  y: 60, color: fillFor("A") },
@@ -228,7 +231,7 @@ function Widget() {
 
   return (
     <Card className="p-4 max-w-md">
-      <CardHeader><CardTitle>BFS step {step}</CardTitle></CardHeader>
+      <CardHeader><CardTitle className="font-handwriting text-xl">BFS step {step}</CardTitle></CardHeader>
       <CardContent>
         <Graph nodes={nodes} edges={edges} viewBox="0 0 240 130" height={180} />
         <div className="flex gap-2 mt-3">
@@ -248,8 +251,67 @@ function Widget() {
 
 - Default to compact widgets — `max-w-sm` for single-purpose, `max-w-md` for lists.
 - Use `Card` as the outer container so the widget feels native to the board.
-- Tailwind tokens follow the host theme (parchment + sienna defaults). Stick to semantic classes like `text-muted-foreground`, `border`, `bg-card`, not raw hex colors.
 - Don't add scroll containers — the host auto-resizes the iframe to fit content.
+
+---
+
+## Typography
+
+Mix three families like a notebook layout — handwriting for headings, mono for code, sans for everything else. The fonts ship with the runtime; just use the utility classes.
+
+- `font-handwriting` — titles, subtitles, callouts. Adds personality. Use sparingly, usually only on the `<CardTitle>` or a one-line subtitle. The host UI uses this for note titles, so widget titles match.
+- `font-mono` — anything code-like: keyboard shortcuts, variable names, raw values, log lines, snippets inside `<code>` or `<pre>`.
+- `font-sans` — the default; you usually don't need to spell it out. Body copy, labels, button text.
+- `font-serif` — long-form prose if you ever need it (rare in widgets).
+
+Example mixing all three:
+
+```jsx
+<CardHeader>
+  <CardTitle className="font-handwriting text-2xl">Counter</CardTitle>
+  <p className="text-sm text-muted-foreground">Press <kbd className="font-mono">+</kbd> to add</p>
+</CardHeader>
+```
+
+Don't apply `font-handwriting` to long blocks — it's playful but tiring to read past a sentence.
+
+---
+
+## Colors
+
+The host runs six themes × {light, dark}, and the iframe inherits whichever is active. The agent's job is to stay inside the semantic palette so the widget themes for free.
+
+**Always-safe — use semantic Tailwind tokens.**
+
+| Want | Class |
+|---|---|
+| Card background | `bg-card` |
+| Page background | `bg-background` |
+| Primary action | `bg-primary text-primary-foreground` |
+| Secondary action | `bg-secondary text-secondary-foreground` |
+| Muted surface | `bg-muted` |
+| Body text | `text-foreground` (default) |
+| Subdued text | `text-muted-foreground` |
+| Destructive action | `bg-destructive text-destructive-foreground` |
+| Border | `border` |
+| Focus ring | `ring-ring` |
+
+For charts and graphs, pass `color="primary"` / `"destructive"` / `"chart-1"`…`"chart-5"` rather than literal hex. The five `chart-N` slots are picked per theme to look good together.
+
+**Last-resort — use a theme-stable color literal.**
+
+If you genuinely need a color outside the palette (e.g. a domain-specific colour like "danger orange" in a fire-risk widget), use **OKLCH** with mid-range lightness so it reads in both modes:
+
+```jsx
+<div style={{ background: "oklch(0.62 0.18 60)" }} />  // warm amber that survives dark/light
+```
+
+Pick lightness in `0.50`–`0.65`, chroma `0.10`–`0.20`, and a hue that fits the warm parchment-ish default palette (red 25°, orange 60°, yellow 90°, green 145°, teal 195°, blue 240°, purple 295°).
+
+**Never.**
+
+- Raw hex (`#965e30`), `rgb()`, or named colors (`"red"`, `"navy"`) — these don't theme.
+- Pure black (`#000`) or pure white (`#fff`) — use `text-foreground` / `bg-background` instead so dark mode inverts correctly.
 
 ---
 

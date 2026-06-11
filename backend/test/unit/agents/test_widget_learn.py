@@ -40,3 +40,11 @@ async def test_learn_generate_mini_app_returns_skill_prompt() -> None:
     # widgets it ships are limited to a stale subset of the runtime.
     assert "Chart" in prompt
     assert "Graph" in prompt
+    # Typography + color guidance — the agent must know about the three
+    # font families and the semantic shadcn palette, otherwise widgets
+    # come out monochrome and don't theme across light/dark.
+    assert "font-handwriting" in prompt
+    assert "font-mono" in prompt
+    assert "bg-card" in prompt
+    assert "text-muted-foreground" in prompt
+    assert "oklch" in prompt
