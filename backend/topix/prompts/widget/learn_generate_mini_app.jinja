@@ -68,10 +68,9 @@ Every identifier listed below is available as a bare name. Anything not listed i
 - `cn(...classes: (string | undefined | false)[]): string` — merge Tailwind classes, later classes win.
 
 ### Host RPC
-- `host.initialState: unknown` — value the host stored for this user on this note via a previous `saveState`. `undefined` on first mount.
+- `host.initialState: unknown` — value the host stored for this user on this note via a previous `saveState`. `undefined` on first mount. **Shape may have changed** if you rewrote the widget — validate before use rather than dereferencing fields blindly. A safe pattern: `useState(isMyState(host.initialState) ? host.initialState : defaultState)`.
 - `host.saveState(state): Promise<void>` — persist the given JSON value for the current user on the current note. Use in a `useEffect`, fire-and-forget.
 - `host.toast(message: string, level?: "info" | "error"): Promise<void>` — flash a short message in the host app.
-- `host.callTool(name, args)` and `host.openNote(noteId)` — stubs in v1; will reject with "not implemented." Don't call them.
 
 ---
 

@@ -100,18 +100,6 @@ describe("host.* RPC bridge", () => {
   })
 
 
-  it("callTool stub still uses the RPC channel (host decides to reject)", async () => {
-    const pending = host.callTool("search", { q: "x" })
-    const id = posted[0].id
-    handleHostMessage({
-      type: "mini-app:rpc-result",
-      id,
-      error: "callTool not implemented in v1",
-    })
-    await expect(pending).rejects.toThrow(/not implemented/)
-  })
-
-
   it("host.initialState reflects setHostInitialState", () => {
     expect(host.initialState).toBeUndefined()
     setHostInitialState({ saved: 42 })

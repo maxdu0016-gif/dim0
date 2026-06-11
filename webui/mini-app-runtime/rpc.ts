@@ -57,9 +57,12 @@ export function setHostInitialState(value: unknown): void {
 /**
  * The object injected into the agent's scope under the name `host`.
  *
- * Phase 2 wires `saveState` + `toast` end-to-end; `callTool` and
- * `openNote` are stubs that will reject with "not implemented" until
- * Phase 3 fills them in.
+ * v1 surface: `initialState`, `saveState`, `toast`. `callTool` and
+ * `openNote` were sketched as stubs but only returned "not implemented"
+ * errors, which produced confusing UX when the agent tried them. They
+ * were dropped from the scope until there's a concrete need + real
+ * implementation; reintroduce alongside an agent-callable handler in
+ * dispatch.ts when that day comes.
  */
 export const host = {
   /** Last persisted state for this widget mount, or undefined on first load. */
@@ -79,19 +82,6 @@ export const host = {
   /** Show a transient toast in the host app. Level defaults to "info". */
   toast(message: string, level?: "info" | "error"): Promise<void> {
     return send<void>("toast", { message, level })
-  },
-
-  /**
-   * Invoke a host-exposed tool by name. Phase 2 stub — rejects until
-   * the agent path lands in Phase 3.
-   */
-  callTool(name: string, args: unknown): Promise<unknown> {
-    return send<unknown>("callTool", { name, args })
-  },
-
-  /** Open a note by id. Phase 2 stub — rejects until Phase 3. */
-  openNote(noteId: string): Promise<void> {
-    return send<void>("openNote", { noteId })
   },
 }
 

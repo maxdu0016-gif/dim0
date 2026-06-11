@@ -70,27 +70,6 @@ describe("dispatchRpc", () => {
   })
 
 
-  it("returns an error for callTool — stubbed in v1", async () => {
-    const deps = makeRpcDeps()
-    const reply = await dispatchRpc(
-      { type: "mini-app:rpc", id: "1", method: "callTool", args: { name: "search" } },
-      deps,
-    )
-    expect(reply.error).toMatch(/not implemented/)
-    expect(reply.result).toBeUndefined()
-  })
-
-
-  it("returns an error for openNote — stubbed in v1", async () => {
-    const deps = makeRpcDeps()
-    const reply = await dispatchRpc(
-      { type: "mini-app:rpc", id: "1", method: "openNote", args: { noteId: "x" } },
-      deps,
-    )
-    expect(reply.error).toMatch(/not implemented/)
-  })
-
-
   it("returns an error for genuinely unknown methods", async () => {
     const deps = makeRpcDeps()
     const reply = await dispatchRpc(

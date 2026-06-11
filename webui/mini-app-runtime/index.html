@@ -1,13 +1,27 @@
 <!doctype html>
 <!--
   Initial theme defaults live on <html> to match where the host writes
-  them (theme-provider.tsx). main.tsx overwrites these the moment the
-  first `mini-app:render` message arrives from the host, so this is
-  only the holding pattern between iframe load and the handshake. The
-  widget itself isn't painted until the render message lands, so the
-  user doesn't see a flash even if the host's active palette differs.
+  them (theme-provider.tsx). The inline script below upgrades these
+  from URL query params (`?theme=parchment&mode=dark`) BEFORE any CSS
+  paint, so the iframe boots in the host's active palette without a
+  parchment-light flash. main.tsx then keeps them in sync via the
+  `mini-app:theme` postMessage protocol on live changes.
 -->
 <html lang="en" data-theme="parchment" data-mode="light">
+  <script>
+    (function () {
+      try {
+        var p = new URLSearchParams(location.search)
+        var t = p.get("theme")
+        var m = p.get("mode")
+        if (t) document.documentElement.dataset.theme = t
+        if (m === "light" || m === "dark") document.documentElement.dataset.mode = m
+      } catch (_) {
+        // No URL or bad params → fall back to the hardcoded defaults
+        // above. Not worth bailing out of the iframe over.
+      }
+    })()
+  </script>
   <head>
     <meta charset="utf-8" />
     <!--

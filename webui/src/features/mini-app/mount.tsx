@@ -23,7 +23,7 @@
 // is filtered on event.origin === RUNTIME_ORIGIN AND
 // event.source === iframeRef.current.contentWindow. Both, no exceptions.
 
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
 import { ArrowClockwiseIcon, WarningIcon } from "@phosphor-icons/react"
 import { toast } from "sonner"
@@ -54,6 +54,28 @@ const RUNTIME_ORIGIN =
   (typeof window !== "undefined" ? window.__APP_CONFIG__?.miniAppOrigin : undefined) ||
   import.meta.env.VITE_MINI_APP_ORIGIN ||
   ""
+
+
+// Deployment safeguard: the iframe is sandboxed with `allow-same-origin`
+// for legit browser-API reasons (see the comment near the `sandbox`
+// attribute below). That flag is SAFE only when the runtime is served
+// from a *different* origin than the host — that cross-origin split is
+// what stops the iframe from touching host cookies / DOM / storage.
+// If a deploy ever points VITE_MINI_APP_ORIGIN at the host's origin,
+// the security model collapses silently. Fail loud here at module
+// load so a misconfig is impossible to miss.
+if (
+  typeof window !== "undefined" &&
+  RUNTIME_ORIGIN !== "" &&
+  RUNTIME_ORIGIN === window.location.origin
+) {
+  console.error(
+    "[mini-app] runtime origin matches host origin — `allow-same-origin` " +
+      "sandbox would expose host cookies/storage to the iframe. " +
+      "Move the runtime to a different subdomain.",
+    { hostOrigin: window.location.origin, runtimeOrigin: RUNTIME_ORIGIN },
+  )
+}
 
 
 // Dev-only host-side debug surface — pairs with the iframe's
@@ -153,6 +175,23 @@ export function MiniAppMount({
     setContentHeight(null)
     setReloadKey((k) => k + 1)
   }, [])
+
+  // Bake the host's active theme into the iframe URL so the runtime's
+  // inline bootstrap script (index.html) applies it to <html> BEFORE
+  // any CSS paints. Eliminates the parchment-default flash when the
+  // host is in a different palette. Intentionally NOT depending on
+  // themeId/resolvedTheme — live theme changes flow via postMessage
+  // (mini-app:theme) and must NOT recompute the src, or the iframe
+  // would reload and lose state on every host theme flip. Re-evaluates
+  // only on retry (reloadKey++), at which point we capture the
+  // current theme for the fresh iframe instance.
+  const iframeSrc = useMemo(() => {
+    const u = new URL(`${RUNTIME_ORIGIN}/index.html`)
+    u.searchParams.set("theme", themeId)
+    u.searchParams.set("mode", resolvedTheme)
+    return u.toString()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reloadKey])
 
   // Hydrate saved state from the backend. Failures fall through
   // silently — a network blip on load shouldn't block the widget from
@@ -275,18 +314,24 @@ export function MiniAppMount({
       ref={iframeRef}
       data-testid="mini-app-iframe"
       // `allow-same-origin` is included on purpose. Without it the iframe
-      // has an opaque "null" origin, which breaks (a) Vite's HMR module
-      // loading in dev — null-origin iframes can't load their own
-      // modules due to SOP — and (b) any client-side state the runtime
-      // needs (its own localStorage, etc.).
+      // has an opaque "null" origin, which (a) breaks Vite's HMR module
+      // loading in dev (null-origin iframes can't load their own modules
+      // due to SOP) and (b) blocks several browser APIs even in prod
+      // (localStorage, IndexedDB, etc.).
       //
       // Security is still preserved because the iframe is loaded from
-      // VITE_MINI_APP_ORIGIN, which is a different origin from the host
+      // VITE_MINI_APP_ORIGIN, which is a *different origin from the host*
       // (different port in dev, different subdomain in prod). The host
       // → iframe boundary still blocks cross-origin DOM/cookie/storage
       // access. The iframe still cannot remove its own sandbox.
+      //
+      // ⚠ If the iframe is ever served from the SAME origin as the host
+      // (e.g., a misconfig putting it on `dim0.net/mini-app/`),
+      // `allow-same-origin` becomes catastrophic — the iframe could
+      // then read host cookies/localStorage/DOM. Keep mini-app on its
+      // own subdomain; the assertion below enforces it at boot.
       sandbox="allow-scripts allow-same-origin"
-      src={`${RUNTIME_ORIGIN}/index.html`}
+      src={iframeSrc}
       title="mini-app"
       onError={() => setIframeFailed(true)}
       style={{

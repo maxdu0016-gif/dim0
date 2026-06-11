@@ -117,11 +117,10 @@ export const MINI_APP_SCOPE: Record<string, ScopeEntry> = {
   host: {
     value: host,
     signature:
-      "host.initialState: unknown; host.saveState(state); host.toast(message, level?); " +
-      "host.callTool(name, args); host.openNote(noteId)",
+      "host.initialState: unknown; host.saveState(state); host.toast(message, level?)",
     doc:
-      "RPC bridge to the host. saveState + toast work in v1; callTool + openNote " +
-      "exist but reject until the agent path is wired in Phase 3.",
+      "RPC bridge to the host. saveState persists per-user state for this " +
+      "widget mount; toast surfaces a transient message in the host app.",
   },
 }
 

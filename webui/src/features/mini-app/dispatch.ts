@@ -55,13 +55,15 @@ export async function dispatchRpc(
         else deps.toastInfo(message)
         return { type: "mini-app:rpc-result", id: request.id, result: undefined }
       }
-      case "callTool":
-      case "openNote":
       default:
+        // Unknown method. Today this only fires if the agent's code
+        // posts a method we don't recognize — `callTool`/`openNote`
+        // used to live as explicit cases here but were dropped from
+        // the host bridge until they have real implementations.
         return {
           type: "mini-app:rpc-result",
           id: request.id,
-          error: `${request.method} not implemented in v1`,
+          error: `${request.method} not implemented`,
         }
     }
   } catch (err) {
