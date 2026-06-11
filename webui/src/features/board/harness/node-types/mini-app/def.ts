@@ -7,15 +7,25 @@ import { MiniAppView } from "./view"
 /**
  * Mini-app node — sandboxed-iframe-rendered React component.
  *
- * Like the HTML widget, the iframe is expensive to mount; we share the
- * same LOD threshold (0.6) so iframes only render when the user has
- * zoomed in. Below that, the canvas placeholder paint runs in its
- * place — see drawMiniAppPlaceholder.
+ * LOD threshold is lower than the HTML widget's (0.25 vs 0.6) because
+ * mini-apps tend to grow tall via the canvas auto-grow path
+ * (view.tsx → store.updateNode). Users routinely zoom out to take in
+ * a multi-section dashboard widget in context; cutting React off too
+ * early defeats that — the placeholder is just a static icon, not
+ * the widget. The off-screen suspension in view.tsx (useIsInView)
+ * still bounds memory because only mini-apps actually inside the
+ * viewport at any zoom level pay the iframe-mount cost.
+ *
+ * Sibling thresholds for reference (Jun 2026):
+ * - widget (HTML iframe): 0.6
+ * - sheet, document, folder: 0.4
+ * - code-sandbox: 0.5
+ * - mini-app (this): 0.25
  */
 export const miniAppDef = defineNode({
   type: "mini-app",
   view: MiniAppView,
   drawPlaceholder: drawMiniAppPlaceholder,
-  lod: { minZoomForReact: 0.6, minZoomForPlaceholder: 0.05 },
+  lod: { minZoomForReact: 0.25, minZoomForPlaceholder: 0.05 },
   hitTest: (node, p) => p.x >= 0 && p.x <= node.w && p.y >= 0 && p.y <= node.h,
 })
