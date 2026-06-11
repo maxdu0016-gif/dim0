@@ -75,8 +75,15 @@ export const DEFAULT_DIAMOND_NOTE_HEIGHT = 340
 export const DEFAULT_TEXT_NOTE_WIDTH = 150
 export const DEFAULT_TEXT_NOTE_HEIGHT = 20
 
-export const DEFAULT_SHEET_WIDTH = 320
-export const DEFAULT_SHEET_HEIGHT = 200
+// Sheet default size targets the typography sweet spot for prose.
+// At ~14px text + standard padding, 560px width yields ~65-70 chars
+// per line — comfortable for sustained reading without crossing into
+// the "too long" territory past ~75 chars. The earlier 320px default
+// felt sticky-note-cramped for anything beyond a short reminder.
+// Min width stays at 200 — the user can still shrink a sheet to
+// sticky-note size manually when that's the intent.
+export const DEFAULT_SHEET_WIDTH = 560
+export const DEFAULT_SHEET_HEIGHT = 320
 export const SHEET_MIN_WIDTH = 200
 export const SHEET_MIN_HEIGHT = 120
 
