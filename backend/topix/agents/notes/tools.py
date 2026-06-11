@@ -195,8 +195,9 @@ def create_create_note_tool(
         backward compatibility.
         If the user asks for a rich-text document or long-form note, use `note_type="sheet"`.
         If the user asks for a code note or runnable snippet, use `code-sandbox` and put the code in `content`.
-        If the user asks for an HTML widget, first use `learn_generate_html_widget`
-            and then store the full HTML in `content` with `note_type="widget"`.
+        If the user asks for a chart, dashboard, diagram, flashcard, or other custom-rendered artifact,
+            first call `learn_generate_mini_app` and then store the JSX in `content` with `note_type="mini-app"`.
+            Raw HTML widgets (`learn_generate_html_widget` + `note_type="widget"`) are legacy.
 
         Args:
             content (str): Main markdown body of the note. This is the most important text.

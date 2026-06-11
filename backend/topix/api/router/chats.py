@@ -200,6 +200,7 @@ async def send_message(
                     "link_notes",
                     "learn_generate_html_widget",
                     "learn_generate_mini_app",
+                    "learn_generate_diagram",
                 }
             ]
 
