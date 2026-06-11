@@ -181,19 +181,27 @@ if (globalThis.__MINI_APP_DEBUG__) {
 
 
 // Auto-resize: watch the widget's content height and report it to
-// the host so the iframe (and eventually the canvas node, Phase 4)
-// can grow to fit. ResizeObserver fires on every content-size
-// change, including after React commits a state update that grows
-// the DOM.
+// the host so the iframe (and the canvas node it lives in) can grow
+// to fit. ResizeObserver fires on every content-size change,
+// including after React commits a state update that grows the DOM.
+//
+// Reports are coalesced via requestAnimationFrame so a widget
+// animating its height (e.g. the stepper, BFS step-through) sends
+// at most one `mini-app:resize` per frame instead of one per
+// ResizeObserver fire. The host's MiniAppView batches incoming
+// heights through its own rAF on the way to `store.updateNode`, so
+// without this coalescing we'd pay two postMessage hops + a
+// dedup-no-op per fire — fine for steady state, wasteful during
+// animation.
 //
 // Measurement combines four metrics (documentElement vs body,
-// scrollHeight vs offsetHeight) and takes the max — mirroring the
-// approach in widget-document.ts:buildWidgetResizeScript. Single-
-// metric measurement (just body.scrollHeight) understates content
-// extent in layouts with sticky/absolute positioning, transforms,
-// or overflow containers; the 4-metric max is robust against those
+// scrollHeight vs offsetHeight) and takes the max. Single-metric
+// measurement (just body.scrollHeight) understates content extent
+// in layouts with sticky/absolute positioning, transforms, or
+// overflow containers; the 4-metric max is robust against those
 // quirks at near-zero cost.
 let lastReportedHeight = 0
+let scheduledFrame: number | null = null
 function measureContentHeight(): number {
   const doc = document.documentElement
   const body = document.body
@@ -207,7 +215,8 @@ function measureContentHeight(): number {
   )
 }
 
-function reportHeight() {
+function flushHeight() {
+  scheduledFrame = null
   const height = measureContentHeight()
   if (height === lastReportedHeight || height <= 0) return
   lastReportedHeight = height
@@ -217,15 +226,15 @@ function reportHeight() {
   )
 }
 
-const resizeObserver = new ResizeObserver(() => reportHeight())
+function scheduleReport() {
+  if (scheduledFrame != null) return
+  scheduledFrame = requestAnimationFrame(flushHeight)
+}
+
+const resizeObserver = new ResizeObserver(() => scheduleReport())
 resizeObserver.observe(document.body)
 
-// Also fire on every animation frame for the first second — covers
-// the post-mount React renders that update DOM after the iframe
-// becomes visible but before ResizeObserver settles.
-let framesLeft = 60
-function frameTick() {
-  reportHeight()
-  if (framesLeft-- > 0) requestAnimationFrame(frameTick)
-}
-requestAnimationFrame(frameTick)
+// Kick the first measurement on next frame so the post-mount React
+// commit has flushed to DOM before we measure. ResizeObserver covers
+// every subsequent change.
+scheduleReport()
