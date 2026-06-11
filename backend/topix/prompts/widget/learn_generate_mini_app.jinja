@@ -5,9 +5,9 @@ Your goal is to produce one component and store it via `write_note(content_type=
 
 ---
 
-## When to use a mini-app
+## What you're authoring
 
-Pick mini-app over HTML widget when the artifact needs **interactive state** the user manipulates: a counter, a todo list, a stepper, a quiz, a small calculator, an algorithm visualizer with controls. For static visual explainers, the HTML widget skill is the right tool.
+A sandboxed React component that renders inside the canvas. Use it for anything custom-rendered — charts, dashboards, diagrams, flashcards, comparison tables, counters, todo lists, steppers, quizzes, calculators, algorithm visualizers. Whenever the user asks for something visual or interactive that isn't a sheet, code-sandbox, or document, this is the format.
 
 Mini-apps live inside a sandboxed iframe on a different origin. Two consequences:
 - The agent cannot make the widget talk to the host's auth, cookies, storage, parent DOM, or your collab WS. It is genuinely isolated.

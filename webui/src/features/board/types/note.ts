@@ -194,6 +194,8 @@ export const createDefaultNote = ({
       ? DEFAULT_CODE_SANDBOX_WIDTH
       : nodeType === 'widget'
       ? DEFAULT_WIDGET_WIDTH
+      : nodeType === 'mini-app'
+      ? DEFAULT_MINI_APP_WIDTH
       : nodeType === 'ellipse' || nodeType === 'layered-circle'
       ? DEFAULT_ELLIPSE_NOTE_WIDTH
       : nodeType === 'diamond' || nodeType === 'soft-diamond' || nodeType === 'layered-diamond'
@@ -211,6 +213,8 @@ export const createDefaultNote = ({
       ? DEFAULT_CODE_SANDBOX_HEIGHT
       : nodeType === 'widget'
       ? DEFAULT_WIDGET_HEIGHT
+      : nodeType === 'mini-app'
+      ? DEFAULT_MINI_APP_HEIGHT
       : nodeType === 'ellipse' || nodeType === 'layered-circle'
       ? DEFAULT_ELLIPSE_NOTE_HEIGHT
       : nodeType === 'diamond' || nodeType === 'soft-diamond' || nodeType === 'layered-diamond'
