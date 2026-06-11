@@ -89,11 +89,15 @@ export const DEFAULT_CODE_SANDBOX_WIDTH = 320
 export const DEFAULT_CODE_SANDBOX_HEIGHT = 320
 export const DEFAULT_WIDGET_WIDTH = 800
 export const DEFAULT_WIDGET_HEIGHT = 500
-// Mini-apps tend to be compact interactive cards (counters, todos, steppers).
-// Smaller default than the HTML widget; auto-resize via mini-app:resize will
-// grow them when content needs more room.
-export const DEFAULT_MINI_APP_WIDTH = 480
-export const DEFAULT_MINI_APP_HEIGHT = 320
+// Mini-apps trend toward interactive dashboards (charts + controls, lists
+// with KPI rows, multi-section step-throughs) — wider than the earlier
+// "counter / stepper" assumption. Paired with the 1200px auto-grow cap in
+// view.tsx, this width keeps a max-grown card at a usable ~1.67:1
+// portrait ratio instead of a thin column. Auto-resize via mini-app:resize
+// still shrinks/grows the height; width is set once at creation and the
+// user can drag-resize from there.
+export const DEFAULT_MINI_APP_WIDTH = 720
+export const DEFAULT_MINI_APP_HEIGHT = 440
 
 
 /**
