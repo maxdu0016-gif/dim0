@@ -18,9 +18,9 @@ import { MiniAppView } from "./view"
  *
  * Sibling thresholds for reference (Jun 2026):
  * - widget (HTML iframe): 0.6
- * - sheet, document, folder: 0.4
  * - code-sandbox: 0.5
- * - mini-app (this): 0.25
+ * - document, folder: 0.4
+ * - sheet, mini-app (this): 0.25
  */
 export const miniAppDef = defineNode({
   type: "mini-app",
