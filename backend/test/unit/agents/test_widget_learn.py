@@ -9,6 +9,7 @@ from agents import RunContextWrapper
 from topix.agents.datatypes.context import Context
 from topix.agents.prompt_utils import render_prompt
 from topix.agents.widgets.learn import (
+    learn_generate_diagram,
     learn_generate_html_widget,
     learn_generate_mini_app,
 )
@@ -63,6 +64,33 @@ async def test_learn_generate_mini_app_returns_skill_prompt() -> None:
     assert "Pick mini-app over" not in prompt
 
 
+@pytest.mark.asyncio
+async def test_learn_generate_diagram_returns_skill_prompt() -> None:
+    """Diagram skill must teach brevity + the rectangle/ellipse/diamond shape vocabulary.
+
+    The agent loads this skill before any multi-note structured answer
+    (mindmap, taxonomy, schema, flowchart). Drift guards:
+    - the brevity rule survives ("paragraph" forbidden, "label" mentioned)
+    - the minimal shape vocabulary (rectangle / ellipse / diamond) is in
+      the prompt — if any drops, the agent can't tell when to mix them
+    - the calls the skill anchors on (`write_note`, `link_notes`) stay
+    """
+    prompt = await learn_generate_diagram(RunContextWrapper(Context()))
+
+    assert "write_note" in prompt
+    assert "link_notes" in prompt
+    # Brevity rule.
+    assert "paragraph" in prompt.lower()
+    assert "label" in prompt.lower()
+    # Shape vocabulary — narrow on purpose (no capsule / tag / thought-cloud / layered-*).
+    assert "rectangle" in prompt
+    assert "ellipse" in prompt
+    assert "diamond" in prompt
+    # Stay-with-rectangles rule for pure taxonomies — drift would
+    # let the agent over-decorate hierarchies.
+    assert "taxonomy" in prompt.lower() or "hierarchy" in prompt.lower()
+
+
 def test_plan_system_prompt_lists_mini_app_before_html_widget() -> None:
     """Plan agent's main prompt should reach for mini-app first.
 
@@ -82,3 +110,6 @@ def test_plan_system_prompt_lists_mini_app_before_html_widget() -> None:
     )
     # Demotion marker — same idea as above but anchored to the literal.
     assert "legacy" in prompt.lower()
+    # Diagram skill must be referenced so the agent knows to call it
+    # before a mindmap / schema / flowchart turn.
+    assert "learn_generate_diagram" in prompt

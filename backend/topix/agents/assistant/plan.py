@@ -28,6 +28,7 @@ from topix.agents.websearch.handler import WebSearchHandler
 from topix.agents.widgets.finance import display_stock_widget_tool
 from topix.agents.widgets.image import display_image_search_widget_tool
 from topix.agents.widgets.learn import (
+    learn_generate_diagram_tool,
     learn_generate_html_widget_tool,
     learn_generate_mini_app_tool,
 )
@@ -84,6 +85,7 @@ class Plan(BaseAgent):
             display_image_search_widget_tool,
             learn_generate_html_widget_tool,
             learn_generate_mini_app_tool,
+            learn_generate_diagram_tool,
             WebSearchHandler.from_config(config.web_search),
             create_memory_search_tool(memory_filters, content_store),  # memory search tool
         ]

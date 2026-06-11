@@ -123,6 +123,7 @@ export type ToolName =
   | "display_image_search_widget"
   | "learn_generate_html_widget"
   | "learn_generate_mini_app"
+  | "learn_generate_diagram"
 
 
 export const ToolNameDescription: Record<ToolName, string> = {
@@ -148,6 +149,7 @@ export const ToolNameDescription: Record<ToolName, string> = {
   display_image_search_widget: "Search for images from the web",
   learn_generate_html_widget: "Learn widget and visual explainer skill",
   learn_generate_mini_app: "Learn interactive React mini-app skill",
+  learn_generate_diagram: "Learn mindmap and diagram skill",
 }
 
 
@@ -173,6 +175,7 @@ export const ToolNameIcon: Record<string, AppIconComponent> = {
   display_image_search_widget: ImageSearchWidgetIcon,
   learn_generate_html_widget: ScrollIcon,
   learn_generate_mini_app: ScrollIcon,
+  learn_generate_diagram: ScrollIcon,
 }
 
 

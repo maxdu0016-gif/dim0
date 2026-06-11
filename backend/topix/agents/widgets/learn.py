@@ -30,3 +30,22 @@ learn_generate_mini_app_tool = ToolHandler.convert_func_to_tool(
     tool_name=AgentToolName.LEARN_GENERATE_MINI_APP,
     tool_description=tool_descriptions.get(AgentToolName.LEARN_GENERATE_MINI_APP, ""),
 )
+
+
+async def learn_generate_diagram(_wrapper: RunContextWrapper[Context]) -> str:
+    """Load guidance for composing structured multi-note answers.
+
+    Loaded lazily before any mindmap / schema / flowchart / taxonomy turn —
+    teaches the brevity rule (short content per node) and the minimal
+    shape vocabulary (rectangle / ellipse / diamond) so the resulting
+    diagram reads at a glance instead of bunching paragraph-length text
+    into uniformly-rectangular cards.
+    """
+    return render_prompt("widget/learn_generate_diagram.jinja")
+
+
+learn_generate_diagram_tool = ToolHandler.convert_func_to_tool(
+    learn_generate_diagram,
+    tool_name=AgentToolName.LEARN_GENERATE_DIAGRAM,
+    tool_description=tool_descriptions.get(AgentToolName.LEARN_GENERATE_DIAGRAM, ""),
+)
