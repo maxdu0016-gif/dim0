@@ -49,6 +49,21 @@ Every identifier listed below is available as a bare name. Anything not listed i
 - `<Card className?>{children}</Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<CardFooter>`
 - `<Button variant? size? onClick?>{children}</Button>` — variants: `default | destructive | outline | secondary | ghost | link`
 
+### Charts + graphs
+- `<Chart kind data? datasets? labels? yAxis? xAxis? legend? tooltip? height? />` — cartesian or pie chart.
+  - `kind`: `"bar" | "line" | "area" | "scatter" | "pie" | "composed"`
+  - **Shorthand (one series):** `data={[42, 58, 71]}` + `kind="line"`.
+  - **Multi-series:** `datasets={[{ label: "Revenue", data: [...], color: "primary" }, ...]}`. Use either `data` OR `datasets`, never both.
+  - `labels` default to `"0", "1", "2", ...` when omitted.
+  - Colors accept palette names (`"primary"`, `"destructive"`, `"chart-1"`...`"chart-5"`) or CSS literals (`"#abc123"`, `"var(--color-foo)"`).
+  - For `kind="pie"`: pass `data` as `[{ name: "A", value: 30 }, ...]`.
+
+- `<Graph nodes edges viewBox? height? />` — node-link diagram (pure SVG).
+  - `nodes`: `[{ id, x, y, label?, sublabel?, color?, border?, textColor? }]`. **Supply `x` and `y` yourself** — no built-in layout engine.
+  - `edges`: `[{ a, b, label?, color? }]` where `a`/`b` are node ids.
+  - `viewBox` auto-computed from node positions when omitted.
+  - Algorithm visualizers, dependency graphs, state machines — anywhere you need nodes connected by lines.
+
 ### Helpers
 - `cn(...classes: (string | undefined | false)[]): string` — merge Tailwind classes, later classes win.
 
@@ -142,6 +157,84 @@ function Widget() {
         <div className="flex gap-2">
           <Button variant="outline" disabled={i === 0} onClick={() => setI(i - 1)}>back</Button>
           <Button disabled={i === steps.length - 1} onClick={() => setI(i + 1)}>next</Button>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+```
+
+### Bar chart (shorthand single-series)
+```jsx
+function Widget() {
+  return (
+    <Card className="p-4 max-w-md">
+      <CardHeader><CardTitle>Q4 sales (k$)</CardTitle></CardHeader>
+      <CardContent>
+        <Chart
+          kind="bar"
+          labels={["Oct", "Nov", "Dec"]}
+          data={[42, 58, 71]}
+          color="primary"
+          height={220}
+        />
+      </CardContent>
+    </Card>
+  )
+}
+```
+
+### Multi-series line chart (full datasets form)
+```jsx
+function Widget() {
+  return (
+    <Card className="p-4 max-w-md">
+      <CardHeader><CardTitle>Revenue vs cost</CardTitle></CardHeader>
+      <CardContent>
+        <Chart
+          kind="line"
+          labels={["Jan", "Feb", "Mar", "Apr", "May"]}
+          datasets={[
+            { label: "Revenue", data: [120, 132, 145, 160, 178], color: "chart-1" },
+            { label: "Cost",    data: [80,  88,  95,  102, 110], color: "chart-2" },
+          ]}
+          height={220}
+        />
+      </CardContent>
+    </Card>
+  )
+}
+```
+
+### Graph with state-driven highlighting (BFS step-through)
+```jsx
+function Widget() {
+  const [step, setStep] = useState(host.initialState ?? 0)
+  useEffect(() => { host.saveState(step) }, [step])
+
+  const visited = ["A", "B", "C"].slice(0, step)
+  const fillFor = (id) =>
+    visited.includes(id) ? "var(--color-chart-1)" : "var(--color-card)"
+
+  const nodes = [
+    { id: "A", x: 30,  y: 60, color: fillFor("A") },
+    { id: "B", x: 110, y: 30, color: fillFor("B") },
+    { id: "C", x: 110, y: 90, color: fillFor("C") },
+    { id: "D", x: 200, y: 60 },
+  ]
+  const edges = [
+    { a: "A", b: "B" }, { a: "A", b: "C" }, { a: "B", b: "D" }, { a: "C", b: "D" },
+  ]
+
+  return (
+    <Card className="p-4 max-w-md">
+      <CardHeader><CardTitle>BFS step {step}</CardTitle></CardHeader>
+      <CardContent>
+        <Graph nodes={nodes} edges={edges} viewBox="0 0 240 130" height={180} />
+        <div className="flex gap-2 mt-3">
+          <Button variant="outline" disabled={step === 0} onClick={() => setStep(step - 1)}>back</Button>
+          <Button disabled={step === 3} onClick={() => setStep(step + 1)}>next</Button>
+          <Button variant="ghost" onClick={() => setStep(0)}>reset</Button>
         </div>
       </CardContent>
     </Card>

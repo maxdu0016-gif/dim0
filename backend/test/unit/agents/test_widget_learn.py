@@ -34,3 +34,9 @@ async def test_learn_generate_mini_app_returns_skill_prompt() -> None:
     assert "mini-app" in prompt
     assert "host.saveState" in prompt
     assert "Widget" in prompt
+    # Drift guard for the scope manifest: when new identifiers join
+    # MINI_APP_SCOPE on the frontend, the prompt must mention them too —
+    # otherwise the agent doesn't know they're available and the
+    # widgets it ships are limited to a stale subset of the runtime.
+    assert "Chart" in prompt
+    assert "Graph" in prompt
