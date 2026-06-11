@@ -1,163 +1,51 @@
-// React component for the <chart> custom element.
+// Thin lazy wrapper around the recharts-heavy ChartElement.
 //
-// Thin layer: runs the pure translator (chart-translate.ts), then maps the
-// resulting RechartsConfig onto recharts components. All shape decisions
-// live in the translator; this file is just rendering.
+// recharts ships at ~190KB gz once tree-shaken — too heavy to eagerly
+// bundle into the mini-app iframe runtime, where a board may have no
+// chart-using widgets at all. By lazy-importing the implementation,
+// the recharts chunk is fetched only the first time a Chart renders.
+//
+// What this means in practice:
+//   * Iframe runtime initial bundle: ~120KB gz (no recharts) instead
+//     of ~310KB gz.
+//   * First mount of a Chart: brief Suspense fallback while the chunk
+//     loads (~50-200ms typical, then cached for the rest of the
+//     session).
+//   * Subsequent Chart mounts: instant — chunk is already in the
+//     module graph.
+//
+// The chart-impl.tsx file holds all the actual recharts code; this
+// file just defers to it.
 
-import { useMemo } from "react"
-import type { ComponentType, ReactNode } from "react"
-import {
-  Area,
-  AreaChart,
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  ComposedChart,
-  Legend,
-  Line,
-  LineChart,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Scatter,
-  ScatterChart,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts"
+import { Suspense, lazy } from "react"
 
-import { translateChart } from "./chart-translate"
-import type {
-  CartesianConfig,
-  ChartProps,
-  PieConfig,
-  SeriesSpec,
-  YAxisSpec,
-} from "./chart-types"
+import type { ChartProps } from "./chart-types"
+
+
+// React.lazy wants a `default` export; chart-impl exports a named
+// ChartElement, so we adapt at the boundary.
+const ChartImpl = lazy(() =>
+  import("./chart-impl").then((m) => ({ default: m.ChartElement })),
+)
 
 
 export function ChartElement(props: ChartProps) {
-  const config = useMemo(() => translateChart(props), [props])
-  if (config.kind === "pie") return <PieRenderer config={config} />
-  return <CartesianRenderer config={config} />
-}
-
-
-function CartesianRenderer({ config }: { config: CartesianConfig }) {
-  const Root = pickCartesianRoot(config.kind)
-  return (
-    <ResponsiveContainer width="100%" height={config.height}>
-      <Root data={config.data}>
-        <CartesianGrid strokeDasharray="3 3" />
-        <XAxis dataKey={config.xKey} {...config.xAxis} />
-        {config.yAxes.map((ax) => (
-          <YAxis
-            key={ax.id}
-            yAxisId={ax.id}
-            orientation={ax.orientation}
-            label={ax.label}
-          />
-        ))}
-        {config.tooltip ? <Tooltip /> : null}
-        {config.legend ? <Legend /> : null}
-        {config.series.map((s) => renderSeries(s, config.yAxes))}
-      </Root>
-    </ResponsiveContainer>
+  // Fallback reserves the chart's eventual height so the page doesn't
+  // jump when recharts mounts. `width: 100%` matches the
+  // ResponsiveContainer inside chart-impl. height defaults to 200 to
+  // mirror chart-impl's default.
+  const fallback = (
+    <div
+      style={{
+        width: "100%",
+        height: props.height ?? 200,
+      }}
+      aria-label="Loading chart"
+    />
   )
-}
-
-
-function PieRenderer({ config }: { config: PieConfig }) {
-  // Cast at the boundary: ResolvedPieDatum is structurally compatible with
-  // recharts' ChartDataInput[], but the latter declares an index signature
-  // that our strict interface omits.
-  const pieData = config.data as unknown as Record<string, unknown>[]
   return (
-    <ResponsiveContainer width="100%" height={config.height}>
-      <PieChart>
-        <Pie
-          data={pieData}
-          dataKey="value"
-          nameKey="name"
-          outerRadius="70%"
-          label
-          isAnimationActive={false}
-        >
-          {config.data.map((d, i) => (
-            <Cell key={i} fill={d.color} />
-          ))}
-        </Pie>
-        {config.tooltip ? <Tooltip /> : null}
-        {config.legend ? <Legend /> : null}
-      </PieChart>
-    </ResponsiveContainer>
+    <Suspense fallback={fallback}>
+      <ChartImpl {...props} />
+    </Suspense>
   )
-}
-
-
-type CartesianRoot =
-  | typeof BarChart
-  | typeof LineChart
-  | typeof AreaChart
-  | typeof ScatterChart
-  | typeof ComposedChart
-
-
-function pickCartesianRoot(kind: CartesianConfig["kind"]): CartesianRoot {
-  switch (kind) {
-    case "bar":
-      return BarChart
-    case "line":
-      return LineChart
-    case "area":
-      return AreaChart
-    case "scatter":
-      return ScatterChart
-    case "composed":
-      return ComposedChart
-  }
-}
-
-
-function renderSeries(s: SeriesSpec, axes: YAxisSpec[]): ReactNode {
-  // recharts requires every series to declare a yAxisId matching one of the
-  // mounted <YAxis> components. Series without an explicit yAxis fall back
-  // to the first declared axis (which is the synthetic "_default" in the
-  // single-axis case).
-  const yAxisId = s.yAxisId ?? axes[0]?.id
-  const Comp = pickSeriesComponent(s.type)
-  // Disable recharts' built-in mount/transition animations. The runtime
-  // drives chart animation via `state.tween` writes (which then re-render
-  // recharts with the new snapshot); letting recharts animate too would
-  // compound and visibly stutter.
-  const common = {
-    dataKey: s.dataKey,
-    name: s.label,
-    yAxisId,
-    isAnimationActive: false,
-  }
-  if (s.type === "line") {
-    return <Comp key={s.dataKey} {...common} stroke={s.color} dot={false} />
-  }
-  if (s.type === "area") {
-    return <Comp key={s.dataKey} {...common} stroke={s.color} fill={s.color} />
-  }
-  return <Comp key={s.dataKey} {...common} fill={s.color} />
-}
-
-
-function pickSeriesComponent(
-  type: SeriesSpec["type"]
-): ComponentType<Record<string, unknown>> {
-  switch (type) {
-    case "bar":
-      return Bar as unknown as ComponentType<Record<string, unknown>>
-    case "line":
-      return Line as unknown as ComponentType<Record<string, unknown>>
-    case "area":
-      return Area as unknown as ComponentType<Record<string, unknown>>
-    case "scatter":
-      return Scatter as unknown as ComponentType<Record<string, unknown>>
-  }
 }
