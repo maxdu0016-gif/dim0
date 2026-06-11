@@ -23,14 +23,23 @@
 // is filtered on event.origin === RUNTIME_ORIGIN AND
 // event.source === iframeRef.current.contentWindow. Both, no exceptions.
 
-import { useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 
+import { ArrowClockwiseIcon, WarningIcon } from "@phosphor-icons/react"
 import { toast } from "sonner"
 
 import { useTheme } from "@/components/theme-provider"
+import { cn } from "@/lib/utils"
 
 import { createMessageHandler } from "./dispatch"
 import { fetchMiniAppState, saveMiniAppState } from "./state-client"
+
+
+// How long we wait for the iframe to send `mini-app:ready` after mount
+// before declaring it stuck. Generous enough to survive a slow CDN +
+// cold sucrase compile but short enough that the user doesn't stare
+// at an empty rectangle wondering if anything's happening.
+const HANDSHAKE_TIMEOUT_MS = 5000
 
 
 // Runtime origin resolution priority:
@@ -101,6 +110,14 @@ export function MiniAppMount({
   const [iframeReady, setIframeReady] = useState(false)
   const [savedStateLoaded, setSavedStateLoaded] = useState(false)
   const savedStateRef = useRef<unknown>(undefined)
+  // Load-failure state: `iframeFailed` flips when either the iframe
+  // never sends `mini-app:ready` within HANDSHAKE_TIMEOUT_MS, or when
+  // the browser surfaces a low-level load error (404, network blip,
+  // CSP block). `reloadKey` bumps to force the iframe element to
+  // remount on retry. Keep them separate so we can show a different
+  // message for "stuck" vs "couldn't fetch" if we ever want to.
+  const [iframeFailed, setIframeFailed] = useState(false)
+  const [reloadKey, setReloadKey] = useState(0)
   // Pull the host's active theme so the iframe can mirror it. `themeId`
   // is the palette ("parchment", "tokyo-night", …) and `resolvedTheme`
   // collapses "system" mode down to a concrete "light" | "dark". Both
@@ -118,6 +135,24 @@ export function MiniAppMount({
   // canvas card's full size. Once auto-resize kicks in (Phase 4
   // grows the canvas node too), this becomes the source of truth.
   const [contentHeight, setContentHeight] = useState<number | null>(null)
+
+  // Trip iframeFailed if `mini-app:ready` doesn't arrive within the
+  // handshake budget. Reset on `reloadKey` so the retry path gets a
+  // fresh window.
+  useEffect(() => {
+    if (iframeReady) return
+    const timer = window.setTimeout(() => {
+      setIframeFailed(true)
+    }, HANDSHAKE_TIMEOUT_MS)
+    return () => window.clearTimeout(timer)
+  }, [iframeReady, reloadKey])
+
+  const retryLoad = useCallback(() => {
+    setIframeReady(false)
+    setIframeFailed(false)
+    setContentHeight(null)
+    setReloadKey((k) => k + 1)
+  }, [])
 
   // Hydrate saved state from the backend. Failures fall through
   // silently — a network blip on load shouldn't block the widget from
@@ -207,8 +242,36 @@ export function MiniAppMount({
     )
   }, [iframeReady, themeId, resolvedTheme])
 
+  if (iframeFailed) {
+    return (
+      <div
+        className={cn(
+          "flex h-full w-full flex-col items-center justify-center gap-2 px-4 text-center",
+          className,
+        )}
+      >
+        <WarningIcon className="size-5 shrink-0 text-destructive" />
+        <span className="text-sm font-medium text-destructive">
+          Mini-app failed to load
+        </span>
+        <span className="text-xs text-muted-foreground">
+          The runtime didn't respond. Network blip, bad deploy, or the iframe was blocked.
+        </span>
+        <button
+          type="button"
+          onClick={retryLoad}
+          className="mt-2 inline-flex items-center gap-1.5 rounded-md border bg-card px-3 py-1.5 text-xs font-medium hover:bg-accent"
+        >
+          <ArrowClockwiseIcon className="size-3.5" />
+          Retry
+        </button>
+      </div>
+    )
+  }
+
   return (
     <iframe
+      key={reloadKey}
       ref={iframeRef}
       data-testid="mini-app-iframe"
       // `allow-same-origin` is included on purpose. Without it the iframe
@@ -225,6 +288,7 @@ export function MiniAppMount({
       sandbox="allow-scripts allow-same-origin"
       src={`${RUNTIME_ORIGIN}/index.html`}
       title="mini-app"
+      onError={() => setIframeFailed(true)}
       style={{
         width: "100%",
         // contentHeight wins when the runtime has reported its size;
