@@ -16,6 +16,8 @@
 
 import * as React from "react"
 
+import { ChartElement } from "@/components/charts"
+import { GraphElement } from "@/components/charts"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
@@ -74,6 +76,31 @@ export const MINI_APP_SCOPE: Record<string, ScopeEntry> = {
     value: Button,
     signature: "<Button variant? size? onClick?>{children}</Button>",
     doc: "variant: 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link'.",
+  },
+
+  // Chart + graph primitives — implementations live in
+  // src/components/charts/ and are shared with the host bundle.
+  Chart: {
+    value: ChartElement,
+    signature:
+      "<Chart kind data? datasets? labels? yAxis? xAxis? legend? tooltip? height? />",
+    doc:
+      "Cartesian/pie chart. kind: 'bar' | 'line' | 'area' | 'scatter' | 'pie' | 'composed'. " +
+      "Shorthand: data=[1,2,3] for one series; full form: datasets=[{label, data, color?}]. " +
+      "Use either `data` OR `datasets`, never both. " +
+      "Auto-labels '0','1','2',... when `labels` omitted. " +
+      "Colors accept palette names ('primary' | 'destructive' | 'chart-1'..'chart-5') or CSS color literals.",
+  },
+  Graph: {
+    value: GraphElement,
+    signature:
+      "<Graph nodes edges viewBox? height? />",
+    doc:
+      "Node-link diagram. nodes=[{id, x, y, label?, color?, border?, textColor?, sublabel?}]; " +
+      "edges=[{a, b, label?, color?}]. " +
+      "Pure SVG — agent supplies x/y for each node (no built-in layout engine). " +
+      "viewBox auto-computed from node positions when omitted. " +
+      "Useful for algorithm visualizers, dependency graphs, state machines.",
   },
 
   // Tailwind class-merge helper. Agents often want to compose conditional
