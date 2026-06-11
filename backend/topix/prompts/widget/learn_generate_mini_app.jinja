@@ -250,7 +250,7 @@ function Widget() {
 
 - Default to compact widgets — `max-w-sm` for single-purpose, `max-w-md` for lists.
 - Use `Card` as the outer container so the widget feels native to the board.
-- Don't add scroll containers — the host auto-resizes the iframe to fit content.
+- Don't wrap your top-level widget in a scroll container — the host auto-resizes the iframe to fit content. If you need a bounded scroll area *inside* the widget (a long chat log, a fixed-height list with overflow), pair `overflow-y-auto` with the `scrollbar-thin` utility from the host theme: it gives you a 4px-wide thumb that fades in on hover, matching the rest of the app.
 
 ---
 
