@@ -27,10 +27,29 @@ import "./runtime.css"
 import "@tailwindcss/browser"
 
 
-const HOST_ORIGIN = import.meta.env.VITE_HOST_ORIGIN
+// Host origin resolution priority:
+//   1. window.__APP_CONFIG__.hostOrigin set by docker-entrypoint.sh
+//      from VITE_HOST_ORIGIN at container start. Lets one image ship
+//      to dev / staging / prod without rebuilding.
+//   2. import.meta.env.VITE_HOST_ORIGIN — build-time fallback for
+//      vite-dev (no entrypoint runs there).
+//
+// The Window.__APP_CONFIG__ shape declaration lives in
+// src/config/api.ts — both dist/index.html and dist-mini-app/index.html
+// load the same /config.js so the shape is identical across bundles.
+// We don't redeclare it here to avoid TS's "subsequent property
+// declarations must have the same type" conflict from the shared
+// tsconfig.app.json project root.
+
+const HOST_ORIGIN =
+  (typeof window !== "undefined" ? window.__APP_CONFIG__?.hostOrigin : undefined) ||
+  import.meta.env.VITE_HOST_ORIGIN
 
 if (!HOST_ORIGIN) {
-  throw new Error("VITE_HOST_ORIGIN not set at build time")
+  // Fail loud at startup: a missing origin means every postMessage
+  // origin check would silently reject everything, which presents as
+  // "iframe loads but nothing happens" — the worst kind of bug to debug.
+  throw new Error("VITE_HOST_ORIGIN not set at build time or via config.js")
 }
 
 

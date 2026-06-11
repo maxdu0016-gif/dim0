@@ -17,6 +17,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Mini-app runtime</title>
     <link rel="stylesheet" href="/runtime.css" />
+    <!--
+      Runtime config injection — docker-entrypoint.sh generates
+      /config.js from config.template.js with per-env substitutions
+      and copies it into dist-mini-app/. main.tsx reads
+      window.__APP_CONFIG__.hostOrigin to know which origin's
+      postMessage events to trust. In vite-dev there's no config.js
+      (the dev server doesn't run the entrypoint) — main.tsx falls
+      back to import.meta.env.VITE_HOST_ORIGIN there.
+    -->
+    <script src="/config.js"></script>
   </head>
   <body data-theme="parchment" data-mode="light">
     <div id="root"></div>

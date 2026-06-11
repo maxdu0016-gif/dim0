@@ -28,11 +28,18 @@ import { createMessageHandler } from "./dispatch"
 import { fetchMiniAppState, saveMiniAppState } from "./state-client"
 
 
-// Resolved at build time per env (see mini-app-archi.md §6.1). Empty
-// string when unset — leaves the iframe src obviously broken in devtools
-// rather than silently failing. Production builds throw at the runtime
-// entry too, so a missing env never gets far.
-const RUNTIME_ORIGIN = import.meta.env.VITE_MINI_APP_ORIGIN ?? ""
+// Runtime origin resolution priority:
+//   1. window.__APP_CONFIG__.miniAppOrigin  — set by docker-entrypoint.sh
+//      from VITE_MINI_APP_ORIGIN at container start. Lets one image
+//      ship to dev / staging / prod without rebuilding.
+//   2. import.meta.env.VITE_MINI_APP_ORIGIN — build-time fallback for
+//      vite-dev (no entrypoint runs there).
+//   3. "" — empty string makes the broken state obvious in devtools.
+// See mini-app-archi.md §6.1.
+const RUNTIME_ORIGIN =
+  (typeof window !== "undefined" ? window.__APP_CONFIG__?.miniAppOrigin : undefined) ||
+  import.meta.env.VITE_MINI_APP_ORIGIN ||
+  ""
 
 
 // Dev-only host-side debug surface — pairs with the iframe's
