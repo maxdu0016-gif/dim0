@@ -42,7 +42,7 @@ export interface GraphEdge {
 
 
 // === INTERMEDIATE — what the renderer consumes (post-layout) ===
-// Colors are already resolved to CSS (`var(--color-X)` or pass-through).
+// Colors are already resolved to CSS (`var(--X)` or pass-through).
 
 
 export interface LaidOutGraph {

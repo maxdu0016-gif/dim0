@@ -91,15 +91,15 @@ function EdgeLabel({ edge }: { edge: PositionedEdge }) {
         width={EDGE_LABEL_CHIP_WIDTH}
         height={EDGE_LABEL_CHIP_HEIGHT}
         rx={EDGE_LABEL_CHIP_RADIUS}
-        fill="var(--color-card)"
-        stroke="var(--color-border)"
+        fill="var(--card)"
+        stroke="var(--border)"
       />
       <text
         x={cx}
         y={cy + 3}
         textAnchor="middle"
         fontSize={EDGE_LABEL_FONT_SIZE}
-        fill="var(--color-muted-foreground)"
+        fill="var(--muted-foreground)"
       >
         {edge.label}
       </text>
@@ -135,7 +135,7 @@ function Node({ node }: { node: PositionedNode }) {
           y={node.y + SUBLABEL_DY}
           textAnchor="middle"
           fontSize={SUBLABEL_FONT_SIZE}
-          fill="var(--color-muted-foreground)"
+          fill="var(--muted-foreground)"
         >
           {node.sublabel}
         </text>

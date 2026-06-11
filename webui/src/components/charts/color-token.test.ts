@@ -5,28 +5,28 @@ import { defaultPaletteColor, resolveColor } from "./color-token"
 
 describe("resolveColor", () => {
   describe("token names", () => {
-    it("resolves chart-1 to var(--color-chart-1)", () => {
-      expect(resolveColor("chart-1")).toBe("var(--color-chart-1)")
+    it("resolves chart-1 to var(--chart-1)", () => {
+      expect(resolveColor("chart-1")).toBe("var(--chart-1)")
     })
 
 
-    it("resolves chart-5 (last in palette) to var(--color-chart-5)", () => {
-      expect(resolveColor("chart-5")).toBe("var(--color-chart-5)")
+    it("resolves chart-5 (last in palette) to var(--chart-5)", () => {
+      expect(resolveColor("chart-5")).toBe("var(--chart-5)")
     })
 
 
-    it("resolves primary to var(--color-primary)", () => {
-      expect(resolveColor("primary")).toBe("var(--color-primary)")
+    it("resolves primary to var(--primary)", () => {
+      expect(resolveColor("primary")).toBe("var(--primary)")
     })
 
 
-    it("resolves muted-foreground (hyphenated) to var(--color-muted-foreground)", () => {
-      expect(resolveColor("muted-foreground")).toBe("var(--color-muted-foreground)")
+    it("resolves muted-foreground (hyphenated) to var(--muted-foreground)", () => {
+      expect(resolveColor("muted-foreground")).toBe("var(--muted-foreground)")
     })
 
 
-    it("resolves destructive to var(--color-destructive)", () => {
-      expect(resolveColor("destructive")).toBe("var(--color-destructive)")
+    it("resolves destructive to var(--destructive)", () => {
+      expect(resolveColor("destructive")).toBe("var(--destructive)")
     })
   })
 
@@ -53,7 +53,7 @@ describe("resolveColor", () => {
 
 
     it("passes pre-resolved var(...) unchanged (no double-wrapping)", () => {
-      expect(resolveColor("var(--color-chart-3)")).toBe("var(--color-chart-3)")
+      expect(resolveColor("var(--chart-3)")).toBe("var(--chart-3)")
     })
 
 
@@ -68,12 +68,12 @@ describe("resolveColor", () => {
 
   describe("fallbacks", () => {
     it("undefined falls back to first palette color", () => {
-      expect(resolveColor(undefined)).toBe("var(--color-chart-1)")
+      expect(resolveColor(undefined)).toBe("var(--chart-1)")
     })
 
 
     it("empty string falls back to first palette color", () => {
-      expect(resolveColor("")).toBe("var(--color-chart-1)")
+      expect(resolveColor("")).toBe("var(--chart-1)")
     })
   })
 })
@@ -81,15 +81,15 @@ describe("resolveColor", () => {
 
 describe("defaultPaletteColor", () => {
   it("indexes 0..4 map to chart-1..chart-5", () => {
-    expect(defaultPaletteColor(0)).toBe("var(--color-chart-1)")
-    expect(defaultPaletteColor(1)).toBe("var(--color-chart-2)")
-    expect(defaultPaletteColor(4)).toBe("var(--color-chart-5)")
+    expect(defaultPaletteColor(0)).toBe("var(--chart-1)")
+    expect(defaultPaletteColor(1)).toBe("var(--chart-2)")
+    expect(defaultPaletteColor(4)).toBe("var(--chart-5)")
   })
 
 
   it("indexes wrap modulo 5 to keep the palette consistent", () => {
-    expect(defaultPaletteColor(5)).toBe("var(--color-chart-1)")
-    expect(defaultPaletteColor(7)).toBe("var(--color-chart-3)")
-    expect(defaultPaletteColor(12)).toBe("var(--color-chart-3)")
+    expect(defaultPaletteColor(5)).toBe("var(--chart-1)")
+    expect(defaultPaletteColor(7)).toBe("var(--chart-3)")
+    expect(defaultPaletteColor(12)).toBe("var(--chart-3)")
   })
 })

@@ -37,7 +37,7 @@ describe("translateChart — bar shorthand", () => {
       {
         type: "bar",
         dataKey: "value",
-        color: "var(--color-chart-1)",
+        color: "var(--chart-1)",
         yAxisId: undefined,
         label: "value",
       },
@@ -51,7 +51,7 @@ describe("translateChart — bar shorthand", () => {
       labels: ["a"],
       data: [1],
     })
-    expect(config.series[0].color).toBe("var(--color-chart-1)")
+    expect(config.series[0].color).toBe("var(--chart-1)")
   })
 })
 
@@ -87,9 +87,9 @@ describe("translateChart — bar multi-series", () => {
       ],
     })
     expect(config.series.map((s) => s.color)).toEqual([
-      "var(--color-chart-1)",
-      "var(--color-chart-2)",
-      "var(--color-chart-3)",
+      "var(--chart-1)",
+      "var(--chart-2)",
+      "var(--chart-3)",
     ])
   })
 })
@@ -186,8 +186,8 @@ describe("translateChart — pie", () => {
       ],
     })
     expect(config.data).toEqual([
-      { name: "Direct", value: 42, color: "var(--color-chart-1)" },
-      { name: "Search", value: 28, color: "var(--color-chart-2)" },
+      { name: "Direct", value: 42, color: "var(--chart-1)" },
+      { name: "Search", value: 28, color: "var(--chart-2)" },
     ])
   })
 
@@ -201,8 +201,8 @@ describe("translateChart — pie", () => {
       ],
     })
     expect(config.data.map((d) => d.color)).toEqual([
-      "var(--color-chart-1)",
-      "var(--color-chart-2)",
+      "var(--chart-1)",
+      "var(--chart-2)",
     ])
   })
 })

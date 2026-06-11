@@ -91,7 +91,7 @@ export interface SeriesSpec {
   type: SeriesType
   // The key under which this series' values live in each Row.
   dataKey: string
-  // Already resolved by color-token.ts — either `var(--color-X)` or a
+  // Already resolved by color-token.ts — either `var(--X)` or a
   // pass-through literal.
   color: string
   yAxisId?: string

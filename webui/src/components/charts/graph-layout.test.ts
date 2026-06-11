@@ -65,9 +65,9 @@ describe("layoutGraph — color resolution and defaults", () => {
       nodes: [{ id: "A", x: 0, y: 0 }],
       edges: [],
     })
-    expect(g.nodes[0].color).toBe("var(--color-card)")
-    expect(g.nodes[0].border).toBe("var(--color-border)")
-    expect(g.nodes[0].textColor).toBe("var(--color-foreground)")
+    expect(g.nodes[0].color).toBe("var(--card)")
+    expect(g.nodes[0].border).toBe("var(--border)")
+    expect(g.nodes[0].textColor).toBe("var(--foreground)")
   })
 
 
@@ -85,9 +85,9 @@ describe("layoutGraph — color resolution and defaults", () => {
       ],
       edges: [],
     })
-    expect(g.nodes[0].color).toBe("var(--color-chart-1)")
-    expect(g.nodes[0].border).toBe("var(--color-chart-2)")
-    expect(g.nodes[0].textColor).toBe("var(--color-primary-foreground)")
+    expect(g.nodes[0].color).toBe("var(--chart-1)")
+    expect(g.nodes[0].border).toBe("var(--chart-2)")
+    expect(g.nodes[0].textColor).toBe("var(--primary-foreground)")
   })
 
 
@@ -111,8 +111,8 @@ describe("layoutGraph — color resolution and defaults", () => {
         { a: "A", b: "B", color: "chart-3" },
       ],
     })
-    expect(g.edges[0].color).toBe("var(--color-border)")
-    expect(g.edges[1].color).toBe("var(--color-chart-3)")
+    expect(g.edges[0].color).toBe("var(--border)")
+    expect(g.edges[1].color).toBe("var(--chart-3)")
   })
 })
 
