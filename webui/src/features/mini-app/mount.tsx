@@ -79,6 +79,15 @@ export interface MiniAppMountProps {
   source: string
   /** Optional canvas-side className for sizing/spacing. */
   className?: string
+  /**
+   * Optional sink for the widget's reported natural height (from
+   * `mini-app:resize`). Lets a parent grow its surrounding chrome to
+   * fit the widget — for the canvas card this is wired into the
+   * harness's `updateNode` so a node grows when its widget grows.
+   * Receives the raw widget height in CSS pixels; the parent decides
+   * whether to apply chrome offset, throttle, or clamp.
+   */
+  onContentHeightChange?: (height: number) => void
 }
 
 
@@ -86,6 +95,7 @@ export function MiniAppMount({
   noteId,
   source,
   className,
+  onContentHeightChange,
 }: MiniAppMountProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const [iframeReady, setIframeReady] = useState(false)
@@ -96,6 +106,12 @@ export function MiniAppMount({
   // collapses "system" mode down to a concrete "light" | "dark". Both
   // map 1:1 to data attributes the iframe sets on its own <html>.
   const { themeId, resolvedTheme } = useTheme()
+  // Stash the latest onContentHeightChange in a ref so the message
+  // listener (recreated only when `noteId` flips) always sees the
+  // current callback without forcing a re-subscribe on every parent
+  // re-render.
+  const onContentHeightChangeRef = useRef(onContentHeightChange)
+  onContentHeightChangeRef.current = onContentHeightChange
   // contentHeight is the widget's reported natural height (from
   // mini-app:resize). When >0, we use it directly; until then the
   // iframe fills its parent so the user sees the widget at the
@@ -146,7 +162,10 @@ export function MiniAppMount({
         }
         setIframeReady(true)
       },
-      onResize: (h) => setContentHeight(h),
+      onResize: (h) => {
+        setContentHeight(h)
+        onContentHeightChangeRef.current?.(h)
+      },
     })
     window.addEventListener("message", handler)
     return () => window.removeEventListener("message", handler)
