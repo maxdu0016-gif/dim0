@@ -54,6 +54,7 @@ import { useBlockFolderCopy } from "./use-block-folder-copy"
 import { useStampNewEdges } from "./use-stamp-new-edges"
 import { useStampNewNodes } from "./use-stamp-new-nodes"
 import { useStyleMemory } from "./use-style-memory"
+import { CUSTOM_NODE_TYPES } from "./custom-node-types"
 import { useLocalPresence } from "./use-local-presence"
 import { useWsCollab } from "./use-ws-collab"
 import { useThumbnailCapture } from "./use-thumbnail-capture"
@@ -292,16 +293,6 @@ export function HarnessCanvas() {
     </CanvasProvider>
   )
 }
-
-
-/** canvas node.type values whose dbl-click should NOT trigger the lib's beginEdit. */
-const CUSTOM_NODE_TYPES = new Set([
-  "folder",
-  "document",
-  "sheet",
-  "code-sandbox",
-  "widget",
-])
 
 
 type InnerProps = {

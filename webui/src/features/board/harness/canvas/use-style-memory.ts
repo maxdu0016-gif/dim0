@@ -25,8 +25,8 @@ import {
  * One shared bucket for non-custom nodes (rect, ellipse, diamond,
  * text, etc.) — picking a color on a rect carries to the next
  * ellipse. Custom node types (folder, sheet, code-sandbox, widget,
- * document) are intentionally excluded both as memory inputs AND
- * outputs: they have a fixed visual identity and shouldn't bleed
+ * document, mini-app) are intentionally excluded both as memory inputs
+ * AND outputs: they have a fixed visual identity and shouldn't bleed
  * styles in or out.
  *
  * Persisted to localStorage so preferences survive reloads. Version
@@ -43,6 +43,7 @@ const EXCLUDED_TYPES: ReadonlySet<string> = new Set([
   "code-sandbox",
   "widget",
   "document",
+  "mini-app",
 ])
 
 
