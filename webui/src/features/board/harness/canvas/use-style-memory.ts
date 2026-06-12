@@ -10,6 +10,8 @@ import type { NoteNodeData } from "../convert/note-to-node"
 import {
   applyColorsToEdgeStyle,
   applyColorsToStyle,
+  pickStoredEdgeColors,
+  type StoredEdgeColors,
 } from "../theme/color-adapter"
 
 
@@ -94,6 +96,7 @@ export type StyleMemoryApi = {
   getNodeStyle: () => Style | undefined
   getEdgeStyle: () => EdgeStyle | undefined
   getEdgePathStyle: () => PathStyle | undefined
+  getEdgeStoredColors: () => StoredEdgeColors | undefined
 }
 
 
@@ -178,6 +181,21 @@ export const useStyleMemory = (store: CanvasStore): StyleMemoryApi => {
       },
       getEdgeStyle: () => memoryRef.current.edge.style,
       getEdgePathStyle: () => memoryRef.current.edge.pathStyle,
+      // Canonical (light-space) stroke/label colors the user last picked.
+      // `edge.style` already holds canonical colors — the capture path
+      // overlays `_storedColors` before folding into memory — so we can
+      // pluck them directly. Returns undefined when no color was ever
+      // picked (e.g. only width changed) so callers fall back to canonical
+      // defaults rather than stamping `undefined` colors.
+      getEdgeStoredColors: () => {
+        const style = memoryRef.current.edge.style
+        if (!style) return undefined
+        const colors = pickStoredEdgeColors(style)
+        if (colors.strokeColor === undefined && colors.textColor === undefined) {
+          return undefined
+        }
+        return colors
+      },
     }),
     [],
   )
