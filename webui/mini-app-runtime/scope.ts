@@ -18,6 +18,7 @@ import * as React from "react"
 
 import { ChartElement } from "@/components/charts"
 import { GraphElement } from "@/components/charts"
+import { MapElement } from "@/components/charts"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
@@ -103,6 +104,20 @@ export const MINI_APP_SCOPE: Record<string, ScopeEntry> = {
       "'manual' (you supply x/y per node — for grids/algorithm steps). " +
       "directed=true draws arrowheads. viewBox auto-computed when omitted. " +
       "Use for dependency graphs, taxonomies, state machines, algorithm visualizers.",
+  },
+
+  // World map — choropleth (regions shaded by data) + optional markers.
+  // Geometry is bundled + lazily loaded; the agent supplies only data.
+  Map: {
+    value: MapElement,
+    signature: "<Map data? markers? color? height? />",
+    doc:
+      "World choropleth. data=[{id, value?, color?}] where id is a country's " +
+      "English name ('France') or ISO numeric code; value shades `color` " +
+      "(default 'chart-1') by magnitude, color overrides per region. " +
+      "markers=[{lat, lng, label?, color?, r?}] overlays points/bubbles. " +
+      "Unknown regions are dropped. Use for geographic data, country " +
+      "comparisons, location maps.",
   },
 
   // Tailwind class-merge helper. Agents often want to compose conditional

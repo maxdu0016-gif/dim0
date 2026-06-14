@@ -49,7 +49,7 @@ Every identifier listed below is available as a bare name. Anything not listed i
 - `<Card className?>{children}</Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<CardFooter>`
 - `<Button variant? size? onClick?>{children}</Button>` — variants: `default | destructive | outline | secondary | ghost | link`
 
-### Charts + graphs
+### Charts, graphs + maps
 - `<Chart kind data? datasets? labels? yAxis? xAxis? legend? tooltip? height? />` — cartesian or pie chart.
   - `kind`: `"bar" | "line" | "area" | "scatter" | "pie" | "composed"`
   - **Shorthand (one series):** `data={[42, 58, 71]}` + `kind="line"`.
@@ -67,6 +67,11 @@ Every identifier listed below is available as a bare name. Anything not listed i
     - `"manual"` — you supply `x` and `y` on every node. Only for layouts that need exact placement: grids, geographic-ish maps, or algorithm visualizers that highlight fixed positions step by step.
   - `directed={true}` draws arrowheads along `a → b`.
   - `viewBox` auto-computed from node positions when omitted (you rarely set it).
+
+- `<Map data? markers? color? height? />` — world choropleth + point overlay.
+  - `data`: `[{ id, value?, color? }]`. `id` is a country's **common English name** (`"France"`, `"United States"`) or its ISO numeric code. `value` shades `color` (default `"chart-1"`) by magnitude across the dataset; `color` sets a region's fill outright. Regions with no entry render neutral; unknown ids are dropped.
+  - `markers`: `[{ lat, lng, label?, color?, r? }]` — plot points/bubbles by latitude/longitude (cities, events; vary `r` for a bubble map).
+  - The boundary geometry is built in — supply only data, never coordinates. Use for geographic distributions, country comparisons, location maps.
 
 ### Helpers
 - `cn(...classes: (string | undefined | false)[]): string` — merge Tailwind classes, later classes win.
@@ -294,6 +299,33 @@ function Widget() {
           <Button disabled={step === 3} onClick={() => setStep(step + 1)}>next</Button>
           <Button variant="ghost" onClick={() => setStep(0)}>reset</Button>
         </div>
+      </CardContent>
+    </Card>
+  )
+}
+```
+
+### World map (choropleth by value + a marker)
+```jsx
+function Widget() {
+  // id is the country's English name; value shades chart-1 by magnitude.
+  const data = [
+    { id: "United States", value: 331 },
+    { id: "Brazil", value: 214 },
+    { id: "Nigeria", value: 223 },
+    { id: "India", value: 1428 },
+    { id: "France", value: 68 },
+  ]
+  return (
+    <Card className="p-4 max-w-2xl">
+      <CardHeader><CardTitle className="font-handwriting text-xl">Population (millions)</CardTitle></CardHeader>
+      <CardContent>
+        <Map
+          data={data}
+          color="chart-1"
+          markers={[{ lat: 48.85, lng: 2.35, label: "Paris" }]}
+          height={360}
+        />
       </CardContent>
     </Card>
   )

@@ -49,6 +49,11 @@ async def test_learn_generate_mini_app_returns_skill_prompt() -> None:
     # widgets it ships are limited to a stale subset of the runtime.
     assert "Chart" in prompt
     assert "Graph" in prompt
+    # Map primitive — agents must know the world choropleth exists and that
+    # they supply data by country name, not coordinates.
+    assert "Map" in prompt
+    assert "choropleth" in prompt
+    assert "markers" in prompt
     # Graph layout vocabulary — the agent must know it can hand over a bare
     # node/edge list and pick a layout instead of hand-computing every x/y.
     # If these drop out, the prompt regresses to the old "supply coordinates
