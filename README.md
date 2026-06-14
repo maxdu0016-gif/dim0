@@ -53,7 +53,6 @@ You already have a chat assistant, a whiteboard, and a doc tool. Dim0 is what yo
 | Agent reads the workspace & writes back | ✅ | ⚠️ chat only | ⚠️ doc only | ❌ |
 | Mini-apps: real, editable, persistent React apps | ✅ | ⚠️ trapped in thread | ❌ | ❌ |
 | Rich notes (math, code, sub-pages) on the canvas | ✅ | ❌ | ⚠️ docs, not canvas | ❌ |
-| Present from frames, on the same canvas | ✅ | ❌ | ❌ | ⚠️ Miro only |
 | Real-time multiplayer | ✅ | ❌ | ✅ | ✅ |
 | Bring-your-own model (Claude, GPT, Gemini, …) | ✅ | ❌ | ❌ | ❌ |
 | Open-source & self-hostable | ✅ | ❌ | ❌ | ⚠️ partial |
