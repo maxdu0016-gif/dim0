@@ -137,6 +137,7 @@ export function RootLayout() {
  * Full-screen auth background:
  * - subtle dot grid overlay (matches the dim0.net landing-page graph paper)
  * - decorative graph texture layered on top
+ * - fractal-noise paper grain (shared with the board) for a tactile finish
  */
 export function AuthBackground() {
   return (
@@ -153,6 +154,9 @@ export function AuthBackground() {
 
       {/* decorative graph layered on top of the dot grid */}
       <AuthGraphTexture />
+
+      {/* fractal-noise paper grain (same substrate the board uses) */}
+      <div className="board-paper-grain auth-paper-grain" />
     </div>
   )
 }
