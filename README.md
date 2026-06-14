@@ -37,6 +37,7 @@
 - 💻 **Code & documents** — run code in sandboxes; drop in files that the agent can search (RAG)
 - 🔌 **Bring your own model** — OpenAI, Anthropic, Gemini, Mistral, DeepSeek, Qwen, and more — switch anytime
 - ♾️ **Infinite canvas** — thousands of nodes and nested boards, smooth at scale
+- 🎨 **A real whiteboard underneath** — hand-drawn and geometric shapes, arrows, freehand drawing, images and media, and a big library of icons and shapes
 - 🔓 **Open-source & private** — MIT, self-hostable, your data stays yours (no training, no telemetry)
 
 See it in action:
