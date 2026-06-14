@@ -27,18 +27,21 @@
 ![Dim0 app screenshot](docs/images/main-screen.png)
 *A single board: notes, a mind map, mini-apps, documents, and the agent - all in the same workspace.*
 
-https://github.com/user-attachments/assets/cdc7d3d4-eb59-4d7d-a9ff-6f0206ba82df
-
 ## Features
 
-- **Board-aware agent** — reads your canvas and selected nodes, takes multi-step tool actions, and writes results back as editable nodes
-- **Mini-apps** — describe a tool, get a real interactive React app on the board: open it, edit it, export it
-- **Real-time multiplayer** — live cursors, shared edits, a shared agent; conflict-free sync, solo or fifty people deep
-- **Rich notes** — Notion-style rich text, math, code, and sub-pages, edited in place
-- **Code & documents** — run code in sandboxes; drop in files that the agent can search (RAG)
-- **Bring your own model** — OpenAI, Anthropic, Gemini, Mistral, DeepSeek, Qwen, and more — switch anytime
-- **Infinite canvas** — thousands of nodes, nested boards, and presentation frames, smooth at scale
-- **Open-source & private** — MIT, self-hostable, your data stays yours (no training, no telemetry)
+- 🤖 **Board-aware agent** — reads your canvas and selected nodes, takes multi-step tool actions, and writes results back as editable nodes
+- 🧩 **Mini-apps** — describe a tool, get a real interactive React app on the board: open it, edit it, export it
+- 👥 **Real-time multiplayer** — live cursors, shared edits, a shared agent; conflict-free sync, solo or fifty people deep
+- 📝 **Rich notes** — Notion-style rich text, math, code, and sub-pages, edited in place
+- 🎬 **Present from the canvas** — drop frames on the board and run them as a slideshow, no export to a separate slides tool
+- 💻 **Code & documents** — run code in sandboxes; drop in files that the agent can search (RAG)
+- 🔌 **Bring your own model** — OpenAI, Anthropic, Gemini, Mistral, DeepSeek, Qwen, and more — switch anytime
+- ♾️ **Infinite canvas** — thousands of nodes and nested boards, smooth at scale
+- 🔓 **Open-source & private** — MIT, self-hostable, your data stays yours (no training, no telemetry)
+
+See it in action:
+
+https://github.com/user-attachments/assets/cdc7d3d4-eb59-4d7d-a9ff-6f0206ba82df
 
 ## Why Dim0?
 
@@ -50,6 +53,7 @@ You already have a chat assistant, a whiteboard, and a doc tool. Dim0 is what yo
 | Agent reads the workspace & writes back | ✅ | ⚠️ chat only | ⚠️ doc only | ❌ |
 | Mini-apps: real, editable, persistent React apps | ✅ | ⚠️ trapped in thread | ❌ | ❌ |
 | Rich notes (math, code, sub-pages) on the canvas | ✅ | ❌ | ⚠️ docs, not canvas | ❌ |
+| Present from frames, on the same canvas | ✅ | ❌ | ❌ | ⚠️ Miro only |
 | Real-time multiplayer | ✅ | ❌ | ✅ | ✅ |
 | Bring-your-own model (Claude, GPT, Gemini, …) | ✅ | ❌ | ❌ | ❌ |
 | Open-source & self-hostable | ✅ | ❌ | ❌ | ⚠️ partial |
