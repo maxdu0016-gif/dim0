@@ -94,13 +94,15 @@ export const MINI_APP_SCOPE: Record<string, ScopeEntry> = {
   Graph: {
     value: GraphElement,
     signature:
-      "<Graph nodes edges viewBox? height? />",
+      "<Graph nodes edges layout? directed? root? viewBox? height? />",
     doc:
-      "Node-link diagram. nodes=[{id, x, y, label?, color?, border?, textColor?, sublabel?}]; " +
-      "edges=[{a, b, label?, color?}]. " +
-      "Pure SVG — agent supplies x/y for each node (no built-in layout engine). " +
-      "viewBox auto-computed from node positions when omitted. " +
-      "Useful for algorithm visualizers, dependency graphs, state machines.",
+      "Node-link diagram. nodes=[{id, label?, sublabel?, color?, border?, textColor?, x?, y?}]; " +
+      "edges=[{a, b, label?, color?}] (a→b). " +
+      "layout: 'force' (auto-arrange networks — the default when x/y omitted) | " +
+      "'tree' (top-down hierarchy; edges read parent→child, set root? or it's inferred) | " +
+      "'manual' (you supply x/y per node — for grids/algorithm steps). " +
+      "directed=true draws arrowheads. viewBox auto-computed when omitted. " +
+      "Use for dependency graphs, taxonomies, state machines, algorithm visualizers.",
   },
 
   // Tailwind class-merge helper. Agents often want to compose conditional
