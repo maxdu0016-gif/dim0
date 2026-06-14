@@ -345,6 +345,13 @@ function HarnessCanvasInner({
             onDoubleClick={onDoubleClick}
             onRenderer={onRenderer}
           />
+          {/*
+            Paper grain over the canvas surface: sits above the drawn
+            scene (z-index 1) but below all chrome (z-50+), pointer-events
+            none so it never intercepts interaction. Hidden while
+            presenting for clean slides.
+          */}
+          {!presenting && <div className="board-paper-grain" aria-hidden="true" />}
           {!presenting && (
             <Minimap
               width={200}
