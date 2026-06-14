@@ -29,15 +29,15 @@
 
 ## Features
 
-- 🤖 **Board-aware agent** — reads your canvas and selected nodes, takes multi-step tool actions, and writes results back as editable nodes
-- 🧩 **Mini-apps** — describe a tool, get a real interactive React app on the board: open it, edit it, export it
-- 👥 **Real-time multiplayer** — live cursors, shared edits, a shared agent; conflict-free sync, solo or fifty people deep
-- 📝 **Rich notes** — Notion-style rich text, math, code, and sub-pages, edited in place
-- 🎬 **Present from the canvas** — drop frames on the board and run them as a slideshow, no export to a separate slides tool
-- 💻 **Code & documents** — run code in sandboxes; drop in files that the agent can search (RAG)
-- 🔌 **Bring your own model** — OpenAI, Anthropic, Gemini, Mistral, DeepSeek, Qwen, and more — switch anytime
 - ♾️ **Infinite canvas** — thousands of nodes and nested boards, smooth at scale
 - 🎨 **A real whiteboard underneath** — hand-drawn and geometric shapes, arrows, images and media, and a huge icon library (200,000+ via Iconify)
+- 🤖 **Board-aware agent** — reads your canvas and selected nodes, takes multi-step tool actions, and writes results back as editable nodes
+- 🧩 **Mini-apps** — describe a tool, get a real interactive React app on the board: open it, edit it, export it
+- 📝 **Rich notes** — Notion-style rich text, math, code, and sub-pages, edited in place
+- 💻 **Code & documents** — run code in sandboxes; drop in files that the agent can search (RAG)
+- 🔌 **Bring your own model** — OpenAI, Anthropic, Gemini, Mistral, DeepSeek, Qwen, and more — switch anytime
+- 👥 **Real-time multiplayer** — live cursors, shared edits, a shared agent; conflict-free sync, solo or fifty people deep
+- 🎬 **Present from the canvas** — drop frames on the board and run them as a slideshow, no export to a separate slides tool
 - 🔓 **Open-source & private** — MIT, self-hostable, your data stays yours (no training, no telemetry)
 
 See it in action:
