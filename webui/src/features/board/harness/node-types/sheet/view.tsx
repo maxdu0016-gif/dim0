@@ -3,9 +3,12 @@ import { NotepadIcon } from "@phosphor-icons/react"
 import { type NodeId } from "@canvas-harness/core"
 import { useCanvasStore, useNode } from "@canvas-harness/react"
 import { IconPropertyView } from "@/components/icons/icon-property-view"
+import { useTheme } from "@/components/theme-provider"
 import { createBoardPageProvider } from "@/features/board/providers/board-page-provider"
+import { findFamilyShadeFromHex, toBaseHex } from "@/features/board/lib/colors/tailwind"
 import { cn } from "@/lib/utils"
 import type { NoteNodeData } from "../../convert/note-to-node"
+import { computeNodeColorUpdate } from "../../theme/apply-node-colors"
 import {
   NodeTitleCaption,
   NodeTrafficLights,
@@ -13,6 +16,7 @@ import {
   useStopCanvasGesture,
 } from "../../shared-views"
 import { useBoardAppStore } from "../../store/board-app-store"
+import { SheetColorPicker } from "./sheet-color-picker"
 import { SheetInlineEditor } from "./sheet-inline-editor"
 
 
@@ -36,9 +40,14 @@ export type SheetViewProps = {
 export function SheetView({ id }: SheetViewProps) {
   const node = useNode(id)
   const store = useCanvasStore()
+  const { resolvedTheme } = useTheme()
   const openNodeSurface = useBoardAppStore((s) => s.openNodeSurface)
   const canEdit = useBoardAppStore((s) => s.canEdit)
   const [editing, setEditing] = useState(false)
+  // Viewport coords of the double-click that entered edit mode, so the
+  // editor can drop the caret where the user clicked (null = caret at end,
+  // e.g. when edit is entered via keyboard).
+  const [caretCoords, setCaretCoords] = useState<{ x: number; y: number } | null>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
   useStopCanvasGesture(bodyRef)
@@ -66,6 +75,32 @@ export function SheetView({ id }: SheetViewProps) {
       store.updateNode(id, { content: markdown })
     },
     [store, id],
+  )
+
+  // Background color lives on `style.backgroundColor`, but we only honor it
+  // when the canonical (light-space) value is a Tailwind shade-100 — anything
+  // else (incl. the legacy BLUE_200 default) falls back to the card surface.
+  // Gate on the canonical color (`_storedColors`), paint the theme-projected
+  // `node.style.backgroundColor` so dark mode stays consistent.
+  const canonicalBg = node?.data
+    ? (node.data as Partial<NoteNodeData>)._storedColors?.backgroundColor ?? null
+    : null
+  const isShade100 = findFamilyShadeFromHex(toBaseHex(canonicalBg))?.shade === 100
+  const honoredBg = isShade100 ? node?.style?.backgroundColor ?? null : null
+
+  const handlePickColor = useCallback(
+    (hexOrNull: string | null) => {
+      const n = store.getNode(id)
+      if (!n) return
+      const mode = resolvedTheme === "dark" ? "dark" : "light"
+      const { style, data: nextData } = computeNodeColorUpdate(
+        n,
+        { backgroundColor: hexOrNull ?? undefined },
+        mode,
+      )
+      store.updateNode(id, { style, data: nextData })
+    },
+    [store, id, resolvedTheme],
   )
 
   if (!node) return null
@@ -98,6 +133,9 @@ export function SheetView({ id }: SheetViewProps) {
           // Select the node (show handles) alongside entering edit — the
           // body swallows pointerdown, so the lib's gesture never selects it.
           store.setSelection([id])
+          // Remember where the user clicked so the editor can place the caret
+          // there instead of jumping to the end.
+          setCaretCoords({ x: e.clientX, y: e.clientY })
           enterEdit()
         }}
         onKeyDown={(e) => {
@@ -106,14 +144,17 @@ export function SheetView({ id }: SheetViewProps) {
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault()
             e.stopPropagation()
+            setCaretCoords(null)
             enterEdit()
           }
         }}
         className={cn(
-          "absolute inset-0 flex flex-col overflow-hidden rounded-2xl border border-border bg-card text-left text-card-foreground shadow-md",
+          "absolute inset-0 flex flex-col overflow-hidden rounded-xl border border-foreground/40 shadow-sm text-left text-card-foreground",
+          honoredBg ? null : "bg-card",
           "pointer-events-auto",
           !editing && canEdit ? "cursor-pointer" : "cursor-default",
         )}
+        style={honoredBg ? { backgroundColor: honoredBg } : undefined}
         title={!editing && canEdit ? "Double-click to edit" : undefined}
       >
         <div
@@ -123,8 +164,8 @@ export function SheetView({ id }: SheetViewProps) {
           )}
         >
           {iconValue && (
-            <div className="pointer-events-none mb-2">
-              <IconPropertyView icon={iconValue} size={24} />
+            <div className="pointer-events-none mb-3">
+              <IconPropertyView icon={iconValue} size={44} />
             </div>
           )}
           {(body || editing) && isInView ? (
@@ -132,6 +173,7 @@ export function SheetView({ id }: SheetViewProps) {
               <SheetInlineEditor
                 markdown={node.content ?? ""}
                 editable={editing}
+                caretCoords={caretCoords}
                 pageProvider={pageProvider}
                 parentNoteId={id as unknown as string}
                 onSave={handleSave}
@@ -155,6 +197,12 @@ export function SheetView({ id }: SheetViewProps) {
         onDelete={canEdit ? () => store.removeNode(id) : undefined}
         onExpand={canEdit ? () => openNodeSurface(id as unknown as string, "sheet") : undefined}
       />
+
+      {canEdit && (
+        <div className="pointer-events-auto absolute right-2 top-2 z-40">
+          <SheetColorPicker value={isShade100 ? canonicalBg : null} onPick={handlePickColor} />
+        </div>
+      )}
 
       <div className="pointer-events-auto absolute left-1/2 top-full z-20 mt-2 w-full -translate-x-1/2">
         <NodeTitleCaption

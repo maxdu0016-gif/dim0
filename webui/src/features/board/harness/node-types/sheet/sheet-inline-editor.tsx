@@ -14,6 +14,11 @@ type SheetInlineEditorProps = {
   markdown: string
   /** When true, the card is an editable editor; when false, a read-only render. */
   editable: boolean
+  /**
+   * Viewport coords of the click that entered edit mode. When set, the caret
+   * is dropped at the nearest document position; null places it at the end.
+   */
+  caretCoords?: { x: number; y: number } | null
   /** Resolves @-mention / subpage chips (titles, icons, /subpage creation). */
   pageProvider?: PageProvider | null
   /** Sheet id, so /subpage nests new pages under it. */
@@ -36,6 +41,7 @@ type SheetInlineEditorProps = {
 export function SheetInlineEditor({
   markdown,
   editable,
+  caretCoords,
   pageProvider,
   parentNoteId,
   onSave,
@@ -43,6 +49,11 @@ export function SheetInlineEditor({
   className,
 }: SheetInlineEditorProps) {
   const wrapRef = useRef<HTMLDivElement>(null)
+
+  // Latest click coords, read (not depended on) by the place-caret effect so
+  // it only fires on the edit-mode flip, not on every coord change.
+  const caretCoordsRef = useRef(caretCoords)
+  caretCoordsRef.current = caretCoords
 
   const onSaveRef = useRef(onSave)
   useEffect(() => {
@@ -78,9 +89,20 @@ export function SheetInlineEditor({
     editor?.setEditable(editable)
   }, [editor, editable])
 
-  // Place the caret when entering edit mode.
+  // Place the caret when entering edit mode — at the click position when we
+  // have one (ProseMirror maps viewport coords → doc pos, transform-aware so
+  // it works at any canvas zoom), else at the end.
   useEffect(() => {
-    if (editor && editable) editor.commands.focus("end")
+    if (!editor || !editable) return
+    const coords = caretCoordsRef.current
+    if (coords) {
+      const hit = editor.view.posAtCoords({ left: coords.x, top: coords.y })
+      if (hit) {
+        editor.chain().focus().setTextSelection(hit.pos).run()
+        return
+      }
+    }
+    editor.commands.focus("end")
   }, [editor, editable])
 
   // External content sync: when the canonical markdown changes from elsewhere
