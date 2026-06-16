@@ -4,7 +4,6 @@ import CharacterCount from "@tiptap/extension-character-count"
 import TaskList from "@tiptap/extension-task-list"
 import TaskItem from "@tiptap/extension-task-item"
 import Link from "@tiptap/extension-link"
-import Underline from "@tiptap/extension-underline"
 import Typography from "@tiptap/extension-typography"
 import { Markdown } from "tiptap-markdown"
 import { Extension } from "@tiptap/core"
@@ -247,7 +246,6 @@ export function getExtensions(options: GetExtensionsOptions = {}) {
       openOnClick: false,
       HTMLAttributes: { class: "editor-link" },
     }),
-    Underline,
     Typography,
     Markdown.configure({
       html: false,
