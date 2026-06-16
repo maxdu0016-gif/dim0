@@ -82,10 +82,13 @@ export function SheetView({ id }: SheetViewProps) {
   // else (incl. the legacy BLUE_200 default) falls back to the card surface.
   // Gate on the canonical color (`_storedColors`), paint the theme-projected
   // `node.style.backgroundColor` so dark mode stays consistent.
-  const canonicalBg = node?.data
-    ? (node.data as Partial<NoteNodeData>)._storedColors?.backgroundColor ?? null
-    : null
-  const isShade100 = findFamilyShadeFromHex(toBaseHex(canonicalBg))?.shade === 100
+  const canonicalBg = data._storedColors?.backgroundColor ?? null
+  // The shade-100 lookup linearly scans the whole Tailwind palette, so memoize
+  // it on the color — SheetView re-renders per keystroke while editing.
+  const isShade100 = useMemo(
+    () => findFamilyShadeFromHex(toBaseHex(canonicalBg))?.shade === 100,
+    [canonicalBg],
+  )
   const honoredBg = isShade100 ? node?.style?.backgroundColor ?? null : null
 
   const handlePickColor = useCallback(
