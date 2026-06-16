@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from "react"
 import { NotepadIcon } from "@phosphor-icons/react"
+import type { Editor } from "@tiptap/react"
 import { type NodeId } from "@canvas-harness/core"
 import { useCanvasStore, useNode } from "@canvas-harness/react"
 import { IconPropertyView } from "@/components/icons/icon-property-view"
@@ -17,6 +18,7 @@ import {
 } from "../../shared-views"
 import { useBoardAppStore } from "../../store/board-app-store"
 import { SheetColorPicker } from "./sheet-color-picker"
+import { SheetEditorToolbar } from "./sheet-toolbar"
 import { SheetInlineEditor } from "./sheet-inline-editor"
 
 
@@ -57,6 +59,9 @@ export function SheetView({ id }: SheetViewProps) {
   const openNodeSurface = useBoardAppStore((s) => s.openNodeSurface)
   const canEdit = useBoardAppStore((s) => s.canEdit)
   const [editing, setEditing] = useState(false)
+  // The inline editor reports its TipTap instance up so the card can render the
+  // formatting toolbar as its own bottom flex child (flush at the card edge).
+  const [toolbarEditor, setToolbarEditor] = useState<Editor | null>(null)
   // Viewport coords of the double-click that entered edit mode, so the
   // editor can drop the caret where the user clicked (null = caret at end,
   // e.g. when edit is entered via keyboard).
@@ -199,6 +204,7 @@ export function SheetView({ id }: SheetViewProps) {
               <SheetInlineEditor
                 markdown={node.content ?? ""}
                 editable={editing}
+                onEditor={setToolbarEditor}
                 caretCoords={caretCoords}
                 pageProvider={pageProvider}
                 parentNoteId={id as unknown as string}
@@ -222,6 +228,10 @@ export function SheetView({ id }: SheetViewProps) {
           <div className="pointer-events-none absolute bottom-2 right-3 text-[10px] leading-none text-muted-foreground">
             {stampPrefix} {formatStampDate(stampIso)}
           </div>
+        ) : null}
+
+        {editing && toolbarEditor ? (
+          <SheetEditorToolbar editor={toolbarEditor} surfaceColor={honoredBg} />
         ) : null}
       </div>
 

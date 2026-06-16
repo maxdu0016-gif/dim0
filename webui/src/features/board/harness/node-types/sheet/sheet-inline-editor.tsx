@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from "react"
-import { EditorContent, useEditor } from "@tiptap/react"
+import { EditorContent, useEditor, type Editor } from "@tiptap/react"
 import { useDebouncedCallback } from "use-debounce"
 import { getExtensions } from "@/components/editor/tiptap/extensions"
 import type { PageProvider } from "@/components/editor/tiptap/page/types"
@@ -14,6 +14,11 @@ type SheetInlineEditorProps = {
   markdown: string
   /** When true, the card is an editable editor; when false, a read-only render. */
   editable: boolean
+  /**
+   * Reports the TipTap instance to the parent (null on unmount) so the card
+   * can mount the formatting toolbar as its own bottom flex child.
+   */
+  onEditor?: (editor: Editor | null) => void
   /**
    * Viewport coords of the click that entered edit mode. When set, the caret
    * is dropped at the nearest document position; null places it at the end.
@@ -41,6 +46,7 @@ type SheetInlineEditorProps = {
 export function SheetInlineEditor({
   markdown,
   editable,
+  onEditor,
   caretCoords,
   pageProvider,
   parentNoteId,
@@ -116,6 +122,14 @@ export function SheetInlineEditor({
 
   // Don't lose a pending edit when the card unmounts (pan / zoom-out / LOD).
   useEffect(() => () => save.flush(), [save])
+
+  // Surface the editor to the card so it can render the bottom toolbar.
+  const onEditorRef = useRef(onEditor)
+  onEditorRef.current = onEditor
+  useEffect(() => {
+    onEditorRef.current?.(editor)
+    return () => onEditorRef.current?.(null)
+  }, [editor])
 
   if (!editor) return null
 
