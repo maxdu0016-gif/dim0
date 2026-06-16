@@ -25,6 +25,19 @@ export type SheetViewProps = {
 }
 
 
+/** Compact stamp date — "Jun 14", with the year only when it isn't this year. */
+const formatStampDate = (iso: string): string => {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ""
+  const sameYear = d.getFullYear() === new Date().getFullYear()
+  return d.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    ...(sameYear ? {} : { year: "numeric" }),
+  })
+}
+
+
 /**
  * Sheet inline view — sticky-note style card. The body renders through the
  * *same* TipTap pipeline as the modal editor ({@link SheetInlineEditor}) so
@@ -111,6 +124,9 @@ export function SheetView({ id }: SheetViewProps) {
   const label = data.label?.markdown
   const body = node.content?.trim() ?? ""
   const iconValue = data.properties?.iconData?.icon ?? null
+  // Last-modified, falling back to created. Prefix tells which one it is.
+  const stampIso = data.updatedAt ?? data.createdAt
+  const stampPrefix = data.updatedAt ? "Edited" : "Created"
 
   const enterEdit = () => {
     if (canEdit) setEditing(true)
@@ -201,6 +217,12 @@ export function SheetView({ id }: SheetViewProps) {
             <span className="italic text-muted-foreground">Empty sheet</span>
           )}
         </div>
+
+        {!editing && stampIso ? (
+          <div className="pointer-events-none absolute bottom-2 right-3 text-[10px] leading-none text-muted-foreground">
+            {stampPrefix} {formatStampDate(stampIso)}
+          </div>
+        ) : null}
       </div>
 
       <NodeTrafficLights
