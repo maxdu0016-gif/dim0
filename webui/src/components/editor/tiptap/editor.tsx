@@ -103,24 +103,6 @@ export function TipTapEditor({
     return () => window.removeEventListener("keydown", handler)
   }, [editor, debouncedSave])
 
-  // Stop Cmd/Ctrl+C/V/X from reaching @canvas-harness's window-level
-  // keydown listener, which preventDefault's clipboard ops when focus
-  // isn't on an INPUT/TEXTAREA — but it doesn't check `isContentEditable`,
-  // so paste was hijacked inside the editor. Bubble-phase listener on the
-  // editor's own root fires before window, so stopPropagation here keeps
-  // ProseMirror's native paste handling intact.
-  useEffect(() => {
-    if (!editor) return
-    const dom = editor.view.dom
-    const onClipboardKey = (e: KeyboardEvent) => {
-      if (!(e.metaKey || e.ctrlKey)) return
-      const k = e.key.toLowerCase()
-      if (k === "c" || k === "v" || k === "x") e.stopPropagation()
-    }
-    dom.addEventListener("keydown", onClipboardKey)
-    return () => dom.removeEventListener("keydown", onClipboardKey)
-  }, [editor])
-
   // External content sync. `useEditor`'s `content` is only consumed on
   // mount, so when something outside (e.g. an AI rewrite) updates the
   // markdown prop we have to push it into the editor manually. Compare
