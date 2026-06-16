@@ -164,6 +164,13 @@ export function SheetView({ id }: SheetViewProps) {
           className={cn(
             "min-h-0 flex-1 px-4 pb-3 pt-10 text-sm leading-relaxed text-foreground",
             editing ? "scrollbar-thin overflow-auto" : "overflow-hidden",
+            // Fade the text into the card near the bottom edge so a clipped
+            // (unfinished) sheet reads as "there's more". Masks the text alpha,
+            // so it works on any card color and only shows when text reaches
+            // the edge. Skipped while editing (full scroll).
+            !editing && body
+              ? "[--sheet-fade:linear-gradient(to_bottom,#000_calc(100%-2.75rem),transparent)] [mask-image:var(--sheet-fade)] [-webkit-mask-image:var(--sheet-fade)]"
+              : null,
           )}
         >
           {iconValue && (
