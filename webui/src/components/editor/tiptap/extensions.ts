@@ -217,6 +217,7 @@ export function getExtensions(options: GetExtensionsOptions = {}) {
       codeBlock: false, // replaced by ShikiCodeBlock
       blockquote: false, // replaced by BlockquoteNoShortcut so `> ` triggers toggle
       underline: false, // replaced by UnderlineMarkdown so Ctrl+U survives markdown round-trip
+      link: false, // replaced by our explicit Link.configure(...) below — fixes a "Duplicate extension names: ['link']" warning
     }),
     BlockquoteNoShortcut,
     ShikiCodeBlock,
