@@ -44,6 +44,11 @@ const EXCLUDED_TYPES: ReadonlySet<string> = new Set([
   "widget",
   "document",
   "mini-app",
+  // Icons opt out: user-picked color is per-icon, not a sticky session
+  // preference. Without this, dropping an icon after styling a rectangle
+  // would inherit the rectangle's stroke / fill — visually surprising
+  // since icons are usually outline-transparent glyphs.
+  "icon",
 ])
 
 
