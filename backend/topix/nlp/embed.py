@@ -47,9 +47,21 @@ class OpenAIEmbedder:
             )
         return fitted
 
+    def _fit_batch(self, texts: list[str]) -> list[str]:
+        """Clamp every text in a batch to the token limit, mapping empties to "$"."""
+        return [self._fit(text) if text else "$" for text in texts]
+
     @async_timeit
     async def _embed_batch(self, texts: list[str]) -> list[list[float]]:
-        texts = [self._fit(text) if text else "$" for text in texts]
+        # Clamping only runs a (synchronous, GIL-holding) BPE encode for text
+        # long enough to possibly overflow — see the fast-path threshold in
+        # truncate_to_tokens. tiktoken releases the GIL during encode, so when a
+        # batch actually contains such text we offload the whole fit to a thread
+        # to keep a large bulk batch off the event loop. All-short batches (e.g.
+        # chat turns) skip the hop and fit inline for free. Mis-estimating the
+        # threshold only costs a needless hop or inline encode, never correctness.
+        needs_encode = any(t and len(t) > MAX_EMBED_TOKENS // 4 for t in texts)
+        texts = await asyncio.to_thread(self._fit_batch, texts) if needs_encode else self._fit_batch(texts)
         # Call the embeddings endpoint asynchronously
         response = await self._client.embeddings.create(
             model=MODEL_NAME,

@@ -1,7 +1,10 @@
 """Unit tests for the embedder's per-input token clamping."""
 
+import asyncio
+
 import tiktoken
 
+from topix.nlp import embed as embed_mod
 from topix.nlp.embed import MAX_EMBED_TOKENS, OpenAIEmbedder
 from topix.nlp.tokens import EMBED_ENCODING
 
@@ -63,3 +66,30 @@ class TestEmbedderClamping:
         await embedder.embed(["The capital of Peru is Lima."])
 
         assert fake.embeddings.last_input == ["The capital of Peru is Lima."]
+
+    async def test_long_batch_offloads_encode_to_thread(self, monkeypatch):
+        """A batch with encode-worthy text runs the fit off the event loop."""
+        embedder, _ = self._embedder()
+        calls = {"n": 0}
+        real = asyncio.to_thread
+
+        async def _spy(fn, *args, **kwargs):
+            calls["n"] += 1
+            return await real(fn, *args, **kwargs)
+
+        monkeypatch.setattr(embed_mod.asyncio, "to_thread", _spy)
+        await embedder.embed(["x" * (MAX_EMBED_TOKENS * 4)])
+        assert calls["n"] == 1
+
+    async def test_short_batch_fits_inline(self, monkeypatch):
+        """An all-short batch never pays for a thread hop."""
+        embedder, _ = self._embedder()
+        calls = {"n": 0}
+
+        async def _spy(fn, *args, **kwargs):
+            calls["n"] += 1
+            return fn(*args, **kwargs)
+
+        monkeypatch.setattr(embed_mod.asyncio, "to_thread", _spy)
+        await embedder.embed(["short text", "another short one"])
+        assert calls["n"] == 0
