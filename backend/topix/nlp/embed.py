@@ -1,14 +1,24 @@
 """Embedding class."""
 
 import asyncio
+import logging
 
 from openai import AsyncOpenAI
 
 from topix.config.config import Config
+from topix.nlp.tokens import truncate_to_tokens
 from topix.utils.timeit import async_timeit
+
+logger = logging.getLogger(__name__)
 
 MODEL_NAME = "text-embedding-3-small"
 DIMENSIONS = 512
+
+# Hard per-input limit for `text-embedding-3-small` is 8191 tokens; cap a touch
+# below it so any counting drift still lands inside the limit. Oversized inputs
+# (long sheets, mini-app JSX, non-English notes) are truncated rather than
+# allowed to 400 the whole embed request.
+MAX_EMBED_TOKENS = 8000
 
 
 class OpenAIEmbedder:
@@ -23,9 +33,23 @@ class OpenAIEmbedder:
         """Create an instance of OpenAIEmbedder from configuration."""
         return cls(api_key=Config.instance().run.apis.openai.api_key.get_secret_value())
 
+    def _fit(self, text: str) -> str:
+        """Clamp one text to the embedding model's per-input token limit.
+
+        Logs a warning when truncation actually happens so we have visibility
+        into how often oversized content is being clipped (and on what).
+        """
+        fitted = truncate_to_tokens(text, MAX_EMBED_TOKENS)
+        if len(fitted) != len(text):
+            logger.warning(
+                "Truncated embedding input to %d tokens (was %d chars, now %d chars)",
+                MAX_EMBED_TOKENS, len(text), len(fitted),
+            )
+        return fitted
+
     @async_timeit
     async def _embed_batch(self, texts: list[str]) -> list[list[float]]:
-        texts = [text if text else "$" for text in texts]
+        texts = [self._fit(text) if text else "$" for text in texts]
         # Call the embeddings endpoint asynchronously
         response = await self._client.embeddings.create(
             model=MODEL_NAME,
