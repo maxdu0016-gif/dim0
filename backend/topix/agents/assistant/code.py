@@ -36,6 +36,14 @@ REQUIRED_DAYTONA_ENV_VARS = (
     "DAYTONA_TARGET",
 )
 
+# Languages Daytona can actually execute via its built-in code toolboxes
+# (`process.code_run`). These values match Daytona's `CodeLanguage` enum
+# verbatim, so they pass straight through to sandbox creation. Any other
+# language is a display-only code note — the UI hides the run affordance
+# and this module never sees an execute request for it.
+RUNNABLE_LANGUAGES = frozenset({"python", "javascript", "typescript"})
+DEFAULT_LANGUAGE = "python"
+
 
 class DaytonaSandboxManager:
     """Create and tear down a Daytona sandbox for a single code execution."""
@@ -52,34 +60,39 @@ class DaytonaSandboxManager:
         self._image = os.getenv("DAYTONA_IMAGE")
         self._snapshot = os.getenv("DAYTONA_SNAPSHOT")
 
-    def _sandbox_kwargs(self) -> dict[str, object]:
-        """Return shared sandbox creation defaults for short-lived code runs."""
+    def _sandbox_kwargs(self, language: str) -> dict[str, object]:
+        """Return shared sandbox creation defaults for short-lived code runs.
+
+        ``language`` selects Daytona's code toolbox (the command used by
+        ``code_run``); the configured image/snapshot must carry the matching
+        runtime (e.g. Node for javascript/typescript).
+        """
         return {
-            "language": "python",
+            "language": language,
             "auto_stop_interval": SANDBOX_AUTO_STOP_INTERVAL_MINUTES,
             "network_block_all": True,
             "ephemeral": True,
         }
 
-    async def create(self) -> AsyncSandbox:
-        """Create a sandbox for the current execution."""
+    async def create(self, language: str = DEFAULT_LANGUAGE) -> AsyncSandbox:
+        """Create a sandbox configured for ``language``'s code toolbox."""
         if self._snapshot:
             params = CreateSandboxFromSnapshotParams(
                 snapshot=self._snapshot,
-                **self._sandbox_kwargs(),
+                **self._sandbox_kwargs(language),
             )
             return await self._client.create(params, timeout=SANDBOX_CREATE_TIMEOUT_SECONDS)
 
         if self._image:
             params = CreateSandboxFromImageParams(
                 image=self._image,
-                **self._sandbox_kwargs(),
+                **self._sandbox_kwargs(language),
             )
             return await self._client.create(params, timeout=SANDBOX_CREATE_TIMEOUT_SECONDS)
 
         params = CreateSandboxFromImageParams(
             image=Image.debian_slim("3.13"),
-            **self._sandbox_kwargs(),
+            **self._sandbox_kwargs(language),
         )
         return await self._client.create(params, timeout=SANDBOX_CREATE_TIMEOUT_SECONDS)
 
@@ -88,7 +101,11 @@ class DaytonaSandboxManager:
         await sandbox.delete(timeout=CODE_RUN_TIMEOUT_SECONDS)
 
     async def run_code(self, sandbox: AsyncSandbox, code: str) -> tuple[str, str]:
-        """Execute Python code inside the sandbox and capture stdio."""
+        """Execute code inside the sandbox and capture stdio.
+
+        The language was fixed at create time via the sandbox's code toolbox,
+        so this just runs whatever the agent/user wrote against it.
+        """
         response = await sandbox.process.code_run(
             code,
             timeout=CODE_RUN_TIMEOUT_SECONDS,
@@ -119,9 +136,25 @@ def _get_missing_daytona_env_vars() -> list[str]:
     return [name for name in REQUIRED_DAYTONA_ENV_VARS if not os.getenv(name)]
 
 
-async def execute_python_code(code: str) -> CodeInterpreterOutput:
-    """Run Python code in an isolated Daytona sandbox and return execution results."""
+async def execute_code(
+    code: str,
+    language: str = DEFAULT_LANGUAGE,
+) -> CodeInterpreterOutput:
+    """Run code in an isolated Daytona sandbox and return execution results.
+
+    ``language`` must be one of ``RUNNABLE_LANGUAGES``; anything else is
+    rejected up front since Daytona has no toolbox to execute it.
+    """
     started_at = time.perf_counter()
+
+    if language not in RUNNABLE_LANGUAGES:
+        return CodeInterpreterOutput(
+            status="error",
+            stdout="",
+            stderr=f"Language '{language}' is not runnable.",
+            duration_ms=int((time.perf_counter() - started_at) * 1000),
+        )
+
     missing_env_vars = _get_missing_daytona_env_vars()
 
     if missing_env_vars:
@@ -142,7 +175,7 @@ async def execute_python_code(code: str) -> CodeInterpreterOutput:
 
     async with CODE_RUN_SEMAPHORE:
         try:
-            sandbox = await sandbox_manager.create()
+            sandbox = await sandbox_manager.create(language)
             stdout, stderr = await sandbox_manager.run_code(sandbox, code)
         except TimeoutError:
             stderr = (
@@ -166,6 +199,11 @@ async def execute_python_code(code: str) -> CodeInterpreterOutput:
         stderr=stderr,
         duration_ms=duration_ms,
     )
+
+
+async def execute_python_code(code: str) -> CodeInterpreterOutput:
+    """Run Python code in an isolated Daytona sandbox (agent-tool entrypoint)."""
+    return await execute_code(code, language="python")
 
 
 async def run_code(

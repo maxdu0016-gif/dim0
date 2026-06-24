@@ -59,10 +59,12 @@ class FakeSandboxManager:
         """Prepare the sandbox returned by create calls."""
         self.sandbox = FakeSandbox(response)
         self.create_calls = 0
+        self.create_languages: list[str] = []
 
-    async def create(self) -> FakeSandbox:
-        """Create and return the fake sandbox."""
+    async def create(self, language: str = "python") -> FakeSandbox:
+        """Create and return the fake sandbox, recording the requested language."""
         self.create_calls += 1
+        self.create_languages.append(language)
         return self.sandbox
 
     async def destroy(self, sandbox: FakeSandbox) -> None:
@@ -189,3 +191,51 @@ async def test_daytona_sandbox_manager_applies_short_lived_sandbox_defaults(monk
     assert params.ephemeral is True
     assert params.auto_delete_interval == 0
     assert client.timeouts == [code_module.SANDBOX_CREATE_TIMEOUT_SECONDS]
+
+
+@pytest.mark.asyncio
+async def test_create_sandbox_uses_requested_language(monkeypatch):
+    """The requested language should select the matching Daytona toolbox."""
+    client = RecordingDaytonaClient()
+    monkeypatch.setenv("DAYTONA_API_KEY", "configured")
+    monkeypatch.setenv("DAYTONA_API_URL", "https://example.test")
+    monkeypatch.setenv("DAYTONA_TARGET", "eu")
+    monkeypatch.setattr(code_module, "AsyncDaytona", lambda config: client)
+
+    manager = code_module.DaytonaSandboxManager()
+    await manager.create("javascript")
+
+    assert client.params[0].language == "javascript"
+
+
+@pytest.mark.asyncio
+async def test_execute_code_runs_in_requested_language(monkeypatch):
+    """A runnable language should reach the sandbox via create(language)."""
+    for env_var in code_module.REQUIRED_DAYTONA_ENV_VARS:
+        monkeypatch.setenv(env_var, "configured")
+
+    manager = FakeSandboxManager(FakeResponse(stdout="3\n", exit_code=0))
+    monkeypatch.setattr(code_module, "DaytonaSandboxManager", lambda: manager)
+
+    result = await code_module.execute_code("console.log(1 + 2)", "javascript")
+
+    assert result.status == "success"
+    assert result.stdout == "3\n"
+    assert manager.create_languages == ["javascript"]
+
+
+@pytest.mark.asyncio
+async def test_execute_code_rejects_non_runnable_language(monkeypatch):
+    """Languages without a Daytona toolbox should error before any sandbox."""
+    for env_var in code_module.REQUIRED_DAYTONA_ENV_VARS:
+        monkeypatch.setenv(env_var, "configured")
+
+    def _fail():
+        raise AssertionError("sandbox should not be created for non-runnable language")
+
+    monkeypatch.setattr(code_module, "DaytonaSandboxManager", _fail)
+
+    result = await code_module.execute_code("int main(){}", "c")
+
+    assert result.status == "error"
+    assert "not runnable" in result.stderr
