@@ -61,85 +61,104 @@ class ModelEnum:
     OpenRouter = OpenRouterModel
 
 
-def support_temperature(model: str) -> bool:
+def _bare(model: object) -> str:
+    """Return a model's bare name (final path segment), ignoring any route prefix.
+
+    Capability checks must hold whether a model is addressed natively
+    ("openai/gpt-5.4"), routed through OpenRouter ("openrouter/openai/gpt-5.4"),
+    or wrapped in a LitellmModel — all share the same bare name "gpt-5.4".
+    """
+    name = model.model if hasattr(model, "model") else model
+    if isinstance(name, Enum):
+        name = name.value  # str(Enum) yields "OpenAIModel.X", not the model string
+    return str(name).rsplit("/", 1)[-1]
+
+
+# Capability sets keyed on bare model names so they match regardless of route.
+_NO_TEMPERATURE_MODELS = frozenset(_bare(m) for m in (
+    OpenAIModel.GPT_5,
+    OpenAIModel.GPT_5_MINI,
+    OpenAIModel.GPT_5_NANO,
+    OpenAIModel.GPT_5_4,
+    OpenAIModel.GPT_5_4_MINI,
+    OpenAIModel.GPT_5_4_NANO,
+    OpenAIModel.GPT_5_1_CHAT,
+))
+
+_REASONING_MODELS = frozenset(_bare(m) for m in (
+    # OpenAI reasoning-capable
+    OpenAIModel.GPT_5_1,
+    OpenAIModel.GPT_5_1_CHAT,
+    OpenAIModel.GPT_5,
+    OpenAIModel.GPT_5_MINI,
+    OpenAIModel.GPT_5_NANO,
+    OpenAIModel.GPT_5_2,
+    OpenAIModel.GPT_5_2_CHAT,
+    OpenAIModel.GPT_5_4,
+    OpenAIModel.GPT_5_4_MINI,
+    OpenAIModel.GPT_5_4_NANO,
+    # Gemini reasoning-capable
+    GeminiModel.GEMINI_2_5_FLASH,
+    GeminiModel.GEMINI_2_5_PRO,
+    # Perplexity reasoning-capable
+    PerplexityModel.PERPLEXITY_SONAR,
+))
+
+_REASONING_EFFORT_INSTANT_MODELS = frozenset(_bare(m) for m in (
+    OpenAIModel.GPT_5_1_CHAT,
+))
+
+_REASONING_EFFORT_NONE_MODELS = frozenset(_bare(m) for m in (
+    OpenAIModel.GPT_5_1,
+    OpenAIModel.GPT_5_4,
+    OpenAIModel.GPT_5_4_MINI,
+    OpenAIModel.GPT_5_4_NANO,
+    OpenAIModel.GPT_5_2,
+    OpenAIModel.GPT_5_2_CHAT,
+))
+
+_NO_PENALTIES_MODELS = frozenset(_bare(m) for m in (
+    OpenAIModel.GPT_4O,
+    OpenAIModel.GPT_4O_MINI,
+    OpenAIModel.GPT_4_1,
+    OpenAIModel.GPT_4_1_MINI,
+    OpenAIModel.GPT_4_1_NANO,
+    OpenAIModel.GPT_5_1_CHAT,
+    OpenAIModel.GPT_5,
+    OpenAIModel.GPT_5_MINI,
+    OpenAIModel.GPT_5_NANO,
+    OpenAIModel.GPT_5_4,
+    OpenAIModel.GPT_5_4_MINI,
+    OpenAIModel.GPT_5_4_NANO,
+    GeminiModel.GEMINI_2_5_FLASH,
+    GeminiModel.GEMINI_2_5_PRO,
+))
+
+
+def support_temperature(model: object) -> bool:
     """Check if the model supports temperature.
 
     Temperature is possibly not supported in reasoning models due to
     introduced newer parameters like `verbosity` or `reasoning_effort`.
     """
-    if model in [
-        OpenAIModel.GPT_5,
-        OpenAIModel.GPT_5_MINI,
-        OpenAIModel.GPT_5_NANO,
-        OpenAIModel.GPT_5_4,
-        OpenAIModel.GPT_5_4_MINI,
-        OpenAIModel.GPT_5_4_NANO,
-        OpenAIModel.GPT_5_1_CHAT,
-    ]:
-        return False
-    return True
+    return _bare(model) not in _NO_TEMPERATURE_MODELS
 
 
-def support_reasoning(model: str) -> bool:
+def support_reasoning(model: object) -> bool:
     """Check if the model supports reasoning."""
-    reasoning_models = {
-        # OpenAI reasoning-capable
-        OpenAIModel.GPT_5_1,
-        OpenAIModel.GPT_5_1_CHAT,
-        OpenAIModel.GPT_5,
-        OpenAIModel.GPT_5_MINI,
-        OpenAIModel.GPT_5_NANO,
-        OpenAIModel.GPT_5_2,
-        OpenAIModel.GPT_5_2_CHAT,
-        OpenAIModel.GPT_5_4,
-        OpenAIModel.GPT_5_4_MINI,
-        OpenAIModel.GPT_5_4_NANO,
-
-        # Gemini reasoning-capable
-        GeminiModel.GEMINI_2_5_FLASH,
-        GeminiModel.GEMINI_2_5_PRO,
-
-        # Perplexity reasoning-capable
-        PerplexityModel.PERPLEXITY_SONAR
-    }
-
-    return model in reasoning_models
+    return _bare(model) in _REASONING_MODELS
 
 
-def support_reasoning_effort_instant_mode(model: str) -> bool:
+def support_reasoning_effort_instant_mode(model: object) -> bool:
     """Check if the model supports instant reasoning effort."""
-    return model in [OpenAIModel.GPT_5_1_CHAT]
+    return _bare(model) in _REASONING_EFFORT_INSTANT_MODELS
 
 
-def support_reasoning_effort_none(model: str) -> bool:
+def support_reasoning_effort_none(model: object) -> bool:
     """Check if the model supports 'none' reasoning effort."""
-    return model in [
-        OpenAIModel.GPT_5_1,
-        OpenAIModel.GPT_5_4,
-        OpenAIModel.GPT_5_4_MINI,
-        OpenAIModel.GPT_5_4_NANO,
-        OpenAIModel.GPT_5_2,
-        OpenAIModel.GPT_5_2_CHAT
-    ]
+    return _bare(model) in _REASONING_EFFORT_NONE_MODELS
 
 
-def support_penalties(model: str) -> bool:
+def support_penalties(model: object) -> bool:
     """Check if the model supports frequency and presence penalty."""
-    if model in [
-        OpenAIModel.GPT_4O,
-        OpenAIModel.GPT_4O_MINI,
-        OpenAIModel.GPT_4_1,
-        OpenAIModel.GPT_4_1_MINI,
-        OpenAIModel.GPT_4_1_NANO,
-        OpenAIModel.GPT_5_1_CHAT,
-        OpenAIModel.GPT_5,
-        OpenAIModel.GPT_5_MINI,
-        OpenAIModel.GPT_5_NANO,
-        OpenAIModel.GPT_5_4,
-        OpenAIModel.GPT_5_4_MINI,
-        OpenAIModel.GPT_5_4_NANO,
-        GeminiModel.GEMINI_2_5_FLASH,
-        GeminiModel.GEMINI_2_5_PRO,
-    ]:
-        return False
-    return True
+    return _bare(model) not in _NO_PENALTIES_MODELS
