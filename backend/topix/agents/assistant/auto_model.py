@@ -12,9 +12,10 @@ from typing import Literal
 from openai import AsyncOpenAI
 from pydantic import BaseModel
 
+from topix.config import catalog
+
 AUTO_MODEL_TIMEOUT_SECONDS = 2
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
-OPENROUTER_AUTO_MODEL = "openai/gpt-oss-120b:nitro"
 
 logger = logging.getLogger(__name__)
 
@@ -156,23 +157,39 @@ def _build_classifier_input(messages: list[dict[str, str]]) -> str:
     return "\n\n".join(parts)
 
 
+def _classifier_client_and_model() -> tuple[AsyncOpenAI, str] | None:
+    """Build an OpenAI-compatible client + model for the cheap classifier call.
+
+    Uses the best available "lite" model; supports the OpenAI and OpenRouter
+    providers (both OpenAI-compatible). Returns None when no compatible model
+    is reachable, in which case the caller falls back to a default complexity.
+    """
+    fast = catalog.default_resolved("lite") or catalog.default_resolved()
+    if fast is None:
+        return None
+
+    if fast.provider == "openai":
+        return AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY")), fast.model
+    if fast.provider == "openrouter":
+        client = AsyncOpenAI(api_key=os.getenv("OPENROUTER_API_KEY"), base_url=OPENROUTER_BASE_URL)
+        return client, fast.model
+    return None
+
+
 async def classify_auto_model_complexity(messages: list[dict[str, str]]) -> ComplexityLabel:
     """Classify the request complexity, falling back to medium on any failure."""
     started_at = time.perf_counter()
-    api_key = os.getenv("OPENROUTER_API_KEY")
-    if not api_key:
+    selected = _classifier_client_and_model()
+    if selected is None:
         elapsed_ms = (time.perf_counter() - started_at) * 1000
-        logger.info("Auto model classifier skipped (missing OPENROUTER_API_KEY) in %.1fms", elapsed_ms)
+        logger.info("Auto model classifier skipped (no compatible model) in %.1fms", elapsed_ms)
         return "medium"
 
-    client = AsyncOpenAI(
-        api_key=api_key,
-        base_url=OPENROUTER_BASE_URL,
-    )
+    client, classifier_model = selected
 
     async def _run() -> ComplexityLabel:
         response = await client.beta.chat.completions.parse(
-            model=OPENROUTER_AUTO_MODEL,
+            model=classifier_model,
             messages=[
                 {"role": "system", "content": AUTO_MODEL_SYSTEM_PROMPT},
                 {"role": "user", "content": _build_classifier_input(messages)},
