@@ -168,7 +168,7 @@ async def send_message(
 
     if body.use_deep_research:
         deepsearch_config = DeepResearchConfig.from_yaml()
-        deepsearch_model = body.model if body.model != "auto" else catalog.default_model_code("lite")
+        deepsearch_model = body.model if body.model != "auto" else catalog.require_model_code("lite")
         deepsearch_config.set_model(deepsearch_model)
 
         deepsearch = DeepResearch.from_config(deepsearch_config)

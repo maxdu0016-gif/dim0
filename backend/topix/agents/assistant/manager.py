@@ -34,14 +34,14 @@ from topix.utils.common import gen_uid
 
 logger = logging.getLogger(__name__)
 
-def _auto_base_model() -> str | None:
+def _auto_base_model() -> str:
     """Cheapest/fastest available model for the auto-mode base plan."""
-    return catalog.default_model_code("lite") or catalog.default_model_code()
+    return catalog.require_model_code("lite")
 
 
-def _auto_complex_model() -> str | None:
+def _auto_complex_model() -> str:
     """Most capable available model for complex auto-mode requests."""
-    return catalog.default_model_code("pro") or catalog.default_model_code()
+    return catalog.require_model_code("pro")
 
 
 # Hard ceiling on plan-agent turns (one turn = one LLM invocation, which may

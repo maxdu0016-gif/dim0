@@ -21,6 +21,10 @@ from pydantic import BaseModel
 logger = logging.getLogger(__name__)
 
 MODELS_FILEPATH = Path(__file__).parent.parent / "models.yml"
+OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+NO_LLM_ERROR = (
+    "No LLM API available. Set a provider key (e.g. OPENAI_API_KEY or OPENROUTER_API_KEY)."
+)
 
 
 class Provider(BaseModel):
@@ -93,15 +97,14 @@ def available_providers() -> list[str]:
     return [name for name, p in providers.items() if _provider_available(p)]
 
 
-def _resolve(model: CatalogModel) -> Resolved | None:
-    """Return the first route whose provider key is present; None if unreachable."""
-    providers, _, _ = _load()
+def _resolve(model: CatalogModel, providers: dict[str, Provider], present: frozenset[str]) -> Resolved | None:
+    """Return the first route served by an available provider; None if unreachable."""
     for route in model.routes:
         p = providers.get(route.via)
         if p is None:
             logger.warning("Model '%s' references unknown provider '%s'", model.id, route.via)
             continue
-        if _provider_available(p):
+        if p.name in present:
             call = f"{p.prefix}/{route.model}" if p.prefix else route.model
             return Resolved(
                 id=model.id,
@@ -116,19 +119,29 @@ def _resolve(model: CatalogModel) -> Resolved | None:
     return None
 
 
+@lru_cache(maxsize=8)
+def _resolved_for(present: frozenset[str]) -> tuple[tuple[Resolved, ...], Resolved | None]:
+    """Resolve the whole catalog for a given set of available providers (memoized).
+
+    Keyed on the present-provider snapshot so it recomputes only when configured
+    keys change (startup sync, tests); stable env => cache hit on the hot path.
+    """
+    providers, llm, embedding = _load()
+    llms = tuple(r for m in llm if (r := _resolve(m, providers, present)))
+    emb = next((r for m in embedding if (r := _resolve(m, providers, present))), None)
+    return llms, emb
+
+
 def available_llms() -> list[Resolved]:
     """All LLM models reachable with the configured keys, in catalog order."""
-    _, llm, _ = _load()
-    return [r for m in llm if (r := _resolve(m))]
+    llms, _ = _resolved_for(frozenset(available_providers()))
+    return list(llms)
 
 
 def available_embedding() -> Resolved | None:
     """First embedding model reachable with the configured keys (preference order)."""
-    _, _, embedding = _load()
-    for m in embedding:
-        if (r := _resolve(m)):
-            return r
-    return None
+    _, emb = _resolved_for(frozenset(available_providers()))
+    return emb
 
 
 def resolve_code(model_id_or_code: str) -> str | None:
@@ -138,6 +151,8 @@ def resolve_code(model_id_or_code: str) -> str | None:
     code ("openrouter/anthropic/claude-opus-4.6") for backward compatibility.
     Returns None when the model is not reachable with the current keys.
     """
+    if not isinstance(model_id_or_code, str):
+        return None
     for r in available_llms():
         if model_id_or_code in (r.id, r.call):
             return r.call
@@ -152,6 +167,9 @@ def normalize_code(model: str) -> str | None:
     ("openai/gpt-4.1-mini", "openrouter/openai/gpt-5.2") by progressively
     stripping leading provider segments until a catalog model matches.
     """
+    if not isinstance(model, str):
+        return None
+
     direct = resolve_code(model)
     if direct is not None:
         return direct
@@ -184,3 +202,26 @@ def default_model_code(tier: str | None = None) -> str | None:
     """
     r = default_resolved(tier)
     return r.call if r else None
+
+
+def require_model_code(tier: str | None = None) -> str:
+    """Like default_model_code but raise a clear error when no model is reachable."""
+    code = default_model_code(tier)
+    if code is None:
+        raise ValueError(NO_LLM_ERROR)
+    return code
+
+
+def openai_compatible_client(resolved: Resolved):
+    """Build an OpenAI-compatible AsyncOpenAI client for a resolved route.
+
+    Supports the OpenAI and OpenRouter providers (both speak the OpenAI API);
+    returns None for providers that are not OpenAI-API-compatible.
+    """
+    from openai import AsyncOpenAI
+
+    if resolved.provider == "openai":
+        return AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    if resolved.provider == "openrouter":
+        return AsyncOpenAI(api_key=os.getenv("OPENROUTER_API_KEY"), base_url=OPENROUTER_BASE_URL)
+    return None

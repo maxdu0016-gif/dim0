@@ -134,3 +134,29 @@ def test_normalize_code_unknown_returns_none(clean_keys):
     """An unknown model reference normalizes to None."""
     clean_keys.setenv("OPENAI_API_KEY", "sk-x")
     assert catalog.normalize_code("totally-made-up-model") is None
+
+
+def test_normalize_code_handles_non_str(clean_keys):
+    """Non-string input resolves to None instead of raising."""
+    clean_keys.setenv("OPENAI_API_KEY", "sk-x")
+    assert catalog.normalize_code(None) is None
+    assert catalog.resolve_code(None) is None
+
+
+def test_require_model_code_raises_without_keys(clean_keys):
+    """require_model_code raises a clear error when nothing resolves."""
+    with pytest.raises(ValueError):
+        catalog.require_model_code()
+
+    clean_keys.setenv("OPENAI_API_KEY", "sk-x")
+    assert catalog.require_model_code("lite") is not None
+
+
+def test_openai_compatible_client_only_for_openai_apis(clean_keys):
+    """A client is built for openai/openrouter routes, not native others."""
+    clean_keys.setenv("OPENROUTER_API_KEY", "or-x")
+    emb = catalog.available_embedding()
+    assert emb is not None and emb.provider == "openrouter"
+    client = catalog.openai_compatible_client(emb)
+    assert client is not None
+    assert str(client.base_url).rstrip("/").endswith("openrouter.ai/api/v1")

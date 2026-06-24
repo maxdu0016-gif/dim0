@@ -2,7 +2,6 @@
 
 import asyncio
 import logging
-import os
 
 from openai import AsyncOpenAI
 
@@ -14,7 +13,6 @@ logger = logging.getLogger(__name__)
 
 MODEL_NAME = "text-embedding-3-small"
 DIMENSIONS = 512
-OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
 # Hard per-input limit for `text-embedding-3-small` is 8191 tokens; cap a touch
 # below it so any counting drift still lands inside the limit. Oversized inputs
@@ -32,13 +30,12 @@ class OpenAIEmbedder:
 
     def __init__(
         self,
-        api_key: str | None = None,
-        base_url: str | None = None,
+        client: AsyncOpenAI,
         model: str = MODEL_NAME,
         dimensions: int = DIMENSIONS,
     ):
         """Initialize the embedder with a provider client, model, and vector size."""
-        self._client = AsyncOpenAI(api_key=api_key, base_url=base_url)
+        self._client = client
         self.model = model
         self.dimensions = dimensions
 
@@ -51,21 +48,15 @@ class OpenAIEmbedder:
                 "No embedding model available. Set OPENAI_API_KEY or OPENROUTER_API_KEY."
             )
 
-        dimensions = resolved.dim or DIMENSIONS
-        if resolved.provider == "openai":
-            return cls(
-                api_key=os.getenv("OPENAI_API_KEY"),
-                model=resolved.model,
-                dimensions=dimensions,
-            )
-        if resolved.provider == "openrouter":
-            return cls(
-                api_key=os.getenv("OPENROUTER_API_KEY"),
-                base_url=OPENROUTER_BASE_URL,
-                model=resolved.model,
-                dimensions=dimensions,
-            )
-        raise RuntimeError(f"Unsupported embedding provider: {resolved.provider}")
+        client = catalog.openai_compatible_client(resolved)
+        if client is None:
+            raise RuntimeError(f"Unsupported embedding provider: {resolved.provider}")
+
+        return cls(
+            client=client,
+            model=resolved.model,
+            dimensions=resolved.dim or DIMENSIONS,
+        )
 
     def _fit(self, text: str) -> str:
         """Clamp one text to the embedding model's per-input token limit.

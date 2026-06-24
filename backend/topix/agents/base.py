@@ -60,12 +60,9 @@ class BaseAgent(Agent[Context]):
         """Resolve the model against available keys, then load LiteLLM if not OpenAI."""
         if isinstance(self.model, str):
             # Normalize any id / legacy code to a concrete route for the current
-            # keys; fall back to the best available model if it is unreachable.
-            self.model = (
-                catalog.normalize_code(self.model)
-                or catalog.default_model_code()
-                or self.model
-            )
+            # keys; fall back to the best available model, or raise a clear error
+            # when no provider key is configured at all.
+            self.model = catalog.normalize_code(self.model) or catalog.require_model_code()
             model_type = self.model.split("/")[0]
             if model_type != "openai":
                 self.model = LitellmModel(self.model)
