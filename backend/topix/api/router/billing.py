@@ -14,7 +14,7 @@ from topix.api.utils.billing.stripe_config import get_stripe_config
 from topix.api.utils.billing.stripe_webhook import verify_stripe_signature
 from topix.api.utils.decorators import with_standard_response
 from topix.api.utils.security import get_current_user_uid
-from topix.datatypes.user_billing import BillingStatus
+from topix.datatypes.user_billing import BillingStatus, effective_plan
 from topix.store.user import UserStore
 from topix.store.user_billing import UserBillingStore
 
@@ -287,7 +287,13 @@ async def handle_stripe_webhook(request: Request):
             logger.warning("Stripe webhook %s ignored: no user mapping", event_type)
             return {"processed": False, "reason": "no_user_mapping", "event_type": event_type}
 
-        plan = "free" if status_value == "canceled" or event_type.endswith(".deleted") else "plus"
+        # Only grant a paid plan when the subscription status actually grants
+        # access. A subscription created before its first payment is
+        # `incomplete` and must stay free until payment succeeds.
+        if event_type.endswith(".deleted"):
+            plan = "free"
+        else:
+            plan = effective_plan("plus", status_value)
         await user_billing_store.upsert_user_billing(
             user_uid=user_uid,
             data={
