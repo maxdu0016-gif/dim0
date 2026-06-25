@@ -15,7 +15,7 @@ export type CodeExecutionResult = {
 // in backend/topix/agents/assistant/code.py). A code-sandbox note whose
 // language is outside this set renders as a plain code node — no Execute
 // action, no stdout/stderr panel.
-export const RUNNABLE_LANGUAGES = new Set(["python", "javascript", "typescript"])
+export const RUNNABLE_LANGUAGES = new Set(["python", "javascript"])
 
 
 /** Whether a code node's language can be executed in a sandbox. */

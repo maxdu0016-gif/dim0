@@ -266,21 +266,19 @@ def _make_manager(monkeypatch) -> "code_module.DaytonaSandboxManager":
 
 
 def test_language_family_mapping():
-    """js/ts share the node family; python maps to python; unknown defaults."""
+    """Javascript maps to the node family; python to python; unknown defaults."""
     assert code_module._family_for("python") == "python"
     assert code_module._family_for("javascript") == "node"
-    assert code_module._family_for("typescript") == "node"
     assert code_module._family_for("rust") == code_module.DEFAULT_FAMILY
 
 
-def test_node_default_image_installs_ts_node():
-    """The node family's default image bundles node + a global ts-node."""
+def test_node_default_image_is_node_base():
+    """The node family's default image is a plain node base (runs javascript)."""
     dockerfile = code_module._default_family_image("node").dockerfile()
     assert "node:20-slim" in dockerfile
-    assert "ts-node" in dockerfile
 
     python_dockerfile = code_module._default_family_image("python").dockerfile()
-    assert "ts-node" not in python_dockerfile
+    assert "node" not in python_dockerfile
 
 
 def test_resolve_source_prefers_family_snapshot_env(monkeypatch):
@@ -323,8 +321,8 @@ def test_resolve_source_defaults_to_declarative_image(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_create_typescript_uses_node_family_image(monkeypatch):
-    """create('typescript') runs the ts toolbox on a node-family image."""
+async def test_create_javascript_uses_node_family_image(monkeypatch):
+    """create('javascript') runs the js toolbox on a node-family image."""
     client = RecordingDaytonaClient()
     monkeypatch.setenv("DAYTONA_API_KEY", "configured")
     monkeypatch.setenv("DAYTONA_API_URL", "https://example.test")
@@ -334,8 +332,8 @@ async def test_create_typescript_uses_node_family_image(monkeypatch):
     monkeypatch.setattr(code_module, "AsyncDaytona", lambda config: client)
 
     manager = code_module.DaytonaSandboxManager()
-    await manager.create("typescript")
+    await manager.create("javascript")
 
     params = client.params[0]
-    assert params.language == "typescript"
-    assert "ts-node" in params.image.dockerfile()
+    assert params.language == "javascript"
+    assert "node:20-slim" in params.image.dockerfile()

@@ -41,18 +41,17 @@ REQUIRED_DAYTONA_ENV_VARS = (
 # verbatim, so they pass straight through to sandbox creation. Any other
 # language is a display-only code note — the UI hides the run affordance
 # and this module never sees an execute request for it.
-RUNNABLE_LANGUAGES = frozenset({"python", "javascript", "typescript"})
+RUNNABLE_LANGUAGES = frozenset({"python", "javascript"})
 DEFAULT_LANGUAGE = "python"
 
 # Each runnable language maps to a *runtime family* — the toolchain its
 # sandbox image must carry. Several languages can share one family (and so
-# one image): javascript + typescript both run on Node. The image is
-# selected per family, not per language, so adding a language that reuses an
-# existing runtime is free.
+# one image), e.g. javascript and (later) typescript both run on Node. The
+# image is selected per family, not per language, so adding a language that
+# reuses an existing runtime is free.
 LANGUAGE_FAMILY: dict[str, str] = {
     "python": "python",
     "javascript": "node",
-    "typescript": "node",
 }
 DEFAULT_FAMILY = "python"
 
@@ -71,12 +70,8 @@ def _default_family_image(family: str) -> Image:
     configured — production should point those at pre-warmed snapshots.
     """
     if family == "node":
-        # Node serves both javascript and typescript. ts-node + typescript
-        # are installed globally because the runtime sandbox has no network
-        # (`network_block_all`), so `npx` cannot fetch them at run time.
-        return Image.base("node:20-slim").run_commands(
-            "npm install -g ts-node typescript",
-        )
+        # Node runs javascript out of the box — no extra install needed.
+        return Image.base("node:20-slim")
     return Image.debian_slim("3.13")
 
 
