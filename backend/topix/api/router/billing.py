@@ -245,6 +245,11 @@ async def handle_stripe_webhook(request: Request):
         user_uid = data_object.get("client_reference_id") or data_object.get("metadata", {}).get("user_uid")
         if not user_uid:
             return {"processed": False, "reason": "missing_user_uid"}
+        # Async payment methods complete the session before funds clear; only
+        # grant access once payment is settled (card checkouts are "paid").
+        payment_status = data_object.get("payment_status")
+        if payment_status not in ("paid", "no_payment_required"):
+            return {"processed": False, "reason": "payment_not_settled", "event_type": event_type}
         await user_billing_store.upsert_user_billing(
             user_uid=user_uid,
             data={
