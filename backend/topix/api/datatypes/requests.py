@@ -53,6 +53,7 @@ class ResetPasswordRequest(BaseModel):
 class BillingCheckoutRequest(BaseModel):
     """Request model for creating a Stripe checkout session."""
 
+    plan: Literal["basic", "plus"] = "plus"
     success_url: str | None = None
     cancel_url: str | None = None
 

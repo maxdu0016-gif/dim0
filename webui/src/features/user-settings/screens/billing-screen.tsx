@@ -22,7 +22,9 @@ import {
   getBillingPublicConfig,
   getBillingSummary,
   type BillingPublicConfig,
-  type BillingSummary
+  type BillingSummary,
+  type PaidPlan,
+  type PriceInfo
 } from "@/features/user-settings/api/billing"
 import { getAccessToken } from "@/features/signin/auth-storage"
 import { decodeJwt, resolveBillingPlan } from "@/lib/decode-jwt"
@@ -50,7 +52,7 @@ function FeatureRow({ icon, label }: FeatureRowProps) {
 export function BillingScreen() {
   const userPlan = useAppStore(s => s.userPlan)
   const setUserPlan = useAppStore(s => s.setUserPlan)
-  const [busyAction, setBusyAction] = useState<"upgrade" | "manage" | null>(null)
+  const [busyAction, setBusyAction] = useState<"upgrade-basic" | "upgrade-plus" | "manage" | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [billingSummary, setBillingSummary] = useState<BillingSummary | null>(null)
   const [billingPublicConfig, setBillingPublicConfig] = useState<BillingPublicConfig | null>(null)
@@ -94,13 +96,14 @@ export function BillingScreen() {
     })()
   }, [searchParams, setUserPlan])
 
-  const onUpgrade = async () => {
+  const onUpgrade = async (plan: PaidPlan) => {
     setErrorMessage(null)
-    setBusyAction("upgrade")
+    setBusyAction(plan === "basic" ? "upgrade-basic" : "upgrade-plus")
     try {
       const successUrl = `${window.location.origin}/settings/billing?checkout=success`
       const cancelUrl = `${window.location.origin}/settings/billing?checkout=cancel`
       const data = await createCheckoutSession({
+        plan,
         success_url: successUrl,
         cancel_url: cancelUrl,
       })
@@ -142,23 +145,29 @@ export function BillingScreen() {
     return "Active"
   }, [billingSummary, formattedPeriodEnd])
 
-  const plusPriceLabel = useMemo(() => {
-    const rawAmount = billingPublicConfig?.plus_price?.unit_amount
-    const rawCurrency = billingPublicConfig?.plus_price?.currency
-    if (typeof rawAmount !== "number" || !rawCurrency) return "€11.99"
+  const formatPrice = (price: PriceInfo | undefined, fallback: string): string => {
+    const rawAmount = price?.unit_amount
+    const rawCurrency = price?.currency
+    if (typeof rawAmount !== "number" || !rawCurrency) return fallback
     return new Intl.NumberFormat(undefined, {
       style: "currency",
       currency: rawCurrency.toUpperCase(),
       minimumFractionDigits: rawAmount % 100 === 0 ? 0 : 2,
       maximumFractionDigits: 2,
     }).format(rawAmount / 100)
-  }, [billingPublicConfig])
+  }
 
-  const plusIntervalLabel = useMemo(() => {
-    const interval = billingPublicConfig?.plus_price?.interval
-    if (!interval) return "month"
-    return interval
-  }, [billingPublicConfig])
+  const basicPriceLabel = useMemo(
+    () => formatPrice(billingPublicConfig?.basic_price, "€6.99"),
+    [billingPublicConfig]
+  )
+  const plusPriceLabel = useMemo(
+    () => formatPrice(billingPublicConfig?.plus_price, "€11.99"),
+    [billingPublicConfig]
+  )
+
+  const basicIntervalLabel = billingPublicConfig?.basic_price?.interval || "month"
+  const plusIntervalLabel = billingPublicConfig?.plus_price?.interval || "month"
 
   if (!BILLING_ENABLED) return null
 
@@ -222,7 +231,7 @@ export function BillingScreen() {
           ) : null}
         </Card>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <Card className="relative">
             <CardHeader>
               <div className="flex items-center gap-2">
@@ -237,14 +246,61 @@ export function BillingScreen() {
             </CardHeader>
             <CardContent className="space-y-3 text-sm text-muted-foreground">
               <p className="text-3xl font-semibold text-foreground">Free</p>
-              <FeatureRow icon={IdeaIcon} label="40 AI requests / day" />
+              <FeatureRow icon={IdeaIcon} label="50 AI requests / day" />
               <FeatureRow icon={NoteIcon} label="5 boards maximum" />
               <FeatureRow icon={DocumentIcon} label="1 document upload / board" />
-              <FeatureRow icon={ChatTranslateIcon} label="Basic AI actions" />
+              <FeatureRow icon={ChatTranslateIcon} label="Lite models only" />
               <FeatureRow icon={AwardIcon} label="Community support" />
               <p className="pt-2 text-xs leading-relaxed text-muted-foreground/80">
                 Free is currently limited while we run on a small budget. We plan to make the free plan more usable over time.
               </p>
+            </CardContent>
+          </Card>
+
+          <Card className="relative">
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <CardTitle className="text-4xl font-informal">Basic</CardTitle>
+                {userPlan === "basic" ? (
+                  <Badge variant="outline" className="w-fit bg-background/40 font-mono font-medium uppercase tracking-wide">
+                    Current
+                  </Badge>
+                ) : null}
+              </div>
+              <CardDescription>For steady, everyday use</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-end gap-2">
+                <span className="text-3xl font-semibold text-foreground">{basicPriceLabel}</span>
+                <span className="text-sm text-muted-foreground">/ {basicIntervalLabel}</span>
+              </div>
+              <div className="space-y-2.5 text-sm text-muted-foreground">
+                <FeatureRow icon={IdeaIcon} label="120 AI requests / day" />
+                <FeatureRow icon={NoteIcon} label="More boards" />
+                <FeatureRow icon={DocumentIcon} label="More document uploads" />
+                <FeatureRow icon={ChatTranslateIcon} label="Lite models (no top-tier AI)" />
+                <FeatureRow icon={AwardIcon} label="Standard support" />
+              </div>
+
+              {userPlan === "basic" ? (
+                <Button
+                  variant="outline"
+                  onClick={onManage}
+                  disabled={busyAction !== null}
+                  className="w-full"
+                >
+                  {busyAction === "manage" ? "Opening portal..." : "Manage Subscription"}
+                </Button>
+              ) : userPlan === "free" ? (
+                <Button
+                  variant="outline"
+                  onClick={() => onUpgrade("basic")}
+                  disabled={busyAction !== null}
+                  className="w-full"
+                >
+                  {busyAction === "upgrade-basic" ? "Redirecting..." : "Choose Basic"}
+                </Button>
+              ) : null}
             </CardContent>
           </Card>
 
@@ -267,10 +323,10 @@ export function BillingScreen() {
                 <span className="text-sm text-muted-foreground">/ {plusIntervalLabel}</span>
               </div>
               <div className="space-y-2.5 text-sm text-muted-foreground">
-                <FeatureRow icon={IdeaIcon} label="Unlimited AI requests" />
+                <FeatureRow icon={IdeaIcon} label="200 AI requests / day" />
                 <FeatureRow icon={NoteIcon} label="Unlimited boards" />
                 <FeatureRow icon={DocumentIcon} label="Unlimited document uploads" />
-                <FeatureRow icon={SparklesFeatureIcon} label="Advanced AI actions" />
+                <FeatureRow icon={SparklesFeatureIcon} label="Top-tier AI models" />
                 <FeatureRow icon={AwardIcon} label="Priority support" />
               </div>
 
@@ -285,11 +341,11 @@ export function BillingScreen() {
                 </Button>
               ) : (
                 <Button
-                  onClick={onUpgrade}
+                  onClick={() => onUpgrade("plus")}
                   disabled={busyAction !== null}
                   className="w-full"
                 >
-                  {busyAction === "upgrade" ? "Redirecting..." : "Upgrade to Plus"}
+                  {busyAction === "upgrade-plus" ? "Redirecting..." : "Upgrade to Plus"}
                 </Button>
               )}
             </CardContent>

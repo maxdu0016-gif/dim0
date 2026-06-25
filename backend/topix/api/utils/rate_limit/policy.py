@@ -13,20 +13,32 @@ logger = logging.getLogger(__name__)
 
 MINUTE_BURST_LIMITS: dict[PlanType, int] = {
     "free": 10,
+    "basic": 10,
     "plus": 10,
 }
 
 DAILY_UTC_LIMITS: dict[PlanType, int] = {
     "free": 50,
+    "basic": 120,
     "plus": 200,
 }
 
 MONTHLY_UTC_LIMITS: dict[PlanType, int] = {
     "free": 100,
+    "basic": 2000,
     "plus": 5000,
 }
 
 BILLING_ENABLED_ENV = "VITE_BILLING_ENABLED"
+
+# Model capability tiers (matches `tier` in models.yml) a plan may use.
+ALL_MODEL_TIERS: set[str] = {"lite", "pro"}
+
+PLAN_ALLOWED_TIERS: dict[PlanType, set[str]] = {
+    "free": {"lite"},
+    "basic": {"lite"},
+    "plus": {"lite", "pro"},
+}
 
 
 def _is_truthy(value: str | None) -> bool:
@@ -57,6 +69,18 @@ def resolve_tier_limits(plan: PlanType) -> dict[str, int]:
         "day": DAILY_UTC_LIMITS.get(plan, DAILY_UTC_LIMITS["free"]),
         "month": MONTHLY_UTC_LIMITS.get(plan, MONTHLY_UTC_LIMITS["free"]),
     }
+
+
+def resolve_allowed_model_tiers(plan: PlanType) -> set[str]:
+    """Resolve the model tiers a plan may use.
+
+    When billing is disabled (default OSS mode), all tiers are allowed so
+    self-hosted deploys keep unrestricted model access.
+    """
+    billing_enabled = _is_truthy(os.getenv(BILLING_ENABLED_ENV))
+    if not billing_enabled:
+        return set(ALL_MODEL_TIERS)
+    return set(PLAN_ALLOWED_TIERS.get(plan, PLAN_ALLOWED_TIERS["free"]))
 
 
 def build_rate_limit_rules(entitlement: EntitlementContext) -> list[RateLimitRule]:
