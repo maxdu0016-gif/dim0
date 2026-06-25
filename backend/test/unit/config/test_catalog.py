@@ -36,7 +36,7 @@ def test_no_keys_yields_nothing(clean_keys):
     assert catalog.available_llms() == []
     assert catalog.available_embedding() is None
     assert catalog.default_model_code() is None
-    assert catalog.resolve_code("gpt-4.1") is None
+    assert catalog.resolve_code("gpt-5.4") is None
 
 
 def test_openai_only_routes_native(clean_keys):
@@ -51,14 +51,14 @@ def test_openai_only_routes_native(clean_keys):
     assert llms, "expected OpenAI models to be available"
     assert all(m.provider == "openai" and m.call.startswith("openai/") for m in llms)
 
-    # OpenRouter-only models (z-ai/qwen/moonshot) are not reachable.
+    # OpenRouter-only models (z-ai/qwen/deepseek/...) are not reachable.
     ids = {m.id for m in llms}
-    assert "glm-4.7" not in ids
-    assert "gpt-4.1" in ids
+    assert "glm-5.2" not in ids
+    assert "gpt-5.4" in ids
 
-    assert catalog.resolve_code("gpt-4.1") == "openai/gpt-4.1"
+    assert catalog.resolve_code("gpt-5.4") == "openai/gpt-5.4"
     # A model with no native OpenAI route is unreachable here.
-    assert catalog.resolve_code("claude-opus-4.6") is None
+    assert catalog.resolve_code("claude-opus-4.8") is None
 
     emb = catalog.available_embedding()
     assert emb is not None
@@ -76,10 +76,13 @@ def test_openrouter_only_routes_via_openrouter(clean_keys):
     llms = catalog.available_llms()
     assert all(m.provider == "openrouter" and m.call.startswith("openrouter/") for m in llms)
 
-    # OpenAI models are reachable through OpenRouter.
-    assert catalog.resolve_code("gpt-4.1") == "openrouter/openai/gpt-4.1"
+    # OpenAI models are reachable through OpenRouter (no :nitro for openai/anthropic).
+    assert catalog.resolve_code("gpt-5.4") == "openrouter/openai/gpt-5.4"
     # So is Claude, with no native Anthropic key.
-    assert catalog.resolve_code("claude-opus-4.6") == "openrouter/anthropic/claude-opus-4.6"
+    assert catalog.resolve_code("claude-opus-4.8") == "openrouter/anthropic/claude-opus-4.8"
+    # Non-OpenAI/Anthropic models carry the :nitro throughput variant.
+    assert catalog.resolve_code("glm-5.2") == "openrouter/z-ai/glm-5.2:nitro"
+    assert catalog.resolve_code("minimax-m2.7") == "openrouter/minimax/minimax-m2.7:nitro"
 
     # Embeddings work through OpenRouter (no OpenAI key required).
     emb = catalog.available_embedding()
@@ -89,6 +92,27 @@ def test_openrouter_only_routes_via_openrouter(clean_keys):
     assert emb.dim == 512
 
 
+def test_nitro_only_on_non_openai_anthropic_routes(clean_keys):
+    """OpenAI/Anthropic OpenRouter routes omit :nitro; others include it."""
+    clean_keys.setenv("OPENROUTER_API_KEY", "or-x")
+    by_id = {m.id: m for m in catalog.available_llms()}
+
+    # OpenAI + Anthropic via OpenRouter: no :nitro.
+    assert ":nitro" not in by_id["gpt-5.4"].call
+    assert ":nitro" not in by_id["claude-opus-4.8"].call
+    # Everyone else via OpenRouter: :nitro.
+    for mid in ("glm-5.2", "gemma-4-31b", "qwen3.6-plus", "deepseek-v4-pro", "kimi-k2.6", "minimax-m2.7"):
+        assert by_id[mid].call.endswith(":nitro"), mid
+
+
+def test_retired_models_are_gone(clean_keys):
+    """Models dropped in the revamp no longer resolve."""
+    clean_keys.setenv("OPENROUTER_API_KEY", "or-x")
+    ids = {m.id for m in catalog.available_llms()}
+    for retired in ("gpt-4.1", "gpt-4o", "gemini-2.5-pro", "glm-4.7", "kimi-k2.5", "deepseek-v3.2"):
+        assert retired not in ids
+
+
 def test_native_route_preferred_over_openrouter(clean_keys):
     """Native routes win over OpenRouter when both keys are present."""
     clean_keys.setenv("OPENAI_API_KEY", "sk-x")
@@ -96,10 +120,10 @@ def test_native_route_preferred_over_openrouter(clean_keys):
     clean_keys.setenv("ANTHROPIC_API_KEY", "an-x")
 
     # Native routes win when both a native key and OpenRouter are present.
-    assert catalog.resolve_code("gpt-4.1") == "openai/gpt-4.1"
-    assert catalog.resolve_code("claude-opus-4.6") == "anthropic/claude-opus-4-6"
+    assert catalog.resolve_code("gpt-5.4") == "openai/gpt-5.4"
+    assert catalog.resolve_code("claude-opus-4.8") == "anthropic/claude-opus-4-8"
     # A model with no native key still falls back to OpenRouter.
-    assert catalog.resolve_code("kimi-k2.5") == "openrouter/moonshotai/kimi-k2.5:nitro"
+    assert catalog.resolve_code("kimi-k2.6") == "openrouter/moonshotai/kimi-k2.6:nitro"
 
 
 def test_default_model_code_by_tier(clean_keys):
@@ -119,15 +143,15 @@ def test_default_model_code_by_tier(clean_keys):
 @pytest.mark.parametrize(
     "given",
     [
-        "gpt-4.1-mini",                       # canonical id
-        "openai/gpt-4.1-mini",               # legacy provider-prefixed code
-        "openrouter/openai/gpt-4.1-mini",    # already-resolved call code
+        "gpt-5.4-mini",                       # canonical id
+        "openai/gpt-5.4-mini",               # legacy provider-prefixed code
+        "openrouter/openai/gpt-5.4-mini",    # already-resolved call code
     ],
 )
 def test_normalize_code_accepts_ids_codes_and_legacy(clean_keys, given):
     """normalize_code maps ids, call codes, and legacy codes to a reachable call."""
     clean_keys.setenv("OPENROUTER_API_KEY", "or-x")
-    assert catalog.normalize_code(given) == "openrouter/openai/gpt-4.1-mini"
+    assert catalog.normalize_code(given) == "openrouter/openai/gpt-5.4-mini"
 
 
 def test_normalize_code_unknown_returns_none(clean_keys):

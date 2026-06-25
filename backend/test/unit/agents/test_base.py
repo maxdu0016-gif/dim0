@@ -12,7 +12,7 @@ def test_adjust_model_settings_enables_openai_prompt_cache_retention():
     agent.name = "planner_agent"
 
     settings = agent._adjust_model_settings(
-        "openai/gpt-5-mini",
+        "openai/gpt-5.4-mini",
         ModelSettings(extra_args={"existing": "value"}),
     )
 
