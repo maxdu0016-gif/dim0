@@ -44,6 +44,41 @@ REQUIRED_DAYTONA_ENV_VARS = (
 RUNNABLE_LANGUAGES = frozenset({"python", "javascript", "typescript"})
 DEFAULT_LANGUAGE = "python"
 
+# Each runnable language maps to a *runtime family* — the toolchain its
+# sandbox image must carry. Several languages can share one family (and so
+# one image): javascript + typescript both run on Node. The image is
+# selected per family, not per language, so adding a language that reuses an
+# existing runtime is free.
+LANGUAGE_FAMILY: dict[str, str] = {
+    "python": "python",
+    "javascript": "node",
+    "typescript": "node",
+}
+DEFAULT_FAMILY = "python"
+
+
+def _family_for(language: str) -> str:
+    """Return the runtime family (shared image) for a runnable language."""
+    return LANGUAGE_FAMILY.get(language, DEFAULT_FAMILY)
+
+
+def _default_family_image(family: str) -> Image:
+    """Build the declarative fallback image for a runtime family.
+
+    Daytona content-addresses and caches the built image, so it's built once
+    then reused. Only used when no ``DAYTONA_SNAPSHOT_<FAMILY>`` /
+    ``DAYTONA_IMAGE_<FAMILY>`` (or, for python, the legacy global vars) is
+    configured — production should point those at pre-warmed snapshots.
+    """
+    if family == "node":
+        # Node serves both javascript and typescript. ts-node + typescript
+        # are installed globally because the runtime sandbox has no network
+        # (`network_block_all`), so `npx` cannot fetch them at run time.
+        return Image.base("node:20-slim").run_commands(
+            "npm install -g ts-node typescript",
+        )
+    return Image.debian_slim("3.13")
+
 
 class DaytonaSandboxManager:
     """Create and tear down a Daytona sandbox for a single code execution."""
@@ -74,26 +109,50 @@ class DaytonaSandboxManager:
             "ephemeral": True,
         }
 
+    def _resolve_source(self, family: str) -> tuple[str, object]:
+        """Resolve the sandbox source for a runtime family.
+
+        Returns ``("snapshot", name)`` or ``("image", image)`` where image is
+        a registry name or a declarative ``Image``. Precedence:
+          1. ``DAYTONA_SNAPSHOT_<FAMILY>`` (pre-warmed snapshot)
+          2. ``DAYTONA_IMAGE_<FAMILY>`` (registry image name)
+          3. legacy global ``DAYTONA_SNAPSHOT`` / ``DAYTONA_IMAGE`` — scoped to
+             the python family only, since they predate per-language support
+             and only ever ran python (keeps existing deploys unchanged)
+          4. the declarative default image for the family
+        """
+        suffix = family.upper()
+        snapshot = os.getenv(f"DAYTONA_SNAPSHOT_{suffix}")
+        if snapshot:
+            return "snapshot", snapshot
+
+        image = os.getenv(f"DAYTONA_IMAGE_{suffix}")
+        if image:
+            return "image", image
+
+        if family == DEFAULT_FAMILY:
+            if self._snapshot:
+                return "snapshot", self._snapshot
+            if self._image:
+                return "image", self._image
+
+        return "image", _default_family_image(family)
+
     async def create(self, language: str = DEFAULT_LANGUAGE) -> AsyncSandbox:
-        """Create a sandbox configured for ``language``'s code toolbox."""
-        if self._snapshot:
-            params = CreateSandboxFromSnapshotParams(
-                snapshot=self._snapshot,
-                **self._sandbox_kwargs(language),
-            )
-            return await self._client.create(params, timeout=SANDBOX_CREATE_TIMEOUT_SECONDS)
+        """Create a sandbox configured for ``language``'s code toolbox.
 
-        if self._image:
-            params = CreateSandboxFromImageParams(
-                image=self._image,
-                **self._sandbox_kwargs(language),
-            )
-            return await self._client.create(params, timeout=SANDBOX_CREATE_TIMEOUT_SECONDS)
+        The image is selected by the language's runtime family; the
+        ``language`` kwarg still selects Daytona's per-language toolbox.
+        """
+        family = _family_for(language)
+        kind, source = self._resolve_source(family)
+        kwargs = self._sandbox_kwargs(language)
 
-        params = CreateSandboxFromImageParams(
-            image=Image.debian_slim("3.13"),
-            **self._sandbox_kwargs(language),
-        )
+        if kind == "snapshot":
+            params = CreateSandboxFromSnapshotParams(snapshot=source, **kwargs)
+        else:
+            params = CreateSandboxFromImageParams(image=source, **kwargs)
+
         return await self._client.create(params, timeout=SANDBOX_CREATE_TIMEOUT_SECONDS)
 
     async def destroy(self, sandbox: AsyncSandbox) -> None:
