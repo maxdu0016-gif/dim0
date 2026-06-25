@@ -143,6 +143,9 @@ export const CodeSandboxPanel = memo(function CodeSandboxPanel({
           },
         },
       })
+      // The previous run's stdout/stderr belongs to the old language; clear
+      // it so the output panel doesn't mislabel it as this language's result.
+      setResult(EMPTY_CODE_EXECUTION_RESULT)
     },
     [node, nodeId, store, language],
   )
@@ -303,6 +306,7 @@ export const CodeSandboxPanel = memo(function CodeSandboxPanel({
             value={codeDraft}
             onChange={setCodeDraft}
             language={language as CodeAreaLanguage}
+            placeholder="Write code here"
           />
         </div>
 

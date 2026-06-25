@@ -5,7 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, Response, UploadFile
 from fastapi.params import Body, Path
 
-from topix.agents.assistant.code import RUNNABLE_LANGUAGES, execute_code
+from topix.agents.assistant.code import DEFAULT_LANGUAGE, RUNNABLE_LANGUAGES, execute_code
 from topix.agents.datatypes.context import Context
 from topix.agents.describe_board import DescribeBoard
 from topix.agents.run import AgentRunner
@@ -300,7 +300,7 @@ async def execute_note_code(
     if note.style.type != NodeType.CODE_SANDBOX:
         raise HTTPException(status_code=400, detail="Note is not a code sandbox")
 
-    language = note.properties.programming_language.text or "python"
+    language = note.properties.programming_language.text or DEFAULT_LANGUAGE
     if language not in RUNNABLE_LANGUAGES:
         raise HTTPException(
             status_code=400,

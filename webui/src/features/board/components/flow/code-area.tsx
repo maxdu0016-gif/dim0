@@ -37,7 +37,7 @@ export function CodeArea({
   value,
   onChange,
   language = "python",
-  placeholder = "# Write Python here",
+  placeholder = "Write code here",
 }: CodeAreaProps) {
   const { shikiThemes } = useTheme()
   const highlightedLayerRef = useRef<HTMLDivElement | null>(null)
