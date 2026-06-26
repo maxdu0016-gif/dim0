@@ -4,22 +4,42 @@ import { useAppStore } from "@/store"
 import { useListBoards } from "../api/list-boards"
 
 
-export const FREE_PLAN_BOARD_LIMIT = 5
-export const FREE_PLAN_DOCUMENT_LIMIT_PER_BOARD = 1
+// Per-plan workspace limits. `Infinity` = uncapped (Plus boards are "unlimited").
+export const BOARD_LIMITS: Record<BillingPlan, number> = {
+  free: 5,
+  basic: 25,
+  plus: Infinity,
+}
+
+export const DOCUMENT_LIMITS_PER_BOARD: Record<BillingPlan, number> = {
+  free: 3,
+  basic: 10,
+  plus: 25,
+}
+
+
+// Back-compat aliases (free-tier values) still referenced by some components.
+export const FREE_PLAN_BOARD_LIMIT = BOARD_LIMITS.free
+export const FREE_PLAN_DOCUMENT_LIMIT_PER_BOARD = DOCUMENT_LIMITS_PER_BOARD.free
 
 export const FREE_PLAN_BOARD_LIMIT_TOOLTIP =
-  `${FREE_PLAN_BOARD_LIMIT}-board limit reached for free plan. Upgrade to Plus for unlimited limits, or self-host for your own unlimited setup.`
+  "Board limit reached for your plan. Upgrade for more boards, or self-host for your own unlimited setup."
 export const FREE_PLAN_DOCUMENT_LIMIT_TOOLTIP =
-  "1-document upload limit reached for this board on free plan. Upgrade to Plus for unlimited limits, or self-host for your own unlimited setup."
+  "Document upload limit reached for this board on your plan. Upgrade for more, or self-host for your own unlimited setup."
+
+
+export function boardLimitForPlan(plan: BillingPlan): number {
+  return BOARD_LIMITS[plan]
+}
 
 
 export function isBoardCreationLimited(plan: BillingPlan, boardCount: number): boolean {
-  return BILLING_ENABLED && plan === "free" && boardCount >= FREE_PLAN_BOARD_LIMIT
+  return BILLING_ENABLED && boardCount >= BOARD_LIMITS[plan]
 }
 
 
 export function isDocumentUploadLimited(plan: BillingPlan, documentCount: number): boolean {
-  return BILLING_ENABLED && plan === "free" && documentCount >= FREE_PLAN_DOCUMENT_LIMIT_PER_BOARD
+  return BILLING_ENABLED && documentCount >= DOCUMENT_LIMITS_PER_BOARD[plan]
 }
 
 

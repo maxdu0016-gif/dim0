@@ -14,7 +14,7 @@ import { SettingsBillingUrl } from '@/routes'
 import { WelcomeMessage } from './welcome-message'
 import { StarterPromptPills } from './starter-prompts'
 import { InputSettings } from './input-settings/settings'
-import { useIsBoardCreationLimited, FREE_PLAN_BOARD_LIMIT, FREE_PLAN_BOARD_LIMIT_TOOLTIP } from '@/features/board/lib/board-limit'
+import { useIsBoardCreationLimited, FREE_PLAN_BOARD_LIMIT_TOOLTIP } from '@/features/board/lib/board-limit'
 
 // shadcn/ui
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
@@ -114,7 +114,7 @@ export const InputBar = ({
   // not on title/content changes. Cheap.
   const hasActiveSurface = useBoardAppStore((s) => Boolean(s.activeNodeSurface))
   const placeholder = showBoardLimitGate
-    ? `You've used ${FREE_PLAN_BOARD_LIMIT}/${FREE_PLAN_BOARD_LIMIT} boards on the free plan`
+    ? "You've reached your plan's board limit"
     : autoCreateBoard
       ? 'Start a new board with a question…'
       : 'Ask anything...'

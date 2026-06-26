@@ -1,7 +1,6 @@
 """Billing API router for Stripe checkout, portal, and webhook."""
 
 import logging
-import os
 
 from datetime import datetime
 from typing import Annotated
@@ -10,7 +9,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Request, status
 
 from topix.api.datatypes.requests import BillingCheckoutRequest, BillingPortalRequest
 from topix.api.utils.billing.stripe_client import StripeApiError, StripeClient
-from topix.api.utils.billing.stripe_config import get_stripe_config
+from topix.api.utils.billing.stripe_config import get_stripe_config, is_billing_active
 from topix.api.utils.billing.stripe_webhook import verify_stripe_signature
 from topix.api.utils.decorators import with_standard_response
 from topix.api.utils.security import get_current_user_uid
@@ -26,12 +25,6 @@ router = APIRouter(
     tags=["billing"],
     responses={404: {"description": "Not found"}},
 )
-
-
-def _is_truthy(value: str | None) -> bool:
-    if value is None:
-        return False
-    return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _resolve_status(value: str) -> BillingStatus:
@@ -146,8 +139,7 @@ async def create_checkout_session(
 @with_standard_response
 async def get_public_billing_config():
     """Return public billing pricing metadata for UI rendering."""
-    billing_enabled = _is_truthy(os.getenv("VITE_BILLING_ENABLED"))
-    if not billing_enabled:
+    if not is_billing_active():
         return {"billing_enabled": False}
 
     config = get_stripe_config()

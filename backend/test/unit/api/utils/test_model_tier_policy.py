@@ -2,31 +2,36 @@
 
 import topix.config.catalog as catalog
 
+from topix.api.utils.rate_limit import policy
 from topix.api.utils.rate_limit.policy import (
-    BILLING_ENABLED_ENV,
     DAILY_UTC_LIMITS,
     MONTHLY_UTC_LIMITS,
     resolve_allowed_model_tiers,
 )
 
 
-def test_basic_tier_is_in_limit_tables():
-    """The basic plan must have explicit minute/day/month limits."""
-    assert DAILY_UTC_LIMITS["basic"] < DAILY_UTC_LIMITS["plus"]
-    assert MONTHLY_UTC_LIMITS["basic"] < MONTHLY_UTC_LIMITS["plus"]
+def _set_billing_active(monkeypatch, active: bool):
+    monkeypatch.setattr(policy, "is_billing_active", lambda: active)
 
 
-def test_allowed_tiers_when_billing_enabled(monkeypatch):
-    """With billing on, only plus reaches the pro tier."""
-    monkeypatch.setenv(BILLING_ENABLED_ENV, "true")
+def test_basic_tier_sits_between_free_and_plus():
+    """Basic has a higher daily cap than free; plus has no monthly cap."""
+    assert DAILY_UTC_LIMITS["free"] < DAILY_UTC_LIMITS["basic"] < DAILY_UTC_LIMITS["plus"]
+    assert MONTHLY_UTC_LIMITS["basic"] is not None
+    assert MONTHLY_UTC_LIMITS["plus"] is None  # plus = unlimited monthly
+
+
+def test_allowed_tiers_when_billing_active(monkeypatch):
+    """With billing active, only plus reaches the pro tier."""
+    _set_billing_active(monkeypatch, True)
     assert resolve_allowed_model_tiers("free") == {"lite"}
     assert resolve_allowed_model_tiers("basic") == {"lite"}
     assert resolve_allowed_model_tiers("plus") == {"lite", "pro"}
 
 
-def test_allowed_tiers_unrestricted_when_billing_disabled(monkeypatch):
-    """OSS mode (billing off) grants every tier to every plan."""
-    monkeypatch.delenv(BILLING_ENABLED_ENV, raising=False)
+def test_allowed_tiers_unrestricted_when_billing_inactive(monkeypatch):
+    """OSS mode (billing inactive) grants every tier to every plan."""
+    _set_billing_active(monkeypatch, False)
     assert resolve_allowed_model_tiers("free") == {"lite", "pro"}
     assert resolve_allowed_model_tiers("basic") == {"lite", "pro"}
 

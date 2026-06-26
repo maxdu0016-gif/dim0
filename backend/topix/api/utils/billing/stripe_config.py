@@ -6,6 +6,39 @@ from dataclasses import dataclass
 
 from fastapi import HTTPException, status
 
+BILLING_ENABLED_ENV = "VITE_BILLING_ENABLED"
+
+# Env vars required for billing to function. If any is missing, billing is
+# treated as fully disabled (OSS mode) regardless of VITE_BILLING_ENABLED.
+REQUIRED_ENV_VARS = (
+    "STRIPE_SECRET_KEY",
+    "STRIPE_WEBHOOK_SECRET",
+    "STRIPE_PRICE_PLUS_MONTHLY",
+    "STRIPE_PRICE_BASIC_MONTHLY",
+    "APP_BASE_URL",
+)
+
+
+def _is_truthy(value: str | None) -> bool:
+    """Parse common truthy env values."""
+    if value is None:
+        return False
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def stripe_configured() -> bool:
+    """Return True only if every required Stripe env var is present."""
+    return all(_read_env(name) for name in REQUIRED_ENV_VARS)
+
+
+def is_billing_active() -> bool:
+    """Billing gates apply only when explicitly enabled AND fully configured.
+
+    When billing is disabled or any Stripe key is missing, the deploy runs in
+    full-OSS mode: no limits, all features and models available.
+    """
+    return _is_truthy(os.getenv(BILLING_ENABLED_ENV)) and stripe_configured()
+
 
 @dataclass(frozen=True)
 class StripeConfig:

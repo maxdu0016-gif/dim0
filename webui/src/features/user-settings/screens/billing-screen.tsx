@@ -247,8 +247,8 @@ export function BillingScreen() {
             <CardContent className="space-y-3 text-sm text-muted-foreground">
               <p className="text-3xl font-semibold text-foreground">Free</p>
               <FeatureRow icon={IdeaIcon} label="50 AI requests / day" />
-              <FeatureRow icon={NoteIcon} label="5 boards maximum" />
-              <FeatureRow icon={DocumentIcon} label="1 document upload / board" />
+              <FeatureRow icon={NoteIcon} label="5 boards" />
+              <FeatureRow icon={DocumentIcon} label="3 documents / board" />
               <FeatureRow icon={ChatTranslateIcon} label="Lite models only" />
               <FeatureRow icon={AwardIcon} label="Community support" />
               <p className="pt-2 text-xs leading-relaxed text-muted-foreground/80">
@@ -275,9 +275,9 @@ export function BillingScreen() {
                 <span className="text-sm text-muted-foreground">/ {basicIntervalLabel}</span>
               </div>
               <div className="space-y-2.5 text-sm text-muted-foreground">
-                <FeatureRow icon={IdeaIcon} label="120 AI requests / day" />
-                <FeatureRow icon={NoteIcon} label="More boards" />
-                <FeatureRow icon={DocumentIcon} label="More document uploads" />
+                <FeatureRow icon={IdeaIcon} label="150 AI requests / day" />
+                <FeatureRow icon={NoteIcon} label="25 boards" />
+                <FeatureRow icon={DocumentIcon} label="10 documents / board" />
                 <FeatureRow icon={ChatTranslateIcon} label="Lite models (no top-tier AI)" />
                 <FeatureRow icon={AwardIcon} label="Standard support" />
               </div>
@@ -323,9 +323,9 @@ export function BillingScreen() {
                 <span className="text-sm text-muted-foreground">/ {plusIntervalLabel}</span>
               </div>
               <div className="space-y-2.5 text-sm text-muted-foreground">
-                <FeatureRow icon={IdeaIcon} label="200 AI requests / day" />
+                <FeatureRow icon={IdeaIcon} label="Unlimited AI requests" />
                 <FeatureRow icon={NoteIcon} label="Unlimited boards" />
-                <FeatureRow icon={DocumentIcon} label="Unlimited document uploads" />
+                <FeatureRow icon={DocumentIcon} label="25 documents / board" />
                 <FeatureRow icon={SparklesFeatureIcon} label="Top-tier AI models" />
                 <FeatureRow icon={AwardIcon} label="Priority support" />
               </div>
