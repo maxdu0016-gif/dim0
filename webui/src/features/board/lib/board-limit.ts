@@ -9,7 +9,7 @@ import { useListBoards } from "../api/list-boards"
 // ----------------------------------------------------------------------------
 export const BOARD_LIMITS: Record<BillingPlan, number> = {
   free: 5,
-  basic: 25,
+  basic: Infinity,
   plus: Infinity,
 }
 

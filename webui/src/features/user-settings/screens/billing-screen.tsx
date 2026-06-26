@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react"
-import { BracketsCurly, GithubLogo, Headset, UsersThree } from "@phosphor-icons/react"
+import { BracketsCurly, CardsThree, GithubLogo, Headset, UsersThree } from "@phosphor-icons/react"
 import {
   AwardIcon,
   ChatTranslateIcon,
   DocumentIcon,
   LayerStackIcon,
-  NoteIcon,
   PuzzlePieceIcon,
   SparklesFeatureIcon,
   SparklesIcon,
@@ -254,7 +253,7 @@ export function BillingScreen() {
               <p className="text-3xl font-semibold text-foreground">Free</p>
               <FeatureRow icon={SparklesIcon} label="50 AI requests / day" />
               <FeatureRow icon={SparklesIcon} label="750 AI requests / month" />
-              <FeatureRow icon={NoteIcon} label="5 boards" />
+              <FeatureRow icon={CardsThree} label="5 boards" />
               <FeatureRow icon={UsersThree} label="Up to 5 collaborators / board" />
               <FeatureRow icon={DocumentIcon} label="3 documents / board" />
               <FeatureRow icon={PuzzlePieceIcon} label="10 mini-apps / board" />
@@ -286,7 +285,7 @@ export function BillingScreen() {
               <div className="space-y-2.5 text-sm text-muted-foreground">
                 <FeatureRow icon={SparklesIcon} label="150 AI requests / day" />
                 <FeatureRow icon={SparklesIcon} label="3,000 AI requests / month" />
-                <FeatureRow icon={NoteIcon} label="25 boards" />
+                <FeatureRow icon={CardsThree} label="Unlimited boards" />
                 <FeatureRow icon={UsersThree} label="Up to 10 collaborators / board" />
                 <FeatureRow icon={DocumentIcon} label="10 documents / board" />
                 <FeatureRow icon={PuzzlePieceIcon} label="20 mini-apps / board" />
@@ -347,7 +346,7 @@ export function BillingScreen() {
               </div>
               <div className="space-y-2.5 text-sm text-muted-foreground">
                 <FeatureRow icon={SparklesIcon} label="Unlimited AI requests" />
-                <FeatureRow icon={NoteIcon} label="Unlimited boards" />
+                <FeatureRow icon={CardsThree} label="Unlimited boards" />
                 <FeatureRow icon={UsersThree} label="Up to 20 collaborators / board" />
                 <FeatureRow icon={DocumentIcon} label="25 documents / board" />
                 <FeatureRow icon={PuzzlePieceIcon} label="100 mini-apps / board" />
