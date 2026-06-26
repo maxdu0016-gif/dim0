@@ -1,17 +1,23 @@
 import { useEffect, useMemo, useRef, useState } from "react"
+import { GithubLogo } from "@phosphor-icons/react"
 import {
   AwardIcon,
   ChatTranslateIcon,
   DocumentIcon,
   IdeaIcon,
+  LayerStackIcon,
   NoteIcon,
   PuzzlePieceIcon,
   SparklesFeatureIcon,
   SparklesIcon,
+  ToolCodeIcon,
   UserSquareIcon,
   WarningIcon,
   type AppIconComponent,
 } from "@/components/icons"
+
+
+const GITHUB_URL = "https://github.com/vcmf/dim0"
 
 import { refresh } from "@/api"
 import { Badge } from "@/components/ui/badge"
@@ -176,7 +182,7 @@ export function BillingScreen() {
 
   return (
     <div className="absolute inset-0 overflow-y-auto scrollbar-thin bg-background">
-      <div className="mx-auto w-full max-w-5xl px-6 py-20 space-y-6">
+      <div className="mx-auto w-full max-w-7xl px-6 py-20 space-y-6">
         <div className="space-y-2">
           <h1 className="text-5xl leading-none">Billing Plans</h1>
           <p className="text-sm text-muted-foreground">
@@ -234,7 +240,7 @@ export function BillingScreen() {
           ) : null}
         </Card>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           <Card className="relative">
             <CardHeader>
               <div className="flex items-center gap-2">
@@ -380,6 +386,30 @@ export function BillingScreen() {
                   {busyAction === "upgrade-plus" ? "Redirecting..." : "Upgrade to Plus"}
                 </Button>
               )}
+            </CardContent>
+          </Card>
+
+          <Card className="relative">
+            <CardHeader>
+              <CardTitle className="text-4xl font-informal">Self-host</CardTitle>
+              <CardDescription>Run it yourself, own everything</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm text-muted-foreground">
+              <div className="flex items-end gap-2">
+                <span className="text-3xl font-semibold text-foreground">Free</span>
+                <span className="text-sm text-muted-foreground">MIT licensed</span>
+              </div>
+              <FeatureRow icon={ToolCodeIcon} label="Full source on GitHub" />
+              <FeatureRow icon={LayerStackIcon} label="Your infrastructure, your data" />
+              <FeatureRow icon={SparklesIcon} label="Bring your own model keys" />
+              <FeatureRow icon={UserSquareIcon} label="Unlimited collaborators" />
+              <FeatureRow icon={AwardIcon} label="No caps, no lock-in" />
+              <Button asChild variant="outline" className="w-full">
+                <a href={GITHUB_URL} target="_blank" rel="noreferrer">
+                  <GithubLogo className="h-4 w-4" weight="fill" />
+                  Get the code
+                </a>
+              </Button>
             </CardContent>
           </Card>
         </div>
