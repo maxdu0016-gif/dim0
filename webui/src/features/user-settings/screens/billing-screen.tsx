@@ -1,24 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from "react"
-import { GithubLogo } from "@phosphor-icons/react"
+import { BracketsCurly, GithubLogo, Headset, UsersThree } from "@phosphor-icons/react"
 import {
   AwardIcon,
   ChatTranslateIcon,
   DocumentIcon,
-  IdeaIcon,
   LayerStackIcon,
   NoteIcon,
   PuzzlePieceIcon,
   SparklesFeatureIcon,
   SparklesIcon,
   ToolCodeIcon,
-  UserSquareIcon,
   WarningIcon,
   type AppIconComponent,
 } from "@/components/icons"
-
-
-const GITHUB_URL = "https://github.com/vcmf/dim0"
-
 import { refresh } from "@/api"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -38,6 +32,9 @@ import {
 import { getAccessToken } from "@/features/signin/auth-storage"
 import { decodeJwt, resolveBillingPlan } from "@/lib/decode-jwt"
 import { useAppStore } from "@/store"
+
+
+const GITHUB_URL = "https://github.com/vcmf/dim0"
 
 
 type FeatureRowProps = {
@@ -244,7 +241,7 @@ export function BillingScreen() {
           <Card className="relative">
             <CardHeader>
               <div className="flex items-center gap-2">
-                <CardTitle className="text-4xl font-informal">Free</CardTitle>
+                <CardTitle className="text-4xl font-semibold">Free</CardTitle>
                 {userPlan === "free" ? (
                   <Badge variant="outline" className="w-fit bg-background/40 font-mono font-medium uppercase tracking-wide">
                     Current
@@ -255,14 +252,14 @@ export function BillingScreen() {
             </CardHeader>
             <CardContent className="space-y-3 text-sm text-muted-foreground">
               <p className="text-3xl font-semibold text-foreground">Free</p>
-              <FeatureRow icon={IdeaIcon} label="50 AI requests / day" />
+              <FeatureRow icon={SparklesIcon} label="50 AI requests / day" />
               <FeatureRow icon={SparklesIcon} label="750 AI requests / month" />
               <FeatureRow icon={NoteIcon} label="5 boards" />
-              <FeatureRow icon={UserSquareIcon} label="Up to 5 collaborators / board" />
+              <FeatureRow icon={UsersThree} label="Up to 5 collaborators / board" />
               <FeatureRow icon={DocumentIcon} label="3 documents / board" />
               <FeatureRow icon={PuzzlePieceIcon} label="10 mini-apps / board" />
               <FeatureRow icon={ChatTranslateIcon} label="Lite models only" />
-              <FeatureRow icon={AwardIcon} label="Community support" />
+              <FeatureRow icon={Headset} label="Community support" />
               <p className="pt-2 text-xs leading-relaxed text-muted-foreground/80">
                 Free is currently limited while we run on a small budget. We plan to make the free plan more usable over time.
               </p>
@@ -272,7 +269,7 @@ export function BillingScreen() {
           <Card className="relative">
             <CardHeader>
               <div className="flex items-center gap-2">
-                <CardTitle className="text-4xl font-informal">Basic</CardTitle>
+                <CardTitle className="text-4xl font-semibold">Basic</CardTitle>
                 {userPlan === "basic" ? (
                   <Badge variant="outline" className="w-fit bg-background/40 font-mono font-medium uppercase tracking-wide">
                     Current
@@ -287,14 +284,14 @@ export function BillingScreen() {
                 <span className="text-sm text-muted-foreground">/ {basicIntervalLabel}</span>
               </div>
               <div className="space-y-2.5 text-sm text-muted-foreground">
-                <FeatureRow icon={IdeaIcon} label="150 AI requests / day" />
+                <FeatureRow icon={SparklesIcon} label="150 AI requests / day" />
                 <FeatureRow icon={SparklesIcon} label="3,000 AI requests / month" />
                 <FeatureRow icon={NoteIcon} label="25 boards" />
-                <FeatureRow icon={UserSquareIcon} label="Up to 10 collaborators / board" />
+                <FeatureRow icon={UsersThree} label="Up to 10 collaborators / board" />
                 <FeatureRow icon={DocumentIcon} label="10 documents / board" />
                 <FeatureRow icon={PuzzlePieceIcon} label="20 mini-apps / board" />
                 <FeatureRow icon={ChatTranslateIcon} label="Lite models (no top-tier AI)" />
-                <FeatureRow icon={AwardIcon} label="Standard support" />
+                <FeatureRow icon={Headset} label="Standard support" />
               </div>
 
               {userPlan === "basic" ? (
@@ -334,7 +331,7 @@ export function BillingScreen() {
             <CardHeader>
               <div className="flex items-center gap-2">
                 <AwardIcon className="h-6 w-6 text-secondary-foreground" strokeWidth={2} />
-                <CardTitle className="text-4xl font-informal">Plus</CardTitle>
+                <CardTitle className="text-4xl font-semibold">Plus</CardTitle>
                 {userPlan === "plus" ? (
                   <Badge variant="outline" className="w-fit bg-background/40 font-mono font-medium uppercase tracking-wide">
                     Current
@@ -349,13 +346,13 @@ export function BillingScreen() {
                 <span className="text-sm text-muted-foreground">/ {plusIntervalLabel}</span>
               </div>
               <div className="space-y-2.5 text-sm text-muted-foreground">
-                <FeatureRow icon={IdeaIcon} label="Unlimited AI requests" />
+                <FeatureRow icon={SparklesIcon} label="Unlimited AI requests" />
                 <FeatureRow icon={NoteIcon} label="Unlimited boards" />
-                <FeatureRow icon={UserSquareIcon} label="Up to 20 collaborators / board" />
+                <FeatureRow icon={UsersThree} label="Up to 20 collaborators / board" />
                 <FeatureRow icon={DocumentIcon} label="25 documents / board" />
                 <FeatureRow icon={PuzzlePieceIcon} label="100 mini-apps / board" />
                 <FeatureRow icon={SparklesFeatureIcon} label="Frontier models: GPT, Claude, Gemini & more" />
-                <FeatureRow icon={AwardIcon} label="Priority support" />
+                <FeatureRow icon={Headset} label="Priority support" />
               </div>
 
               {userPlan === "plus" ? (
@@ -391,7 +388,7 @@ export function BillingScreen() {
 
           <Card className="relative">
             <CardHeader>
-              <CardTitle className="text-4xl font-informal">Self-host</CardTitle>
+              <CardTitle className="text-4xl font-semibold">Self-host</CardTitle>
               <CardDescription>Run it yourself, own everything</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3 text-sm text-muted-foreground">
@@ -401,8 +398,8 @@ export function BillingScreen() {
               </div>
               <FeatureRow icon={ToolCodeIcon} label="Full source on GitHub" />
               <FeatureRow icon={LayerStackIcon} label="Your infrastructure, your data" />
-              <FeatureRow icon={SparklesIcon} label="Bring your own model keys" />
-              <FeatureRow icon={UserSquareIcon} label="Unlimited collaborators" />
+              <FeatureRow icon={BracketsCurly} label="Bring your own model keys" />
+              <FeatureRow icon={UsersThree} label="Unlimited collaborators" />
               <FeatureRow icon={AwardIcon} label="No caps, no lock-in" />
               <Button asChild variant="outline" className="w-full">
                 <a href={GITHUB_URL} target="_blank" rel="noreferrer">
