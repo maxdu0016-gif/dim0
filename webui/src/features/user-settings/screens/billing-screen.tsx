@@ -5,7 +5,10 @@ import {
   DocumentIcon,
   IdeaIcon,
   NoteIcon,
+  PuzzlePieceIcon,
   SparklesFeatureIcon,
+  SparklesIcon,
+  UserSquareIcon,
   WarningIcon,
   type AppIconComponent,
 } from "@/components/icons"
@@ -247,8 +250,11 @@ export function BillingScreen() {
             <CardContent className="space-y-3 text-sm text-muted-foreground">
               <p className="text-3xl font-semibold text-foreground">Free</p>
               <FeatureRow icon={IdeaIcon} label="50 AI requests / day" />
+              <FeatureRow icon={SparklesIcon} label="750 AI requests / month" />
               <FeatureRow icon={NoteIcon} label="5 boards" />
+              <FeatureRow icon={UserSquareIcon} label="Up to 5 collaborators / board" />
               <FeatureRow icon={DocumentIcon} label="3 documents / board" />
+              <FeatureRow icon={PuzzlePieceIcon} label="10 mini-apps / board" />
               <FeatureRow icon={ChatTranslateIcon} label="Lite models only" />
               <FeatureRow icon={AwardIcon} label="Community support" />
               <p className="pt-2 text-xs leading-relaxed text-muted-foreground/80">
@@ -276,8 +282,11 @@ export function BillingScreen() {
               </div>
               <div className="space-y-2.5 text-sm text-muted-foreground">
                 <FeatureRow icon={IdeaIcon} label="150 AI requests / day" />
+                <FeatureRow icon={SparklesIcon} label="3,000 AI requests / month" />
                 <FeatureRow icon={NoteIcon} label="25 boards" />
+                <FeatureRow icon={UserSquareIcon} label="Up to 10 collaborators / board" />
                 <FeatureRow icon={DocumentIcon} label="10 documents / board" />
+                <FeatureRow icon={PuzzlePieceIcon} label="20 mini-apps / board" />
                 <FeatureRow icon={ChatTranslateIcon} label="Lite models (no top-tier AI)" />
                 <FeatureRow icon={AwardIcon} label="Standard support" />
               </div>
@@ -336,8 +345,10 @@ export function BillingScreen() {
               <div className="space-y-2.5 text-sm text-muted-foreground">
                 <FeatureRow icon={IdeaIcon} label="Unlimited AI requests" />
                 <FeatureRow icon={NoteIcon} label="Unlimited boards" />
+                <FeatureRow icon={UserSquareIcon} label="Up to 20 collaborators / board" />
                 <FeatureRow icon={DocumentIcon} label="25 documents / board" />
-                <FeatureRow icon={SparklesFeatureIcon} label="Top-tier AI models" />
+                <FeatureRow icon={PuzzlePieceIcon} label="100 mini-apps / board" />
+                <FeatureRow icon={SparklesFeatureIcon} label="Frontier models: GPT, Claude, Gemini & more" />
                 <FeatureRow icon={AwardIcon} label="Priority support" />
               </div>
 
