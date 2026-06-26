@@ -13,7 +13,12 @@ from topix.api.utils.billing.stripe_config import get_stripe_config, is_billing_
 from topix.api.utils.billing.stripe_webhook import verify_stripe_signature
 from topix.api.utils.decorators import with_standard_response
 from topix.api.utils.security import get_current_user_uid
-from topix.datatypes.user_billing import ACCESS_GRANTING_STATUSES, BillingStatus, effective_plan
+from topix.datatypes.user_billing import (
+    ACCESS_GRANTING_STATUSES,
+    BillingStatus,
+    coerce_plan,
+    effective_plan,
+)
 from topix.store.user import UserStore
 from topix.store.user_billing import UserBillingStore
 
@@ -108,6 +113,15 @@ async def create_checkout_session(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Plan '{body.plan}' is not purchasable",
+        )
+
+    # An existing subscriber must change tier via the billing portal — a new
+    # checkout would create a second subscription (double billing).
+    existing = await user_billing_store.get_user_billing(user_id)
+    if existing and existing.stripe_subscription_id and existing.status in ACCESS_GRANTING_STATUSES:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="You already have an active subscription. Use the billing portal to change your plan.",
         )
 
     try:
@@ -243,9 +257,10 @@ async def _handle_checkout_completed(data_object: dict, user_billing_store: User
     payment_status = data_object.get("payment_status")
     if payment_status not in ("paid", "no_payment_required"):
         return {"processed": False, "reason": "payment_not_settled"}
-    # Plan is stamped into session metadata at checkout; subscription.* events
-    # later reconcile it from the purchased price.
-    plan = data_object.get("metadata", {}).get("plan") or "plus"
+    # Plan is stamped into session metadata at checkout; coerce to a valid plan
+    # (fail-closed) and let the price-based subscription.* events reconcile the
+    # paid tier authoritatively.
+    plan = coerce_plan(data_object.get("metadata", {}).get("plan"))
     await user_billing_store.upsert_user_billing(
         user_uid=user_uid,
         data={
@@ -325,15 +340,18 @@ async def _handle_subscription_event(
         plan = "free"
     else:
         # Price id is the source of truth (survives portal plan changes); fall
-        # back to checkout metadata, then plus.
-        intended_plan = (
-            config.price_to_plan().get(price_id)
-            or data_object.get("metadata", {}).get("plan")
-            or "plus"
-        )
+        # back to checkout metadata. Fail closed to `free` on an unmapped price
+        # so a misconfigured/legacy price never over-grants the top tier.
+        resolved = config.price_to_plan().get(price_id) or data_object.get("metadata", {}).get("plan")
+        if resolved is None:
+            logger.warning(
+                "Stripe webhook %s: price %s not in price map and no plan metadata; defaulting to free",
+                event_type,
+                price_id,
+            )
         # Gate on status: a never-paid (`incomplete`) or canceled subscription
         # must not persist a paid plan.
-        plan = effective_plan(intended_plan, status_value)
+        plan = effective_plan(coerce_plan(resolved), status_value)
     await user_billing_store.upsert_user_billing(
         user_uid=user_uid,
         data={

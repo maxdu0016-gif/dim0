@@ -49,6 +49,17 @@ def test_available_llms_filters_by_tier(monkeypatch):
     assert any(m.tier == "pro" for m in everything)
 
 
+def test_model_tier_normalizes_legacy_prefixed_codes(monkeypatch):
+    """A legacy provider-prefixed code resolves to its tier (no false 403)."""
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test")
+    catalog._resolved_for.cache_clear()
+
+    # "gpt-5.4-mini" is a lite model; its legacy "openai/..." prefixed form
+    # (neither the canonical id nor the full call code) must still resolve.
+    assert catalog.model_tier("openai/gpt-5.4-mini") == "lite"
+    assert catalog.is_model_allowed("openai/gpt-5.4-mini", {"lite"}) is True
+
+
 def test_is_model_allowed_respects_tier(monkeypatch):
     """A pro model is gated for a lite-only plan but allowed otherwise."""
     monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test")

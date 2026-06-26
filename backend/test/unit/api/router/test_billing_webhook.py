@@ -109,3 +109,16 @@ async def test_active_basic_subscription_is_persisted_as_basic(monkeypatch):
     await billing.handle_stripe_webhook(_build_request(store))
 
     assert store.upserts[0]["plan"] == "basic"
+
+
+async def test_unmapped_price_without_metadata_fails_closed_to_free(monkeypatch):
+    """An unmapped price id and no plan metadata must not over-grant plus."""
+    store = _FakeBillingStore(existing=None)
+    # price_to_plan() is stubbed to {} so "price_x" is unmapped; metadata carries
+    # only user_uid (portal-initiated events have no app plan metadata).
+    event = _subscription_event(status="active", metadata={"user_uid": "u1"})
+    monkeypatch.setattr(billing, "verify_stripe_signature", lambda **_: event)
+
+    await billing.handle_stripe_webhook(_build_request(store))
+
+    assert store.upserts[0]["plan"] == "free"

@@ -31,6 +31,11 @@ MONTHLY_UTC_LIMITS: dict[PlanType, int | None] = {
     "plus": None,  # Unlimited — no monthly meter, daily fair-use only
 }
 
+# OSS / unconfigured deploys have no plan-based caps, but keep a per-user
+# minute burst as a denial-of-service safety valve (generous enough that normal
+# use never hits it).
+OSS_MINUTE_BURST = 60
+
 # Model capability tiers (matches `tier` in models.yml) a plan may use.
 ALL_MODEL_TIERS: set[str] = {"lite", "pro"}
 
@@ -44,12 +49,13 @@ PLAN_ALLOWED_TIERS: dict[PlanType, set[str]] = {
 def resolve_tier_limits(plan: PlanType) -> dict[str, int | None]:
     """Resolve minute/day/month limits for a plan.
 
-    When billing is inactive (disabled or unconfigured), returns no caps at all
-    so OSS / self-hosted deploys are fully unlimited. A `None` value for any
-    window means that window is uncapped.
+    When billing is inactive (disabled or unconfigured), only a per-user minute
+    burst applies (DoS safety valve) with no daily/monthly caps, so OSS /
+    self-hosted deploys are effectively unlimited. A `None` value for any window
+    means that window is uncapped.
     """
     if not is_billing_active():
-        return {"minute": None, "day": None, "month": None}
+        return {"minute": OSS_MINUTE_BURST, "day": None, "month": None}
 
     return {
         "minute": MINUTE_BURST_LIMITS.get(plan, MINUTE_BURST_LIMITS["free"]),

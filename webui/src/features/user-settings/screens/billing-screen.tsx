@@ -291,7 +291,18 @@ export function BillingScreen() {
                 >
                   {busyAction === "manage" ? "Opening portal..." : "Manage Subscription"}
                 </Button>
-              ) : userPlan === "free" ? (
+              ) : userPlan === "plus" ? (
+                // Existing subscriber → switch tier via the portal (not a new
+                // checkout, which would create a second subscription).
+                <Button
+                  variant="outline"
+                  onClick={onManage}
+                  disabled={busyAction !== null}
+                  className="w-full"
+                >
+                  {busyAction === "manage" ? "Opening portal..." : "Switch to Basic"}
+                </Button>
+              ) : (
                 <Button
                   variant="outline"
                   onClick={() => onUpgrade("basic")}
@@ -300,7 +311,7 @@ export function BillingScreen() {
                 >
                   {busyAction === "upgrade-basic" ? "Redirecting..." : "Choose Basic"}
                 </Button>
-              ) : null}
+              )}
             </CardContent>
           </Card>
 
@@ -338,6 +349,16 @@ export function BillingScreen() {
                   className="w-full bg-background/30 border-foreground/60"
                 >
                   {busyAction === "manage" ? "Opening portal..." : "Manage Subscription"}
+                </Button>
+              ) : userPlan === "basic" ? (
+                // Existing subscriber → upgrade via the portal so Stripe swaps
+                // the plan instead of opening a second subscription.
+                <Button
+                  onClick={onManage}
+                  disabled={busyAction !== null}
+                  className="w-full"
+                >
+                  {busyAction === "manage" ? "Opening portal..." : "Switch to Plus"}
                 </Button>
               ) : (
                 <Button

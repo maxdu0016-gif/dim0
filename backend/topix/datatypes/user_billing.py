@@ -13,6 +13,18 @@ type BillingStatus = Literal["active", "trialing", "past_due", "canceled", "inco
 # NOT grant access; `past_due` keeps access during Stripe's retry grace window.
 ACCESS_GRANTING_STATUSES: frozenset[str] = frozenset({"active", "trialing", "past_due"})
 
+_VALID_PLANS: frozenset[str] = frozenset({"free", "basic", "plus"})
+
+
+def coerce_plan(value: str | None) -> BillingPlan:
+    """Coerce an untrusted plan string to a valid plan, defaulting to free.
+
+    Fail-closed: unknown/missing values (e.g. unmapped Stripe prices, edited
+    webhook metadata) resolve to ``free`` rather than over-granting a paid tier
+    or violating the DB CHECK constraint.
+    """
+    return value if value in _VALID_PLANS else "free"
+
 
 def effective_plan(plan: BillingPlan, status: BillingStatus) -> BillingPlan:
     """Resolve the plan a user is truly entitled to, gated on subscription status.

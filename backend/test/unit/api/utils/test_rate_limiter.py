@@ -247,13 +247,22 @@ async def test_rate_limiter_raises_on_monthly_limit(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_rate_limiter_unifies_limits_when_billing_disabled(monkeypatch):
-    """Billing inactive (OSS) applies no rate limiting at all."""
+async def test_rate_limiter_oss_keeps_only_minute_burst(monkeypatch):
+    """Billing inactive (OSS) applies only a per-user minute burst (DoS valve)."""
+    from topix.api.utils.rate_limit.policy import OSS_MINUTE_BURST
+
     _set_billing_active(monkeypatch, False)
     fake_store = _FakeRedisStore()
     request = _build_request(fake_store, plan="free")
 
     await rate_limiter(request=request, user_id="user-123")
 
-    assert fake_store.fixed_calls == []
-    assert fake_store.cycle_calls == []
+    assert fake_store.fixed_calls == [
+        {
+            "user_id": "user-123",
+            "limit": OSS_MINUTE_BURST,
+            "period": "minute",
+            "scope": "tier_usage",
+        },
+    ]
+    assert fake_store.cycle_calls == []  # no daily/monthly caps in OSS

@@ -145,9 +145,18 @@ def available_llms(allowed_tiers: set[str] | None = None) -> list[Resolved]:
 
 
 def model_tier(model_id_or_code: str) -> str | None:
-    """Return the tier of a reachable model by id or call code, else None."""
+    """Return the tier of a reachable model, else None.
+
+    Normalizes the input first (canonical id, full call code, or legacy
+    provider-prefixed code) the same way the rest of the catalog resolves
+    models, so an entitled model isn't falsely gated when sent in a non-canonical
+    form.
+    """
+    code = normalize_code(model_id_or_code)
+    if code is None:
+        return None
     for r in available_llms():
-        if model_id_or_code in (r.id, r.call):
+        if r.call == code:
             return r.tier
     return None
 

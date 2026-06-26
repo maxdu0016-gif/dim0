@@ -2,7 +2,19 @@
 
 import pytest
 
-from topix.datatypes.user_billing import effective_plan
+from topix.datatypes.user_billing import coerce_plan, effective_plan
+
+
+@pytest.mark.parametrize("value", ["free", "basic", "plus"])
+def test_coerce_plan_passes_valid_plans(value):
+    """Valid plan strings are returned unchanged."""
+    assert coerce_plan(value) == value
+
+
+@pytest.mark.parametrize("value", [None, "", "pro", "enterprise", "PLUS"])
+def test_coerce_plan_fails_closed_to_free(value):
+    """Unknown/missing values fail closed to free (never over-grant)."""
+    assert coerce_plan(value) == "free"
 
 
 @pytest.mark.parametrize("plan", ["basic", "plus"])
