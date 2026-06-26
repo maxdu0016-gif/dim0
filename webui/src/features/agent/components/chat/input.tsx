@@ -5,6 +5,7 @@ import { SendMessageError } from '../../api/send-message'
 import { useSubmitPrompt } from '../../hooks/use-submit-prompt'
 import { buildMessageContext } from '../../hooks/use-message-context'
 import { useAppStore } from '@/store'
+import type { BillingPlan } from '@/lib/decode-jwt'
 import { SendButton } from './send-button'
 import TextareaAutosize from 'react-textarea-autosize'
 import { useChat } from '../../hooks/chat-context'
@@ -51,7 +52,7 @@ const buildLimitDescription = ({
   userPlan,
   retryAfter,
 }: {
-  userPlan: "free" | "plus"
+  userPlan: BillingPlan
   retryAfter?: number
 }) => {
   const resetHint = retryAfter && retryAfter >= 60 * 60 * 8
