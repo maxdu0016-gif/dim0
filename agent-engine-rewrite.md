@@ -141,19 +141,41 @@ Because tools are local and orchestration is in the frontend, the backend
 | `agents/websearch/tools.py` (Linkup/Tavily/…) | 397 | **KEEP** — back the `/tools/web_search` endpoint |
 | `agents/websearch/handler.py` + `openai.py` | ~250 | **SIMPLIFY/REMOVE** — drop provider-native search wrapper |
 | `config/catalog.py` + `models.yml` + `base.py` | ~590 | **KEEP** — for the our-key proxy path (Phase B); not on the BYOK path |
-| `api/router/chats.py` send_message orchestration | part of 302 | **REMOVE** orchestration; chat history → local (optional) |
+| `api/router/chats.py` send_message orchestration | part of 302 | **REMOVE** orchestration; chat history → local IndexedDB (persisted) |
 
 Net: roughly **~3,500+ LOC of backend agent code retired** (manager/plan/
 auto_model/tool_handler/deep_research/mindmap/layout/notes-tools/memory), on top
 of the embeddings/Qdrant path already dropped. The model catalog + Linkup client
 survive as the only meaningful backend agent pieces.
 
-## What this does to chat history
+## Principle: the agent runtime is ALWAYS frontend (one path, not a mode)
 
-The agent UI today persists chats/messages via backend CRUD. Per the data-model
-residency split, **chat transcripts are local-first (optional v1)** — store them
-in the A0 IndexedDB `chat` store. So the `chats.py` CRUD endpoints become
-optional too; v1 can run the agent with purely local history.
+There is **no permanent "backend agent" mode**. The backend's only future
+inference role is the **key-proxy** (attach key, forward, stream). So the chat —
+**including the floating-island** — runs the *frontend* engine, for every board.
+The existing `send-message → manager.py` path is **transitional legacy being
+retired**, not a mode to keep.
+
+> One agent runtime (frontend). The only variable is the LLM **transport**:
+> BYOK-direct (now) or our-key-proxy (Phase B). The floating-island is *migrated*
+> to the frontend engine (transport-switchable), reused for local now + online
+> later — not parameterized to preserve a backend that's going away.
+
+Transition only: online boards keep the legacy backend agent until Phase B builds
+the proxy + retires `manager.py`; then they switch to the same frontend engine.
+
+## Chat history is PERSISTED (mirror the backend), not ephemeral
+
+Confirmed in `store/chat.py`: the backend persists **chat metadata → Postgres**
+and **messages → Qdrant** (`ContentStore`, tagged `chat_uid`, retrieved by a plain
+metadata *filter* — a keyed store, not vector search). So persistence is "just
+store the message objects."
+
+The frontend mirrors this in **IndexedDB** — a `chats` store (metadata) + a
+`chat_messages` store (keyed by `[chatUid, msgId]`) — so **local chat history
+survives reloads**. It's *simpler* than the backend: no embeddings (we dropped
+RAG), so the frontend only stores + reads by chat. The `chats.py` CRUD retires
+with the rest of the backend agent.
 
 ## A4 build order (within Phase A)
 

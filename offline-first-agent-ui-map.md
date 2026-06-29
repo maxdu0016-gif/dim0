@@ -35,7 +35,7 @@ store. The UI below `ReasoningStep[]` is identical.
 | File | Role |
 |---|---|
 | `utils/stream/agent-event-to-step.ts` | accumulate `AgentEvent` → `ReasoningStep[]` (mirrors `build.ts`: tool_start→ToolCallStep "started", tool_result→fill output "completed", assistant_text→reasoning step, done→finalize). Reuses `build.ts`'s `makeToolOutput`/`toReasoningStep` where possible. |
-| `store/local-messages-store.ts` | Zustand store of the session's `ChatMessage[]` (ephemeral; later → IndexedDB `chat` store) |
+| `store/local-messages-store.ts` | local `ChatMessage[]` backed by **IndexedDB** (`chats` + `chat_messages` stores) — persists across reloads, mirrors the backend's Postgres-meta + Qdrant-messages |
 | `hooks/use-local-messages.ts` | read messages from the local store (parallel to `useListMessages`) |
 | `hooks/use-local-submit-prompt.ts` | local submit: BYOK check → run engine → accumulate → write store (parallel to `use-submit-prompt`) |
 
@@ -51,7 +51,7 @@ small `tool-outputs.ts` addition for `search_notes`/`list_boards`.
 | **REPLACE** | `hooks/use-submit-prompt.ts`, `api/send-message.ts`, `api/list-messages.ts` → local equivalents |
 | **RECONFIGURE** | `store/chat-store.ts` (drop services/llmModel/webSearch; keep `isStreaming` + context selection; tools = local subset) |
 | **DROP for local** | `input-settings/{settings,tools-menu,model-card,web-search,memory-search,code-interpreter,image-gen}`, `api/{list-chats,create-chat,describe-chat,update-chat,delete-chat,list-available-services}`, `utils/stream/{digest,transform}` (no HTTP stream) |
-| **PARAMETERIZE** (entry points) | `components/board-view.tsx`, `flow/floating-assistant.tsx`, `flow/floating-island.tsx` → add `agentSource: "backend" \| "local"`, swap the submit hook; `flow/copilot-sheet.tsx` reuses as-is |
+| **MIGRATE** (entry points) | `flow/floating-assistant.tsx`, `flow/floating-island.tsx` → run the **frontend engine** (transport-switchable BYOK/proxy); legacy backend submit retires in Phase B. `flow/copilot-sheet.tsx` reuses as-is |
 
 ## Tool → ToolOutput mapping (so our tools render through `tool-step-row`)
 
@@ -70,16 +70,22 @@ Required for the note card to render: `noteId, graphUid, label, noteType`; the
 these structured outputs (today they return `{ id }`), and the adapter sets
 `state`. `eventMessages` can stay empty (local tools are instant).
 
-## Entry-point parameterization (the `agentSource` switch)
+## Entry points: MIGRATE to the frontend engine (not a dual-mode)
 
-Mirror the board's `local` prop:
+Correction: the agent runtime is **always frontend** (the backend agent is being
+retired — see agent-engine-rewrite.md). So this is a **migration**, not a
+permanent `backend|local` switch. The floating-island gets rewired to the
+frontend engine, with a **transport** selector (BYOK-direct now / our-key-proxy
+Phase B). The legacy `useSubmitPrompt → send-message → backend` path lingers only
+until Phase B retires it.
+
 ```ts
-const submit = agentSource === "local" ? useLocalSubmitPrompt() : useSubmitPrompt()
+// one runtime; transport varies (not "which agent")
+const llm = transport === "byok" ? ByokLlmClient.fromConfig(cfg) : ProxyLlmClient(...)
 ```
-on `FloatingIsland`; thread `agentSource` from `board-view` → `FloatingAssistant`
-→ `FloatingIsland`. The local board (`local-board-screen`) then mounts the SAME
-`FloatingAssistant`/`CopilotSheet` with `agentSource="local"`, replacing the
-minimal `LocalAgentPanel`.
+
+`local-board-screen` mounts the migrated floating-island (frontend engine, BYOK
+transport) — the interim `LocalAgentPanel` retires once that lands.
 
 ## What this deletes/simplifies vs backend
 
@@ -92,6 +98,7 @@ minimal `LocalAgentPanel`.
 
 1. `agent-event-to-step.ts` (+ tool-output additions, + structured tool results) — unit-test the adapter.
 2. `local-messages-store.ts` + `use-local-messages.ts` + `use-local-submit-prompt.ts`.
-3. Parameterize `FloatingAssistant`/`FloatingIsland`/`board-view` with `agentSource`.
-4. Mount `agentSource="local"` in `local-board-screen`; retire `LocalAgentPanel`.
+3. Migrate `FloatingAssistant`/`FloatingIsland` to the frontend engine (transport
+   = BYOK now); legacy backend submit retires in Phase B.
+4. Mount the migrated floating-island in `local-board-screen`; retire `LocalAgentPanel`.
 5. Reconfigure `chat-store` for local; verify with the e2e flow (transcript now rich).

@@ -51,6 +51,9 @@ export function RootLayout() {
     [location.pathname]
   )
   const showShell = isAuthed && !onAuthPage
+  // /local boards render bare: no backend-coupled shell (sidebar fetches
+  // boards/chats) and no connectivity overlay — they work with the server down.
+  const isLocalRoute = location.pathname.startsWith("/local")
   const presentationMode = useBoardAppStore(s => s.presentationMode)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const effectiveSidebarOpen = presentationMode ? false : sidebarOpen
@@ -62,6 +65,9 @@ export function RootLayout() {
   }, [presentationMode])
 
   useEffect(() => {
+    // Local-only boards are offline-first — don't ping the backend (which would
+    // raise the "Can't reach Dim0 server" overlay) when on a /local route.
+    if (window.location.pathname.startsWith("/local")) return
     initConnectionState()
   }, [])
 
@@ -89,6 +95,19 @@ export function RootLayout() {
     if (location.pathname.startsWith("/share/")) return
     navigate({ to: "/share/$token", params: { token } })
   }, [isAuthed, location.pathname, navigate])
+
+  if (isLocalRoute) {
+    return (
+      <ThemeProvider>
+        <StyleDefaultsProvider>
+          <main>
+            <Outlet />
+            <Toaster position="top-right" closeButton toastOptions={{ style: { borderRadius: 'var(--radius-xl)' } }} />
+          </main>
+        </StyleDefaultsProvider>
+      </ThemeProvider>
+    )
+  }
 
   return (
     <ThemeProvider>

@@ -296,7 +296,8 @@ IndexedDB "dim0" (per origin):
   snapshots  key=boardId         → BoardContent (latest materialized scene)
   oplog      key=[boardId, seq]  → OpBatch        (+ per-board `syncedSeq` watermark)
   search     key=boardId         → serialized Orama index
-  chat       key=[boardId, msgId]→ agent transcript (optional v1)
+  chats      key=chatUid        → Chat metadata (mirrors backend Postgres)
+  chat_messages key=[chatUid, msgId] → agent transcript (mirrors backend Qdrant; no embeddings)
   settings   key=string          → prefs, persist grant, BYOK key (opt-in)
 ```
 
@@ -316,7 +317,7 @@ server-authoritative.
 |---|---|
 | nodes / edges / groups (board content) | **IndexedDB (local-first)** + R2 snapshots (synced) |
 | board metadata (title, owner, ACL, visibility) | **D1 (server-auth)** + cached in `boards` |
-| chat / agent transcripts | **IndexedDB (local-first, per board)** — optional v1 |
+| chat / agent transcripts | **IndexedDB (local-first)** — persisted; mirrors backend (Postgres chat-meta + Qdrant messages, a plain keyed store; no embeddings since no-RAG) |
 | user / billing / auth tokens | **server-only** (Postgres/D1) — never local-first |
 | newsfeed / subscriptions | **server-only**; cached read-only for offline view |
 | files / documents (uploads) | **R2 blobs**, referenced by id from nodes |

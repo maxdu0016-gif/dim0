@@ -238,6 +238,18 @@ This is a few hundred lines sitting beside the CRDT, not a subsystem.
 Decision: re-implement the agent as **frontend-only orchestration over local-only
 tools** (replaces today's Python `agent_bridge.py`).
 
+> **One runtime, not a mode.** The agent loop is *always* frontend — there is no
+> permanent "backend agent." The backend's only future inference role is the
+> key-proxy. So the chat UI (**floating-island included**) is *migrated* to the
+> frontend engine for every board; the only variable is the LLM **transport**
+> (BYOK-direct now / our-key-proxy Phase B). Today's `send-message → manager.py`
+> path is transitional legacy, retired in Phase B.
+>
+> **Chat history persists** (mirrors the backend): metadata + messages →
+> IndexedDB (`chats` + `chat_messages`), like the backend's Postgres + Qdrant
+> keyed store — minus embeddings (no RAG). It survives reloads; it is not
+> ephemeral.
+
 ### Shape: a frontend, local-only op-emitter
 
 - The agent loop + tool calls run in the **frontend (TS)**. It reads/writes the
