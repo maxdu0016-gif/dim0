@@ -5,7 +5,7 @@ import { SparklesIcon } from "@/components/icons"
 import { ThinkingIndicator } from "@/components/animations/thinking-indicator"
 import { cn } from "@/lib/utils"
 import { SendMessageError } from "@/features/agent/api/send-message"
-import { useSubmitPrompt } from "@/features/agent/hooks/use-submit-prompt"
+import { useChatSubmit } from "@/features/agent/hooks/use-chat-submit"
 import { buildMessageContext, useHasMessageContext } from "@/features/agent/hooks/use-message-context"
 import { ProgressLine } from "./progress-line"
 import { useCurrentAssistantMessage } from "./use-current-assistant-message"
@@ -26,7 +26,7 @@ export const FloatingIsland = ({ boardId, onOpenFullSheet }: FloatingIslandProps
   const [input, setInput] = useState("")
   const latestAssistantMessage = useCurrentAssistantMessage()
   const isStreaming = latestAssistantMessage?.streaming === true
-  const submit = useSubmitPrompt()
+  const submit = useChatSubmit()
   const hasMessageContext = useHasMessageContext()
   // Single boolean derivation — only re-renders when a surface opens or
   // closes, never when its content/title changes. Cheap.

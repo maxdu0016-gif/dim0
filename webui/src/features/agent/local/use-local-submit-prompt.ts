@@ -1,4 +1,5 @@
 import { useCallback } from "react"
+import { generateUuid, trimText } from "@/lib/common"
 import { getCanvasStoreRef } from "@/features/board/harness/canvas-store-ref"
 import { runAgent } from "@/features/agent/engine/agent-loop"
 import { ByokLlmClient } from "@/features/agent/engine/byok-client"
@@ -22,16 +23,26 @@ const mintId = (): string => `local-${Date.now()}-${counter++}`
  * Local analog of `useSubmitPrompt`: runs the frontend engine against the live
  * board and streams its events into the local message store as a `ChatMessage`
  * with `ReasoningStep[]` — so the existing rich chat UI renders it unchanged.
+ * Mints a chat on the first turn (mirrors the backend creating a chat) and
+ * labels it from the opening prompt.
  */
-export function useLocalSubmitPrompt(boardId: string, chatUid = boardId) {
+export function useLocalSubmitPrompt(boardId: string) {
   const asConfig = useByokStore((s) => s.asConfig)
   const setMessages = useLocalMessagesStore((s) => s.setMessages)
+  const setChatUid = useLocalMessagesStore((s) => s.setChatUid)
   const persist = useLocalMessagesStore((s) => s.persist)
 
   return useCallback(
     async (prompt: string): Promise<void> => {
       const store = getCanvasStoreRef()
       const config = asConfig()
+
+      // Reuse the active chat, or mint one on the first turn.
+      const existingUid = useLocalMessagesStore.getState().chatUid
+      const isNewChat = !existingUid
+      const chatUid = existingUid ?? generateUuid()
+      if (isNewChat) setChatUid(chatUid)
+      const label = isNewChat ? trimText(prompt, 40) : undefined
 
       const assistantId = mintId()
       const userMessage: ChatMessage = { id: mintId(), role: "user", content: { markdown: prompt }, chatUid, properties: {} }
@@ -53,6 +64,7 @@ export function useLocalSubmitPrompt(boardId: string, chatUid = boardId) {
 
       if (!store || !config) {
         patch({ ...base, content: { markdown: store ? "Set your API key first." : "No active board." }, streaming: false })
+        await persist(label)
         return
       }
 
@@ -77,9 +89,9 @@ export function useLocalSubmitPrompt(boardId: string, chatUid = boardId) {
         events.push({ type: "assistant_text", text: e instanceof Error ? e.message : String(e) })
         render(false)
       } finally {
-        await persist()
+        await persist(label)
       }
     },
-    [asConfig, setMessages, persist, boardId, chatUid],
+    [asConfig, setMessages, setChatUid, persist, boardId],
   )
 }

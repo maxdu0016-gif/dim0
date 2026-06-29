@@ -1,4 +1,4 @@
-import { openDim0Db } from "@/features/board/persist/local/idb"
+import { openDim0Db, type ChatRecord } from "@/features/board/persist/local/idb"
 import type { ChatMessage } from "@/features/agent/types/chat"
 
 
@@ -20,10 +20,15 @@ export const loadMessages = async (chatUid: string): Promise<ChatMessage[]> => {
 
 /**
  * Persist a chat's full transcript: replace its messages and stamp the chat
- * record, in one transaction. Mirrors the backend storing message objects —
- * minus embeddings (no RAG).
+ * record (with an optional label), in one transaction. Mirrors the backend
+ * storing message objects — minus embeddings (no RAG).
  */
-export const saveMessages = async (chatUid: string, boardId: string, messages: ChatMessage[]): Promise<void> => {
+export const saveMessages = async (
+  chatUid: string,
+  boardId: string,
+  messages: ChatMessage[],
+  label?: string,
+): Promise<void> => {
   const db = await openDim0Db()
   try {
     const tx = db.transaction(["chat_messages", "chats"], "readwrite")
@@ -31,8 +36,22 @@ export const saveMessages = async (chatUid: string, boardId: string, messages: C
     for (const m of messages) {
       await tx.objectStore("chat_messages").put({ ...m, chatUid })
     }
-    await tx.objectStore("chats").put({ id: chatUid, boardId, updatedAt: Date.now() })
+    // Preserve an existing label when none is supplied this save.
+    const prev = await tx.objectStore("chats").get(chatUid)
+    await tx.objectStore("chats").put({ id: chatUid, boardId, label: label ?? prev?.label, updatedAt: Date.now() })
     await tx.done
+  } finally {
+    db.close()
+  }
+}
+
+
+/** List a board's chats, most-recently-updated first (mirrors backend `list_chats`). */
+export const listLocalChats = async (boardId: string): Promise<ChatRecord[]> => {
+  const db = await openDim0Db()
+  try {
+    const chats = await db.getAllFromIndex("chats", "by-board", boardId)
+    return chats.sort((a, b) => b.updatedAt - a.updatedAt)
   } finally {
     db.close()
   }

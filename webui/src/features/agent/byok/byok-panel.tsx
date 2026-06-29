@@ -49,7 +49,7 @@ export function ByokPanel({ onSaved }: { onSaved?: () => void }) {
         <input
           value={model}
           onChange={(e) => setModel(e.target.value)}
-          placeholder={provider === "openai" ? "gpt-4o-mini" : "openai/gpt-4o-mini"}
+          placeholder={provider === "openai" ? "gpt-5.4" : "openai/gpt-5.4"}
           className="rounded border border-border bg-background px-2 py-1"
         />
       </label>

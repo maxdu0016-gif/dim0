@@ -6,6 +6,14 @@
 import type { AgentEvent, LlmClient, LlmMessage, LlmToolDef, Tool, ToolContext } from "./types"
 
 
+/**
+ * Safety cap on tool-calling rounds for a single turn. High enough for complex
+ * multi-step builds, bounded so a misbehaving model can't loop forever (each
+ * round is a billed LLM call). Override per-run via `RunAgentOptions.maxTurns`.
+ */
+export const DEFAULT_MAX_TURNS = 30
+
+
 /** Reduce tools to the name/description/parameters the LLM needs. */
 const toDefs = (tools: Tool[]): LlmToolDef[] =>
   tools.map((t) => ({ name: t.name, description: t.description, parameters: t.parameters }))
@@ -34,7 +42,7 @@ export type RunAgentOptions = {
 
 /** Run the agent, yielding events as tools execute and the answer streams. */
 export async function* runAgent(opts: RunAgentOptions): AsyncGenerator<AgentEvent> {
-  const maxTurns = opts.maxTurns ?? 8
+  const maxTurns = opts.maxTurns ?? DEFAULT_MAX_TURNS
   const defs = toDefs(opts.tools)
   const messages: LlmMessage[] = []
   if (opts.system) messages.push({ role: "system", content: opts.system })

@@ -1,12 +1,11 @@
 import { useEffect, useMemo, useState } from "react"
 import { motion, useReducedMotion } from "motion/react"
-import { useAppStore } from "@/store"
 import { CheckCircleStatusIcon, ChevronDownIcon } from "@/components/icons"
 import { ThinkingDots } from "@/components/animations/thinking-indicator"
 import { Popover, PopoverAnchor, PopoverTrigger } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
 import { useChat } from "@/features/agent/hooks/chat-context"
-import { useListMessages } from "@/features/agent/api/list-messages"
+import { useChatMessages } from "@/features/agent/hooks/use-chat-messages"
 import { isReasoningTextStep, isToolCallStep, ToolNameIcon } from "@/features/agent/types/stream"
 import type { ToolCallStep } from "@/features/agent/types/stream"
 import { getToolTitle } from "@/features/agent/utils/stream/build"
@@ -22,23 +21,19 @@ import { StepsPopoverContent } from "./steps-popover-content"
  * cache bleed from other chats is discarded on switch.
  */
 export const ProgressLine = () => {
-  const { chatId } = useChat()
-  const userId = useAppStore((s) => s.userId)
+  const { chatId, local } = useChat()
   const reduceMotion = useReducedMotion()
-  const { data: messages } = useListMessages({
-    chatId: chatId ?? "",
-    userId,
-  })
+  const messages = useChatMessages()
 
   const latestAssistantMessage = useMemo(() => {
-    if (!messages?.length || !chatId) return null
+    if (!messages?.length) return null
     for (let i = messages.length - 1; i >= 0; i -= 1) {
       const m = messages[i]
-      if (m.chatUid !== chatId) continue
+      if (!local && m.chatUid !== chatId) continue
       if (m.role === "assistant") return m
     }
     return null
-  }, [messages, chatId])
+  }, [messages, chatId, local])
 
   const isThisChatStreaming = latestAssistantMessage?.streaming === true
 

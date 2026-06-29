@@ -1,45 +1,77 @@
 import { create } from "zustand"
 import type { ChatMessage } from "@/features/agent/types/chat"
-import { loadMessages, saveMessages } from "./chat-persist"
+import type { ChatRecord } from "@/features/board/persist/local/idb"
+import { listLocalChats, loadMessages, saveMessages } from "./chat-persist"
 
 
 type LocalMessagesState = {
-  chatUid: string | null
   boardId: string | null
+  /** Current chat. Null means a fresh, not-yet-persisted chat. */
+  chatUid: string | null
   messages: ChatMessage[]
-  /** Load a chat's persisted history from IndexedDB. */
-  open: (chatUid: string, boardId: string) => Promise<void>
+  /** The board's chats, most-recent first (drives the history list). */
+  chats: ChatRecord[]
+  /** Open a board: load its chat list and select the most recent (or a fresh chat). */
+  openBoard: (boardId: string) => Promise<void>
+  /** Switch to an existing chat and load its transcript. */
+  selectChat: (chatUid: string) => Promise<void>
+  /** Start a fresh, empty chat (persisted on first message). */
+  newChat: () => void
+  /** Set the active chat id (used when a turn mints a new chat). */
+  setChatUid: (chatUid: string) => void
   /** In-memory update (drives streaming render); call `persist` to save. */
   setMessages: (messages: ChatMessage[]) => void
-  /** Write the current transcript to IndexedDB. */
-  persist: () => Promise<void>
+  /** Write the current transcript to IndexedDB and refresh the chat list. */
+  persist: (label?: string) => Promise<void>
   reset: () => void
 }
 
 
 /**
- * Local chat transcript, backed by IndexedDB (mirrors the backend's persisted
- * messages). In-memory mirror drives the UI during streaming; `persist` writes
- * the turn so history survives reloads.
+ * Local chat state, backed by IndexedDB (mirrors the backend's persisted
+ * messages + chat list). One board has many chats; the in-memory mirror drives
+ * the UI during streaming, and `persist` writes the turn so history survives
+ * reloads.
  */
 export const useLocalMessagesStore = create<LocalMessagesState>((set, get) => ({
-  chatUid: null,
   boardId: null,
+  chatUid: null,
   messages: [],
+  chats: [],
 
-  open: async (chatUid, boardId) => {
-    set({ chatUid, boardId, messages: [] })
+  openBoard: async (boardId) => {
+    set({ boardId, chatUid: null, messages: [], chats: [] })
+    const chats = await listLocalChats(boardId)
+    // Guard against a newer openBoard racing this load.
+    if (get().boardId !== boardId) return
+    const latest = chats[0]
+    if (latest) {
+      const messages = await loadMessages(latest.id)
+      if (get().boardId === boardId) set({ chats, chatUid: latest.id, messages })
+    } else {
+      set({ chats })
+    }
+  },
+
+  selectChat: async (chatUid) => {
+    set({ chatUid, messages: [] })
     const messages = await loadMessages(chatUid)
-    // Guard against a newer open() racing this load.
     if (get().chatUid === chatUid) set({ messages })
   },
 
+  newChat: () => set({ chatUid: null, messages: [] }),
+
+  setChatUid: (chatUid) => set({ chatUid }),
+
   setMessages: (messages) => set({ messages }),
 
-  persist: async () => {
+  persist: async (label) => {
     const { chatUid, boardId, messages } = get()
-    if (chatUid && boardId) await saveMessages(chatUid, boardId, messages)
+    if (!chatUid || !boardId) return
+    await saveMessages(chatUid, boardId, messages, label)
+    const chats = await listLocalChats(boardId)
+    if (get().boardId === boardId) set({ chats })
   },
 
-  reset: () => set({ chatUid: null, boardId: null, messages: [] }),
+  reset: () => set({ boardId: null, chatUid: null, messages: [], chats: [] }),
 }))

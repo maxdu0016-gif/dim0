@@ -2,7 +2,8 @@ import { useState, type KeyboardEvent } from 'react'
 import clsx from 'clsx'
 import { useChatStore } from '../../store/chat-store'
 import { SendMessageError } from '../../api/send-message'
-import { useSubmitPrompt } from '../../hooks/use-submit-prompt'
+import { useChatSubmit } from '../../hooks/use-chat-submit'
+import { useActiveChatId, useChatStreaming } from '../../hooks/use-chat-messages'
 import { buildMessageContext } from '../../hooks/use-message-context'
 import { useAppStore } from '@/store'
 import type { BillingPlan } from '@/lib/decode-jwt'
@@ -15,6 +16,7 @@ import { SettingsBillingUrl } from '@/routes'
 import { WelcomeMessage } from './welcome-message'
 import { StarterPromptPills } from './starter-prompts'
 import { InputSettings } from './input-settings/settings'
+import { ByokSettingsButton } from '@/features/agent/byok/byok-settings-button'
 import { useIsBoardCreationLimited, FREE_PLAN_BOARD_LIMIT_TOOLTIP } from '@/features/board/lib/board-limit'
 
 // shadcn/ui
@@ -82,11 +84,12 @@ export const InputBar = ({
   enableSelectionContext = false,
   autoCreateBoard = false,
 }: InputBarProps) => {
-  const { chatId } = useChat()
+  const { local } = useChat()
+  const chatId = useActiveChatId()
 
   const userPlan = useAppStore((state) => state.userPlan)
 
-  const isStreaming = useChatStore((state) => state.isStreaming)
+  const isStreaming = useChatStreaming()
   const useDeepResearch = useChatStore((state) => state.useDeepResearch)
 
   const [input, setInput] = useState<string>('')
@@ -99,7 +102,7 @@ export const InputBar = ({
     description: string
   } | null>(null)
 
-  const submit = useSubmitPrompt()
+  const submit = useChatSubmit()
   const navigate = useNavigate()
   const boardParams = useParams({ from: "/boards/$id", shouldThrow: false })
   const boardRouteId = boardParams?.id
@@ -150,7 +153,7 @@ export const InputBar = ({
 
   const handlePrimarySend = async () => {
     if (isStreaming) return
-    if (useDeepResearch) {
+    if (!local && useDeepResearch) {
       setShowDRDialog(true)
       return
     }
@@ -162,7 +165,7 @@ export const InputBar = ({
    */
   const handleStarterPromptSelect = async (prompt: string) => {
     if (isStreaming) return
-    if (useDeepResearch) {
+    if (!local && useDeepResearch) {
       setInput(prompt)
       setShowDRDialog(true)
       return
@@ -241,10 +244,14 @@ export const InputBar = ({
 
       <div className="flex items-center justify-between gap-3">
         <div className="flex min-w-0 flex-wrap items-center gap-1">
-          <InputSettings
-            showBoardContextOption={enableSelectionContext}
-            memorySearchAvailable={memorySearchAvailable}
-          />
+          {local ? (
+            <ByokSettingsButton />
+          ) : (
+            <InputSettings
+              showBoardContextOption={enableSelectionContext}
+              memorySearchAvailable={memorySearchAvailable}
+            />
+          )}
         </div>
 
         <div className="flex items-center gap-2">

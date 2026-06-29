@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest"
 import type { ChatMessage } from "@/features/agent/types/chat"
 import { resetIdb } from "@/test/canvas"
-import { loadMessages, saveMessages } from "./chat-persist"
+import { listLocalChats, loadMessages, saveMessages } from "./chat-persist"
 
 
 const msg = (id: string, text: string, chatUid = "c1"): ChatMessage => ({
@@ -33,5 +33,28 @@ describe("chat-persist", () => {
 
     expect(await loadMessages("c1")).toHaveLength(2)
     expect(await loadMessages("c2")).toHaveLength(1)
+  })
+
+
+  it("lists a board's chats and isolates them by board", async () => {
+    await saveMessages("c1", "b1", [msg("m1", "hi")], "First chat")
+    await saveMessages("c2", "b1", [msg("m1", "yo", "c2")], "Second chat")
+    await saveMessages("c3", "b2", [msg("m1", "elsewhere", "c3")], "Other board")
+
+    const b1 = await listLocalChats("b1")
+    expect(b1.map((c) => c.id).sort()).toEqual(["c1", "c2"])
+    expect(b1.find((c) => c.id === "c1")?.label).toBe("First chat")
+
+    const b2 = await listLocalChats("b2")
+    expect(b2.map((c) => c.id)).toEqual(["c3"])
+  })
+
+
+  it("preserves a chat's label when a later save omits it", async () => {
+    await saveMessages("c1", "b1", [msg("m1", "a")], "Labeled")
+    await saveMessages("c1", "b1", [msg("m1", "a"), msg("m2", "b")]) // no label
+
+    const [chat] = await listLocalChats("b1")
+    expect(chat.label).toBe("Labeled")
   })
 })
