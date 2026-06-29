@@ -26,6 +26,8 @@ import { ForgotPasswordPage } from "@/features/signin/screens/forgot-password"
 import { ResetPasswordPage } from "@/features/signin/screens/reset-password"
 import { InstallScreen } from "@/features/install/screens/install-screen"
 import { ShareLandingScreen } from "@/features/sharing/screens/share-landing"
+import { LocalDashboard } from "@/features/board/local/local-dashboard"
+import { LocalBoardScreen } from "@/features/board/local/local-board-screen"
 
 
 export const rootRoute = createRootRoute({
@@ -252,7 +254,25 @@ const shareLandingRoute = createRoute({
   component: ShareLandingScreen,
 })
 
+// /local + /local/:boardId — local-only boards. Intentionally UNGUARDED:
+// no account required, no backend. The whole point of Phase A.
+export const LocalDashboardUrl = "/local"
+const localDashboardRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: LocalDashboardUrl,
+  component: LocalDashboard,
+})
+
+export const LocalBoardUrl = "/local/$boardId"
+const localBoardRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: LocalBoardUrl,
+  component: LocalBoardScreen,
+})
+
 const routeTree = rootRoute.addChildren([
+  localDashboardRoute,
+  localBoardRoute,
   signinRoute,
   signupRoute,
   verifyEmailRoute,

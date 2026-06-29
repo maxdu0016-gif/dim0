@@ -1,0 +1,125 @@
+/**
+ * BYOK LLM client (A4) — a thin OpenAI-compatible adapter implementing
+ * `LlmClient`. One client covers both BYOK providers via a swappable baseURL:
+ * OpenAI direct, or OpenRouter (which reaches Claude/Gemini/etc.). The key is
+ * the user's; it goes straight to the provider, never to our servers.
+ *
+ * Non-streaming per turn (matches the `LlmClient` contract). The mapping helpers
+ * are exported + unit-tested; the network path is exercised via an injected
+ * `ChatCompleter` so tests never hit a real API.
+ */
+import OpenAI from "openai"
+import type {
+  ChatCompletion,
+  ChatCompletionCreateParamsNonStreaming,
+  ChatCompletionMessage,
+  ChatCompletionMessageParam,
+  ChatCompletionTool,
+} from "openai/resources/chat/completions"
+import type { LlmClient, LlmMessage, LlmToolCall, LlmToolDef, LlmTurn } from "./types"
+
+
+export type ByokProvider = "openai" | "openrouter"
+
+
+export type ByokConfig = {
+  provider: ByokProvider
+  apiKey: string
+  model: string
+  /** Override the default base URL (e.g. an OpenAI-compatible proxy). */
+  baseURL?: string
+}
+
+
+/** The single SDK method we depend on — injectable so tests avoid the network. */
+export type ChatCompleter = {
+  create(params: ChatCompletionCreateParamsNonStreaming): Promise<ChatCompletion>
+}
+
+
+const BASE_URLS: Record<ByokProvider, string> = {
+  openai: "https://api.openai.com/v1",
+  openrouter: "https://openrouter.ai/api/v1",
+}
+
+
+/** Our messages → OpenAI chat message params. */
+export const toOpenAiMessages = (messages: LlmMessage[]): ChatCompletionMessageParam[] =>
+  messages.map((m): ChatCompletionMessageParam => {
+    if (m.role === "system") return { role: "system", content: m.content }
+    if (m.role === "user") return { role: "user", content: m.content }
+    if (m.role === "tool") return { role: "tool", tool_call_id: m.toolCallId, content: m.content }
+    return {
+      role: "assistant",
+      content: m.content,
+      ...(m.toolCalls && m.toolCalls.length > 0
+        ? {
+            tool_calls: m.toolCalls.map((tc) => ({
+              id: tc.id,
+              type: "function" as const,
+              function: { name: tc.name, arguments: tc.arguments },
+            })),
+          }
+        : {}),
+    }
+  })
+
+
+/** Our tool defs → OpenAI function tools. */
+export const toOpenAiTools = (tools: LlmToolDef[]): ChatCompletionTool[] =>
+  tools.map((t) => ({
+    type: "function",
+    function: { name: t.name, description: t.description, parameters: t.parameters },
+  }))
+
+
+/** An OpenAI assistant message → our turn (tool calls take precedence over text). */
+export const fromOpenAiMessage = (message?: ChatCompletionMessage): LlmTurn => {
+  const calls: LlmToolCall[] = []
+  for (const tc of message?.tool_calls ?? []) {
+    if (tc.type === "function") {
+      calls.push({ id: tc.id, name: tc.function.name, arguments: tc.function.arguments })
+    }
+  }
+  if (calls.length > 0) return { kind: "tool_calls", calls }
+  return { kind: "text", text: message?.content ?? "" }
+}
+
+
+/** Build the injectable completer from BYOK config (creates the OpenAI client). */
+export const makeCompleter = (config: ByokConfig): ChatCompleter => {
+  const client = new OpenAI({
+    apiKey: config.apiKey,
+    baseURL: config.baseURL ?? BASE_URLS[config.provider],
+    dangerouslyAllowBrowser: true,
+  })
+  return { create: (params) => client.chat.completions.create(params) }
+}
+
+
+export class ByokLlmClient implements LlmClient {
+  private readonly completer: ChatCompleter
+  private readonly model: string
+
+
+  constructor(completer: ChatCompleter, model: string) {
+    this.completer = completer
+    this.model = model
+  }
+
+
+  static fromConfig(config: ByokConfig): ByokLlmClient {
+    return new ByokLlmClient(makeCompleter(config), config.model)
+  }
+
+
+  async complete(messages: LlmMessage[], tools: LlmToolDef[]): Promise<LlmTurn> {
+    const params: ChatCompletionCreateParamsNonStreaming = {
+      model: this.model,
+      messages: toOpenAiMessages(messages),
+      ...(tools.length > 0 ? { tools: toOpenAiTools(tools), tool_choice: "auto" } : {}),
+    }
+    const res = await this.completer.create(params)
+    return fromOpenAiMessage(res.choices[0]?.message)
+  }
+}

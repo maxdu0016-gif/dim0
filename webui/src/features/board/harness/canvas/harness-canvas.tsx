@@ -40,6 +40,8 @@ import {
 import { LinearView, ListView } from "../views"
 import { boardNodeTypes, useRenderCustomNodeView } from "../node-types"
 import { hydrateBoardStore } from "../persist/snapshot-load"
+import { BoardPersistence } from "@/features/board/persist/local/board-persistence"
+import { applyContentToStore } from "@/features/board/persist/local/apply-content"
 import { ShareButton } from "@/features/sharing/share-button"
 import { useBoardAppStore } from "../store/board-app-store"
 import { createBoardStore } from "../store/create-board-store"
@@ -80,7 +82,7 @@ import { HarnessWrapRefProvider } from "./wrap-ref-provider"
  * Tool state, top-bar wiring, keyboard shortcuts land in subsequent
  * phase-4 commits.
  */
-export function HarnessCanvas() {
+export function HarnessCanvas({ local = false }: { local?: boolean } = {}) {
   const boardId = useBoardAppStore((s) => s.boardId)
   const rootId = useBoardAppStore((s) => s.rootId)
   const canEdit = useBoardAppStore((s) => s.canEdit)
@@ -150,14 +152,14 @@ export function HarnessCanvas() {
   useHarnessApplyMindMap(store, boardId, rootId)
   useHydrateIconNodes(store, boardId, rootId, ready)
   useThemeColorProjection(store, ready)
-  useThumbnailCapture(store, boardId, ready, theme.minimap)
+  useThumbnailCapture(store, boardId, ready && !local, theme.minimap)
   usePresentationMode(store, wrapRef, rendererRef)
 
   // Collab is the only edit path (collab-archi §1). The WS adapter is
   // mounted unconditionally; presence + local cursor tracking go with it.
   // The server is the sole writer — no local REST save loop, so no
   // save-status pill either.
-  useWsCollab(store, boardId, ready, rootId)
+  useWsCollab(store, boardId, ready && !local, rootId)
   useLocalPresence(store, wrapRef, ready)
 
   const { handleCreateDrag, handleClick } = useCreateHandlers(store, boardId, rootId, styleMemory)
@@ -226,7 +228,7 @@ export function HarnessCanvas() {
           const node = store.getNode(hit.nodeId)
           if (node && CUSTOM_NODE_TYPES.has(node.type)) {
             store.cancelEdit()
-            if (node.type === "folder" && boardId) {
+            if (node.type === "folder" && boardId && !local) {
               navigate({
                 to: "/boards/$id",
                 params: { id: boardId },
@@ -258,10 +260,10 @@ export function HarnessCanvas() {
       store.setSelection([styled.id as NodeId])
       store.beginEdit(styled.id as NodeId)
     },
-    [store, boardId, rootId, canEdit, navigate, styleMemory],
+    [store, boardId, rootId, canEdit, navigate, styleMemory, local],
   )
 
-  // Hydrate on scope change. `cancelled` guards against late-arriving fetches
+  // Hydrate on scope change. `cancelled` guards against late-arriving loads
   // when the user navigates rapidly between boards.
   useEffect(() => {
     if (!boardId) {
@@ -271,6 +273,38 @@ export function HarnessCanvas() {
     let cancelled = false
     setReady(false)
     setIsLoading(true)
+
+    // Local-only board: load from IndexedDB + attach local persistence. The
+    // analog of the backend hydrate below — it fills the same empty store.
+    if (local) {
+      const persistence = new BoardPersistence(boardId)
+      let detach: (() => void) | null = null
+      void persistence
+        .init()
+        .then(() => persistence.load())
+        .then((content) => {
+          if (cancelled) return
+          applyContentToStore(store, content)
+          detach = persistence.attach(store)
+          setCanEdit(true)
+          setBoardRole("owner")
+          setBoardVisibility("private")
+        })
+        .catch((err) => {
+          if (!cancelled) console.error("[harness] local load failed", err)
+        })
+        .finally(() => {
+          if (cancelled) return
+          setIsLoading(false)
+          setReady(true)
+        })
+      return () => {
+        cancelled = true
+        detach?.()
+        void persistence.flush().finally(() => persistence.close())
+      }
+    }
+
     hydrateBoardStore(store, {
       boardId,
       rootId: rootId ?? undefined,
@@ -296,7 +330,7 @@ export function HarnessCanvas() {
     return () => {
       cancelled = true
     }
-  }, [boardId, rootId, store, setIsLoading, setCanEdit, setBoardRole, setBoardLabel, setBoardVisibility])
+  }, [boardId, rootId, store, local, setIsLoading, setCanEdit, setBoardRole, setBoardLabel, setBoardVisibility])
 
   return (
     <CanvasProvider store={store}>
@@ -312,6 +346,7 @@ export function HarnessCanvas() {
             tool={tool}
             ready={ready}
             viewMode={viewMode}
+            canCollab={!local}
             arrowDefaults={arrowDefaults}
             onCreateDrag={handleCreateDrag}
             onClick={handleClick}
@@ -331,6 +366,7 @@ type InnerProps = {
   tool: string
   ready: boolean
   viewMode: "board" | "files" | "list"
+  canCollab: boolean
   arrowDefaults: ArrowToolDefaults
   onCreateDrag: ReturnType<typeof useCreateHandlers>["handleCreateDrag"]
   onClick: ReturnType<typeof useCreateHandlers>["handleClick"]
@@ -344,6 +380,7 @@ function HarnessCanvasInner({
   tool,
   ready,
   viewMode,
+  canCollab,
   arrowDefaults,
   onCreateDrag,
   onClick,
@@ -401,7 +438,7 @@ function HarnessCanvasInner({
           )}
           {!presenting && <HarnessViewportControls />}
           <StyleSidebar />
-          <RemoteCursors />
+          {canCollab && <RemoteCursors />}
           <EmptyBoardCoachmarks ready={ready} />
         </>
       ) : viewMode === "files" ? (
@@ -422,10 +459,10 @@ function HarnessCanvasInner({
         — the container is invisible when empty.
       */}
       <div className="absolute right-3 top-3 z-50 flex items-center gap-2">
-        <HarnessPeerChip />
+        {canCollab && <HarnessPeerChip />}
         <HarnessReadonlyChip />
-        <HarnessCollabStatus />
-        <ShareButton />
+        {canCollab && <HarnessCollabStatus />}
+        {canCollab && <ShareButton />}
       </div>
       <NodeSurfaceHost />
       <SlidesSheet />
