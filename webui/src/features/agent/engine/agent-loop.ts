@@ -6,10 +6,12 @@
 import type { AgentEvent, LlmClient, LlmMessage, LlmToolDef, Tool, ToolContext } from "./types"
 
 
+/** Reduce tools to the name/description/parameters the LLM needs. */
 const toDefs = (tools: Tool[]): LlmToolDef[] =>
   tools.map((t) => ({ name: t.name, description: t.description, parameters: t.parameters }))
 
 
+/** Parse a tool call's JSON arguments, tolerating malformed/non-object input. */
 const parseArgs = (raw: string): Record<string, unknown> => {
   try {
     const v: unknown = JSON.parse(raw)

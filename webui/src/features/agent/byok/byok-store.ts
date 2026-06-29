@@ -19,6 +19,7 @@ const load = (): Stored | null => {
 }
 
 
+/** Fallback model id per provider when the user leaves the field blank. */
 const defaultModel = (provider: ByokProvider): string =>
   provider === "openai" ? "gpt-4o-mini" : "openai/gpt-4o-mini"
 

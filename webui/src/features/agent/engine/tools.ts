@@ -11,12 +11,14 @@ import type { DimEdgeData, DimNodeData } from "@/features/board/model"
 import type { Tool } from "./types"
 
 
+/** Fresh SyncMeta stamp for a created/updated entity. */
 const meta = (): DimNodeData["meta"] => {
   const t = Date.now()
   return { v: 1, createdAt: t, updatedAt: t }
 }
 
 
+// Coerce loosely-typed tool args to string/number with a fallback.
 const str = (v: unknown, fallback = ""): string => (typeof v === "string" ? v : fallback)
 const num = (v: unknown, fallback = 0): number => (typeof v === "number" ? v : fallback)
 
