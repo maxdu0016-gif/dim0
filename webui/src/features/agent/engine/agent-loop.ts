@@ -36,6 +36,8 @@ export type RunAgentOptions = {
   llm: LlmClient
   ctx: ToolContext
   system?: string
+  /** Prior conversation turns, prepended so the agent remembers the chat. */
+  history?: LlmMessage[]
   maxTurns?: number
 }
 
@@ -46,6 +48,7 @@ export async function* runAgent(opts: RunAgentOptions): AsyncGenerator<AgentEven
   const defs = toDefs(opts.tools)
   const messages: LlmMessage[] = []
   if (opts.system) messages.push({ role: "system", content: opts.system })
+  if (opts.history) messages.push(...opts.history)
   messages.push({ role: "user", content: opts.userMessage })
 
   for (let turn = 0; turn < maxTurns; turn += 1) {

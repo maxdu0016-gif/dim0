@@ -7,7 +7,7 @@ import { LocalSearchIndex } from "@/features/board/search/local-index"
 import { addNode, freshStore, resetIdb } from "@/test/canvas"
 import { ScriptedLlm, toolTurn } from "@/test/llm"
 import { runAgent } from "./agent-loop"
-import type { AgentEvent } from "./types"
+import type { AgentEvent, LlmClient, LlmMessage } from "./types"
 import { createNote, listBoards, localTools, searchNotes, updateNote } from "./tools"
 
 
@@ -61,6 +61,31 @@ describe("runAgent (scripted LLM)", () => {
 
     store.undo()
     expect(store.getAllNodes()).toHaveLength(0)
+  })
+
+
+  it("prepends prior history before the new user message", async () => {
+    const store = freshStore("c")
+    let seen: LlmMessage[] = []
+    const llm: LlmClient = {
+      async complete(messages) {
+        seen = [...messages]
+        return { kind: "text", text: "ok" }
+      },
+    }
+    const history: LlmMessage[] = [
+      { role: "user", content: "first question" },
+      { role: "assistant", content: "first answer" },
+    ]
+
+    await drain(runAgent({ userMessage: "follow up", history, tools: localTools, llm, ctx: { store } }))
+
+    expect(seen.map((m) => m.role)).toEqual(["user", "assistant", "user"])
+    expect(seen.map((m) => ("content" in m ? m.content : ""))).toEqual([
+      "first question",
+      "first answer",
+      "follow up",
+    ])
   })
 
 
