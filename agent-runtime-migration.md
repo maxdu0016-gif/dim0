@@ -232,3 +232,44 @@ wiring (§2), sheet seed.
 
 These four are the difference between "the agent calls tools" and "the agent
 builds boards." None needs the relay — all doable now on BYOK.
+
+---
+
+## Mini-app → local-first (single frontend)
+
+The mini-app is iframe-sandboxed React, compiled client-side (sucrase) and
+rendered in the iframe. Migrated to local with **no second origin / build /
+server**:
+
+1. **Widget state → IndexedDB** (`mini-app/state-client.ts` → `mini_app_state`
+   store, DB v4). Was `/mini-app-state/:noteId`.
+2. **Validate-on-write** (`mini-app/validate.ts`): `write_note(mini-app)`
+   sucrase-validates before persist, returning line/col so the agent
+   self-corrects. Was a redundant backend `compile.py` subprocess.
+3. **Single-frontend serving (opaque origin).** Best practice for untrusted
+   code is `sandbox="allow-scripts"` *without* `allow-same-origin` → **opaque
+   "null" origin**, isolated even when served same-origin. So the second origin
+   (`mini-app.dim0.net`) is gone:
+   - `vite.mini-app.config` + `vite-plugin-singlefile` build the runtime into one
+     self-contained `public/mini-app/index.html` (no external module fetch — the
+     requirement for opaque origin). `npm run build` builds it first.
+   - `mount.tsx` dual-path: **default (single-frontend)** loads
+     `/mini-app/index.html` with `sandbox="allow-scripts"`, `postMessage` target
+     `"*"`, trusts inbound `origin === "null"` + `source === contentWindow`.
+     **Cross-origin (opt-in via `VITE_MINI_APP_ORIGIN`)** keeps the old
+     `allow-same-origin` + HMR path.
+   - `main.tsx` / `rpc.ts` (runtime): when no `HOST_ORIGIN` is configured, trust
+     the host by **`source === window.parent`** (origin-independent; a sandboxed
+     iframe's only peer is its embedder) and reply with `"*"`.
+
+**Dev:** single-frontend needs `npm run build:mini-app` once to populate
+`public/mini-app/` (static asset, no runtime HMR). For runtime-harness HMR, set
+`VITE_MINI_APP_ORIGIN` + run `dev:mini-app` (opt-in cross-origin).
+
+**Needs live (browser-only) verification:** iframe renders under opaque origin;
+`parent.document` throws from inside; host cookies/storage unreachable.
+
+**Known polish (non-fatal):** the single-file still references
+`./theme-bootstrap.js` (brief theme flash before the render message applies
+theme) and `/config.js` (404). Both are non-fatal; inline theme-bootstrap to
+remove the flash + console noise.

@@ -145,12 +145,21 @@ describe("tools", () => {
   it("write_note creates a typed node (mini-app)", async () => {
     const store = freshStore("c")
     const { id } = (await writeNote.run(
-      { note_id: "m1", label: "Chart", content: "export default () => null", note_type: "mini-app" },
+      { note_id: "m1", label: "Chart", content: "function Widget() { return null }", note_type: "mini-app" },
       { store },
     )) as { id: string }
     const node = store.getNode(asNodeId(id))
     expect(node?.type).toBe("mini-app")
     expect(titleOf(node?.data)).toBe("Chart")
+    // Custom types must be born with grow-to-fit OFF (mirrors note_to_wire).
+    expect(node?.style?.autoFit).toBe(false)
+  })
+
+
+  it("write_note leaves a rectangle's autoFit unset (it should grow-to-fit)", async () => {
+    const store = freshStore("c")
+    await writeNote.run({ note_id: "r1", content: "hi", note_type: "rectangle" }, { store })
+    expect(store.getNode(asNodeId("r1"))?.style?.autoFit).not.toBe(false)
   })
 
 
@@ -173,6 +182,14 @@ describe("tools", () => {
     const edge = store.getAllEdges()[0]
     const src = edge.source
     expect("nodeId" in src && src.localOffset).toEqual({ x: a.w / 2, y: a.h / 2 })
+  })
+
+
+  it("write_note rejects a malformed mini-app without creating a node", async () => {
+    const store = freshStore("c")
+    const res = await writeNote.run({ note_id: "bad", content: "const x = 1", note_type: "mini-app" }, { store })
+    expect(res).toMatchObject({ error: expect.stringContaining("mini-app invalid") })
+    expect(store.getNode(asNodeId("bad"))).toBeUndefined()
   })
 
 

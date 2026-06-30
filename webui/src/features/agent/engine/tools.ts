@@ -9,6 +9,8 @@ import { asEdgeId, asNodeId } from "@canvas-harness/core"
 import type { Node } from "@canvas-harness/core"
 import type { DimEdgeData, DimNodeData } from "@/features/board/model"
 import { pickRandomColorOfShade } from "@/features/board/lib/colors/tailwind"
+import { AUTOFIT_DISABLED_TYPES } from "@/features/board/harness/convert/note-to-node"
+import { validateMiniAppSource } from "@/features/mini-app/validate"
 import type { Tool } from "./types"
 import { estimateNoteSize } from "./note-size"
 
@@ -182,6 +184,23 @@ export const writeNote: Tool = {
   },
   async run(args, ctx) {
     const nodeType = toNodeType(str(args.note_type))
+    const content = str(args.content)
+
+    // Custom types render only a preview of `content`, so disable the lib's
+    // grow-to-fit AT CREATION (mirrors backend note_to_wire_node). Setting it
+    // here — not just via the reactive stamp hook — means the node is born with
+    // autoFit off and the lib never grows it before the flag lands.
+    const autoFitStyle = AUTOFIT_DISABLED_TYPES.has(nodeType) ? { autoFit: false } : undefined
+
+    // Validate a mini-app before persisting, so a malformed one is rejected with
+    // line/col for the agent to fix this turn (not a silently-broken note).
+    if (nodeType === "mini-app") {
+      const v = validateMiniAppSource(content)
+      if (!v.ok) {
+        return { error: `mini-app invalid: ${v.message}${v.line ? ` (line ${v.line}:${v.column})` : ""}` }
+      }
+    }
+
     const existingId = str(args.note_id)
 
     if (existingId) {
@@ -192,8 +211,9 @@ export const writeNote: Tool = {
         ctx.store.batch(() =>
           ctx.store.updateNode(id, {
             type: nodeType,
-            content: str(args.content),
+            content,
             data: { ...prev, label: str(args.label) || prev?.label || "", meta: meta() },
+            ...(autoFitStyle ? { style: { ...(node.style ?? {}), ...autoFitStyle } } : {}),
           }),
         )
         return { id: String(id) }
@@ -201,7 +221,6 @@ export const writeNote: Tool = {
     }
 
     const id = asNodeId(existingId || ctx.store.generateId())
-    const content = str(args.content)
     const { w, h } = noteGeometry(nodeType, content)
     ctx.store.batch(() => {
       ctx.store.addNode({
@@ -214,6 +233,7 @@ export const writeNote: Tool = {
         angle: 0,
         groups: [],
         content,
+        ...(autoFitStyle ? { style: autoFitStyle } : {}),
         data: { label: str(args.label), meta: meta(), _storedColors: randomNoteColors() } satisfies DimNodeData,
       })
     })

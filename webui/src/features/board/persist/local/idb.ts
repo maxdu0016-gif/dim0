@@ -38,6 +38,8 @@ interface Dim0DB extends DBSchema {
   // order (assistant is minted before user; counter sorts lexically), so reads
   // must sort by this, not by the key.
   chat_messages: { key: [string, string]; value: ChatMessage & { order?: number } }
+  // Per-note mini-app widget state (local analog of backend /mini-app-state).
+  mini_app_state: { key: string; value: { noteId: string; state: unknown } }
 }
 
 
@@ -45,7 +47,7 @@ export type Dim0Database = IDBPDatabase<Dim0DB>
 
 
 const DB_NAME = "dim0"
-const DB_VERSION = 3
+const DB_VERSION = 4
 
 
 /** Open (creating/upgrading) the dim0 database. `name` is overridable for tests. */
@@ -63,5 +65,6 @@ export const openDim0Db = (name: string = DB_NAME): Promise<Dim0Database> =>
         : db.createObjectStore("chats", { keyPath: "id" })
       if (!chats.indexNames.contains("by-board")) chats.createIndex("by-board", "boardId")
       if (!db.objectStoreNames.contains("chat_messages")) db.createObjectStore("chat_messages", { keyPath: ["chatUid", "id"] })
+      if (!db.objectStoreNames.contains("mini_app_state")) db.createObjectStore("mini_app_state", { keyPath: "noteId" })
     },
   })

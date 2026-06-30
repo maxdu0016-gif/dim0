@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "dotenv -e ../${npm_config_envfile:-.env} -- vite",
     "dev:mini-app": "dotenv -e ../${npm_config_envfile:-.env} -- vite --config vite.mini-app.config.ts",
-    "build": "dotenv -e ../${npm_config_envfile:-.env} -- tsc -b && vite build",
+    "build": "dotenv -e ../${npm_config_envfile:-.env} -- vite build --config vite.mini-app.config.ts && dotenv -e ../${npm_config_envfile:-.env} -- tsc -b && vite build",
     "build:mini-app": "dotenv -e ../${npm_config_envfile:-.env} -- vite build --config vite.mini-app.config.ts",
     "lint": "eslint .",
     "preview": "vite preview",
@@ -147,6 +147,7 @@
     "unified": "^11.0.5",
     "vite": "^7.0.6",
     "vite-plugin-pwa": "^1.2.0",
+    "vite-plugin-singlefile": "^2.3.3",
     "vitest": "^4.1.7"
   },
   "engines": {
