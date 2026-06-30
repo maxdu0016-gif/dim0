@@ -3,8 +3,10 @@ import { generateUuid, trimText } from "@/lib/common"
 import { getCanvasStoreRef } from "@/features/board/harness/canvas-store-ref"
 import { runAgent } from "@/features/agent/engine/agent-loop"
 import { ByokLlmClient } from "@/features/agent/engine/byok-client"
-import { createNote, linkNotes, updateNote } from "@/features/agent/engine/tools"
+import { agentBuildTools } from "@/features/agent/engine/tools"
+import { skillTools } from "@/features/agent/engine/skills"
 import type { AgentEvent } from "@/features/agent/engine/types"
+import { planSystemPrompt } from "@/features/agent/prompts"
 import { useByokStore } from "@/features/agent/byok/byok-store"
 import { useLocalMessagesStore } from "@/features/agent/store/local-messages-store"
 import type { ChatMessage } from "@/features/agent/types/chat"
@@ -12,8 +14,8 @@ import { latestAssistantText, stepsFromEvents } from "./agent-event-to-step"
 import { toLlmHistory } from "./chat-history"
 
 
-// v1 toolset: the build tools (create/update/link). search/list land later.
-const BUILD_TOOLS = [createNote, updateNote, linkNotes]
+// Note-building tools + on-demand skill loaders (search/list land in C/D).
+const AGENT_TOOLS = [...agentBuildTools, ...skillTools]
 
 
 let counter = 0
@@ -85,7 +87,8 @@ export function useLocalSubmitPrompt(boardId: string) {
 
       try {
         const llm = ByokLlmClient.fromConfig(config)
-        for await (const ev of runAgent({ userMessage: prompt, history, tools: BUILD_TOOLS, llm, ctx: { store } })) {
+        const system = planSystemPrompt(new Date().toLocaleString())
+        for await (const ev of runAgent({ system, userMessage: prompt, history, tools: AGENT_TOOLS, llm, ctx: { store } })) {
           events.push(ev)
           render(true)
         }

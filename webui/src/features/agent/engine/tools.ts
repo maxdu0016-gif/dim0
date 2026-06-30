@@ -23,6 +23,19 @@ const str = (v: unknown, fallback = ""): string => (typeof v === "string" ? v : 
 const num = (v: unknown, fallback = 0): number => (typeof v === "number" ? v : fallback)
 
 
+// Map a prompt-level note_type to a canvas node type. Shapes the agent can't
+// render distinctly (ellipse/diamond) fall back to the default rectangle.
+const NODE_TYPE: Record<string, string> = {
+  rectangle: "rect",
+  rect: "rect",
+  sheet: "sheet",
+  "mini-app": "mini-app",
+  widget: "widget",
+  "code-sandbox": "code-sandbox",
+}
+const toNodeType = (t: string): string => NODE_TYPE[t] ?? "rect"
+
+
 export const createNote: Tool = {
   name: "create_note",
   description: "Create a note on the board with a title and optional body.",
@@ -105,6 +118,118 @@ export const linkNotes: Tool = {
 }
 
 
+export const writeNote: Tool = {
+  name: "write_note",
+  description: "Create a new note, or fully rewrite an existing one when note_id is given. note_type: rectangle | sheet | mini-app | widget.",
+  parameters: {
+    type: "object",
+    properties: {
+      content: { type: "string" },
+      label: { type: "string", description: "Short title" },
+      note_type: { type: "string", description: "rectangle | sheet | mini-app | widget" },
+      note_id: { type: "string", description: "Set to rewrite an existing note" },
+    },
+    required: ["content"],
+  },
+  async run(args, ctx) {
+    const nodeType = toNodeType(str(args.note_type))
+    const existingId = str(args.note_id)
+
+    if (existingId) {
+      const id = asNodeId(existingId)
+      const node = ctx.store.getNode(id)
+      if (node) {
+        const prev = node.data as DimNodeData | undefined
+        ctx.store.batch(() =>
+          ctx.store.updateNode(id, {
+            type: nodeType,
+            content: str(args.content),
+            data: { ...prev, label: str(args.label) || prev?.label || "", meta: meta() },
+          }),
+        )
+        return { id: String(id) }
+      }
+    }
+
+    const id = asNodeId(existingId || ctx.store.generateId())
+    ctx.store.batch(() => {
+      ctx.store.addNode({
+        id,
+        type: nodeType,
+        x: 0,
+        y: 0,
+        w: 240,
+        h: 120,
+        angle: 0,
+        groups: [],
+        content: str(args.content),
+        data: { label: str(args.label), meta: meta() } satisfies DimNodeData,
+      })
+    })
+    return { id: String(id) }
+  },
+}
+
+
+export const getNote: Tool = {
+  name: "get_note",
+  description: "Read an existing note's label, content, and type.",
+  parameters: { type: "object", properties: { note_id: { type: "string" } }, required: ["note_id"] },
+  async run(args, ctx) {
+    const id = asNodeId(str(args.note_id))
+    const node = ctx.store.getNode(id)
+    if (!node) return { error: "note not found" }
+    return {
+      id: String(id),
+      label: (node.data as DimNodeData | undefined)?.label ?? "",
+      content: node.content ?? "",
+      note_type: node.type,
+    }
+  },
+}
+
+
+export const editNote: Tool = {
+  name: "edit_note",
+  description: "Targeted edit: replace `old` with `new` in a note's content or label. Fails unless `old` is unique (or replace_all).",
+  parameters: {
+    type: "object",
+    properties: {
+      note_id: { type: "string" },
+      field: { type: "string", description: "content | label" },
+      old: { type: "string" },
+      new: { type: "string" },
+      replace_all: { type: "boolean" },
+    },
+    required: ["note_id", "field", "old", "new"],
+  },
+  async run(args, ctx) {
+    const id = asNodeId(str(args.note_id))
+    const node = ctx.store.getNode(id)
+    if (!node) return { error: "note not found" }
+
+    const field = str(args.field) === "label" ? "label" : "content"
+    const oldStr = str(args.old)
+    const prev = node.data as DimNodeData | undefined
+    const current = field === "label" ? prev?.label ?? "" : node.content ?? ""
+
+    const occurrences = oldStr ? current.split(oldStr).length - 1 : 0
+    if (occurrences === 0) return { error: "`old` not found in field" }
+    if (occurrences > 1 && args.replace_all !== true) {
+      return { error: "`old` occurs multiple times; expand it for uniqueness or set replace_all" }
+    }
+    const updated = args.replace_all === true ? current.split(oldStr).join(str(args.new)) : current.replace(oldStr, str(args.new))
+
+    ctx.store.batch(() =>
+      field === "label"
+        ? ctx.store.updateNode(id, { data: { ...prev, label: updated, meta: meta() } })
+        : ctx.store.updateNode(id, { content: updated }),
+    )
+    return { id: String(id) }
+  },
+}
+
+
 export const searchNotes: Tool = {
   name: "search_notes",
   description: "Full-text search notes on the board. Returns matching ids + titles.",
@@ -134,3 +259,7 @@ export const listBoards: Tool = {
 
 
 export const localTools: Tool[] = [createNote, updateNote, linkNotes, searchNotes, listBoards]
+
+
+/** The note-building tools the chat agent uses (matches the system prompt's vocabulary). */
+export const agentBuildTools: Tool[] = [writeNote, editNote, getNote, linkNotes]

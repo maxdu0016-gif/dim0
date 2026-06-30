@@ -12,21 +12,29 @@ const asStr = (v: unknown): string | undefined => (typeof v === "string" ? v : u
 
 /** Map an engine tool name to the UI ToolName the chat renderers switch on. */
 const toToolName = (name: string): ToolName => {
-  if (name === "create_note") return "create_note"
-  if (name === "update_note") return "edit_note"
+  if (name === "create_note" || name === "write_note") return "create_note"
+  if (name === "update_note" || name === "edit_note") return "edit_note"
+  if (name === "get_note") return "get_note"
   if (name === "link_notes") return "link_notes"
+  if (name.startsWith("learn_generate")) return name as ToolName
   return "raw_message"
 }
+
+
+// Title for the note card: write_note uses `label`, the older create_note `title`.
+const noteLabel = (args: unknown): string | null =>
+  asStr(field(args, "label")) ?? asStr(field(args, "title")) ?? null
 
 
 /** Build the UI ToolOutput a tool-step renders, from the engine's args + result. */
 const toOutput = (name: string, args: unknown, result: unknown, boardId: string): ToolOutput => {
   const id = asStr(field(result, "id")) ?? ""
-  if (name === "create_note") {
-    return { type: "create_note", noteId: id, graphUid: boardId, label: asStr(field(args, "title")) ?? null, noteType: "note" }
+  if (name === "create_note" || name === "write_note") {
+    const noteType = asStr(field(args, "note_type")) ?? "note"
+    return { type: "create_note", noteId: id, graphUid: boardId, label: noteLabel(args), noteType }
   }
-  if (name === "update_note") {
-    return { type: "edit_note", noteId: id, graphUid: boardId, label: asStr(field(args, "title")) ?? null, noteType: "note" }
+  if (name === "update_note" || name === "edit_note") {
+    return { type: "edit_note", noteId: id, graphUid: boardId, label: noteLabel(args), noteType: "note" }
   }
   if (name === "link_notes") {
     return {
@@ -37,6 +45,9 @@ const toOutput = (name: string, args: unknown, result: unknown, boardId: string)
       graphUid: boardId,
       label: asStr(field(args, "label")) ?? null,
     }
+  }
+  if (name.startsWith("learn_generate")) {
+    return `Loaded ${name.replace("learn_generate_", "").replace(/_/g, " ")} guidance`
   }
   return JSON.stringify(result)
 }

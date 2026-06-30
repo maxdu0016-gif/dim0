@@ -47,6 +47,7 @@ Master tracking doc for the offline-first + local-agent refactor. Companion to
 |---|---|---|
 | A | Local boards + persistence + local agent engine | ✅ done |
 | B | One agent path · chat parity · history · settings | 🟡 nearly done |
+| B-agent | Agent capability parity: system prompt + skills + rich note tools | 🟡 core done |
 | C | Board management (local dashboard / CRUD / folders) | ⬜ |
 | D | Board aux features local (search · thumbnails · widgets) | ⬜ |
 | E | Sync transport (collab relay) — **the spine** | ⬜ |
@@ -112,6 +113,33 @@ wired + `ToolName` rendering, done alongside that infra.
 on `/local`; live render check.
 
 ---
+
+## Phase B-agent — Agent capability parity (prompts + skills + rich tools) 🟡
+
+**Goal.** Bring the backend's agent design to the frontend so the local agent is
+the *real* assistant (mindmaps, diagrams, mini-apps), not a plain-note maker.
+
+**Built.**
+- **Prompt system:** ported `plan.system` → `agent/prompts/plan-system.md`
+  (local-adapted — backend-only tools trimmed: web/memory/code/image/widgets),
+  loaded via `?raw` + a tiny `renderPrompt` (`{{var}}`). The local agent now
+  runs *with* a system prompt (it had none — the biggest quality gap).
+- **Skills (progressive disclosure):** ported the 3 skill prompts (diagram /
+  mini-app / html-widget) as `?raw` modules; `learn_generate_*` tools return the
+  guidance on demand — exact mirror of backend `learn.py`.
+- **Rich note tools:** `write_note` (typed: rectangle/sheet/mini-app/widget,
+  create or rewrite), `get_note`, `edit_note` (targeted unique-snippet replace).
+  Wired into the agent toolset; adapter renders them through the existing cards.
+
+**Remaining / deferred.**
+- Mini-app client-side validation (sucrase) before write — currently the node
+  renders and the agent self-corrects on a render error (backend parity).
+- `ellipse`/`diamond` node shapes fall back to rectangle for now.
+- Prompts are canonical here; backend copies deleted in Phase G.
+
+**Verification.** Type-check + tests (note tools, skill loaders, prompt render +
+local-trim); live BYOK check that the agent builds mindmaps/mini-apps.
+
 
 ## Phase C — Board management (local dashboard / CRUD / folders) ⬜
 

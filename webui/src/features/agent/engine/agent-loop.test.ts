@@ -8,7 +8,8 @@ import { addNode, freshStore, resetIdb } from "@/test/canvas"
 import { ScriptedLlm, toolTurn } from "@/test/llm"
 import { runAgent } from "./agent-loop"
 import type { AgentEvent, LlmClient, LlmMessage } from "./types"
-import { createNote, listBoards, localTools, searchNotes, updateNote } from "./tools"
+import { createNote, editNote, getNote, listBoards, localTools, searchNotes, updateNote, writeNote } from "./tools"
+import { learnGenerateMiniApp, skillTools } from "./skills"
 
 
 const drain = async (gen: AsyncGenerator<AgentEvent>): Promise<AgentEvent[]> => {
@@ -138,5 +139,65 @@ describe("tools", () => {
     const res = (await listBoards.run({}, { store, registry })) as { boards: { title: string }[] }
     expect(res.boards.map((b) => b.title)).toEqual(["Ideas"])
     registry.close()
+  })
+
+
+  it("write_note creates a typed node (mini-app)", async () => {
+    const store = freshStore("c")
+    const { id } = (await writeNote.run(
+      { note_id: "m1", label: "Chart", content: "export default () => null", note_type: "mini-app" },
+      { store },
+    )) as { id: string }
+    const node = store.getNode(asNodeId(id))
+    expect(node?.type).toBe("mini-app")
+    expect(titleOf(node?.data)).toBe("Chart")
+  })
+
+
+  it("write_note(note_id) rewrites an existing note", async () => {
+    const store = freshStore("c")
+    await writeNote.run({ note_id: "n1", content: "v1", note_type: "rectangle" }, { store })
+    await writeNote.run({ note_id: "n1", content: "v2", note_type: "sheet" }, { store })
+    const node = store.getNode(asNodeId("n1"))
+    expect(node?.content).toBe("v2")
+    expect(node?.type).toBe("sheet")
+    expect(store.getAllNodes()).toHaveLength(1)
+  })
+
+
+  it("get_note reads label, content, and type", async () => {
+    const store = freshStore("c")
+    await writeNote.run({ note_id: "n1", label: "T", content: "body", note_type: "sheet" }, { store })
+    const res = (await getNote.run({ note_id: "n1" }, { store })) as { label: string; content: string; note_type: string }
+    expect(res).toMatchObject({ label: "T", content: "body", note_type: "sheet" })
+  })
+
+
+  it("edit_note replaces a unique snippet and rejects ambiguous ones", async () => {
+    const store = freshStore("c")
+    await writeNote.run({ note_id: "n1", content: "alpha beta alpha", note_type: "rectangle" }, { store })
+
+    expect(await editNote.run({ note_id: "n1", field: "content", old: "alpha", new: "X" }, { store })).toMatchObject({
+      error: expect.stringContaining("multiple times"),
+    })
+    await editNote.run({ note_id: "n1", field: "content", old: "beta", new: "Y" }, { store })
+    expect(store.getNode(asNodeId("n1"))?.content).toBe("alpha Y alpha")
+  })
+})
+
+
+describe("skills", () => {
+  it("learn_generate_* tools return their guidance text", async () => {
+    const out = (await learnGenerateMiniApp.run({}, { store: freshStore("c") })) as string
+    expect(typeof out).toBe("string")
+    expect(out.length).toBeGreaterThan(200)
+  })
+
+  it("exposes the three skill loaders", () => {
+    expect(skillTools.map((t) => t.name).sort()).toEqual([
+      "learn_generate_diagram",
+      "learn_generate_html_widget",
+      "learn_generate_mini_app",
+    ])
   })
 })
