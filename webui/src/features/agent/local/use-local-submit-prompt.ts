@@ -4,29 +4,16 @@ import { getCanvasStoreRef } from "@/features/board/harness/canvas-store-ref"
 import { runAgent } from "@/features/agent/engine/agent-loop"
 import { ByokLlmClient } from "@/features/agent/engine/byok-client"
 import { createNote, linkNotes, updateNote } from "@/features/agent/engine/tools"
-import type { AgentEvent, LlmMessage } from "@/features/agent/engine/types"
+import type { AgentEvent } from "@/features/agent/engine/types"
 import { useByokStore } from "@/features/agent/byok/byok-store"
 import { useLocalMessagesStore } from "@/features/agent/store/local-messages-store"
 import type { ChatMessage } from "@/features/agent/types/chat"
 import { latestAssistantText, stepsFromEvents } from "./agent-event-to-step"
+import { toLlmHistory } from "./chat-history"
 
 
 // v1 toolset: the build tools (create/update/link). search/list land later.
 const BUILD_TOOLS = [createNote, updateNote, linkNotes]
-
-
-// Recent turns fed back as context so the agent remembers the chat. Mirrors the
-// backend's AssistantSession (MAX_RETRIEVAL_MESSAGES).
-const MAX_HISTORY_MESSAGES = 16
-
-
-/** Convert the stored transcript into the agent's prior-turn context. */
-const toLlmHistory = (messages: ChatMessage[]): LlmMessage[] =>
-  messages
-    .filter((m) => m.role === "user" || m.role === "assistant")
-    .map((m) => ({ role: m.role as "user" | "assistant", content: m.content.markdown?.trim() ?? "" }))
-    .filter((m) => m.content !== "")
-    .slice(-MAX_HISTORY_MESSAGES)
 
 
 let counter = 0
