@@ -4,6 +4,7 @@
  * construction — the LLM is injected, so tests use a scripted mock.
  */
 import type { AgentEvent, LlmClient, LlmMessage, LlmToolDef, Tool, ToolContext } from "./types"
+import { agentLog } from "./debug"
 
 
 /**
@@ -67,6 +68,7 @@ export async function* runAgent(opts: RunAgentOptions): AsyncGenerator<AgentEven
       yield { type: "tool_start", toolName: call.name, args }
       const tool = opts.tools.find((t) => t.name === call.name)
       const output = tool ? await tool.run(args, opts.ctx) : { error: `unknown tool: ${call.name}` }
+      agentLog.tool(call.name, args, output)
       yield { type: "tool_result", toolName: call.name, result: output }
       messages.push({ role: "tool", toolCallId: call.id, content: JSON.stringify(output) })
     }

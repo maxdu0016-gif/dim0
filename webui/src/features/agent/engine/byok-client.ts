@@ -17,6 +17,7 @@ import type {
   ChatCompletionTool,
 } from "openai/resources/chat/completions"
 import type { LlmClient, LlmMessage, LlmToolCall, LlmToolDef, LlmTurn } from "./types"
+import { agentLog } from "./debug"
 
 
 export type ByokProvider = "openai" | "openrouter"
@@ -119,7 +120,17 @@ export class ByokLlmClient implements LlmClient {
       messages: toOpenAiMessages(messages),
       ...(tools.length > 0 ? { tools: toOpenAiTools(tools), tool_choice: "auto" } : {}),
     }
-    const res = await this.completer.create(params)
-    return fromOpenAiMessage(res.choices[0]?.message)
+    agentLog.llmRequest(this.model, messages, tools)
+    try {
+      const res = await this.completer.create(params)
+      const turn = fromOpenAiMessage(res.choices[0]?.message)
+      agentLog.llmResponse(turn)
+      return turn
+    } catch (err) {
+      // Surface the real provider error (bad key, unknown model, rate limit)
+      // instead of letting it masquerade as an empty answer upstream.
+      agentLog.error(`llm.complete(${this.model})`, err)
+      throw err
+    }
   }
 }

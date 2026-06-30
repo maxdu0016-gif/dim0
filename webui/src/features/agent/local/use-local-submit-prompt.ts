@@ -10,6 +10,7 @@ import { planSystemPrompt } from "@/features/agent/prompts"
 import { useByokStore } from "@/features/agent/byok/byok-store"
 import { useLocalMessagesStore } from "@/features/agent/store/local-messages-store"
 import type { ChatMessage } from "@/features/agent/types/chat"
+import { agentLog } from "@/features/agent/engine/debug"
 import { latestAssistantText, stepsFromEvents } from "./agent-event-to-step"
 import { toLlmHistory } from "./chat-history"
 
@@ -94,7 +95,9 @@ export function useLocalSubmitPrompt(boardId: string) {
         }
         render(false)
       } catch (e) {
-        events.push({ type: "assistant_text", text: e instanceof Error ? e.message : String(e) })
+        agentLog.error("runAgent", e)
+        // Mark it as an error so it doesn't read like a normal answer.
+        events.push({ type: "assistant_text", text: `⚠️ Agent error: ${e instanceof Error ? e.message : String(e)}` })
         render(false)
       } finally {
         await persist(label)
