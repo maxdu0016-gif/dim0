@@ -50,6 +50,19 @@ describe("chat-persist", () => {
   })
 
 
+  it("loads messages in insertion order, not id/key order", async () => {
+    // Reproduce the real mint order: assistant id is minted before the user id,
+    // and the counter sorts lexically wrong ("...-10" < "...-9"). Key order
+    // would mis-sort these; insertion order must win.
+    const user = msg("local-1-9", "the question")
+    const assistant = { ...msg("local-1-10", "the answer"), role: "assistant" as const }
+    await saveMessages("c1", "b1", [user, assistant])
+
+    const loaded = await loadMessages("c1")
+    expect(loaded.map((m) => m.content.markdown)).toEqual(["the question", "the answer"])
+  })
+
+
   it("preserves a chat's label when a later save omits it", async () => {
     await saveMessages("c1", "b1", [msg("m1", "a")], "Labeled")
     await saveMessages("c1", "b1", [msg("m1", "a"), msg("m2", "b")]) // no label

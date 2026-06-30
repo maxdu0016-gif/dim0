@@ -8,7 +8,7 @@ import { addNode, freshStore, resetIdb } from "@/test/canvas"
 import { ScriptedLlm, toolTurn } from "@/test/llm"
 import { runAgent } from "./agent-loop"
 import type { AgentEvent, LlmClient, LlmMessage } from "./types"
-import { createNote, editNote, getNote, listBoards, localTools, searchNotes, updateNote, writeNote } from "./tools"
+import { createNote, editNote, getNote, linkNotes, listBoards, localTools, searchNotes, updateNote, writeNote } from "./tools"
 import { learnGenerateMiniApp, skillTools } from "./skills"
 
 
@@ -151,6 +151,28 @@ describe("tools", () => {
     const node = store.getNode(asNodeId(id))
     expect(node?.type).toBe("mini-app")
     expect(titleOf(node?.data)).toBe("Chart")
+  })
+
+
+  it("write_note stamps a random Tailwind-200 fill (theme source-of-truth)", async () => {
+    const store = freshStore("c")
+    await writeNote.run({ note_id: "n1", content: "x", note_type: "rectangle" }, { store })
+    const data = store.getNode(asNodeId("n1"))?.data as { _storedColors?: { backgroundColor?: string; textColor?: string } }
+    expect(data._storedColors?.backgroundColor).toMatch(/^#/)
+    expect(data._storedColors?.textColor).toBe("#000000")
+  })
+
+
+  it("link_notes attaches at node centers (so auto-clip hits the borders)", async () => {
+    const store = freshStore("c")
+    await writeNote.run({ note_id: "a", content: "a", note_type: "rectangle" }, { store })
+    await writeNote.run({ note_id: "b", content: "b", note_type: "rectangle" }, { store })
+    await linkNotes.run({ sourceId: "a", targetId: "b" }, { store })
+
+    const a = store.getNode(asNodeId("a"))!
+    const edge = store.getAllEdges()[0]
+    const src = edge.source
+    expect("nodeId" in src && src.localOffset).toEqual({ x: a.w / 2, y: a.h / 2 })
   })
 
 

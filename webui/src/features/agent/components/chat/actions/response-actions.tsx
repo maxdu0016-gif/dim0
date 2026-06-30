@@ -3,6 +3,7 @@ import { useChat } from "@/features/agent/hooks/chat-context"
 import { CopyAnswer } from "./copy-answer"
 import { SaveAsNote } from "./save-as-note"
 import { useListChats } from "@/features/agent/api/list-chats"
+import { useIsLocalBoard } from "@/features/board/lib/use-is-local-board"
 import { useAppStore } from "@/store"
 
 
@@ -25,6 +26,8 @@ export const ResponseActions = ({
 }) => {
   const { chatId } = useChat()
   const userId = useAppStore(s => s.userId)
+  // Mindmap transforms are backend-only — hide them on local boards for now.
+  const isLocal = useIsLocalBoard()
 
   const { data: chatList } = useListChats({ graphUid: null, userId })
 
@@ -40,9 +43,13 @@ export const ResponseActions = ({
       )}
     >
       <CopyAnswer answer={message} compact={compact} />
-      <SaveAsNote message={message} type="notify" saveAsIs={saveAsIs} boardId={attachedBoardId} compact={compact} />
-      <SaveAsNote message={message} type="mapify" boardId={attachedBoardId} compact={compact} />
-      <SaveAsNote message={message} type="schemify" boardId={attachedBoardId} compact={compact} />
+      {!isLocal && (
+        <>
+          <SaveAsNote message={message} type="notify" saveAsIs={saveAsIs} boardId={attachedBoardId} compact={compact} />
+          <SaveAsNote message={message} type="mapify" boardId={attachedBoardId} compact={compact} />
+          <SaveAsNote message={message} type="schemify" boardId={attachedBoardId} compact={compact} />
+        </>
+      )}
     </div>
   )
 }

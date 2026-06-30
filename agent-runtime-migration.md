@@ -104,10 +104,66 @@ Backend `rearrange_created_notes` (`notes/layout.py`), run by
 Frontend **already has** `autoLayout(nodes, edges, options)` (Dagre) in
 `board/lib/graph/auto-layout.ts`, used by mindmap-drain / Drawify — but it
 operates on flow types (`NoteNode`/`LinkEdge`), not canvas-harness store nodes,
-and **the agent never calls it**.
-→ **Fix (the real Bug-1 fix):** after the agent turn, collect the nodes/links it
-created, adapt store-nodes → flow types, run `autoLayout`, write positions back
-to the store in one batch. ~150–250 LOC of *wiring* + an adapter; no new engine.
+and **the agent never called it**.
+→ **DONE** (`harness/agent/arrange-created-nodes.ts`): after the turn we collect
+the created node ids + the links among them, then lay them out and write
+positions back in one batch (translated below existing content; single-node
+turns untouched). Two modes, mirroring the backend:
+- **Bidirectional mindmap** for trees with ≥2 root children: split children
+  left/right by subtree size, Dagre-LR each half, mirror the left half around
+  the root, stitch at the root.
+- **Flat Dagre LR** fallback for non-tree graphs (DAGs/cycles/chains).
+Still missing vs backend: per-component flex-wrap of multiple disjoint clusters,
+and exact radial clipping for ellipse/diamond (canvas-harness clips to the rect).
+
+### 2f. Note color + edge attachment (DONE)
+- **Color:** agent notes now stamp a **random Tailwind-200** fill per note
+  (`pickRandomColorOfShade(200)`, mirrors backend `random.choice(TAILWIND_200_ADAPTED)`)
+  as `_storedColors`, so the theme hooks project it per mode.
+- **Edges:** `link_notes` attaches at each node's **center** (`{w/2, h/2}` in the
+  local frame), so canvas-harness's `clipSamples` auto-clips the center→center
+  line to each border — the backend's `_edge_anchor_offset`, for free, and it
+  re-clips live as `arrangeCreatedNodes` moves the nodes.
+
+### 2e. Theme adaptation (light/dark) — how to create theme-correct nodes
+**The rule:** a node's display colors (`style.{backgroundColor,strokeColor,textColor}`)
+are *projected per theme mode* from a canonical, theme-independent triplet stored
+at **`data._storedColors`**. Light mode = identity; dark mode runs through
+`adaptNodeColors` (`harness/theme/color-adapter.ts`). Two harness hooks do the
+projection and both **key off `_storedColors`**:
+- `useStampNewNodes` — on every local `node.add`, re-projects display style for
+  the current mode (also where pasted/agent nodes get themed).
+- `useThemeColorProjection` — re-projects all nodes on a theme flip.
+
+**The bugs we hit & fixed:**
+- *Create-time:* `write_note` set neither style nor `_storedColors`, so nodes
+  fell back to the lib's non-theme-aware (light) default. Fixed by stamping
+  `_storedColors` (a random Tailwind-200; see §2f) so the create-time stamp hook
+  projects them.
+- *Reload-time:* a refreshed local board painted the *persisted* theme, not the
+  current one — `applyContentToStore` hydrates as `origin: "remote"`, which both
+  `useStampNewNodes` and `useThemeColorProjection` skip. Fixed by **projecting
+  display colors from `_storedColors` inside `applyContentToStore`** for the
+  current mode (the local analog of `noteToNode`). Persisted `style` is now
+  irrelevant for theming — display is always derived on load.
+
+**Invariant for any new node emitter:** set `_storedColors` (let the hooks/​hydrate
+project) — never bake a concrete light color into `style`.
+
+### 2g. Message order on reload (fixed)
+Chat messages persist keyed by `[chatUid, id]`; `getAll` returns **key order**,
+and ids don't sort to conversation order (the assistant id is minted before the
+user id, and the counter sorts lexically — `…-10` < `…-9`). So a reload showed
+the answer above the question. **Fix:** `saveMessages` stamps an `order` index
+and `loadMessages` sorts by it — insertion order, not key order.
+
+### 2h. End-to-end test
+`agent/local/agent-pipeline.e2e.test.ts` drives the whole pipeline with a
+scripted LLM (turn → tool calls build a mindmap → arrange → persist → **reload
+into a fresh store**) and asserts: nodes survive + arrange bidirectionally,
+colors re-project for the theme on load, and messages reload in order. This is
+the regression guard for the round-trip bugs above (unit tests can't catch them
+— each unit is individually correct; the bug is the round-trip).
 
 ### 2d. Mini-app validation on write — ⚠️
 `mini-app-runtime/compile.ts` (sucrase) exists and is used by the renderer.
@@ -117,6 +173,23 @@ error, return the line/col so the agent self-corrects (backend parity). ~40 LOC.
 ---
 
 ## 3. Chat + canvas feature inventory → phase
+
+### Backend-only AI affordances — DISABLED on local (temporary)
+These call `/tools/*` and would fail on `/local`, so they're **gated off** via
+`useIsLocalBoard()` until ported to the in-browser engine:
+- **Answer-card transforms** — Notify / Mapify / Schemify (`response-actions.tsx`
+  → `SaveAsNote` → `useConvertToMindMap`).
+- **Canvas context-menu AI section** — summarize / mapify / schemify / quizify /
+  drawify / explain / translate (`canvas-context-menu.tsx` →
+  `useAiSparkActions`). Position + Export stay enabled (local-safe).
+
+**Port plan (deferred, ~Phase D "transforms"):** the core mindmap/diagram
+*building* is already covered by the main agent + `learn_generate_diagram` skill;
+these are *post-hoc answer→artifact* transforms. Port the deterministic ones
+(Mapify/Schemify/Summify) as local structured-output calls reusing the
+(now bidirectional) `autoLayout` + `apply-mindmap` pipeline; Notify = a single
+`write_note(sheet)`; Quizify → the mini-app skill; Drawify ≈ Mapify. Re-enable
+each as it lands. `describe_board` (board auto-label) → Phase C.
 
 ### Chat UI — mostly ✅
 Conversation, input bar, user/assistant renderers, reasoning-step + tool-call

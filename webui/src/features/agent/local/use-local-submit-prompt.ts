@@ -1,6 +1,7 @@
 import { useCallback } from "react"
 import { generateUuid, trimText } from "@/lib/common"
 import { getCanvasStoreRef } from "@/features/board/harness/canvas-store-ref"
+import { arrangeCreatedNodes } from "@/features/board/harness/agent/arrange-created-nodes"
 import { runAgent } from "@/features/agent/engine/agent-loop"
 import { ByokLlmClient } from "@/features/agent/engine/byok-client"
 import { agentBuildTools } from "@/features/agent/engine/tools"
@@ -52,8 +53,11 @@ export function useLocalSubmitPrompt(boardId: string) {
       // so the agent remembers the conversation.
       const history = toLlmHistory(useLocalMessagesStore.getState().messages)
 
+      // Stamp creation time (mirrors backend Message.created_at) so the UI
+      // shows a real timestamp instead of "Pending…".
+      const createdAt = new Date().toISOString()
       const assistantId = mintId()
-      const userMessage: ChatMessage = { id: mintId(), role: "user", content: { markdown: prompt }, chatUid, properties: {} }
+      const userMessage: ChatMessage = { id: mintId(), role: "user", content: { markdown: prompt }, chatUid, properties: {}, createdAt }
       const base: ChatMessage = {
         id: assistantId,
         role: "assistant",
@@ -61,6 +65,7 @@ export function useLocalSubmitPrompt(boardId: string) {
         chatUid,
         properties: { reasoning: { type: "reasoning", reasoning: [] } },
         streaming: true,
+        createdAt,
       }
 
       setMessages([...useLocalMessagesStore.getState().messages, userMessage, base])
@@ -86,14 +91,25 @@ export function useLocalSubmitPrompt(boardId: string) {
         })
       }
 
+      const createdNodeIds: string[] = []
       try {
         const llm = ByokLlmClient.fromConfig(config)
         const system = planSystemPrompt(new Date().toLocaleString())
         for await (const ev of runAgent({ system, userMessage: prompt, history, tools: AGENT_TOOLS, llm, ctx: { store } })) {
           events.push(ev)
+          // Track notes created this turn so we can arrange them afterward.
+          if (
+            ev.type === "tool_result" &&
+            (ev.toolName === "write_note" || ev.toolName === "create_note") &&
+            ev.result && typeof ev.result === "object" && "id" in ev.result
+          ) {
+            createdNodeIds.push(String((ev.result as { id: unknown }).id))
+          }
           render(true)
         }
         render(false)
+        // Post-turn arrange (frontend analog of backend rearrange_created_notes).
+        await arrangeCreatedNodes(store, createdNodeIds)
       } catch (e) {
         agentLog.error("runAgent", e)
         // Mark it as an error so it doesn't read like a normal answer.
@@ -101,6 +117,8 @@ export function useLocalSubmitPrompt(boardId: string) {
         render(false)
       } finally {
         await persist(label)
+        const { chatUid: savedUid, messages } = useLocalMessagesStore.getState()
+        agentLog.turnDone(savedUid, messages.length)
       }
     },
     [asConfig, setMessages, setChatUid, persist, boardId],

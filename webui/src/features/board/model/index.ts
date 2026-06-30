@@ -82,6 +82,14 @@ export type DimNodeData = {
   props?: Record<string, DataProperty>
   meta: SyncMeta
 
+  /**
+   * Source-of-truth colors as picked (theme-independent). The display
+   * `node.style.{bg,stroke,text}` is projected from these per theme mode;
+   * keeping the canonical triplet here lets a theme flip re-project without
+   * corrupting stored colors. Mirrors `NoteNodeData._storedColors`.
+   */
+  _storedColors?: { backgroundColor?: string; strokeColor?: string; textColor?: string }
+
   // type-specific (flat — read by the library for built-in types)
   src?: string //         image / icon source
   naturalW?: number //    image

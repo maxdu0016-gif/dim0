@@ -34,7 +34,10 @@ interface Dim0DB extends DBSchema {
   boards: { key: string; value: BoardMeta }
   views: { key: string; value: BoardView }
   chats: { key: string; value: ChatRecord; indexes: { "by-board": string } }
-  chat_messages: { key: [string, string]; value: ChatMessage }
+  // `order` records insertion order — message ids don't sort to conversation
+  // order (assistant is minted before user; counter sorts lexically), so reads
+  // must sort by this, not by the key.
+  chat_messages: { key: [string, string]; value: ChatMessage & { order?: number } }
 }
 
 

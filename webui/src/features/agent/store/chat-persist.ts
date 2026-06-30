@@ -7,11 +7,16 @@ const chatRange = (chatUid: string): IDBKeyRange =>
   IDBKeyRange.bound([chatUid, ""], [chatUid, "￿"])
 
 
-/** Load a chat's persisted messages from IndexedDB (mirrors backend `get_messages`). */
+/**
+ * Load a chat's persisted messages in conversation order. `getAll` returns
+ * key order ([chatUid, id]), which is NOT insertion order — so we sort by the
+ * stored `order` index. Mirrors backend `get_messages`.
+ */
 export const loadMessages = async (chatUid: string): Promise<ChatMessage[]> => {
   const db = await openDim0Db()
   try {
-    return await db.getAll("chat_messages", chatRange(chatUid))
+    const rows = await db.getAll("chat_messages", chatRange(chatUid))
+    return rows.sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
   } finally {
     db.close()
   }
@@ -33,8 +38,9 @@ export const saveMessages = async (
   try {
     const tx = db.transaction(["chat_messages", "chats"], "readwrite")
     await tx.objectStore("chat_messages").delete(chatRange(chatUid))
-    for (const m of messages) {
-      await tx.objectStore("chat_messages").put({ ...m, chatUid })
+    // Stamp insertion order so reads restore conversation order (not key order).
+    for (let i = 0; i < messages.length; i += 1) {
+      await tx.objectStore("chat_messages").put({ ...messages[i], chatUid, order: i })
     }
     // Preserve an existing label when none is supplied this save.
     const prev = await tx.objectStore("chats").get(chatUid)

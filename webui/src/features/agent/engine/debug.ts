@@ -108,6 +108,11 @@ export const agentLog = {
     record("error", { where, error: serializeError(err) })
     if (enabled) console.error(`[agent] ✗ ${where}`, err)
   },
+
+  turnDone(chatUid: string | null, persistedCount: number): void {
+    record("turn_done", { chatUid, persistedCount })
+    if (enabled) console.log(`%c[agent] ✓ turn done · persisted ${persistedCount} msgs · chat ${chatUid ?? "(none)"}`, "color:#22c55e")
+  },
 }
 
 

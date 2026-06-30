@@ -8,7 +8,44 @@
 import { asEdgeId, asNodeId } from "@canvas-harness/core"
 import type { Node } from "@canvas-harness/core"
 import type { DimEdgeData, DimNodeData } from "@/features/board/model"
+import { pickRandomColorOfShade } from "@/features/board/lib/colors/tailwind"
 import type { Tool } from "./types"
+import { estimateNoteSize } from "./note-size"
+
+
+/**
+ * A random Tailwind-200 fill per note (mirrors the backend's
+ * `random.choice(TAILWIND_200_ADAPTED)` in notes/service.py). Stored as
+ * `_storedColors` so the harness theme hooks project the display style for the
+ * current mode — without this, agent notes render with the lib's non-theme-aware
+ * default (always light). Black text reads on every light-200 swatch; the dark
+ * variant is derived on theme flip.
+ */
+const randomNoteColors = (): DimNodeData["_storedColors"] => ({
+  backgroundColor: pickRandomColorOfShade(200)?.hex ?? "#dbeafe",
+  strokeColor: "#00000000",
+  textColor: "#000000",
+})
+
+
+// Default box size per canvas node type (mirrors backend get_default_note_size).
+const DEFAULT_SIZE: Record<string, { w: number; h: number }> = {
+  rect: { w: 320, h: 180 },
+  ellipse: { w: 320, h: 320 },
+  diamond: { w: 340, h: 340 },
+  sheet: { w: 440, h: 440 },
+  "mini-app": { w: 720, h: 440 },
+  widget: { w: 480, h: 320 },
+  "code-sandbox": { w: 560, h: 360 },
+}
+
+
+/** Content-fit size for a note, falling back to the type's default box. */
+const noteGeometry = (nodeType: string, content: string): { w: number; h: number } => {
+  const base = DEFAULT_SIZE[nodeType] ?? { w: 320, h: 180 }
+  const fitted = estimateNoteSize(nodeType, base.w, content)
+  return fitted ? { w: fitted.width, h: fitted.height } : base
+}
 
 
 /** Fresh SyncMeta stamp for a created/updated entity. */
@@ -51,18 +88,20 @@ export const createNote: Tool = {
   },
   async run(args, ctx) {
     const id = asNodeId(str(args.id) || ctx.store.generateId())
+    const body = str(args.body)
+    const { w, h } = noteGeometry("rect", body)
     ctx.store.batch(() => {
       ctx.store.addNode({
         id,
         type: "rect",
         x: num(args.x),
         y: num(args.y),
-        w: 240,
-        h: 120,
+        w,
+        h,
         angle: 0,
         groups: [],
-        content: str(args.body),
-        data: { label: str(args.title), meta: meta() } satisfies DimNodeData,
+        content: body,
+        data: { label: str(args.title), meta: meta(), _storedColors: randomNoteColors() } satisfies DimNodeData,
       })
     })
     return { id: String(id) }
@@ -103,11 +142,21 @@ export const linkNotes: Tool = {
   },
   async run(args, ctx) {
     const id = asEdgeId(ctx.store.generateId())
+    const sourceId = asNodeId(str(args.sourceId))
+    const targetId = asNodeId(str(args.targetId))
+    // Attach at each node's CENTER (local frame is from top-left). canvas-harness
+    // auto-clips the center→center line to each node's border, so the endpoint
+    // lands at the border facing the peer — the backend's _edge_anchor_offset,
+    // for free, and it re-clips live as `arrangeCreatedNodes` moves the nodes.
+    const center = (nodeId: typeof sourceId): { x: number; y: number } => {
+      const node = ctx.store.getNode(nodeId)
+      return node ? { x: node.w / 2, y: node.h / 2 } : { x: 0, y: 0 }
+    }
     ctx.store.batch(() => {
       ctx.store.addEdge({
         id,
-        source: { nodeId: asNodeId(str(args.sourceId)), localOffset: { x: 0, y: 0 } },
-        target: { nodeId: asNodeId(str(args.targetId)), localOffset: { x: 0, y: 0 } },
+        source: { nodeId: sourceId, localOffset: center(sourceId) },
+        target: { nodeId: targetId, localOffset: center(targetId) },
         pathStyle: "bezier",
         groups: [],
         data: { label: str(args.label) || undefined, meta: meta() } satisfies DimEdgeData,
@@ -152,18 +201,20 @@ export const writeNote: Tool = {
     }
 
     const id = asNodeId(existingId || ctx.store.generateId())
+    const content = str(args.content)
+    const { w, h } = noteGeometry(nodeType, content)
     ctx.store.batch(() => {
       ctx.store.addNode({
         id,
         type: nodeType,
         x: 0,
         y: 0,
-        w: 240,
-        h: 120,
+        w,
+        h,
         angle: 0,
         groups: [],
-        content: str(args.content),
-        data: { label: str(args.label), meta: meta() } satisfies DimNodeData,
+        content,
+        data: { label: str(args.label), meta: meta(), _storedColors: randomNoteColors() } satisfies DimNodeData,
       })
     })
     return { id: String(id) }

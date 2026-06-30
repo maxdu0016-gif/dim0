@@ -27,6 +27,7 @@ import {
 } from "@/components/icons"
 import { buildContextTextFromNodes } from "@/features/board/utils/context-text"
 import { useAiSparkActions } from "@/features/board/hooks/use-ai-spark-actions"
+import { useIsLocalBoard } from "@/features/board/lib/use-is-local-board"
 import { useBoardAppStore } from "../store/board-app-store"
 import { nodeToNote } from "../convert/node-to-note"
 import type { NoteNode } from "@/features/board/types/flow"
@@ -104,6 +105,8 @@ const buildSelectedContextText = (
  */
 export function CanvasContextMenu({ wrapRef, store, rendererRef }: CanvasContextMenuProps) {
   const boardId = useBoardAppStore((s) => s.boardId)
+  // AI Spark / Translate are backend-only — hidden on local boards for now.
+  const isLocal = useIsLocalBoard()
   const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null)
   const [aiOpen, setAiOpen] = useState(false)
   const [translateOpen, setTranslateOpen] = useState(false)
@@ -336,6 +339,7 @@ export function CanvasContextMenu({ wrapRef, store, rendererRef }: CanvasContext
         onClick={handleExportSvg}
       />
 
+      {!isLocal && (<>
       <Divider />
       <button
         type="button"
@@ -420,6 +424,7 @@ export function CanvasContextMenu({ wrapRef, store, rendererRef }: CanvasContext
           )}
         </div>
       )}
+      </>)}
     </div>
   )
 }
