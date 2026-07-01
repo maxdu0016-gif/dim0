@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
-import { resetIdb } from "@/test/canvas"
-import { IndexedDbEngine } from "@/features/board/persist/local/indexeddb-engine"
+import { engineCases } from "@/test/engines"
+import type { StorageEngine } from "@/features/board/persist/local/engine"
 import type { ChatMessage } from "@/features/agent/types/chat"
 import { ChatRepo } from "./chat-repo"
 
@@ -14,23 +14,22 @@ const msg = (id: string, text: string, chatUid = "c1"): ChatMessage => ({
 })
 
 
-let engine: IndexedDbEngine
-let repo: ChatRepo
+// Run the full ChatRepo suite against every StorageEngine — proves it's engine-agnostic.
+for (const { label, make } of engineCases) describe(`ChatRepo (${label})`, () => {
+  let engine: StorageEngine
+  let repo: ChatRepo
 
 
-beforeEach(async () => {
-  resetIdb()
-  engine = await IndexedDbEngine.open()
-  repo = new ChatRepo(engine)
-})
+  beforeEach(async () => {
+    engine = await make()
+    repo = new ChatRepo(engine)
+  })
 
 
-afterEach(() => {
-  engine.close()
-})
+  afterEach(() => {
+    engine.close()
+  })
 
-
-describe("ChatRepo", () => {
   it("round-trips a transcript in conversation (insertion) order, not key order", async () => {
     // ids chosen so key order ("aaa" < "zzz") differs from insertion order.
     await repo.saveTranscript("c1", "b1", [msg("zzz", "first"), msg("aaa", "second")])

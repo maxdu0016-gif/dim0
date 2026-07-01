@@ -1,26 +1,25 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
-import { resetIdb } from "@/test/canvas"
-import { IndexedDbEngine } from "@/features/board/persist/local/indexeddb-engine"
+import { engineCases } from "@/test/engines"
+import type { StorageEngine } from "@/features/board/persist/local/engine"
 import { MiniAppRepo } from "./mini-app-repo"
 
 
-let engine: IndexedDbEngine
-let repo: MiniAppRepo
+// Run the full MiniAppRepo suite against every StorageEngine.
+for (const { label, make } of engineCases) describe(`MiniAppRepo (${label})`, () => {
+  let engine: StorageEngine
+  let repo: MiniAppRepo
 
 
-beforeEach(async () => {
-  resetIdb()
-  engine = await IndexedDbEngine.open()
-  repo = new MiniAppRepo(engine)
-})
+  beforeEach(async () => {
+    engine = await make()
+    repo = new MiniAppRepo(engine)
+  })
 
 
-afterEach(() => {
-  engine.close()
-})
+  afterEach(() => {
+    engine.close()
+  })
 
-
-describe("MiniAppRepo", () => {
   it("round-trips per-note state", async () => {
     await repo.putState("n1", { count: 3 })
     expect(await repo.getState("n1")).toEqual({ count: 3 })

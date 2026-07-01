@@ -17,6 +17,7 @@ import type { DBSchema, IDBPDatabase } from "idb"
 import type { OpBatch } from "@canvas-harness/core"
 import type { LocalChat, LocalMessage } from "@/features/agent/types/chat"
 import type { BoardContent, BoardMeta, BoardView } from "@/features/board/model"
+import { COLLECTIONS } from "./schema"
 
 
 export type SnapshotRecord = { content: BoardContent; seq: number }
@@ -47,21 +48,37 @@ const DB_NAME = "dim0"
 const DB_VERSION = 4
 
 
+// Minimal loose shapes for the upgrade loop (see the cast note in `upgrade`).
+type UpgradeStore = {
+  indexNames: DOMStringList
+  createIndex: (name: string, keyPath: string | string[]) => unknown
+}
+type UpgradeDb = {
+  objectStoreNames: DOMStringList
+  createObjectStore: (name: string, options?: { keyPath?: string | string[] }) => UpgradeStore
+}
+type UpgradeTx = { objectStore: (name: string) => UpgradeStore }
+
+
 /** Open (creating/upgrading) the dim0 database. `name` is overridable for tests. */
 export const openDim0Db = (name: string = DB_NAME): Promise<Dim0Database> =>
   openDB<Dim0DB>(name, DB_VERSION, {
-    // Idempotent: creates whatever's missing, so fresh installs and upgrades
-    // (v1→ adds chat stores, v2→ adds the chats by-board index) converge.
+    // Idempotent: derives every store + index from the shared `COLLECTIONS`
+    // descriptor and creates whatever's missing, so fresh installs and upgrades
+    // converge on the same schema (the single source of truth in `schema.ts`).
     upgrade(db, _oldVersion, _newVersion, tx) {
-      if (!db.objectStoreNames.contains("snapshots")) db.createObjectStore("snapshots")
-      if (!db.objectStoreNames.contains("oplog")) db.createObjectStore("oplog", { keyPath: ["boardId", "seq"] })
-      if (!db.objectStoreNames.contains("boards")) db.createObjectStore("boards", { keyPath: "id" })
-      if (!db.objectStoreNames.contains("views")) db.createObjectStore("views")
-      const chats = db.objectStoreNames.contains("chats")
-        ? tx.objectStore("chats")
-        : db.createObjectStore("chats", { keyPath: "id" })
-      if (!chats.indexNames.contains("by-board")) chats.createIndex("by-board", "boardId")
-      if (!db.objectStoreNames.contains("chat_messages")) db.createObjectStore("chat_messages", { keyPath: ["chatUid", "id"] })
-      if (!db.objectStoreNames.contains("mini_app_state")) db.createObjectStore("mini_app_state", { keyPath: "noteId" })
+      // Loose handles: the descriptor is keyed by a union of store names, which
+      // collapses idb's per-store generics to `never`. `COLLECTIONS` is the typed
+      // source of truth; here we just drive store/index creation from it.
+      const rawDb = db as unknown as UpgradeDb
+      const rawTx = tx as unknown as UpgradeTx
+      for (const [name, spec] of Object.entries(COLLECTIONS)) {
+        const store = rawDb.objectStoreNames.contains(name)
+          ? rawTx.objectStore(name)
+          : rawDb.createObjectStore(name, spec.keyPath !== null ? { keyPath: spec.keyPath } : undefined)
+        for (const [indexName, field] of Object.entries(spec.indexes ?? {})) {
+          if (!store.indexNames.contains(indexName)) store.createIndex(indexName, field)
+        }
+      }
     },
   })
