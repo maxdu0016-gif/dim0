@@ -13,9 +13,12 @@ import { getBoardThemeMode } from "@/features/board/harness/theme/theme-mode-ref
 
 
 /**
- * Hydrate an empty store with persisted content — the local analog of the
- * backend `hydrateBoardStore`. Applied as one `remote` batch so it skips the
- * undo stack and (if persistence attaches afterward) isn't re-persisted.
+ * Replace the store's contents with persisted content — the local analog of the
+ * backend `hydrateBoardStore` "replace" mode. Existing nodes/edges are cleared
+ * and the new set applied as ONE `remote` batch, so it skips the undo stack and
+ * (if persistence attaches afterward) isn't re-persisted; `clearHistory` then
+ * makes the (re)load non-undoable. Replace semantics are what make a layer
+ * SWITCH safe: the old layer is removed before the new one is projected.
  *
  * Re-projects each node/edge's display colors from its canonical
  * `_storedColors` for the CURRENT theme mode — the local analog of what
@@ -37,6 +40,11 @@ export const applyContentToStore = (
   const scoped = rootId === undefined ? content : filterContentByLayer(content, rootId)
   const mode = getBoardThemeMode()
   const ops: Op[] = []
+
+  // Clear the current scene first (edges before nodes — a batched `node.remove`
+  // doesn't cascade incident edges the way imperative `removeNode` does).
+  for (const edge of store.getAllEdges()) ops.push({ type: "edge.remove", edge })
+  for (const node of store.getAllNodes()) ops.push({ type: "node.remove", node })
 
   for (const group of scoped.groups) ops.push({ type: "group.upsert", group })
 
@@ -64,6 +72,7 @@ export const applyContentToStore = (
       ops,
     })
   }
+  store.clearHistory()
   if (scoped.frameOrder && scoped.frameOrder.length > 0) {
     store.setFrameOrder(scoped.frameOrder)
   }
