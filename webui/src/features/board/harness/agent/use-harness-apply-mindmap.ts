@@ -137,7 +137,7 @@ const stagedEdgeToLink = (
   rootId: string | null,
   boardId: string,
 ): Link | null => {
-  const data = edge.data as Link | undefined
+  const data = edge.data
   if (!data) return null
   return {
     ...data,

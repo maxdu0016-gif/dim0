@@ -6,7 +6,6 @@ import type {
   EditNoteOutput,
   WriteNoteOutput,
   WebSearchOutput,
-  MemorySearchOutput,
   ToolOutput,
   Annotation,
   UrlAnnotation
@@ -41,11 +40,11 @@ type BuildResponseOptions = {
  */
 const makeToolOutput = (acc: StepAccum): ToolOutput => {
   if (acc.name === "web_search") {
-    const urls = acc.annotations.filter(a => a.type === "url") as WebSearchOutput["searchResults"]
+    const urls = acc.annotations.filter(a => a.type === "url")
     return { type: "web_search", answer: "", searchResults: urls }
   }
   if (acc.name === "memory_search") {
-    const refs = acc.annotations.filter(a => a.type === "reference") as MemorySearchOutput["references"]
+    const refs = acc.annotations.filter(a => a.type === "reference")
     return { type: "memory_search", answer: "", references: refs }
   }
   if (acc.name === "code_interpreter") {

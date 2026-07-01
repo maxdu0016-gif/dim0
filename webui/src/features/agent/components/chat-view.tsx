@@ -168,7 +168,7 @@ const ChatBody = ({
   enableSelectionContext = false,
   autoCreateBoard = false,
 }: ChatProps) => {
-  const { chatId, setChatId, local } = useChat()
+  const { setChatId, local } = useChat()
   const userId = useAppStore(s => s.userId)
   const activeChatId = useActiveChatId()
   const selectLocalChat = useLocalMessagesStore(s => s.selectChat)
@@ -212,7 +212,7 @@ const ChatBody = ({
     // Stay on whatever board-family path we're on (board, sheet, code,
     // widget) — `to: "."` keeps the current pathname so an active surface
     // panel isn't closed when the chat changes. We only swap the search.
-    navigate({
+    void navigate({
       to: ".",
       search: (prev: Record<string, unknown>) => ({
         ...prev,
@@ -235,7 +235,7 @@ const ChatBody = ({
     }
 
     if (routerLocation.pathname?.startsWith("/chats/")) {
-      navigate({ to: "/chats" })
+      void navigate({ to: "/chats" })
     }
   }
 

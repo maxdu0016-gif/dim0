@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it } from "vitest"
 import fc from "fast-check"
 import { asNodeId } from "@canvas-harness/core"
 import type { OpBatch } from "@canvas-harness/core"
-import type { DimNodeData } from "@/features/board/model"
 import { addEdge, addNode, comparable, freshStore, resetIdb } from "@/test/canvas"
 import { BoardPersistence } from "./board-persistence"
 import { contentToScene, readContent } from "./codec"
@@ -33,7 +32,7 @@ describe("BoardPersistence", () => {
 
     const content = await p.load()
     expect(content.nodes.map((n) => n.id)).toContain("n1")
-    expect((content.nodes[0]?.data as DimNodeData | undefined)?.label).toBe("hello")
+    expect((content.nodes[0]?.data)?.label).toBe("hello")
     p.close()
   })
 
@@ -163,12 +162,12 @@ describe("BoardPersistence", () => {
             addNode(store, id, a.label)
             ids.push(id)
           } else if (a.kind === "addEdge" && ids.length >= 2) {
-            addEdge(store, `e${edgeCounter++}`, ids[a.s % ids.length]!, ids[a.t % ids.length]!)
+            addEdge(store, `e${edgeCounter++}`, ids[a.s % ids.length], ids[a.t % ids.length])
           } else if (a.kind === "update" && ids.length > 0) {
-            store.updateNode(asNodeId(ids[a.idx % ids.length]!), { x: a.x })
+            store.updateNode(asNodeId(ids[a.idx % ids.length]), { x: a.x })
           } else if (a.kind === "remove" && ids.length > 0) {
             const i = a.idx % ids.length
-            store.removeNode(asNodeId(ids[i]!))
+            store.removeNode(asNodeId(ids[i]))
             ids.splice(i, 1)
           } else if (a.kind === "reload") {
             await p.flush()

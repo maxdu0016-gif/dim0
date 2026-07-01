@@ -94,7 +94,7 @@ export const stepsFromEvents = (events: AgentEvent[], boardId: string): Reasonin
 /** The latest assistant text across the event stream (the answer body), if any. */
 export const latestAssistantText = (events: AgentEvent[]): string => {
   for (let i = events.length - 1; i >= 0; i -= 1) {
-    const ev = events[i]!
+    const ev = events[i]
     if (ev.type === "assistant_text") return ev.text
   }
   return ""

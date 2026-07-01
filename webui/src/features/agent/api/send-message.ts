@@ -278,7 +278,7 @@ export const useSendMessage = () => {
               && router.state.location.pathname.startsWith(`/boards/${activeBoardId}`)
             ) {
               const centerIds = createdNoteIds.join(",")
-              navigate({
+              void navigate({
                 to: "/boards/$id",
                 params: { id: activeBoardId },
                 replace: true,

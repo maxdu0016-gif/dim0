@@ -84,7 +84,7 @@ export const SaveAsNote = ({
    * Navigate to a board, preserving the current subfolder context when present.
    */
   const goToBoard = (targetBoardId: string) => {
-    navigate({
+    void navigate({
       to: '/boards/$id',
       params: { id: targetBoardId },
       search: rootId

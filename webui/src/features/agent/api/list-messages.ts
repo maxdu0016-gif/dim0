@@ -2,7 +2,7 @@ import camelcaseKeys from "camelcase-keys"
 import type { ChatMessage, MessageRole } from "../types/chat"
 import { useQuery } from "@tanstack/react-query"
 import { apiFetch } from "@/api"
-import { normalizeReasoningSteps, type ReasoningStep, type ToolExecutionState, type ToolName } from "../types/stream"
+import { normalizeReasoningSteps, type ToolExecutionState, type ToolName } from "../types/stream"
 import type { ToolOutput } from "../types/tool-outputs"
 import { trimReasoningSteps } from "../utils/annotations"
 
@@ -73,7 +73,7 @@ export async function listMessages(
       normalized.properties.reasoning = {
         type: "reasoning",
         reasoning: normalizeReasoningSteps(
-          normalized.properties.reasoning.reasoning as ReasoningStep[]
+          normalized.properties.reasoning.reasoning
         ),
       }
     }

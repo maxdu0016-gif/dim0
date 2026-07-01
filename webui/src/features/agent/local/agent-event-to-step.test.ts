@@ -14,7 +14,7 @@ describe("stepsFromEvents", () => {
     const steps = stepsFromEvents(events, "board-1")
 
     expect(steps).toHaveLength(2)
-    const tool = steps[0]!
+    const tool = steps[0]
     expect(tool.type).toBe("tool_call")
     if (tool.type === "tool_call") {
       expect(tool.name).toBe("create_note")
@@ -34,8 +34,8 @@ describe("stepsFromEvents", () => {
     ]
     const steps = stepsFromEvents(events, "b")
 
-    const edit = steps[0]!
-    const link = steps[1]!
+    const edit = steps[0]
+    const link = steps[1]
     expect(edit.type === "tool_call" && edit.name).toBe("edit_note")
     if (edit.type === "tool_call") expect(edit.output).toMatchObject({ type: "edit_note", noteId: "n1", label: "B" })
     expect(link.type === "tool_call" && link.name).toBe("link_notes")

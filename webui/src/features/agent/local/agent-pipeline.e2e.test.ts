@@ -85,7 +85,7 @@ describe("local agent pipeline (turn → tools → arrange → persist → reloa
     const node = reloaded.getNode(asNodeId("root"))!
     const stored = (node.data as { _storedColors?: { backgroundColor?: string } })._storedColors
     expect(stored?.backgroundColor).toMatch(/^#/) // canonical light color preserved
-    expect(node.style?.backgroundColor).toBe(darkModeDisplayHex(stored!.backgroundColor!) ?? stored!.backgroundColor)
+    expect(node.style?.backgroundColor).toBe(darkModeDisplayHex(stored!.backgroundColor) ?? stored!.backgroundColor)
 
     // --- messages reload in conversation order (user before assistant) ---
     expect(messages.map((m) => m.role)).toEqual(["user", "assistant"])

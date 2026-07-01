@@ -353,7 +353,7 @@ export const InputBar = ({
             <Button
               onClick={() => {
                 setLimitDialogCopy(null)
-                navigate({ to: SettingsBillingUrl })
+                void navigate({ to: SettingsBillingUrl })
               }}
             >
               Upgrade

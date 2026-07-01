@@ -154,7 +154,7 @@ export class BoardPersistence {
       "oplog",
       IDBKeyRange.bound([this.boardId, baseSeq], [this.boardId, Number.MAX_SAFE_INTEGER], true, false),
     )
-    const seq = records.length > 0 ? records[records.length - 1]!.seq : baseSeq
+    const seq = records.length > 0 ? records[records.length - 1].seq : baseSeq
     if (records.length === 0) return { content: base, seq }
     const store = createCanvasStore({ initial: contentToScene(base) })
     for (const r of records) {

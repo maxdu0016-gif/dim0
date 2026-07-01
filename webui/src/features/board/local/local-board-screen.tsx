@@ -18,7 +18,7 @@ import { requestPersistentStorage } from "@/features/board/persist/local/persist
  * chat sheet (reused `<Chat>`: history, transcript, docked input).
  */
 export function LocalBoardScreen() {
-  const params = useParams({ strict: false }) as { boardId?: string }
+  const params = useParams({ strict: false })
   const boardId = params.boardId ?? ""
   const setBoardScope = useBoardAppStore((s) => s.setBoardScope)
   const configured = useByokStore((s) => s.configured)
