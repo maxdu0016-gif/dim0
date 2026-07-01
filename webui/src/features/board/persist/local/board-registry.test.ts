@@ -95,6 +95,22 @@ for (const { label, make } of engineCases) describe(`BoardRegistry (${label})`, 
     expect("camera" in content).toBe(false)
     expect("selection" in content).toBe(false)
   })
+
+
+  it("setThumbnail stores a data URL on the board", async () => {
+    const reg = new BoardRegistry({ engine })
+    const board = newLocalBoard("Pic", 1000)
+    await reg.createBoard(board)
+    await reg.setThumbnail(board.id, "data:image/png;base64,AAAA")
+    expect((await reg.getBoard(board.id))?.thumbnail).toBe("data:image/png;base64,AAAA")
+  })
+
+
+  it("setThumbnail is a no-op for a missing board", async () => {
+    const reg = new BoardRegistry({ engine })
+    await reg.setThumbnail("ghost", "data:image/png;base64,AAAA")
+    expect(await reg.getBoard("ghost")).toBeUndefined()
+  })
 })
 
 

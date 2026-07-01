@@ -109,8 +109,15 @@ function LocalBoardCard({
         <CancelPlainIcon className="size-3.5" strokeWidth={2} />
       </button>
 
-      {/* Local boards have no thumbnail (capture is disabled offline). */}
-      <div className="w-full h-40 bg-transparent rounded-md" />
+      {board.thumbnail ? (
+        <img
+          src={board.thumbnail}
+          alt={board.title || UNTITLED_LABEL}
+          className="w-full h-40 object-cover rounded-md"
+        />
+      ) : (
+        <div className="w-full h-40 bg-transparent rounded-md" />
+      )}
 
       <div className="p-2 w-full overflow-ellipsis">
         {editing ? (

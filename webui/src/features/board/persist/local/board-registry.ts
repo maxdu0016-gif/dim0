@@ -84,6 +84,15 @@ export class BoardRegistry {
   }
 
 
+  /** Store a board's thumbnail (a data URL). No-op if the board doesn't exist. */
+  async setThumbnail(id: string, thumbnail: string, now: number = Date.now()): Promise<void> {
+    const engine = this.requireEngine()
+    const existing = await engine.get<BoardMeta>("boards", id)
+    if (!existing) return
+    await engine.put("boards", { ...existing, thumbnail, updatedAt: now })
+  }
+
+
   /** Delete a board and ALL its data (meta + view + content + chats + messages) atomically. */
   async deleteBoard(id: string): Promise<void> {
     await this.requireEngine().tx(BOARD_COLLECTIONS, async (t) => {

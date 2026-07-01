@@ -44,6 +44,7 @@ import { hydrateBoardStore } from "../persist/snapshot-load"
 import { BoardPersistence } from "@/features/board/persist/local/board-persistence"
 import { applyContentToStore } from "@/features/board/persist/local/apply-content"
 import { getLocalStores } from "@/features/local-stores"
+import { saveLocalThumbnail } from "@/features/board/local/save-local-thumbnail"
 import { ShareButton } from "@/features/sharing/share-button"
 import { useBoardAppStore } from "../store/board-app-store"
 import { createBoardStore } from "../store/create-board-store"
@@ -156,7 +157,15 @@ export function HarnessCanvas({ local = false }: { local?: boolean } = {}) {
   useHarnessApplyMindMap(store, boardId, rootId)
   useHydrateIconNodes(store, boardId, rootId, ready)
   useThemeColorProjection(store, ready)
-  useThumbnailCapture(store, boardId, ready && !local, theme.minimap)
+  // Local boards store the thumbnail in IndexedDB; capture only at the root
+  // layer so the dashboard shows the top-level board, not a sub-board.
+  useThumbnailCapture(
+    store,
+    boardId,
+    ready && (!local || !rootId),
+    theme.minimap,
+    local ? saveLocalThumbnail : undefined,
+  )
   usePresentationMode(store, wrapRef, rendererRef)
 
   // Collab is the only edit path (collab-archi §1). The WS adapter is
