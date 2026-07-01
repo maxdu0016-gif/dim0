@@ -7,6 +7,7 @@ import { useByokStore } from "@/features/agent/byok/byok-store"
 import { useLocalMessagesStore } from "@/features/agent/store/local-messages-store"
 import { HarnessCanvas } from "@/features/board/harness/canvas"
 import { LocalFolderBreadcrumb } from "@/features/board/local/local-folder-breadcrumb"
+import { NotesSearchDialog } from "@/features/board/local/notes-search-dialog"
 import { useBoardAppStore } from "@/features/board/harness/store/board-app-store"
 import { FloatingAssistant } from "@/features/board/components/flow/floating-assistant/floating-assistant"
 import { requestPersistentStorage } from "@/features/board/persist/local/persist-storage"
@@ -48,6 +49,8 @@ export function LocalBoardScreen() {
         <HarnessCanvas local />
 
         <LocalFolderBreadcrumb boardId={boardId} rootId={rootId ?? null} />
+
+        <NotesSearchDialog boardId={boardId} />
 
         {/* Island composes turns; hidden while the full sheet is open (parity with online). */}
         {!sheetOpen && configured && (
