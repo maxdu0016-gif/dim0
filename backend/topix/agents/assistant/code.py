@@ -269,6 +269,10 @@ async def run_code(
     The tool executes one short-lived Python run, captures stdout/stderr, and always
     attempts sandbox cleanup after execution. Use explicit ``print(...)`` statements
     in the provided code because bare final expressions are not auto-displayed.
+
+    Args:
+        code: The Python source to execute; use print(...) to surface any output.
+
     """
     return await execute_python_code(code)
 
