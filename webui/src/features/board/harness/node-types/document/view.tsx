@@ -1,6 +1,7 @@
 import { FilePdf, File as FileIcon, Clock, CheckCircle, Warning } from "@phosphor-icons/react"
 import { type NodeId } from "@canvas-harness/core"
 import { useCanvasStore, useNode } from "@canvas-harness/react"
+import { removeNodeSubtree } from "@/features/board/harness/graph/subtree"
 import { cn } from "@/lib/utils"
 import type { NoteNodeData } from "../../convert/note-to-node"
 import { NodeTitleCaption, NodeTrafficLights } from "../../shared-views"
@@ -47,7 +48,7 @@ export function DocumentView({ id }: DocumentViewProps) {
   return (
     <div className="pointer-events-none relative h-full w-full select-none">
       <NodeTrafficLights
-        onDelete={canEdit ? () => store.removeNode(id) : undefined}
+        onDelete={canEdit ? () => removeNodeSubtree(store, id) : undefined}
       />
 
       <div
