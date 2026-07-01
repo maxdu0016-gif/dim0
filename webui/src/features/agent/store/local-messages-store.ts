@@ -1,6 +1,5 @@
 import { create } from "zustand"
-import type { ChatMessage } from "@/features/agent/types/chat"
-import type { ChatRecord } from "@/features/board/persist/local/idb"
+import type { ChatMessage, LocalChat } from "@/features/agent/types/chat"
 import { listLocalChats, loadMessages, saveMessages } from "./chat-persist"
 
 
@@ -10,7 +9,7 @@ type LocalMessagesState = {
   chatUid: string | null
   messages: ChatMessage[]
   /** The board's chats, most-recent first (drives the history list). */
-  chats: ChatRecord[]
+  chats: LocalChat[]
   /** Open a board: load its chat list and select the most recent (or a fresh chat). */
   openBoard: (boardId: string) => Promise<void>
   /** Switch to an existing chat and load its transcript. */

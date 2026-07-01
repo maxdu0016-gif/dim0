@@ -1,64 +1,41 @@
-import { openDim0Db, type ChatRecord } from "@/features/board/persist/local/idb"
-import type { ChatMessage } from "@/features/agent/types/chat"
-
-
-// All messages for a chat: compound key [chatUid, id], so this range spans them.
-const chatRange = (chatUid: string): IDBKeyRange =>
-  IDBKeyRange.bound([chatUid, ""], [chatUid, "￿"])
-
-
 /**
- * Load a chat's persisted messages in conversation order. `getAll` returns
- * key order ([chatUid, id]), which is NOT insertion order — so we sort by the
- * stored `order` index. Mirrors backend `get_messages`.
+ * Functional chat-persistence helpers — thin wrappers over `ChatRepo`.
+ *
+ * These keep the existing call sites stable while the storage logic lives in the
+ * repo. Each call opens a short-lived engine; the composition root (D.0 step 4)
+ * will replace these with a shared engine + injected repo, at which point these
+ * wrappers go away.
  */
-export const loadMessages = async (chatUid: string): Promise<ChatMessage[]> => {
-  const db = await openDim0Db()
+import { IndexedDbEngine } from "@/features/board/persist/local/indexeddb-engine"
+import type { ChatMessage, LocalChat } from "@/features/agent/types/chat"
+import { ChatRepo } from "./chat-repo"
+
+
+/** Run `fn` with a short-lived engine + repo, closing the engine afterwards. */
+const withRepo = async <T>(fn: (repo: ChatRepo) => Promise<T>): Promise<T> => {
+  const engine = await IndexedDbEngine.open()
   try {
-    const rows = await db.getAll("chat_messages", chatRange(chatUid))
-    return rows.sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+    return await fn(new ChatRepo(engine))
   } finally {
-    db.close()
+    engine.close()
   }
 }
 
 
-/**
- * Persist a chat's full transcript: replace its messages and stamp the chat
- * record (with an optional label), in one transaction. Mirrors the backend
- * storing message objects — minus embeddings (no RAG).
- */
-export const saveMessages = async (
+/** Load a chat's persisted messages in conversation order. */
+export const loadMessages = (chatUid: string): Promise<ChatMessage[]> =>
+  withRepo((repo) => repo.getMessages(chatUid))
+
+
+/** Persist a chat's full transcript and stamp its record (optional label). */
+export const saveMessages = (
   chatUid: string,
   boardId: string,
   messages: ChatMessage[],
   label?: string,
-): Promise<void> => {
-  const db = await openDim0Db()
-  try {
-    const tx = db.transaction(["chat_messages", "chats"], "readwrite")
-    await tx.objectStore("chat_messages").delete(chatRange(chatUid))
-    // Stamp insertion order so reads restore conversation order (not key order).
-    for (let i = 0; i < messages.length; i += 1) {
-      await tx.objectStore("chat_messages").put({ ...messages[i], chatUid, order: i })
-    }
-    // Preserve an existing label when none is supplied this save.
-    const prev = await tx.objectStore("chats").get(chatUid)
-    await tx.objectStore("chats").put({ id: chatUid, boardId, label: label ?? prev?.label, updatedAt: Date.now() })
-    await tx.done
-  } finally {
-    db.close()
-  }
-}
+): Promise<void> => withRepo((repo) => repo.saveTranscript(chatUid, boardId, messages, label))
 
 
-/** List a board's chats, most-recently-updated first (mirrors backend `list_chats`). */
-export const listLocalChats = async (boardId: string): Promise<ChatRecord[]> => {
-  const db = await openDim0Db()
-  try {
-    const chats = await db.getAllFromIndex("chats", "by-board", boardId)
-    return chats.sort((a, b) => b.updatedAt - a.updatedAt)
-  } finally {
-    db.close()
-  }
-}
+/** List a board's chats, most-recently-updated first. */
+export const listLocalChats = (boardId: string): Promise<LocalChat[]> =>
+  withRepo((repo) => repo.listByBoard(boardId))

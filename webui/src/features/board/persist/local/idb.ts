@@ -15,7 +15,7 @@
 import { openDB } from "idb"
 import type { DBSchema, IDBPDatabase } from "idb"
 import type { OpBatch } from "@canvas-harness/core"
-import type { ChatMessage } from "@/features/agent/types/chat"
+import type { LocalChat, LocalMessage } from "@/features/agent/types/chat"
 import type { BoardContent, BoardMeta, BoardView } from "@/features/board/model"
 
 
@@ -25,19 +25,16 @@ export type SnapshotRecord = { content: BoardContent; seq: number }
 export type OplogRecord = { boardId: string; seq: number; batch: OpBatch }
 
 
-export type ChatRecord = { id: string; boardId: string; label?: string; updatedAt: number }
-
-
 interface Dim0DB extends DBSchema {
   snapshots: { key: string; value: SnapshotRecord }
   oplog: { key: [string, number]; value: OplogRecord }
   boards: { key: string; value: BoardMeta }
   views: { key: string; value: BoardView }
-  chats: { key: string; value: ChatRecord; indexes: { "by-board": string } }
-  // `order` records insertion order — message ids don't sort to conversation
-  // order (assistant is minted before user; counter sorts lexically), so reads
-  // must sort by this, not by the key.
-  chat_messages: { key: [string, string]; value: ChatMessage & { order?: number } }
+  chats: { key: string; value: LocalChat; indexes: { "by-board": string } }
+  // `order` (on LocalMessage) records insertion order — message ids don't sort to
+  // conversation order (assistant is minted before user; counter sorts lexically),
+  // so reads must sort by that field, not by the key.
+  chat_messages: { key: [string, string]; value: LocalMessage }
   // Per-note mini-app widget state (local analog of backend /mini-app-state).
   mini_app_state: { key: string; value: { noteId: string; state: unknown } }
 }
