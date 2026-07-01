@@ -1,7 +1,17 @@
 # Offline-first: the local storage interface
 
-Status: design → to implement (Phase D.0, before the Phase D carry-overs)
+Status: **implemented** (Phase D.0). Commits: `4623824` engine+adapter · `aa7f0e5`
+registry/persistence on engine + cascade · `a94b001` ChatRepo/MiniAppRepo + canonical
+shapes · `5bd47ba` composition root. Next: the Phase D carry-overs land on the repos.
 Decision inputs: desktop app is **real & near-term** (SQLite target); **canonical entity shapes defined now**.
+
+As-built notes:
+- Layer-2 repos: `BoardRegistry` (metadata/views/cascade) + `BoardPersistence` (snapshot/oplog
+  controller) realize "BoardRepo"; `ChatRepo`, `MiniAppRepo`. Composition root:
+  `webui/src/features/local-stores.ts` (`createLocalStores` / `getLocalStores` / `resetLocalStores`).
+- The old functional helpers (`chat-persist.ts`, `state-client.ts`) remain as thin wrappers over
+  the shared repos — kept only to avoid churn at call sites; safe to inline into `getLocalStores()`
+  consumers later.
 
 ## Why this exists
 
