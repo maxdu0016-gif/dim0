@@ -81,11 +81,11 @@ export const createNote: Tool = {
   parameters: {
     type: "object",
     properties: {
-      id: { type: "string", description: "Optional explicit id" },
-      title: { type: "string" },
-      body: { type: "string" },
-      x: { type: "number" },
-      y: { type: "number" },
+      id: { type: "string", description: "Optional explicit id; omit to auto-generate." },
+      title: { type: "string", description: "Short note title (the heading, stored separately from the body)." },
+      body: { type: "string", description: "The note body — prose or markdown." },
+      x: { type: "number", description: "Optional x canvas position; defaults to 0 (auto-arranged after the turn)." },
+      y: { type: "number", description: "Optional y canvas position; defaults to 0 (auto-arranged after the turn)." },
     },
   },
   async run(args, ctx) {
@@ -116,7 +116,11 @@ export const updateNote: Tool = {
   description: "Update a note's title and/or body.",
   parameters: {
     type: "object",
-    properties: { id: { type: "string" }, title: { type: "string" }, body: { type: "string" } },
+    properties: {
+      id: { type: "string", description: "Id of the note to update." },
+      title: { type: "string", description: "New title; omit to leave unchanged." },
+      body: { type: "string", description: "New body; omit to leave unchanged." },
+    },
     required: ["id"],
   },
   async run(args, ctx) {
@@ -139,7 +143,11 @@ export const linkNotes: Tool = {
   description: "Create a directed link from one note to another.",
   parameters: {
     type: "object",
-    properties: { sourceId: { type: "string" }, targetId: { type: "string" }, label: { type: "string" } },
+    properties: {
+      sourceId: { type: "string", description: "Exact id of the note the arrow starts from." },
+      targetId: { type: "string", description: "Exact id of the note the arrow points to." },
+      label: { type: "string", description: "Optional short label on the edge, e.g. 'yes', 'no', 'then', 'reads', 'causes'." },
+    },
     required: ["sourceId", "targetId"],
   },
   async run(args, ctx) {
@@ -175,10 +183,10 @@ export const writeNote: Tool = {
   parameters: {
     type: "object",
     properties: {
-      content: { type: "string" },
-      label: { type: "string", description: "Short title" },
-      note_type: { type: "string", description: "rectangle | sheet | mini-app | widget" },
-      note_id: { type: "string", description: "Set to rewrite an existing note" },
+      content: { type: "string", description: "The complete note body after this write — prose, markdown, code, or widget source." },
+      label: { type: "string", description: "Optional short title, stored separately from the body." },
+      note_type: { type: "string", description: "Visual note type: rectangle | sheet | mini-app | widget." },
+      note_id: { type: "string", description: "Existing note id to fully rewrite; omit to create a new note." },
     },
     required: ["content"],
   },
@@ -245,7 +253,7 @@ export const writeNote: Tool = {
 export const getNote: Tool = {
   name: "get_note",
   description: "Read an existing note's label, content, and type.",
-  parameters: { type: "object", properties: { note_id: { type: "string" } }, required: ["note_id"] },
+  parameters: { type: "object", properties: { note_id: { type: "string", description: "Id of the note to read." } }, required: ["note_id"] },
   async run(args, ctx) {
     const id = asNodeId(str(args.note_id))
     const node = ctx.store.getNode(id)
@@ -266,11 +274,11 @@ export const editNote: Tool = {
   parameters: {
     type: "object",
     properties: {
-      note_id: { type: "string" },
-      field: { type: "string", description: "content | label" },
-      old: { type: "string" },
-      new: { type: "string" },
-      replace_all: { type: "boolean" },
+      note_id: { type: "string", description: "Id of the note to edit." },
+      field: { type: "string", description: "Which field to edit: content | label." },
+      old: { type: "string", description: "Exact substring to find; must be unique unless replace_all is set." },
+      new: { type: "string", description: "Replacement text for `old`." },
+      replace_all: { type: "boolean", description: "When true, replace every occurrence of `old` instead of requiring uniqueness." },
     },
     required: ["note_id", "field", "old", "new"],
   },
@@ -304,7 +312,7 @@ export const editNote: Tool = {
 export const searchNotes: Tool = {
   name: "search_notes",
   description: "Full-text search notes on the board. Returns matching ids + titles.",
-  parameters: { type: "object", properties: { query: { type: "string" } }, required: ["query"] },
+  parameters: { type: "object", properties: { query: { type: "string", description: "Full-text query matched against note titles and bodies." } }, required: ["query"] },
   async run(args, ctx) {
     if (!ctx.search) return { results: [] }
     const ids = await ctx.search.query(str(args.query))
