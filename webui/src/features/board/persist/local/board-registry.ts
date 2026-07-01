@@ -60,6 +60,15 @@ export class BoardRegistry {
   }
 
 
+  /** Rename a board (no-op if it doesn't exist). Used by describe_board auto-label. */
+  async renameBoard(id: string, title: string, now: number = Date.now()): Promise<void> {
+    const db = this.requireDb()
+    const existing = await db.get("boards", id)
+    if (!existing) return
+    await db.put("boards", { ...existing, title, updatedAt: now })
+  }
+
+
   /** Delete a board and ALL its data (meta + view + snapshot + oplog) atomically. */
   async deleteBoard(id: string): Promise<void> {
     const db = this.requireDb()

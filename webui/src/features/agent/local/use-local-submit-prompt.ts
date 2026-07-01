@@ -14,6 +14,7 @@ import type { ChatMessage } from "@/features/agent/types/chat"
 import { agentLog } from "@/features/agent/engine/debug"
 import { latestAssistantText, stepsFromEvents } from "./agent-event-to-step"
 import { toLlmHistory } from "./chat-history"
+import { maybeAutoLabelBoard } from "./describe-board"
 
 
 // Note-building tools + on-demand skill loaders (search/list land in C/D).
@@ -119,6 +120,8 @@ export function useLocalSubmitPrompt(boardId: string) {
         await persist(label)
         const { chatUid: savedUid, messages } = useLocalMessagesStore.getState()
         agentLog.turnDone(savedUid, messages.length)
+        // Auto-label a still-"Untitled" board from its first turn (fire-and-forget).
+        void maybeAutoLabelBoard(boardId, messages, config ? ByokLlmClient.fromConfig(config) : null)
       }
     },
     [asConfig, setMessages, setChatUid, persist, boardId],

@@ -58,5 +58,15 @@ export function useLocalBoards() {
     [refresh],
   )
 
-  return { boards, ready, createBoard, deleteBoard }
+  const renameBoard = useCallback(
+    async (id: string, title: string): Promise<void> => {
+      const registry = registryRef.current
+      if (!registry) return
+      await registry.renameBoard(id, title.trim() || "Untitled board")
+      await refresh()
+    },
+    [refresh],
+  )
+
+  return { boards, ready, createBoard, deleteBoard, renameBoard }
 }
