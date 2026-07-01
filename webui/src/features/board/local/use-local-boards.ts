@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import type { BoardMeta } from "@/features/board/model"
-import { BoardRegistry, newLocalBoard } from "@/features/board/persist/local/board-registry"
+import { newLocalBoard } from "@/features/board/persist/local/board-registry"
+import type { BoardRegistry } from "@/features/board/persist/local/board-registry"
 import { requestPersistentStorage } from "@/features/board/persist/local/persist-storage"
+import { getLocalStores } from "@/features/local-stores"
 
 
-/** List/create/delete local-only boards via BoardRegistry — no account, offline. */
+/** List/create/delete local-only boards via the shared BoardRegistry — offline, no account. */
 export function useLocalBoards() {
   const [boards, setBoards] = useState<BoardMeta[]>([])
   const [ready, setReady] = useState(false)
@@ -12,21 +14,20 @@ export function useLocalBoards() {
 
   useEffect(() => {
     void requestPersistentStorage()
-    const registry = new BoardRegistry()
-    registryRef.current = registry
     let cancelled = false
-    void registry
-      .init()
-      .then(() => registry.listBoards())
-      .then((list) => {
+    void getLocalStores().then((stores) => {
+      if (cancelled) return
+      registryRef.current = stores.boards
+      return stores.boards.listBoards().then((list) => {
         if (!cancelled) {
           setBoards(list)
           setReady(true)
         }
       })
+    })
+    // The engine is app-wide (owned by the composition root) — don't close it here.
     return () => {
       cancelled = true
-      registry.close()
       registryRef.current = null
     }
   }, [])

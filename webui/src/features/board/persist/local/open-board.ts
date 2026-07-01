@@ -9,6 +9,7 @@
  */
 import { createCanvasStore } from "@canvas-harness/core"
 import type { CanvasStore } from "@canvas-harness/core"
+import { getLocalStores } from "@/features/local-stores"
 import { BoardPersistence } from "./board-persistence"
 import type { BoardPersistenceOptions } from "./board-persistence"
 import { contentToScene } from "./codec"
@@ -27,7 +28,9 @@ export const openBoard = async (
   boardId: string,
   opts: BoardPersistenceOptions = {},
 ): Promise<OpenBoardHandle> => {
-  const persistence = new BoardPersistence(boardId, opts)
+  // Default to the app-wide shared engine; tests may inject their own.
+  const engine = opts.engine ?? (await getLocalStores()).engine
+  const persistence = new BoardPersistence(boardId, { ...opts, engine })
   await persistence.init()
   const content = await persistence.load()
   // No clientId passed → fresh random id per load (see note above).

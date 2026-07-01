@@ -9,10 +9,15 @@ import { asClientId, asEdgeId, asNodeId, createCanvasStore } from "@canvas-harne
 import type { CanvasStore, Scene } from "@canvas-harness/core"
 import { IDBFactory } from "fake-indexeddb"
 import type { BoardContent, DimEdgeData, DimNodeData } from "@/features/board/model"
+import { resetLocalStores } from "@/features/local-stores"
 
 
-/** Replace the global IndexedDB with a fresh, empty in-memory instance. */
+/**
+ * Replace the global IndexedDB with a fresh, empty in-memory instance and drop
+ * the shared local-stores singleton so it re-opens against the new database.
+ */
 export const resetIdb = (): void => {
+  resetLocalStores()
   globalThis.indexedDB = new IDBFactory()
 }
 

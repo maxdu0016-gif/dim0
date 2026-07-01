@@ -28,7 +28,7 @@ export type BoardPersistenceOptions = { engine?: StorageEngine; dbName?: string;
 
 
 export class BoardPersistence {
-  private engine: StorageEngine | null = null
+  private engine: StorageEngine | null
   private readonly ownsEngine: boolean
   private seq = 0
   private queue: Promise<void> = Promise.resolve()
@@ -36,23 +36,22 @@ export class BoardPersistence {
   private timer: ReturnType<typeof setTimeout> | null = null
   private readonly seen = new Set<string>()
   private readonly boardId: string
-  private readonly injectedEngine?: StorageEngine
   private readonly dbName?: string
   private readonly debounceMs: number
 
 
   constructor(boardId: string, opts: BoardPersistenceOptions = {}) {
     this.boardId = boardId
-    this.injectedEngine = opts.engine
+    this.engine = opts.engine ?? null
     this.dbName = opts.dbName
     this.debounceMs = opts.debounceMs ?? 50
     this.ownsEngine = !opts.engine
   }
 
 
-  /** Open the engine if owned. Must be called before any other method. */
+  /** Open the engine if this instance owns one. Idempotent; a no-op when injected. */
   async init(): Promise<void> {
-    this.engine = this.injectedEngine ?? (await IndexedDbEngine.open(this.dbName))
+    if (!this.engine) this.engine = await IndexedDbEngine.open(this.dbName)
   }
 
 

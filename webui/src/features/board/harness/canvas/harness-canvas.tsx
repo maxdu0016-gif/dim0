@@ -42,6 +42,7 @@ import { boardNodeTypes, useRenderCustomNodeView } from "../node-types"
 import { hydrateBoardStore } from "../persist/snapshot-load"
 import { BoardPersistence } from "@/features/board/persist/local/board-persistence"
 import { applyContentToStore } from "@/features/board/persist/local/apply-content"
+import { getLocalStores } from "@/features/local-stores"
 import { ShareButton } from "@/features/sharing/share-button"
 import { useBoardAppStore } from "../store/board-app-store"
 import { createBoardStore } from "../store/create-board-store"
@@ -277,13 +278,17 @@ export function HarnessCanvas({ local = false }: { local?: boolean } = {}) {
     // Local-only board: load from IndexedDB + attach local persistence. The
     // analog of the backend hydrate below — it fills the same empty store.
     if (local) {
-      const persistence = new BoardPersistence(boardId)
       let detach: (() => void) | null = null
-      void persistence
-        .init()
-        .then(() => persistence.load())
+      let persistence: BoardPersistence | null = null
+      void getLocalStores()
+        .then((stores) => {
+          if (cancelled) return undefined
+          // Share the app-wide engine (a desktop build injects SQLite here).
+          persistence = new BoardPersistence(boardId, { engine: stores.engine })
+          return persistence.load()
+        })
         .then((content) => {
-          if (cancelled) return
+          if (cancelled || !content || !persistence) return
           applyContentToStore(store, content)
           detach = persistence.attach(store)
           setCanEdit(true)
@@ -301,7 +306,8 @@ export function HarnessCanvas({ local = false }: { local?: boolean } = {}) {
       return () => {
         cancelled = true
         detach?.()
-        void persistence.flush().finally(() => persistence.close())
+        const p = persistence
+        if (p) void p.flush().finally(() => p.close())
       }
     }
 

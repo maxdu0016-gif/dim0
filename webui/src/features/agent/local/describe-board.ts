@@ -4,7 +4,7 @@
  * "Untitled board") and is best-effort: any failure leaves the title untouched.
  */
 import type { LlmClient } from "@/features/agent/engine/types"
-import { BoardRegistry } from "@/features/board/persist/local/board-registry"
+import { getLocalStores } from "@/features/local-stores"
 import type { ChatMessage } from "@/features/agent/types/chat"
 import describeBoardPrompt from "@/features/agent/prompts/describe-board.md?raw"
 
@@ -61,16 +61,13 @@ export const maybeAutoLabelBoard = async (
   llm: LlmClient | null,
 ): Promise<void> => {
   if (!llm) return
-  const registry = new BoardRegistry()
   try {
-    await registry.init()
-    const meta = await registry.getBoard(boardId)
+    const { boards } = await getLocalStores()
+    const meta = await boards.getBoard(boardId)
     if (!meta || (meta.title && meta.title !== UNTITLED)) return
     const title = await describeBoardTitle(messages, llm)
-    if (title) await registry.renameBoard(boardId, title)
+    if (title) await boards.renameBoard(boardId, title)
   } catch {
     // best-effort labeling — never disrupt the turn
-  } finally {
-    registry.close()
   }
 }
