@@ -1,5 +1,5 @@
 /**
- * Local board persistence (A1) — snapshot + op-log against IndexedDB.
+ * Local board persistence (A1) — snapshot + op-log via the `StorageEngine` port.
  *
  * Write path: each committed (non-remote) `change` batch is buffered and flushed
  * (debounced) to the oplog. Periodically `compact()` folds the tail into a fresh
@@ -13,41 +13,46 @@
  * only replays entries with `seq > snapshot.seq`, so a compaction that wrote the
  * snapshot but didn't delete the tail still loads correctly. The dangerous
  * inverse (oplog deleted without a snapshot) is prevented by doing both writes
- * in a single transaction (`writeSnapshot`).
+ * in a single engine transaction (`writeSnapshot`).
  */
 import { createCanvasStore } from "@canvas-harness/core"
 import type { CanvasStore, OpBatch } from "@canvas-harness/core"
 import type { BoardContent } from "@/features/board/model"
 import { contentToScene, emptyContent, readContent } from "./codec"
-import { openDim0Db } from "./idb"
-import type { Dim0Database } from "./idb"
+import { IndexedDbEngine } from "./indexeddb-engine"
+import type { StorageEngine } from "./engine"
+import type { SnapshotRecord, OplogRecord } from "./idb"
 
 
-export type BoardPersistenceOptions = { dbName?: string; debounceMs?: number }
+export type BoardPersistenceOptions = { engine?: StorageEngine; dbName?: string; debounceMs?: number }
 
 
 export class BoardPersistence {
-  private db: Dim0Database | null = null
+  private engine: StorageEngine | null = null
+  private readonly ownsEngine: boolean
   private seq = 0
   private queue: Promise<void> = Promise.resolve()
   private pending: OpBatch[] = []
   private timer: ReturnType<typeof setTimeout> | null = null
   private readonly seen = new Set<string>()
   private readonly boardId: string
+  private readonly injectedEngine?: StorageEngine
   private readonly dbName?: string
   private readonly debounceMs: number
 
 
   constructor(boardId: string, opts: BoardPersistenceOptions = {}) {
     this.boardId = boardId
+    this.injectedEngine = opts.engine
     this.dbName = opts.dbName
     this.debounceMs = opts.debounceMs ?? 50
+    this.ownsEngine = !opts.engine
   }
 
 
-  /** Open the database. Must be called before any other method. */
+  /** Open the engine if owned. Must be called before any other method. */
   async init(): Promise<void> {
-    this.db = await openDim0Db(this.dbName)
+    this.engine = this.injectedEngine ?? (await IndexedDbEngine.open(this.dbName))
   }
 
 
@@ -93,14 +98,14 @@ export class BoardPersistence {
   }
 
 
-  /** Close the database connection and cancel any pending flush. */
+  /** Close the engine if owned, and cancel any pending flush. */
   close(): void {
     if (this.timer !== null) {
       clearTimeout(this.timer)
       this.timer = null
     }
-    this.db?.close()
-    this.db = null
+    if (this.ownsEngine) this.engine?.close()
+    this.engine = null
   }
 
 
@@ -109,11 +114,10 @@ export class BoardPersistence {
    * tests can simulate a crash before commit. Protected, not for app code.
    */
   protected async writeSnapshot(content: BoardContent, seq: number): Promise<void> {
-    const db = this.requireDb()
-    const tx = db.transaction(["snapshots", "oplog"], "readwrite")
-    await tx.objectStore("snapshots").put({ content, seq }, this.boardId)
-    await tx.objectStore("oplog").delete(IDBKeyRange.bound([this.boardId, 0], [this.boardId, seq]))
-    await tx.done
+    await this.requireEngine().tx(["snapshots", "oplog"], async (t) => {
+      await t.put<SnapshotRecord>("snapshots", { content, seq }, this.boardId)
+      await t.delete("oplog", { lower: [this.boardId, 0], upper: [this.boardId, seq] })
+    })
   }
 
 
@@ -137,7 +141,7 @@ export class BoardPersistence {
     if (this.seen.has(batch.id)) return
     this.seen.add(batch.id)
     this.seq += 1
-    await this.requireDb().put("oplog", { boardId: this.boardId, seq: this.seq, batch })
+    await this.requireEngine().put<OplogRecord>("oplog", { boardId: this.boardId, seq: this.seq, batch })
   }
 
 
@@ -146,14 +150,13 @@ export class BoardPersistence {
    * highest seq it reflects. Also seeds the dedupe set with replayed batch ids.
    */
   private async materialize(): Promise<{ content: BoardContent; seq: number }> {
-    const db = this.requireDb()
-    const snap = await db.get("snapshots", this.boardId)
+    const engine = this.requireEngine()
+    const snap = await engine.get<SnapshotRecord>("snapshots", this.boardId)
     const base = snap?.content ?? emptyContent()
     const baseSeq = snap?.seq ?? 0
-    const records = await db.getAll(
-      "oplog",
-      IDBKeyRange.bound([this.boardId, baseSeq], [this.boardId, Number.MAX_SAFE_INTEGER], true, false),
-    )
+    const records = await engine.list<OplogRecord>("oplog", {
+      range: { lower: [this.boardId, baseSeq], upper: [this.boardId, Number.MAX_SAFE_INTEGER], lowerOpen: true },
+    })
     const seq = records.length > 0 ? records[records.length - 1].seq : baseSeq
     if (records.length === 0) return { content: base, seq }
     const store = createCanvasStore({ initial: contentToScene(base) })
@@ -165,8 +168,8 @@ export class BoardPersistence {
   }
 
 
-  private requireDb(): Dim0Database {
-    if (!this.db) throw new Error("BoardPersistence.init() must be called first")
-    return this.db
+  private requireEngine(): StorageEngine {
+    if (!this.engine) throw new Error("BoardPersistence.init() must be called first")
+    return this.engine
   }
 }

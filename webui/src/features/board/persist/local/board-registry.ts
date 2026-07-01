@@ -1,17 +1,29 @@
 /**
- * Local board registry (A2) — metadata + per-device view state in IndexedDB.
+ * Local board registry (A2) — board metadata + per-device view state.
  *
  * Stores `BoardMeta` (the local board index, incl. local-only boards) and
- * `BoardView` (camera/selection, per device). Board *content* lives in the
- * snapshot/oplog stores owned by BoardPersistence; `deleteBoard` cascades across
- * all of them in one transaction so a removed board leaves no orphans.
+ * `BoardView` (camera/selection, per device) via the `StorageEngine` port. Board
+ * *content* lives in the snapshot/oplog stores driven by `BoardPersistence`;
+ * `deleteBoard` cascades across metadata, view, content AND the board's chats +
+ * messages in one transaction, so a removed board leaves no orphans.
  *
- * No accounts required: local-only boards are created and listed fully offline.
+ * Engine ownership: if no engine is injected the registry opens and owns one
+ * (self-contained lifecycle via `init`/`close`); when the composition root
+ * injects a shared engine, `close` leaves it open for the owner to release.
  */
 import { v4 as uuidv4 } from "uuid"
 import type { BoardMeta, BoardView } from "@/features/board/model"
-import { openDim0Db } from "./idb"
-import type { Dim0Database } from "./idb"
+import { IndexedDbEngine } from "./indexeddb-engine"
+import type { Collection, StorageEngine } from "./engine"
+
+
+export type BoardRegistryOptions = { engine?: StorageEngine; dbName?: string }
+
+
+// Every store a board's data spans — the cascade-delete transaction covers all.
+const BOARD_COLLECTIONS: Collection[] = [
+  "boards", "views", "snapshots", "oplog", "chats", "chat_messages",
+]
 
 
 /** Build a fresh local-only board's metadata. `now` is epoch ms (injectable). */
@@ -26,82 +38,90 @@ export const newLocalBoard = (title: string, now: number): BoardMeta => ({
 
 
 export class BoardRegistry {
-  private db: Dim0Database | null = null
+  private engine: StorageEngine | null
   private readonly dbName?: string
+  private readonly ownsEngine: boolean
 
 
-  constructor(dbName?: string) {
-    this.dbName = dbName
+  constructor(opts: BoardRegistryOptions = {}) {
+    this.engine = opts.engine ?? null
+    this.dbName = opts.dbName
+    this.ownsEngine = !opts.engine
   }
 
 
-  /** Open the database. Must be called before any other method. */
+  /** Open the database if this registry owns its engine. Idempotent. */
   async init(): Promise<void> {
-    this.db = await openDim0Db(this.dbName)
+    if (!this.engine) this.engine = await IndexedDbEngine.open(this.dbName)
   }
 
 
   /** Insert or replace a board's metadata. */
   async createBoard(meta: BoardMeta): Promise<void> {
-    await this.requireDb().put("boards", meta)
+    await this.requireEngine().put("boards", meta)
   }
 
 
   /** Fetch one board's metadata. */
   async getBoard(id: string): Promise<BoardMeta | undefined> {
-    return this.requireDb().get("boards", id)
+    return this.requireEngine().get<BoardMeta>("boards", id)
   }
 
 
   /** List all non-deleted boards (the local board index). */
   async listBoards(): Promise<BoardMeta[]> {
-    const all = await this.requireDb().getAll("boards")
+    const all = await this.requireEngine().list<BoardMeta>("boards")
     return all.filter((b) => !b.deletedAt)
   }
 
 
   /** Rename a board (no-op if it doesn't exist). Used by describe_board auto-label. */
   async renameBoard(id: string, title: string, now: number = Date.now()): Promise<void> {
-    const db = this.requireDb()
-    const existing = await db.get("boards", id)
+    const engine = this.requireEngine()
+    const existing = await engine.get<BoardMeta>("boards", id)
     if (!existing) return
-    await db.put("boards", { ...existing, title, updatedAt: now })
+    await engine.put("boards", { ...existing, title, updatedAt: now })
   }
 
 
-  /** Delete a board and ALL its data (meta + view + snapshot + oplog) atomically. */
+  /** Delete a board and ALL its data (meta + view + content + chats + messages) atomically. */
   async deleteBoard(id: string): Promise<void> {
-    const db = this.requireDb()
-    const tx = db.transaction(["boards", "views", "snapshots", "oplog"], "readwrite")
-    await tx.objectStore("boards").delete(id)
-    await tx.objectStore("views").delete(id)
-    await tx.objectStore("snapshots").delete(id)
-    await tx.objectStore("oplog").delete(IDBKeyRange.bound([id, 0], [id, Number.MAX_SAFE_INTEGER]))
-    await tx.done
+    await this.requireEngine().tx(BOARD_COLLECTIONS, async (t) => {
+      await t.delete("boards", id)
+      await t.delete("views", id)
+      await t.delete("snapshots", id)
+      await t.delete("oplog", { lower: [id, 0], upper: [id, Number.MAX_SAFE_INTEGER] })
+      // Cascade the board's chats and their message transcripts.
+      const chats = await t.list<{ id: string }>("chats", { index: "by-board", range: { lower: id, upper: id } })
+      for (const chat of chats) {
+        await t.delete("chat_messages", { lower: [chat.id, ""], upper: [chat.id, "￿"] })
+        await t.delete("chats", chat.id)
+      }
+    })
   }
 
 
   /** Persist per-device view state (camera/selection) for a board. */
   async saveView(id: string, view: BoardView): Promise<void> {
-    await this.requireDb().put("views", view, id)
+    await this.requireEngine().put("views", view, id)
   }
 
 
   /** Load per-device view state, or undefined if none saved. */
   async loadView(id: string): Promise<BoardView | undefined> {
-    return this.requireDb().get("views", id)
+    return this.requireEngine().get<BoardView>("views", id)
   }
 
 
-  /** Close the database connection. */
+  /** Release the engine if owned; a no-op for an injected (shared) engine. */
   close(): void {
-    this.db?.close()
-    this.db = null
+    if (this.ownsEngine) this.engine?.close()
+    this.engine = null
   }
 
 
-  private requireDb(): Dim0Database {
-    if (!this.db) throw new Error("BoardRegistry.init() must be called first")
-    return this.db
+  private requireEngine(): StorageEngine {
+    if (!this.engine) throw new Error("BoardRegistry.init() must be called first")
+    return this.engine
   }
 }

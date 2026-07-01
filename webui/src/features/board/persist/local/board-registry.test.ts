@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest"
 import { addNode, freshStore, resetIdb } from "@/test/canvas"
 import { BoardPersistence } from "./board-persistence"
 import { BoardRegistry, newLocalBoard } from "./board-registry"
+import { IndexedDbEngine } from "./indexeddb-engine"
 
 
 beforeEach(() => {
@@ -66,6 +67,48 @@ describe("BoardRegistry", () => {
     expect((await p2.load()).nodes).toHaveLength(0)
     p2.close()
     reg.close()
+  })
+
+
+  it("deleteBoard cascades to the board's chats and messages, sparing other boards", async () => {
+    const engine = await IndexedDbEngine.open()
+    const reg = new BoardRegistry({ engine })
+    await reg.init()
+    const board = newLocalBoard("Doomed", 1000)
+    await reg.createBoard(board)
+
+    // Seed two chats (+ a message each) for this board, and one for another board.
+    await engine.put("chats", { id: "chat-1", boardId: board.id, updatedAt: 1 })
+    await engine.put("chats", { id: "chat-2", boardId: board.id, updatedAt: 2 })
+    await engine.put("chats", { id: "chat-x", boardId: "other-board", updatedAt: 3 })
+    await engine.put("chat_messages", { chatUid: "chat-1", id: "m1", role: "user", content: { markdown: "hi" }, order: 0 })
+    await engine.put("chat_messages", { chatUid: "chat-2", id: "m2", role: "user", content: { markdown: "yo" }, order: 0 })
+    await engine.put("chat_messages", { chatUid: "chat-x", id: "mx", role: "user", content: { markdown: "keep" }, order: 0 })
+
+    await reg.deleteBoard(board.id)
+
+    // This board's chats + messages are gone…
+    expect(await engine.list("chats", { index: "by-board", range: { lower: board.id, upper: board.id } })).toHaveLength(0)
+    expect(await engine.get("chat_messages", ["chat-1", "m1"])).toBeUndefined()
+    expect(await engine.get("chat_messages", ["chat-2", "m2"])).toBeUndefined()
+    // …but the other board's chat + message survive.
+    expect(await engine.get("chats", "chat-x")).toBeDefined()
+    expect(await engine.get("chat_messages", ["chat-x", "mx"])).toBeDefined()
+
+    reg.close()
+    engine.close()
+  })
+
+
+  it("close() leaves an injected engine open for its owner", async () => {
+    const engine = await IndexedDbEngine.open()
+    const reg = new BoardRegistry({ engine })
+    await reg.init()
+    reg.close()
+    // The shared engine is still usable after the repo closes.
+    await engine.put("boards", newLocalBoard("Still here", 1000))
+    expect(await engine.list("boards")).toHaveLength(1)
+    engine.close()
   })
 
 
