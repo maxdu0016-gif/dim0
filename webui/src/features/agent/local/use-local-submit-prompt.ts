@@ -9,6 +9,7 @@ import { skillTools } from "@/features/agent/engine/skills"
 import type { AgentEvent } from "@/features/agent/engine/types"
 import { planSystemPrompt } from "@/features/agent/prompts"
 import { useByokStore } from "@/features/agent/byok/byok-store"
+import { useBoardAppStore } from "@/features/board/harness/store/board-app-store"
 import { useLocalMessagesStore } from "@/features/agent/store/local-messages-store"
 import type { ChatMessage } from "@/features/agent/types/chat"
 import { agentLog } from "@/features/agent/engine/debug"
@@ -42,6 +43,9 @@ export function useLocalSubmitPrompt(boardId: string) {
     async (prompt: string): Promise<void> => {
       const store = getCanvasStoreRef()
       const config = asConfig()
+      // Current folder layer at submit time — new notes are born here (not
+      // rescoped after the fact). Read imperatively so it's always current.
+      const rootId = useBoardAppStore.getState().rootId
 
       // Reuse the active chat, or mint one on the first turn.
       const existingUid = useLocalMessagesStore.getState().chatUid
@@ -96,7 +100,7 @@ export function useLocalSubmitPrompt(boardId: string) {
       try {
         const llm = ByokLlmClient.fromConfig(config)
         const system = planSystemPrompt(new Date().toLocaleString())
-        for await (const ev of runAgent({ system, userMessage: prompt, history, tools: AGENT_TOOLS, llm, ctx: { store } })) {
+        for await (const ev of runAgent({ system, userMessage: prompt, history, tools: AGENT_TOOLS, llm, ctx: { store, rootId } })) {
           events.push(ev)
           // Track notes created this turn so we can arrange them afterward.
           if (

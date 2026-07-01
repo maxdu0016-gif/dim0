@@ -103,7 +103,7 @@ export const createNote: Tool = {
         angle: 0,
         groups: [],
         content: body,
-        data: { label: str(args.title), meta: meta(), _storedColors: randomNoteColors() } satisfies DimNodeData,
+        data: { label: str(args.title), parentId: ctx.rootId ?? undefined, meta: meta(), _storedColors: randomNoteColors() } satisfies DimNodeData,
       })
     })
     return { id: String(id) }
@@ -161,7 +161,7 @@ export const linkNotes: Tool = {
         target: { nodeId: targetId, localOffset: center(targetId) },
         pathStyle: "bezier",
         groups: [],
-        data: { label: str(args.label) || undefined, meta: meta() } satisfies DimEdgeData,
+        data: { label: str(args.label) || undefined, parentId: ctx.rootId ?? undefined, meta: meta() } satisfies DimEdgeData,
       })
     })
     return { id: String(id) }
@@ -234,7 +234,7 @@ export const writeNote: Tool = {
         groups: [],
         content,
         ...(autoFitStyle ? { style: autoFitStyle } : {}),
-        data: { label: str(args.label), meta: meta(), _storedColors: randomNoteColors() } satisfies DimNodeData,
+        data: { label: str(args.label), parentId: ctx.rootId ?? undefined, meta: meta(), _storedColors: randomNoteColors() } satisfies DimNodeData,
       })
     })
     return { id: String(id) }

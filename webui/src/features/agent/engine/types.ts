@@ -42,6 +42,13 @@ export interface LlmClient {
 /** Capabilities a tool may need. Search/registry are optional (board-scoped). */
 export type ToolContext = {
   store: CanvasStore
+  /**
+   * Current folder layer new notes/links belong to (null = root). Tools stamp
+   * it as `parentId` AT CREATION — the local analog of the backend passing
+   * `root_id` to `build_note`, so a note is born in the right sub-board rather
+   * than relying on a post-hoc rescope.
+   */
+  rootId?: string | null
   search?: LocalSearchIndex
   registry?: BoardRegistry
 }
