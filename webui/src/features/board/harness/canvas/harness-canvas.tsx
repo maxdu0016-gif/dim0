@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useNavigate } from "@tanstack/react-router"
+import { LocalBoardUrl } from "@/routes"
 import { useQueryClient } from "@tanstack/react-query"
 import { hitTestAny, type CanvasStore, type NodeId, type Renderer } from "@canvas-harness/core"
 import { createDefaultNote } from "@/features/board/types/note"
@@ -229,15 +230,15 @@ export function HarnessCanvas({ local = false }: { local?: boolean } = {}) {
           const node = store.getNode(hit.nodeId)
           if (node && CUSTOM_NODE_TYPES.has(node.type)) {
             store.cancelEdit()
-            if (node.type === "folder" && boardId && !local) {
-              navigate({
-                to: "/boards/$id",
-                params: { id: boardId },
-                search: (prev: Record<string, unknown>) => ({
-                  ...prev,
-                  root_id: node.id,
-                }),
-              })
+            if (node.type === "folder" && boardId) {
+              // Enter the folder: scope to its layer via the `root_id` search
+              // param (local + backend share the mechanism, different routes).
+              const search = (prev: Record<string, unknown>) => ({ ...prev, root_id: node.id })
+              if (local) {
+                navigate({ to: LocalBoardUrl, params: { boardId }, search })
+              } else {
+                navigate({ to: "/boards/$id", params: { id: boardId }, search })
+              }
             }
           }
         }

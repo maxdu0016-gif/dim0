@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react"
-import { useParams } from "@tanstack/react-router"
+import { useParams, useSearch } from "@tanstack/react-router"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Chat } from "@/features/agent/components/chat-view"
 import { ByokPanel } from "@/features/agent/byok/byok-panel"
 import { useByokStore } from "@/features/agent/byok/byok-store"
 import { useLocalMessagesStore } from "@/features/agent/store/local-messages-store"
 import { HarnessCanvas } from "@/features/board/harness/canvas"
+import { LocalFolderBreadcrumb } from "@/features/board/local/local-folder-breadcrumb"
 import { useBoardAppStore } from "@/features/board/harness/store/board-app-store"
 import { FloatingAssistant } from "@/features/board/components/flow/floating-assistant/floating-assistant"
 import { requestPersistentStorage } from "@/features/board/persist/local/persist-storage"
@@ -20,23 +21,33 @@ import { requestPersistentStorage } from "@/features/board/persist/local/persist
 export function LocalBoardScreen() {
   const params = useParams({ strict: false })
   const boardId = params.boardId ?? ""
+  const rootId = useSearch({
+    strict: false,
+    select: (s: { root_id?: string }) => s?.root_id,
+  })
   const setBoardScope = useBoardAppStore((s) => s.setBoardScope)
   const configured = useByokStore((s) => s.configured)
   const openBoard = useLocalMessagesStore((s) => s.openBoard)
   const [sheetOpen, setSheetOpen] = useState(false)
 
+  // Scope the board to the current folder layer (root_id search param); the
+  // harness re-projects that layer when rootId changes.
+  useEffect(() => {
+    if (boardId) setBoardScope({ boardId, rootId: rootId ?? null })
+  }, [boardId, rootId, setBoardScope])
+
+  // Chats are board-scoped, not layer-scoped — open once per board.
   useEffect(() => {
     void requestPersistentStorage()
-    if (boardId) {
-      setBoardScope({ boardId, rootId: null })
-      void openBoard(boardId)
-    }
-  }, [boardId, setBoardScope, openBoard])
+    if (boardId) void openBoard(boardId)
+  }, [boardId, openBoard])
 
   return (
     <div className="fixed inset-0 h-full w-full overflow-hidden bg-background">
       <div className="relative h-full w-full">
         <HarnessCanvas local />
+
+        <LocalFolderBreadcrumb boardId={boardId} rootId={rootId ?? null} />
 
         {/* Island composes turns; hidden while the full sheet is open (parity with online). */}
         {!sheetOpen && configured && (

@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest"
 import { asNodeId } from "@canvas-harness/core"
 import type { BoardContent, DimEdge, DimNode } from "."
-import { filterContentByLayer } from "./layer"
+import { buildLayerPath, filterContentByLayer } from "./layer"
 
 
-const node = (id: string, parentId?: string | null): DimNode =>
-  ({ id: asNodeId(id), data: { parentId, meta: { v: 1, createdAt: 0, updatedAt: 0 } } }) as unknown as DimNode
+const node = (id: string, parentId?: string | null, label?: string): DimNode =>
+  ({ id: asNodeId(id), data: { parentId, label, meta: { v: 1, createdAt: 0, updatedAt: 0 } } }) as unknown as DimNode
 
 
 const edge = (id: string, parentId?: string | null): DimEdge =>
@@ -50,5 +50,31 @@ describe("filterContentByLayer", () => {
   it("is a no-op shape for a flat board (all root)", () => {
     const c = content([node("a"), node("b"), node("c")])
     expect(filterContentByLayer(c, null).nodes).toHaveLength(3)
+  })
+})
+
+
+describe("buildLayerPath", () => {
+  // Board: f1 (root) › f2 (in f1) › leaf (in f2).
+  const nodes = [node("f1", null, "Alpha"), node("f2", "f1", "Beta"), node("leaf", "f2", "Leaf")]
+
+  it("returns [] for the root layer", () => {
+    expect(buildLayerPath(nodes, null)).toEqual([])
+  })
+
+  it("walks parentId up and returns the path root-first", () => {
+    expect(buildLayerPath(nodes, "f2")).toEqual([
+      { id: "f1", label: "Alpha" },
+      { id: "f2", label: "Beta" },
+    ])
+  })
+
+  it("labels an unlabelled folder as 'Folder'", () => {
+    expect(buildLayerPath([node("f1", null)], "f1")).toEqual([{ id: "f1", label: "Folder" }])
+  })
+
+  it("is cycle-safe", () => {
+    const looped = [node("a", "b", "A"), node("b", "a", "B")]
+    expect(buildLayerPath(looped, "a").map((c) => c.id).sort()).toEqual(["a", "b"])
   })
 })
