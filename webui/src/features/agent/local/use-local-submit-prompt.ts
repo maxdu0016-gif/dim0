@@ -4,8 +4,9 @@ import { getCanvasStoreRef } from "@/features/board/harness/canvas-store-ref"
 import { arrangeCreatedNodes } from "@/features/board/harness/agent/arrange-created-nodes"
 import { runAgent } from "@/features/agent/engine/agent-loop"
 import { ByokLlmClient } from "@/features/agent/engine/byok-client"
-import { agentBuildTools } from "@/features/agent/engine/tools"
+import { agentBuildTools, searchNotes } from "@/features/agent/engine/tools"
 import { skillTools } from "@/features/agent/engine/skills"
+import { getSearchIndexRef } from "@/features/board/search/search-index-ref"
 import type { AgentEvent } from "@/features/agent/engine/types"
 import { planSystemPrompt } from "@/features/agent/prompts"
 import { useByokStore } from "@/features/agent/byok/byok-store"
@@ -18,8 +19,8 @@ import { toLlmHistory } from "./chat-history"
 import { maybeAutoLabelBoard } from "./describe-board"
 
 
-// Note-building tools + on-demand skill loaders (search/list land in C/D).
-const AGENT_TOOLS = [...agentBuildTools, ...skillTools]
+// Note-building tools + full-text search + on-demand skill loaders.
+const AGENT_TOOLS = [...agentBuildTools, searchNotes, ...skillTools]
 
 
 let counter = 0
@@ -100,7 +101,8 @@ export function useLocalSubmitPrompt(boardId: string) {
       try {
         const llm = ByokLlmClient.fromConfig(config)
         const system = planSystemPrompt(new Date().toLocaleString())
-        for await (const ev of runAgent({ system, userMessage: prompt, history, tools: AGENT_TOOLS, llm, ctx: { store, rootId } })) {
+        const search = getSearchIndexRef() ?? undefined
+        for await (const ev of runAgent({ system, userMessage: prompt, history, tools: AGENT_TOOLS, llm, ctx: { store, rootId, search } })) {
           events.push(ev)
           // Track notes created this turn so we can arrange them afterward.
           if (

@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest"
 import { asEdgeId, asNodeId } from "@canvas-harness/core"
 import { freshStore } from "@/test/canvas"
+import { LocalSearchIndex } from "@/features/board/search/local-index"
 import type { ToolContext } from "./types"
-import { createNote, linkNotes, writeNote } from "./tools"
+import { createNote, linkNotes, searchNotes, writeNote } from "./tools"
 
 
 const parentOf = (store: ReturnType<typeof freshStore>, id: string): string | null | undefined =>
@@ -52,5 +53,35 @@ describe("agent tools stamp the current layer (parentId) at creation", () => {
     const b = (await createNote.run({ title: "B" }, ctx)) as { id: string }
     const { id } = (await linkNotes.run({ sourceId: a.id, targetId: b.id }, ctx)) as { id: string }
     expect(edgeParentOf(store, id)).toBe("folder-3")
+  })
+})
+
+
+describe("search_notes", () => {
+  it("finds notes by title/body via the attached index", async () => {
+    const store = freshStore("c")
+    const index = new LocalSearchIndex()
+    const detach = index.attach(store)
+    const ctx: ToolContext = { store, search: index }
+
+    await createNote.run({ title: "Quarterly revenue", body: "growth numbers" }, ctx)
+    await createNote.run({ title: "Lunch menu", body: "tacos and salsa" }, ctx)
+    await index.idle() // let incremental indexing settle
+
+    const { results } = (await searchNotes.run({ query: "revenue" }, ctx)) as {
+      results: { id: string; title: string }[]
+    }
+    expect(results.map((r) => r.title)).toContain("Quarterly revenue")
+    expect(results.map((r) => r.title)).not.toContain("Lunch menu")
+    detach()
+  })
+
+
+  it("returns nothing when no index is wired (graceful degrade)", async () => {
+    const store = freshStore("c")
+    const { results } = (await searchNotes.run({ query: "anything" }, { store })) as {
+      results: unknown[]
+    }
+    expect(results).toEqual([])
   })
 })

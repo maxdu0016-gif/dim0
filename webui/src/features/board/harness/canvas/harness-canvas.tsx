@@ -60,6 +60,7 @@ import { usePresentationMode } from "./use-presentation-mode"
 import { useBlockFolderCopy } from "./use-block-folder-copy"
 import { resolveStoredEdgeColors, useStampNewEdges } from "./use-stamp-new-edges"
 import { useStampNewNodes } from "./use-stamp-new-nodes"
+import { useLocalSearchIndex } from "@/features/board/search/use-search-index"
 import { useStyleMemory } from "./use-style-memory"
 import { CUSTOM_NODE_TYPES } from "./custom-node-types"
 import { useLocalPresence } from "./use-local-presence"
@@ -150,6 +151,7 @@ export function HarnessCanvas({ local = false }: { local?: boolean } = {}) {
   const styleMemory = useStyleMemory(store)
   useStampNewEdges(store, boardId, rootId)
   useStampNewNodes(store, boardId, rootId)
+  useLocalSearchIndex(store, local)
   useBlockFolderCopy(store)
   useHarnessApplyMindMap(store, boardId, rootId)
   useHydrateIconNodes(store, boardId, rootId, ready)
