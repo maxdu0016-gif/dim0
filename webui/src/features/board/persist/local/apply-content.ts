@@ -1,6 +1,7 @@
 import { asBatchId } from "@canvas-harness/core"
 import type { CanvasStore, Node, Op } from "@canvas-harness/core"
 import type { BoardContent } from "@/features/board/model"
+import { filterContentByLayer } from "@/features/board/model/layer"
 import {
   adaptEdgeColors,
   adaptNodeColors,
@@ -22,21 +23,31 @@ import { getBoardThemeMode } from "@/features/board/harness/theme/theme-mode-ref
  * theme the colors were last persisted in (the stamp hook + theme-flip
  * projection both skip a `remote` hydrate), so e.g. a dark board reloads
  * mis-themed.
+ *
+ * When `rootId` is given, only that layer's nodes/edges are projected into the
+ * store (root layer for `null`), mirroring the backend `get_graph(root_id)`.
+ * Omit it to hydrate the whole board unchanged. Persistence stays whole-board
+ * regardless, so filtering here never drops other layers.
  */
-export const applyContentToStore = (store: CanvasStore, content: BoardContent): void => {
+export const applyContentToStore = (
+  store: CanvasStore,
+  content: BoardContent,
+  rootId?: string | null,
+): void => {
+  const scoped = rootId === undefined ? content : filterContentByLayer(content, rootId)
   const mode = getBoardThemeMode()
   const ops: Op[] = []
 
-  for (const group of content.groups) ops.push({ type: "group.upsert", group })
+  for (const group of scoped.groups) ops.push({ type: "group.upsert", group })
 
-  for (const node of content.nodes) {
+  for (const node of scoped.nodes) {
     const stored = storedNodeColorsOf(node as unknown as Node)
     const display = mode === "dark" ? adaptNodeColors(stored, "dark") : stored
     const style = applyColorsToStyle(node.style ?? {}, display)
     ops.push({ type: "node.add", node: { ...node, style } })
   }
 
-  for (const edge of content.edges) {
+  for (const edge of scoped.edges) {
     const data = edge.data as { _storedColors?: { strokeColor?: string; textColor?: string } } | undefined
     const stored = data?._storedColors ?? { strokeColor: edge.style?.strokeColor, textColor: edge.style?.textColor }
     const display = mode === "dark" ? adaptEdgeColors(stored, "dark") : stored
@@ -53,7 +64,7 @@ export const applyContentToStore = (store: CanvasStore, content: BoardContent): 
       ops,
     })
   }
-  if (content.frameOrder && content.frameOrder.length > 0) {
-    store.setFrameOrder(content.frameOrder)
+  if (scoped.frameOrder && scoped.frameOrder.length > 0) {
+    store.setFrameOrder(scoped.frameOrder)
   }
 }

@@ -289,7 +289,9 @@ export function HarnessCanvas({ local = false }: { local?: boolean } = {}) {
         })
         .then((content) => {
           if (cancelled || !content || !persistence) return
-          applyContentToStore(store, content)
+          // Project only the current layer into the store (root layer when null);
+          // persistence stays whole-board, so other layers are never dropped.
+          applyContentToStore(store, content, rootId ?? null)
           detach = persistence.attach(store)
           setCanEdit(true)
           setBoardRole("owner")
