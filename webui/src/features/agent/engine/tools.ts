@@ -1,16 +1,21 @@
 /**
  * The agent's tools (A4) — OURS, executed LOCALLY against the canvas store.
  *
- * Each tool wraps its mutation in `store.batch()` so an agent action is ONE
- * undoable batch (INV-8) and flows through the same persistence + search + sync
- * pipeline as a human edit. No server round-trips for these.
+ * Each tool is defined from a Zod parameter schema (`defineTool`): the schema
+ * types the handler, validates the model's call at runtime, and becomes the JSON
+ * Schema the LLM sees — one source of truth, no hand-written schema + coercion.
+ * Each mutation is wrapped in `store.batch()` so an agent action is ONE undoable
+ * batch (INV-8) and flows through the same persistence + search + sync pipeline
+ * as a human edit. No server round-trips for these.
  */
+import { z } from "zod"
 import { asEdgeId, asNodeId } from "@canvas-harness/core"
 import type { Node } from "@canvas-harness/core"
 import type { DimEdgeData, DimNodeData } from "@/features/board/model"
 import { pickRandomColorOfShade } from "@/features/board/lib/colors/tailwind"
 import { AUTOFIT_DISABLED_TYPES } from "@/features/board/harness/convert/note-to-node"
 import { validateMiniAppSource } from "@/features/mini-app/validate"
+import { defineTool } from "./types"
 import type { Tool } from "./types"
 import { estimateNoteSize } from "./note-size"
 
@@ -57,11 +62,6 @@ const meta = (): DimNodeData["meta"] => {
 }
 
 
-// Coerce loosely-typed tool args to string/number with a fallback.
-const str = (v: unknown, fallback = ""): string => (typeof v === "string" ? v : fallback)
-const num = (v: unknown, fallback = 0): number => (typeof v === "number" ? v : fallback)
-
-
 // Map a prompt-level note_type to a canvas node type. Shapes the agent can't
 // render distinctly (ellipse/diamond) fall back to the default rectangle.
 const NODE_TYPE: Record<string, string> = {
@@ -75,124 +75,108 @@ const NODE_TYPE: Record<string, string> = {
 const toNodeType = (t: string): string => NODE_TYPE[t] ?? "rect"
 
 
-export const createNote: Tool = {
+export const createNote = defineTool({
   name: "create_note",
   description: "Create a note on the board with a title and optional body.",
-  parameters: {
-    type: "object",
-    properties: {
-      id: { type: "string", description: "Optional explicit id; omit to auto-generate." },
-      title: { type: "string", description: "Short note title (the heading, stored separately from the body)." },
-      body: { type: "string", description: "The note body — prose or markdown." },
-      x: { type: "number", description: "Optional x canvas position; defaults to 0 (auto-arranged after the turn)." },
-      y: { type: "number", description: "Optional y canvas position; defaults to 0 (auto-arranged after the turn)." },
-    },
-  },
-  async run(args, ctx) {
-    const id = asNodeId(str(args.id) || ctx.store.generateId())
-    const body = str(args.body)
+  parameters: z.object({
+    id: z.string().optional().describe("Optional explicit id; omit to auto-generate."),
+    title: z.string().optional().describe("Short note title (the heading, stored separately from the body)."),
+    body: z.string().optional().describe("The note body — prose or markdown."),
+    x: z.number().optional().describe("Optional x canvas position; defaults to 0 (auto-arranged after the turn)."),
+    y: z.number().optional().describe("Optional y canvas position; defaults to 0 (auto-arranged after the turn)."),
+  }),
+  run: async ({ id, title = "", body = "", x = 0, y = 0 }, ctx) => {
+    const nodeId = asNodeId(id || ctx.store.generateId())
     const { w, h } = noteGeometry("rect", body)
     ctx.store.batch(() => {
       ctx.store.addNode({
-        id,
+        id: nodeId,
         type: "rect",
-        x: num(args.x),
-        y: num(args.y),
+        x,
+        y,
         w,
         h,
         angle: 0,
         groups: [],
         content: body,
-        data: { label: str(args.title), parentId: ctx.rootId ?? undefined, meta: meta(), _storedColors: randomNoteColors() } satisfies DimNodeData,
+        data: { label: title, parentId: ctx.rootId ?? undefined, meta: meta(), _storedColors: randomNoteColors() } satisfies DimNodeData,
       })
     })
-    return { id: String(id) }
+    return { id: String(nodeId) }
   },
-}
+})
 
 
-export const updateNote: Tool = {
+export const updateNote = defineTool({
   name: "update_note",
   description: "Update a note's title and/or body.",
-  parameters: {
-    type: "object",
-    properties: {
-      id: { type: "string", description: "Id of the note to update." },
-      title: { type: "string", description: "New title; omit to leave unchanged." },
-      body: { type: "string", description: "New body; omit to leave unchanged." },
-    },
-    required: ["id"],
-  },
-  async run(args, ctx) {
-    const id = asNodeId(str(args.id))
-    const node = ctx.store.getNode(id)
+  parameters: z.object({
+    id: z.string().describe("Id of the note to update."),
+    title: z.string().optional().describe("New title; omit to leave unchanged."),
+    body: z.string().optional().describe("New body; omit to leave unchanged."),
+  }),
+  run: async ({ id, title, body }, ctx) => {
+    const nid = asNodeId(id)
+    const node = ctx.store.getNode(nid)
     if (!node) return { error: "note not found" }
+
     const patch: Partial<Node> = {}
-    if (typeof args.body === "string") patch.content = args.body
-    if (typeof args.title === "string") {
-      patch.data = { ...(node.data as DimNodeData | undefined), label: args.title, meta: meta() }
+    if (typeof body === "string") patch.content = body
+    if (typeof title === "string") {
+      patch.data = { ...(node.data as DimNodeData | undefined), label: title, meta: meta() }
     }
-    ctx.store.batch(() => ctx.store.updateNode(id, patch))
-    return { id: String(id) }
+    ctx.store.batch(() => ctx.store.updateNode(nid, patch))
+    return { id: String(nid) }
   },
-}
+})
 
 
-export const linkNotes: Tool = {
+export const linkNotes = defineTool({
   name: "link_notes",
   description: "Create a directed link from one note to another.",
-  parameters: {
-    type: "object",
-    properties: {
-      sourceId: { type: "string", description: "Exact id of the note the arrow starts from." },
-      targetId: { type: "string", description: "Exact id of the note the arrow points to." },
-      label: { type: "string", description: "Optional short label on the edge, e.g. 'yes', 'no', 'then', 'reads', 'causes'." },
-    },
-    required: ["sourceId", "targetId"],
-  },
-  async run(args, ctx) {
+  parameters: z.object({
+    sourceId: z.string().describe("Exact id of the note the arrow starts from."),
+    targetId: z.string().describe("Exact id of the note the arrow points to."),
+    label: z.string().optional().describe("Optional short label on the edge, e.g. 'yes', 'no', 'then', 'reads', 'causes'."),
+  }),
+  run: async ({ sourceId, targetId, label }, ctx) => {
     const id = asEdgeId(ctx.store.generateId())
-    const sourceId = asNodeId(str(args.sourceId))
-    const targetId = asNodeId(str(args.targetId))
+    const src = asNodeId(sourceId)
+    const tgt = asNodeId(targetId)
     // Attach at each node's CENTER (local frame is from top-left). canvas-harness
     // auto-clips the center→center line to each node's border, so the endpoint
     // lands at the border facing the peer — the backend's _edge_anchor_offset,
     // for free, and it re-clips live as `arrangeCreatedNodes` moves the nodes.
-    const center = (nodeId: typeof sourceId): { x: number; y: number } => {
+    const center = (nodeId: typeof src): { x: number; y: number } => {
       const node = ctx.store.getNode(nodeId)
       return node ? { x: node.w / 2, y: node.h / 2 } : { x: 0, y: 0 }
     }
     ctx.store.batch(() => {
       ctx.store.addEdge({
         id,
-        source: { nodeId: sourceId, localOffset: center(sourceId) },
-        target: { nodeId: targetId, localOffset: center(targetId) },
+        source: { nodeId: src, localOffset: center(src) },
+        target: { nodeId: tgt, localOffset: center(tgt) },
         pathStyle: "bezier",
         groups: [],
-        data: { label: str(args.label) || undefined, parentId: ctx.rootId ?? undefined, meta: meta() } satisfies DimEdgeData,
+        data: { label: label || undefined, parentId: ctx.rootId ?? undefined, meta: meta() } satisfies DimEdgeData,
       })
     })
     return { id: String(id) }
   },
-}
+})
 
 
-export const writeNote: Tool = {
+export const writeNote = defineTool({
   name: "write_note",
   description: "Create a new note, or fully rewrite an existing one when note_id is given. note_type: rectangle | sheet | mini-app | widget.",
-  parameters: {
-    type: "object",
-    properties: {
-      content: { type: "string", description: "The complete note body after this write — prose, markdown, code, or widget source." },
-      label: { type: "string", description: "Optional short title, stored separately from the body." },
-      note_type: { type: "string", description: "Visual note type: rectangle | sheet | mini-app | widget." },
-      note_id: { type: "string", description: "Existing note id to fully rewrite; omit to create a new note." },
-    },
-    required: ["content"],
-  },
-  async run(args, ctx) {
-    const nodeType = toNodeType(str(args.note_type))
-    const content = str(args.content)
+  parameters: z.object({
+    content: z.string().describe("The complete note body after this write — prose, markdown, code, or widget source."),
+    label: z.string().optional().describe("Optional short title, stored separately from the body."),
+    note_type: z.string().optional().describe("Visual note type: rectangle | sheet | mini-app | widget."),
+    note_id: z.string().optional().describe("Existing note id to fully rewrite; omit to create a new note."),
+  }),
+  run: async ({ content, label, note_type, note_id }, ctx) => {
+    const nodeType = toNodeType(note_type ?? "")
 
     // Custom types render only a preview of `content`, so disable the lib's
     // grow-to-fit AT CREATION (mirrors backend note_to_wire_node). Setting it
@@ -209,10 +193,8 @@ export const writeNote: Tool = {
       }
     }
 
-    const existingId = str(args.note_id)
-
-    if (existingId) {
-      const id = asNodeId(existingId)
+    if (note_id) {
+      const id = asNodeId(note_id)
       const node = ctx.store.getNode(id)
       if (node) {
         const prev = node.data as DimNodeData | undefined
@@ -220,7 +202,7 @@ export const writeNote: Tool = {
           ctx.store.updateNode(id, {
             type: nodeType,
             content,
-            data: { ...prev, label: str(args.label) || prev?.label || "", meta: meta() },
+            data: { ...prev, label: label || prev?.label || "", meta: meta() },
             ...(autoFitStyle ? { style: { ...(node.style ?? {}), ...autoFitStyle } } : {}),
           }),
         )
@@ -228,7 +210,7 @@ export const writeNote: Tool = {
       }
     }
 
-    const id = asNodeId(existingId || ctx.store.generateId())
+    const id = asNodeId(note_id || ctx.store.generateId())
     const { w, h } = noteGeometry(nodeType, content)
     ctx.store.batch(() => {
       ctx.store.addNode({
@@ -242,20 +224,22 @@ export const writeNote: Tool = {
         groups: [],
         content,
         ...(autoFitStyle ? { style: autoFitStyle } : {}),
-        data: { label: str(args.label), parentId: ctx.rootId ?? undefined, meta: meta(), _storedColors: randomNoteColors() } satisfies DimNodeData,
+        data: { label: label ?? "", parentId: ctx.rootId ?? undefined, meta: meta(), _storedColors: randomNoteColors() } satisfies DimNodeData,
       })
     })
     return { id: String(id) }
   },
-}
+})
 
 
-export const getNote: Tool = {
+export const getNote = defineTool({
   name: "get_note",
   description: "Read an existing note's label, content, and type.",
-  parameters: { type: "object", properties: { note_id: { type: "string", description: "Id of the note to read." } }, required: ["note_id"] },
-  async run(args, ctx) {
-    const id = asNodeId(str(args.note_id))
+  parameters: z.object({
+    note_id: z.string().describe("Id of the note to read."),
+  }),
+  run: async ({ note_id }, ctx) => {
+    const id = asNodeId(note_id)
     const node = ctx.store.getNode(id)
     if (!node) return { error: "note not found" }
     return {
@@ -265,39 +249,33 @@ export const getNote: Tool = {
       note_type: node.type,
     }
   },
-}
+})
 
 
-export const editNote: Tool = {
+export const editNote = defineTool({
   name: "edit_note",
   description: "Targeted edit: replace `old` with `new` in a note's content or label. Fails unless `old` is unique (or replace_all).",
-  parameters: {
-    type: "object",
-    properties: {
-      note_id: { type: "string", description: "Id of the note to edit." },
-      field: { type: "string", description: "Which field to edit: content | label." },
-      old: { type: "string", description: "Exact substring to find; must be unique unless replace_all is set." },
-      new: { type: "string", description: "Replacement text for `old`." },
-      replace_all: { type: "boolean", description: "When true, replace every occurrence of `old` instead of requiring uniqueness." },
-    },
-    required: ["note_id", "field", "old", "new"],
-  },
-  async run(args, ctx) {
-    const id = asNodeId(str(args.note_id))
+  parameters: z.object({
+    note_id: z.string().describe("Id of the note to edit."),
+    field: z.enum(["content", "label"]).describe("Which field to edit."),
+    old: z.string().describe("Exact substring to find; must be unique unless replace_all is set."),
+    new: z.string().describe("Replacement text for `old`."),
+    replace_all: z.boolean().optional().describe("When true, replace every occurrence of `old` instead of requiring uniqueness."),
+  }),
+  run: async ({ note_id, field, old, new: replacement, replace_all }, ctx) => {
+    const id = asNodeId(note_id)
     const node = ctx.store.getNode(id)
     if (!node) return { error: "note not found" }
 
-    const field = str(args.field) === "label" ? "label" : "content"
-    const oldStr = str(args.old)
     const prev = node.data as DimNodeData | undefined
     const current = field === "label" ? prev?.label ?? "" : node.content ?? ""
 
-    const occurrences = oldStr ? current.split(oldStr).length - 1 : 0
+    const occurrences = old ? current.split(old).length - 1 : 0
     if (occurrences === 0) return { error: "`old` not found in field" }
-    if (occurrences > 1 && args.replace_all !== true) {
+    if (occurrences > 1 && replace_all !== true) {
       return { error: "`old` occurs multiple times; expand it for uniqueness or set replace_all" }
     }
-    const updated = args.replace_all === true ? current.split(oldStr).join(str(args.new)) : current.replace(oldStr, str(args.new))
+    const updated = replace_all === true ? current.split(old).join(replacement) : current.replace(old, replacement)
 
     ctx.store.batch(() =>
       field === "label"
@@ -306,35 +284,37 @@ export const editNote: Tool = {
     )
     return { id: String(id) }
   },
-}
+})
 
 
-export const searchNotes: Tool = {
+export const searchNotes = defineTool({
   name: "search_notes",
   description: "Full-text search notes on the board. Returns matching ids + titles.",
-  parameters: { type: "object", properties: { query: { type: "string", description: "Full-text query matched against note titles and bodies." } }, required: ["query"] },
-  async run(args, ctx) {
+  parameters: z.object({
+    query: z.string().describe("Full-text query matched against note titles and bodies."),
+  }),
+  run: async ({ query }, ctx) => {
     if (!ctx.search) return { results: [] }
-    const ids = await ctx.search.query(str(args.query))
+    const ids = await ctx.search.query(query)
     const results = ids.map((id) => {
       const node = ctx.store.getNode(asNodeId(id))
       return { id, title: (node?.data as DimNodeData | undefined)?.label ?? "" }
     })
     return { results }
   },
-}
+})
 
 
-export const listBoards: Tool = {
+export const listBoards = defineTool({
   name: "list_boards",
   description: "List the user's boards.",
-  parameters: { type: "object", properties: {} },
-  async run(_args, ctx) {
+  parameters: z.object({}),
+  run: async (_args, ctx) => {
     if (!ctx.registry) return { boards: [] }
     const boards = await ctx.registry.listBoards()
     return { boards: boards.map((b) => ({ id: b.id, title: b.title })) }
   },
-}
+})
 
 
 export const localTools: Tool[] = [createNote, updateNote, linkNotes, searchNotes, listBoards]

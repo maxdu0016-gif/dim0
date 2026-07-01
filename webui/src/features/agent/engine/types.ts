@@ -6,6 +6,7 @@
  * tested with zero network. Tools are OURS and run LOCALLY against the canvas
  * store; the loop emits `AgentEvent`s the UI maps onto its stream.
  */
+import { z } from "zod"
 import type { CanvasStore } from "@canvas-harness/core"
 import type { BoardRegistry } from "@/features/board/persist/local/board-registry"
 import type { LocalSearchIndex } from "@/features/board/search/local-index"
@@ -57,9 +58,38 @@ export type ToolContext = {
 export type Tool = {
   name: string
   description: string
-  parameters: Record<string, unknown>
-  run: (args: Record<string, unknown>, ctx: ToolContext) => Promise<unknown>
+  /** Zod schema for the arguments; the agent loop converts it to JSON Schema for the LLM. */
+  parameters: z.ZodType
+  run: (args: unknown, ctx: ToolContext) => Promise<unknown>
 }
+
+
+/**
+ * Define a tool from a Zod parameter schema — the single source of truth. The
+ * schema types `run`'s args, validates the model's tool call at runtime, and (via
+ * the agent loop) becomes the JSON Schema the LLM sees. Invalid arguments return a
+ * structured error instead of throwing, so the model can correct itself next turn.
+ * This mirrors how the mainstream TS agent frameworks (Vercel AI SDK, OpenAI
+ * Agents SDK) define tools.
+ */
+export const defineTool = <S extends z.ZodType>(def: {
+  name: string
+  description: string
+  parameters: S
+  run: (args: z.infer<S>, ctx: ToolContext) => Promise<unknown>
+}): Tool => ({
+  name: def.name,
+  description: def.description,
+  parameters: def.parameters,
+  run: async (args, ctx) => {
+    const parsed = def.parameters.safeParse(args)
+    if (!parsed.success) {
+      const detail = parsed.error.issues.map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`).join("; ")
+      return { error: `invalid arguments: ${detail}` }
+    }
+    return def.run(parsed.data, ctx)
+  },
+})
 
 
 export type AgentEvent =

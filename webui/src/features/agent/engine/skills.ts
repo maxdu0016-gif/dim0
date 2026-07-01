@@ -4,19 +4,20 @@
  * format — mirrors the backend `widget/learn.py`, where the tool's OUTPUT is
  * the skill prompt. Keeps the system prompt lean until a skill is needed.
  */
+import { z } from "zod"
 import { SKILLS, type SkillName } from "@/features/agent/prompts"
+import { defineTool } from "./types"
 import type { Tool } from "./types"
 
 
-const skillTool = (name: SkillName, description: string): Tool => ({
-  name,
-  description,
-  parameters: { type: "object", properties: {} },
-  // The guidance text IS the useful output; the loop feeds it back to the model.
-  async run() {
-    return SKILLS[name]
-  },
-})
+const skillTool = (name: SkillName, description: string): Tool =>
+  defineTool({
+    name,
+    description,
+    parameters: z.object({}),
+    // The guidance text IS the useful output; the loop feeds it back to the model.
+    run: async () => SKILLS[name],
+  })
 
 
 export const learnGenerateDiagram = skillTool(

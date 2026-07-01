@@ -3,6 +3,7 @@
  * the local tools, emitting `AgentEvent`s. Provider-agnostic and network-free by
  * construction — the LLM is injected, so tests use a scripted mock.
  */
+import { z } from "zod"
 import type { AgentEvent, LlmClient, LlmMessage, LlmToolDef, Tool, ToolContext } from "./types"
 import { agentLog } from "./debug"
 
@@ -15,9 +16,17 @@ import { agentLog } from "./debug"
 export const DEFAULT_MAX_TURNS = 30
 
 
+/** Convert a tool's Zod schema to a plain JSON Schema (dropping the `$schema` tag). */
+const toJsonSchema = (schema: z.ZodType): Record<string, unknown> => {
+  const json = z.toJSONSchema(schema) as Record<string, unknown>
+  delete json.$schema
+  return json
+}
+
+
 /** Reduce tools to the name/description/parameters the LLM needs. */
 const toDefs = (tools: Tool[]): LlmToolDef[] =>
-  tools.map((t) => ({ name: t.name, description: t.description, parameters: t.parameters }))
+  tools.map((t) => ({ name: t.name, description: t.description, parameters: toJsonSchema(t.parameters) }))
 
 
 /** Parse a tool call's JSON arguments, tolerating malformed/non-object input. */
