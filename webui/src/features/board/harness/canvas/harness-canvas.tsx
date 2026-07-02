@@ -45,6 +45,7 @@ import { BoardPersistence } from "@/features/board/persist/local/board-persisten
 import { applyContentToStore } from "@/features/board/persist/local/apply-content"
 import { getLocalStores } from "@/features/local-stores"
 import { saveLocalThumbnail } from "@/features/board/local/save-local-thumbnail"
+import { setBoardPersistenceRef } from "@/features/board/persist/local/board-persistence-ref"
 import { ShareButton } from "@/features/sharing/share-button"
 import { useBoardAppStore } from "../store/board-app-store"
 import { createBoardStore } from "../store/create-board-store"
@@ -297,6 +298,7 @@ export function HarnessCanvas({ local = false }: { local?: boolean } = {}) {
           if (cancelled) return undefined
           // Share the app-wide engine (a desktop build injects SQLite here).
           persistence = new BoardPersistence(boardId, { engine: stores.engine })
+          setBoardPersistenceRef(persistence)
           return persistence.load()
         })
         .then((content) => {
@@ -320,6 +322,7 @@ export function HarnessCanvas({ local = false }: { local?: boolean } = {}) {
       return () => {
         cancelled = true
         detach?.()
+        setBoardPersistenceRef(null)
         const p = persistence
         if (p) void p.flush().finally(() => p.close())
       }

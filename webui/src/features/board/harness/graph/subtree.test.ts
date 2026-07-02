@@ -1,8 +1,17 @@
-import { describe, expect, it } from "vitest"
+import { afterEach, describe, expect, it } from "vitest"
 import { asNodeId } from "@canvas-harness/core"
 import { addEdge, freshStore } from "@/test/canvas"
 import type { DimNode } from "@/features/board/model"
-import { collectSubtreeIds, removeNodeSubtree } from "./subtree"
+import { BoardPersistence } from "@/features/board/persist/local/board-persistence"
+import { InMemoryEngine } from "@/features/board/persist/local/in-memory-engine"
+import { setBoardPersistenceRef } from "@/features/board/persist/local/board-persistence-ref"
+import { collectSubtreeIds, removeNodeSubtree, removeNodesSubtreeAsync } from "./subtree"
+
+
+afterEach(() => {
+  // The persistence ref is a module singleton — isolate tests.
+  setBoardPersistenceRef(null)
+})
 
 
 // Minimal DimNode for the pure BFS (only id + data.parentId are read).
@@ -82,5 +91,35 @@ describe("removeNodeSubtree", () => {
     addChild(store, "b")
     removeNodeSubtree(store, asNodeId("a"))
     expect(store.getAllNodes().map((n) => n.id)).toEqual(["b"])
+  })
+
+
+  it("cascades to descendants in deeper (unloaded) layers via persistence", async () => {
+    const engine = new InMemoryEngine()
+    const persistence = new BoardPersistence("b", { engine })
+
+    // Seed the WHOLE board (all layers) into the oplog via a full store.
+    const full = freshStore("seed")
+    const unsub = persistence.attach(full)
+    addChild(full, "F") // folder at root
+    addChild(full, "c1", "F") // child — a deeper layer
+    addChild(full, "c2", "c1") // grandchild — deeper still
+    addChild(full, "s") // sibling at root
+    await persistence.flush()
+    unsub()
+
+    // Simulate the live ROOT-layer store: only F + s are loaded (children are deeper).
+    const live = freshStore("live")
+    addChild(live, "F")
+    addChild(live, "s")
+    persistence.attach(live)
+    setBoardPersistenceRef(persistence)
+
+    await removeNodesSubtreeAsync(live, [asNodeId("F")])
+
+    // Loaded layer: F gone from the live store, sibling remains.
+    expect(live.getAllNodes().map((n) => n.id).sort()).toEqual(["s"])
+    // Whole board: the deeper descendants were swept from the oplog too.
+    expect((await persistence.load()).nodes.map((n) => n.id).sort()).toEqual(["s"])
   })
 })
