@@ -53,6 +53,47 @@ out → persist snapshot to R2, ACL/meta in D1). **v1 can ship on the existing F
 | Presence (cursors/selection) | ✅ backend | ✅ unchanged |
 | Read-only for viewers | ✅ relay rejects | ✅ unchanged |
 
+## 2b. Server persistence (FastAPI v1 → Cloudflare) — the "post office" shape
+
+Today the server is a **factory**: it parses every op into a normalized DB (Postgres graph +
+Qdrant vectors) and owns the canonical model; the op-log itself isn't durable (in-memory 500-op
+ring buffer resets on restart); per-note history lives in `NoteRevisionStore` (Postgres, zstd).
+
+Target = **post office**: the server stores three *separable* concerns and never needs to
+understand note internals:
+1. **op-log** — `(board_id, seq, batch)` rows (durable; the catch-up buffer + history substrate).
+2. **snapshots** — periodic full-board blob per board (fast join + compaction).
+3. **ACL / metadata** — already exists (`graph`, `graph_user`).
+
+Persist v1 in this shape even on FastAPI (Postgres/filesystem behind the three concerns) so the
+Cloudflare move is a **storage swap, not a redesign**:
+
+| Concern | FastAPI v1 | Cloudflare |
+|---|---|---|
+| Op-log + seq + live room (hot state) | in-memory Room + **Postgres oplog table** | **Durable Object** per board (own strongly-consistent storage; also fixes sticky-routing) |
+| Snapshots / blobs | Postgres blob or filesystem | **R2** (zero egress) |
+| ACL / metadata / accounts | Postgres (`graph`, `graph_user`) | **D1** (serverless SQLite) |
+| Search vectors | Qdrant | Vectorize, or drop for client-side Orama |
+
+Same protocol + client on both; only *where the three stores live* changes. (This is also the
+transition off the ~1,800 LOC factory translation layer — server stores opaque snapshots, not a
+parsed graph.) Refs: DO storage, D1, R2 — see `developers.cloudflare.com/workers/platform/storage-options`.
+
+## 2c. Snapshots + edit history (first-class, not a footnote)
+
+A **snapshot** = full board state at `seq=N`. Three jobs: (1) fast join (load snapshot@N + replay
+tail, not from genesis), (2) compaction (drop ops ≤ N), (3) restore point. **Edit history** = the
+op-log (`seq`, `clientId`, `ts`, patch) + periodic snapshots → time-travel, audit, restore.
+
+Two grains, keep both: **whole-board** snapshot+oplog (join/catch-up/compaction — already built
+locally in `board-persistence.ts`; server needs the durable twin) and **per-entity revisions**
+(today's `NoteRevisionStore` → user-facing "restore this note").
+
+Relation to conflict resolution: LWW + monotonic `seq` makes edits **converge**; history does NOT
+make convergence correct — it's the **safety net that makes an LWW clobber recoverable** (restore
+the lost value; debug "why did this change"). Essential for trust, not for correctness. Nice
+symmetry: local and server persistence are the **same shape** — snapshot + op-log + compaction.
+
 ## 3. As-built vs gap (from scout)
 
 Exists: WS relay (seq, rooms, 500-op catch-up buffer, presence, ACL rejection), optimistic
@@ -95,9 +136,13 @@ adapter only when `synced`.
 - **Risks:** migration correctness (no lost ops between snapshot cut and first synced op);
   identity/ACL assignment.
 
-### E3 — Relay hardening  (v1 on FastAPI: ~200–300 LOC; Cloudflare: ~1200+ LOC, separate)
+### E3 — Relay + server persistence hardening  (v1 on FastAPI: ~350–500 LOC; Cloudflare: ~1200+ LOC, separate)
 - **v1 (recommended):** reuse the FastAPI relay — adapt `collab.py` to accept the local-first
   client's outbox replay + initial snapshot push from E2. Ships on existing infra. (~250, MED)
+- **Durable op-log + snapshots (post-office shape, §2b/2c):** add a Postgres `oplog`
+  `(board_id, seq, batch)` table (replaces the volatile in-memory ring buffer) + periodic
+  whole-board `snapshots` blob + a compaction/checkpoint job; keep per-note revisions
+  (`NoteRevisionStore`). Written as three separable stores so Cloudflare = swap to DO/R2/D1. (~150–200, MED)
 - **Cloudflare target (later phase E3′):** Durable Object per board (relay+seq+buffer) ~500;
   R2 snapshot persistence ~200; D1 ACL/meta ~200; wrangler/auth/infra + migration ~300+.
   Complexity: HIGH (greenfield infra, ops). Defer until scale/"post-office" demands it.
@@ -107,7 +152,8 @@ Hybrid Logical Clock on the op envelope for replay-safe LWW across clock-skewed 
 Not needed for v1 (relay causal order suffices); add when multi-device offline merge shows
 skew artifacts. The only missing field for offline-replay-safe LWW.
 
-**Total v1 (E1+E2+E3-FastAPI): ~1300–1800 LOC.** Cloudflare + HLC are separate later phases.
+**Total v1 (E1+E2+E3-FastAPI incl. durable op-log/snapshots): ~1450–2000 LOC.** Cloudflare + HLC
+are separate later phases.
 
 ## 5. Tests to write (estimation only)
 
@@ -127,6 +173,8 @@ skew artifacts. The only missing field for offline-replay-safe LWW.
 - Concurrent same-field edits A/B → both converge to last-seq. (~2)
 - Disconnect mid-batch → no partial apply; replays whole batch. (~1)
 - Catch-up via `since_seq` (in-buffer vs snapshot fallback). (~2)
+- Snapshot + compaction: checkpoint@N then join replays snapshot@N + tail == full replay. (~2)
+- History/restore: op-log reconstructs a prior state; restore a per-note revision. (~1)
 - Share local→synced: A shares, B joins, sees full board. (~2)
 - Idempotent replay: re-sending outbox after a missed ack doesn't duplicate. (~1)
 
