@@ -36,6 +36,14 @@ and `useCenterFromUrl` already handles `?center=<id>`; `root_id` drives the laye
 
 ## 3. Transforms port — notify / mapify / schemify / drawify  (~250 + ~180 drawify, med risk)
 
+**DEFERRED until after the sync spine (Phase E).** These are leaf features (structured
+LLM call → notes/links → existing apply path); nothing depends on them and the buttons are
+already hidden on local (`!isLocal`), so there's no regression. Deferring avoids rework:
+the sync spine may change persistence / the op model, and transforms write notes/links on
+top of that — so they should be built once, on the final substrate. Plan below stands as-is
+for when we pick it up.
+
+
 Apply half already works locally: `SaveAsNote → convert → {notes,links} → setMindMap →
 useHarnessApplyMindMap` (drain path already local-wired). Porting = replace the backend API
 call with a **local structured LLM call** returning the same `{notes,links}`, reuse staging.
