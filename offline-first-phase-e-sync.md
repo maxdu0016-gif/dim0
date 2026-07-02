@@ -28,19 +28,61 @@ Two planes, one trigger (`offline-first-architecture.md` §Two planes):
 
 **Client:** the local replica (IndexedDB oplog + snapshot, already built in
 `board-persistence.ts`) is the working source of truth. Edits are optimistic (`origin:local`),
-appended to the oplog, and the **outbox** = oplog entries with `seq > syncedSeq`. On (re)connect
-the outbox replays; remote ops (`origin:remote`) are applied + persisted; dedup by `batch.id`.
-
-**Conflict model:** LWW-register per field. The relay's monotonic `seq` gives causal order, so
-concurrent disjoint-field edits commute and same-field edits are last-seq-wins — deterministic
-enough for v1 without HLC.
+appended to the oplog, and the **outbox** = local batches not yet acked by the relay (tracked via
+a `syncedSeq` server cursor). On (re)connect the outbox replays; remote ops (`origin:remote`) are
+applied + persisted; dedup by `batch.id`. Conflict model = §1c.
 
 **Relay:** target is a **Cloudflare Durable Object per board** (validate ACL → assign seq → fan
-out → persist snapshot to R2, ACL/meta in D1). **v1 can ship on the existing FastAPI WS relay**
-(`collab.py` + `room.py` already do seq/rooms/catch-up/ACL) and migrate to Cloudflare later.
+out → persist snapshot to R2, ACL/meta in D1). **v1 ships on the existing FastAPI WS relay**
+(`collab.py` + `room.py` already do seq/rooms/catch-up/ACL) and migrates to Cloudflare later.
+Note the hybrid split: **FastAPI stays the control plane** (accounts, JWT, collab tickets, AI
+metering/proxy); **only the relay** becomes a TS Worker+DO on Cloudflare (not a FastAPI lift —
+Workers/DOs are TS); **the agent is client-side**. A short-lived signed **ticket** (JWT →
+`/ticket` → WS) bridges auth so the relay never touches the user DB.
 
 **Board kind:** `local-only` (IndexedDB only, no owner/ACL) → `synced` (relay + ACL). The
 "Share" action is the hybrid migration.
+
+## 1b. Op & data model (the unit that syncs)
+
+- **Op** = one field-level mutation: `node.add|update|remove`, `edge.*`, `group.upsert`.
+  `node.update` carries a **partial patch** (only changed fields) — the basis for disjoint-field merge.
+- **Batch** (`OpBatch = {id, clientId, ts, origin, ops[]}`) = the **atomic unit**: one `seq`, one
+  undo step, one broadcast, one oplog row. `origin ∈ local | remote | history`. (Label-edit +
+  position-move are two ops; one batch or two depending on whether they share a `store.batch()`
+  gesture — doesn't affect merge, since LWW is per-field.)
+- **Two seqs, don't conflate:** a **local** oplog seq (per board; orders IndexedDB entries for
+  replay/compaction; the only order an offline op has) and the **server** `seq` (relay-assigned;
+  the shared total order, per board — NOT per note/link). Conflicts resolve per-field but *use* the
+  board `seq` as the comparison key.
+- **Undo is separate** — an in-memory stack (`origin:history`), NOT seq-based. In collab, undo =
+  apply the inverse as a **new forward op** (you can't rewind the shared log). Oplog *replay* uses
+  `origin:remote` so a reload never populates the undo stack.
+
+## 1c. Conflict resolution (server-sequenced per-field LWW)
+
+Not a pure CRDT — **server-sequenced ops**: the relay imposes one order (`seq`); clients apply in
+that order; **LWW per field** (highest-`seq` writer of a field wins). Semantically an LWW-Register
+(which *is* a CRDT) with `seq` as the clock; swapping `seq`→HLC (E4) makes it coordination-free.
+Server-authority is the mainstream choice (Figma/Linear), not a compromise.
+
+Rules by case:
+- **Disjoint fields** (A moves, B renames the same node) → both apply, commute. No conflict.
+- **Same field, concurrent** → highest `seq` wins; loser recoverable via history.
+- **Add/add same id** → upsert, last wins (ids are uuids → rare). Different ids → both.
+- **Delete vs update** → **delete wins, with a tombstone** (else a late/replayed update can
+  resurrect a "zombie"). Requires remembering deletes.
+- **Edge vs node delete** → drop the dangling edge (referential-integrity pass; same logic as the
+  subtree cascade).
+- **Ordered lists** (z-index, `frameOrder`, child order) → LWW on the order value in v1 (occasional
+  reorder flicker); fractional-index / sequence-CRDT later if it hurts.
+- **Same-note text co-edit** → LWW on the content field (last writer clobbers); mitigated by
+  per-note granularity + presence. The **only** case the deferred Yjs `Y.Text` upgrade targets.
+
+**Known v1 limitation — "reconnect-order-wins":** offline edits get their `seq` from the relay at
+*reconnect*, so they land after anything accepted meanwhile — a stale offline edit can clobber a
+newer online one (still converges; the "wrong" value may win). Replay is idempotent via `batch.id`.
+HLC (E4) turns this into "actually-latest-wins."
 
 ## 2. Feature mapping (what the user gets)
 
@@ -94,6 +136,21 @@ make convergence correct — it's the **safety net that makes an LWW clobber rec
 the lost value; debug "why did this change"). Essential for trust, not for correctness. Nice
 symmetry: local and server persistence are the **same shape** — snapshot + op-log + compaction.
 
+## 2d. Chats — private, per-user, off the relay
+
+Agent chats are **always private per user** (backend `Chat` has `user_uid`). So they are **not**
+part of the collaborative board doc and do **not** go through the relay/op-log:
+- **Format** — the client shapes verbatim: `LocalChat` (meta) + `LocalMessage[]` (append-only,
+  immutable messages with `order`), stored opaque with a `schemaVersion`.
+- **Transport** — plain **REST** `save transcript` / `load transcript`, keyed `(user, board, chat)`
+  — mirrors the local `ChatRepo`. No fan-out, no CRDT, no LWW.
+- **Backend v1** — `chat(chat_id, board_id, user_id, …)` + `chat_message(chat_id, ord, payload)`.
+- Multi-device: a user's own devices sync chats via the same REST (last-write per transcript is
+  fine given single-user, low-concurrency). Upgrade to a per-user chat op-log only if concurrent
+  multi-device chat editing ever becomes real.
+
+This keeps chats out of E1's relay work entirely — a small, independent persistence task.
+
 ## 3. As-built vs gap (from scout)
 
 Exists: WS relay (seq, rooms, 500-op catch-up buffer, presence, ACL rejection), optimistic
@@ -121,8 +178,12 @@ adapter only when `synced`.
   become one wiring: local-only = persistence only; synced = persistence + WS adapter. (~250–350)
 - **Rollback on op-rejected** — apply `inverseBatch()` on rejection instead of keeping the
   optimistic mutation (optional for v1; behind a flag). (~100)
+- **Delete semantics (§1c)** — tombstones (delete-wins, no zombie resurrection) + a referential
+  pass dropping edges to deleted nodes; applied on both client-apply and server-apply (mirror in E3). (~80)
+- **Chats (§2d), independent small task** — REST save/load transcript keyed `(user, board, chat)`;
+  no relay. Can land in parallel with E1. (~120)
 - **Risks:** offline/online reconciliation + dedup ordering is the subtle part; remote-op
-  persistence must not double-count local echoes.
+  persistence must not double-count local echoes; tombstone durability across compaction.
 
 ### E2 — Hybrid migration: local-only → synced ("Share")  (~400–600 LOC, complexity: MED-HIGH)
 - **Board kind gating** — `BoardMeta.kind` exists locally; gate adapter attach on it; backend
@@ -152,25 +213,30 @@ Hybrid Logical Clock on the op envelope for replay-safe LWW across clock-skewed 
 Not needed for v1 (relay causal order suffices); add when multi-device offline merge shows
 skew artifacts. The only missing field for offline-replay-safe LWW.
 
-**Total v1 (E1+E2+E3-FastAPI incl. durable op-log/snapshots): ~1450–2000 LOC.** Cloudflare + HLC
-are separate later phases.
+**Total v1 (E1+E2+E3-FastAPI incl. durable op-log/snapshots, delete-semantics, chats):
+~1650–2200 LOC.** Cloudflare + HLC are separate later phases.
 
 ## 5. Tests to write (estimation only)
 
-### Unit (~18–26 tests)
+### Unit (~24–32 tests)
 - Outbox derivation from oplog (`seq > syncedSeq`); `syncedSeq` advance on ack. (~4)
 - Remote-op persistence + `batch.id` dedup; no double-count of local echo. (~4)
 - LWW merge: disjoint-field patches commute; same-field last-seq-wins. (~4)
+- Delete semantics: delete-vs-update → delete wins (no zombie); tombstone survives compaction. (~2)
+- Edge referential integrity: node delete drops incident edges; concurrent add-edge/delete-node. (~2)
 - `inverseBatch` rollback on `op-rejected` restores pre-op state. (~3)
 - Board-kind gating (local-only attaches no adapter; synced attaches). (~2)
 - Share migration: id stability, snapshot+oplog handoff shape. (~3)
+- Chats: REST transcript round-trip; order preserved; per-user isolation. (~2)
 - (E4 later) HLC compare/tiebreak. (~3)
 
-### Integration (~8–12 tests, needs a harness)
+### Integration (~9–13 tests, needs a harness)
 - **Harness (~150 LOC):** an in-memory relay + two clients over `InMemoryEngine` + a fake
   `SyncAdapter` — the reusable core for all convergence tests.
 - Offline edit on A → reconnect → converges to relay + B. (~2)
 - Concurrent same-field edits A/B → both converge to last-seq. (~2)
+- Reconnect-order-wins: A edits offline, B edits online meanwhile, A reconnects → both converge
+  (documents the stale-wins caveat; the test HLC will later invert). (~1)
 - Disconnect mid-batch → no partial apply; replays whole batch. (~1)
 - Catch-up via `since_seq` (in-buffer vs snapshot fallback). (~2)
 - Snapshot + compaction: checkpoint@N then join replays snapshot@N + tail == full replay. (~2)
