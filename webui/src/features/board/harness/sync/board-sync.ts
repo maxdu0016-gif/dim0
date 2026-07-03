@@ -104,6 +104,22 @@ export const attachBoardSync = (opts: BoardSyncOptions): BoardSyncHandle => {
     enqueue(() => opts.persistence.recordRemote(batch, serverSeq)) // durable across reload
   }
 
+  /**
+   * Roll back a rejected local batch: undo all unacked local ops, drop the
+   * rejected one, replay the rest (same rebase machinery), so the optimistic
+   * edit disappears while other pending edits are preserved. Store writes use
+   * `origin: "remote"` so nothing re-sends or re-persists.
+   */
+  const rollbackPending = (batchId: string): void => {
+    const pend = [...pending.values()]
+    for (let i = pend.length - 1; i >= 0; i--) {
+      opts.store.applyBatch({ ...pend[i], ops: inverseBatch(pend[i]), origin: "remote" })
+    }
+    pending.delete(batchId)
+    for (const p of pending.values()) opts.store.applyBatch({ ...p, origin: "remote" })
+    pruneDanglingEdges(opts.store)
+  }
+
   const pump = async (): Promise<void> => {
     if (!connection) return
     await opts.persistence.flush() // ensure fresh local edits are in the oplog
@@ -147,7 +163,8 @@ export const attachBoardSync = (opts: BoardSyncOptions): BoardSyncHandle => {
         inFlight.delete(msg.client_seq)
         if (rec) {
           rejected.add(rec.seq) // don't resend a refused op
-          pending.delete(rec.batchId)
+          if (pending.has(rec.batchId)) rollbackPending(rec.batchId) // revert optimistic edit
+          enqueue(() => opts.persistence.removeBatch(rec.seq)) // don't resurrect on reload
         }
         break
       }

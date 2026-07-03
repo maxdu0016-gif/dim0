@@ -194,8 +194,10 @@ describe("board sync coordinator", () => {
 
     expect(ids(editor.store)).toEqual([]) // never broadcast
     expect(relay.log).toHaveLength(0)
-    // viewer keeps its optimistic node (rollback lands in E1.6)
-    expect(ids(viewer.store)).toEqual(["v1"])
+    expect(ids(viewer.store)).toEqual([]) // optimistic node rolled back on reject
+    // the rollback is durable — a reload doesn't resurrect it
+    const reloaded = new BoardPersistence(BOARD, { engine: viewer.engine })
+    expect((await reloaded.load()).nodes).toEqual([])
     editor.sync.detach()
     viewer.sync.detach()
   })

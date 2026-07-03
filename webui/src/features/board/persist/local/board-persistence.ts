@@ -97,6 +97,16 @@ export class BoardPersistence {
   }
 
 
+  /**
+   * Remove a batch from the oplog by its local seq. Used when the relay rejects
+   * a local op (e.g. read-only): the optimistic edit is rolled back in the store
+   * and must not resurrect on reload.
+   */
+  async removeBatch(localSeq: number): Promise<void> {
+    await this.requireEngine().delete("oplog", [this.boardId, localSeq])
+  }
+
+
   /** Buffer a batch and schedule a debounced flush to the oplog. */
   private enqueue(batch: OpBatch, serverSeq?: number): void {
     this.pending.push({ batch, serverSeq })
