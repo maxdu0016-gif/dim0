@@ -12,6 +12,20 @@ beforeEach(() => {
 })
 
 
+/** Capture a valid OpBatch from a throwaway store, retagged as a relay `remote` op. */
+const captureRemoteBatch = (mutate: (s: ReturnType<typeof freshStore>) => void): OpBatch => {
+  const s = freshStore("peer")
+  let captured: OpBatch | undefined
+  const unsub = s.subscribe("change", (b) => {
+    captured = b
+  })
+  mutate(s)
+  unsub()
+  if (!captured) throw new Error("no batch captured")
+  return { ...captured, origin: "remote" }
+}
+
+
 /** Test double: a compaction that crashes before any write commits. */
 class CrashOnCompact extends BoardPersistence {
   protected async writeSnapshot(): Promise<void> {
@@ -33,6 +47,22 @@ describe("BoardPersistence", () => {
     const content = await p.load()
     expect(content.nodes.map((n) => n.id)).toContain("n1")
     expect((content.nodes[0]?.data)?.label).toBe("hello")
+    p.close()
+  })
+
+
+  it("recordRemote persists relay ops so a reload includes remote edits", async () => {
+    const p = new BoardPersistence("b")
+    await p.init()
+    const store = freshStore("c")
+    p.attach(store)
+
+    addNode(store, "local1") // a local edit (recorded via the attach path)
+    p.recordRemote(captureRemoteBatch((s) => addNode(s, "remote1", "from peer")))
+    await p.flush()
+
+    const content = await p.load()
+    expect(content.nodes.map((n) => n.id).sort()).toEqual(["local1", "remote1"])
     p.close()
   })
 

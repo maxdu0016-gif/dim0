@@ -61,9 +61,27 @@ export class BoardPersistence {
   }
 
 
-  /** Buffer a committed batch for persistence (debounced). Ignores remote ops. */
+  /**
+   * Persist a LOCAL committed batch (the attach 'change' path). Remote batches
+   * are skipped here on purpose: the load-time hydrate is applied as a `remote`
+   * batch, so persisting remote from 'change' would re-persist the whole board.
+   * Genuine relay ops are persisted via `recordRemote` (called by the sync
+   * coordinator), so a reload reconstructs the converged (local + remote) state.
+   */
   record(batch: OpBatch): void {
     if (batch.origin === "remote") return
+    this.enqueue(batch)
+  }
+
+
+  /** Persist a batch received from the relay so reload includes remote edits. */
+  recordRemote(batch: OpBatch): void {
+    this.enqueue(batch)
+  }
+
+
+  /** Buffer a batch and schedule a debounced flush to the oplog. */
+  private enqueue(batch: OpBatch): void {
     this.pending.push(batch)
     if (this.timer === null) {
       this.timer = setTimeout(() => this.flushPending(), this.debounceMs)
