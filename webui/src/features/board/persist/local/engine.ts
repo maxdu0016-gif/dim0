@@ -21,6 +21,7 @@ export type Collection =
   | "chats"
   | "chat_messages"
   | "mini_app_state"
+  | "sync_meta"
 
 
 /** A primary or index key: a scalar, or a compound (array) key. */

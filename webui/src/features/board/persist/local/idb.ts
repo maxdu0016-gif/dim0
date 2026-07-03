@@ -26,6 +26,10 @@ export type SnapshotRecord = { content: BoardContent; seq: number }
 export type OplogRecord = { boardId: string; seq: number; batch: OpBatch }
 
 
+/** Sync cursor per board: the highest local oplog seq the relay has acked. */
+export type SyncMetaRecord = { boardId: string; syncedSeq: number }
+
+
 interface Dim0DB extends DBSchema {
   snapshots: { key: string; value: SnapshotRecord }
   oplog: { key: [string, number]; value: OplogRecord }
@@ -38,6 +42,8 @@ interface Dim0DB extends DBSchema {
   chat_messages: { key: [string, string]; value: LocalMessage }
   // Per-note mini-app widget state (local analog of backend /mini-app-state).
   mini_app_state: { key: string; value: { noteId: string; state: unknown } }
+  // Sync cursor per board (offline outbox — how far the relay has acked).
+  sync_meta: { key: string; value: SyncMetaRecord }
 }
 
 
@@ -45,7 +51,7 @@ export type Dim0Database = IDBPDatabase<Dim0DB>
 
 
 const DB_NAME = "dim0"
-const DB_VERSION = 4
+const DB_VERSION = 5
 
 
 // Minimal loose shapes for the upgrade loop (see the cast note in `upgrade`).

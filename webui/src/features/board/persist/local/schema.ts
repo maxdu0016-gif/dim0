@@ -24,4 +24,5 @@ export const COLLECTIONS: Record<Collection, CollectionSchema> = {
   chats: { keyPath: "id", indexes: { "by-board": "boardId" } },
   chat_messages: { keyPath: ["chatUid", "id"] },
   mini_app_state: { keyPath: "noteId" },
+  sync_meta: { keyPath: "boardId" },
 }
