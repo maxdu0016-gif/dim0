@@ -83,9 +83,10 @@ export class MemoryRelay {
       }
       case "hello": {
         // Catch-up: ops after `since_seq`, excluding the joiner's own (no self-echo).
+        // Each carries its relay `seq` so the client can order it per-field LWW.
         const batches = this.log
           .filter((e) => e.seq > msg.since_seq && e.batch.clientId !== clientId)
-          .map((e) => e.batch)
+          .map((e) => ({ seq: e.seq, batch: e.batch }))
         this.deliver(clientId, { kind: "welcome", seq: this.seq, batches })
         return
       }

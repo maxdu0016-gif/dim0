@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest"
-import { asBatchId, asClientId, type OpBatch } from "@canvas-harness/core"
-import { addNode, freshStore } from "@/test/canvas"
+import { asBatchId, asClientId, asNodeId, type OpBatch } from "@canvas-harness/core"
+import type { CanvasStore } from "@canvas-harness/core"
+import { addEdge, addNode, freshStore } from "@/test/canvas"
+import type { DimNodeData } from "@/features/board/model"
 import { MemoryRelay } from "@/test/sync-relay"
 import { InMemoryEngine } from "@/features/board/persist/local/in-memory-engine"
 import { BoardOutbox } from "@/features/board/persist/local/board-outbox"
@@ -31,6 +33,26 @@ const makeClient = (relay: MemoryRelay, id: string, opts: { canEdit?: boolean } 
 
 const ids = (store: ReturnType<typeof freshStore>): string[] =>
   store.getAllNodes().map((n) => n.id).sort()
+
+
+const edgeIds = (store: CanvasStore): string[] =>
+  store.getAllEdges().map((e) => e.id).sort()
+
+
+const labelOf = (store: CanvasStore, id: string): string | undefined =>
+  (store.getAllNodes().find((n) => n.id === id)?.data as DimNodeData | undefined)?.label
+
+
+const xOf = (store: CanvasStore, id: string): number | undefined =>
+  store.getAllNodes().find((n) => n.id === id)?.x
+
+
+/** Update a node's label in place, preserving the rest of its data. */
+const setLabel = (store: CanvasStore, id: string, label: string): void => {
+  const node = store.getAllNodes().find((n) => n.id === id)
+  if (!node) throw new Error(`no node ${id}`)
+  store.updateNode(asNodeId(id), { data: { ...(node.data as DimNodeData), label } })
+}
 
 
 describe("board sync coordinator", () => {
@@ -176,6 +198,153 @@ describe("board sync coordinator", () => {
     expect(ids(viewer.store)).toEqual(["v1"])
     editor.sync.detach()
     viewer.sync.detach()
+  })
+})
+
+
+describe("E1.4 conflict resolution", () => {
+  it("same-field concurrent edits converge on the highest-seq writer", async () => {
+    const relay = new MemoryRelay()
+    const a = makeClient(relay, "A")
+    const b = makeClient(relay, "B")
+    addNode(a.store, "n1", "base")
+    await a.sync.settle()
+    await b.sync.settle() // both hold n1 = "base"
+
+    setLabel(a.store, "n1", "AAA") // concurrent, same field
+    setLabel(b.store, "n1", "BBB")
+    await a.sync.settle() // A's op is sequenced first
+    await b.sync.settle() // B's op gets the higher seq → wins
+    await a.sync.settle()
+
+    expect(labelOf(a.store, "n1")).toBe("BBB")
+    expect(labelOf(b.store, "n1")).toBe("BBB")
+    a.sync.detach()
+    b.sync.detach()
+  })
+
+
+  it("disjoint-field concurrent edits both survive (commute)", async () => {
+    const relay = new MemoryRelay()
+    const a = makeClient(relay, "A")
+    const b = makeClient(relay, "B")
+    addNode(a.store, "n1", "base")
+    await a.sync.settle()
+    await b.sync.settle()
+
+    setLabel(a.store, "n1", "renamed") // A renames
+    b.store.updateNode(asNodeId("n1"), { x: 250 }) // B moves — different field
+    await a.sync.settle()
+    await b.sync.settle()
+    await a.sync.settle()
+
+    for (const s of [a.store, b.store]) {
+      expect(labelOf(s, "n1")).toBe("renamed")
+      expect(xOf(s, "n1")).toBe(250)
+    }
+    a.sync.detach()
+    b.sync.detach()
+  })
+
+
+  it("delete wins over a concurrent update (no zombie)", async () => {
+    const relay = new MemoryRelay()
+    const a = makeClient(relay, "A")
+    const b = makeClient(relay, "B")
+    addNode(a.store, "n1", "base")
+    await a.sync.settle()
+    await b.sync.settle()
+
+    a.store.removeNode(asNodeId("n1")) // A deletes
+    setLabel(b.store, "n1", "edited") // B edits the same node concurrently
+    await a.sync.settle()
+    await b.sync.settle()
+    await a.sync.settle()
+
+    expect(ids(a.store)).toEqual([]) // gone on both
+    expect(ids(b.store)).toEqual([])
+    a.sync.detach()
+    b.sync.detach()
+  })
+
+
+  it("a reload after a same-field conflict matches the live winner", async () => {
+    const relay = new MemoryRelay()
+    const a = makeClient(relay, "A")
+    const b = makeClient(relay, "B")
+    addNode(a.store, "n1", "base")
+    await a.sync.settle()
+    await b.sync.settle()
+
+    setLabel(a.store, "n1", "AAA")
+    setLabel(b.store, "n1", "BBB") // B's op gets the higher seq
+    await a.sync.settle()
+    await b.sync.settle()
+    await a.sync.settle()
+
+    // Live winner is BBB on both; a reload of A must replay in relay order and
+    // land on BBB too (not A's local-append order, which would give AAA).
+    const reloaded = new BoardPersistence(BOARD, { engine: a.engine })
+    const content = await reloaded.load()
+    expect(content.nodes.find((n) => n.id === "n1")?.data?.label).toBe("BBB")
+    a.sync.detach()
+    b.sync.detach()
+  })
+
+
+  it("drops an edge whose endpoint was concurrently deleted", async () => {
+    const relay = new MemoryRelay()
+    const a = makeClient(relay, "A")
+    const b = makeClient(relay, "B")
+    addNode(a.store, "n1")
+    addNode(a.store, "n2")
+    await a.sync.settle()
+    await b.sync.settle() // both hold n1, n2
+
+    a.store.removeNode(asNodeId("n2")) // A deletes an endpoint
+    addEdge(b.store, "e1", "n1", "n2") // B links to it concurrently
+    await a.sync.settle()
+    await b.sync.settle()
+    await a.sync.settle()
+
+    for (const s of [a.store, b.store]) {
+      expect(ids(s)).toEqual(["n1"]) // n2 gone
+      expect(edgeIds(s)).toEqual([]) // dangling edge dropped
+    }
+
+    // The dropped edge stays dropped after a reload of the client that made it.
+    const reloaded = new BoardPersistence(BOARD, { engine: b.engine })
+    const content = await reloaded.load()
+    expect(content.edges).toEqual([])
+    a.sync.detach()
+    b.sync.detach()
+  })
+
+
+  it("offline field edit wins on reconnect (reconnect-order-wins)", async () => {
+    const relay = new MemoryRelay()
+    const a = makeClient(relay, "A")
+    const b = makeClient(relay, "B")
+    addNode(a.store, "n1", "base")
+    await a.sync.settle()
+    await b.sync.settle()
+
+    a.sync.disconnect()
+    setLabel(a.store, "n1", "offline-A") // sits in the outbox, applied optimistically
+    await a.sync.settle()
+
+    setLabel(b.store, "n1", "online-B") // gets sequenced while A is away
+    await b.sync.settle()
+    expect(labelOf(b.store, "n1")).toBe("online-B")
+
+    a.sync.reconnect() // welcome delivers online-B; A replays offline-A (higher seq)
+    await a.sync.settle()
+    await b.sync.settle() // B receives offline-A at the higher seq → it wins
+
+    expect(labelOf(a.store, "n1")).toBe("offline-A")
+    expect(labelOf(b.store, "n1")).toBe("offline-A")
+    a.sync.detach()
+    b.sync.detach()
   })
 })
 

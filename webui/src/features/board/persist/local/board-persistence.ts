@@ -19,6 +19,7 @@ import { createCanvasStore } from "@canvas-harness/core"
 import type { CanvasStore, OpBatch } from "@canvas-harness/core"
 import type { BoardContent } from "@/features/board/model"
 import { contentToScene, emptyContent, readContent } from "./codec"
+import { pruneDanglingEdges } from "./integrity"
 import { IndexedDbEngine } from "./indexeddb-engine"
 import type { StorageEngine } from "./engine"
 import type { SnapshotRecord, OplogRecord } from "./idb"
@@ -32,7 +33,7 @@ export class BoardPersistence {
   private readonly ownsEngine: boolean
   private seq = 0
   private queue: Promise<void> = Promise.resolve()
-  private pending: OpBatch[] = []
+  private pending: { batch: OpBatch; serverSeq?: number }[] = []
   private timer: ReturnType<typeof setTimeout> | null = null
   private readonly seen = new Set<string>()
   private readonly boardId: string
@@ -74,15 +75,31 @@ export class BoardPersistence {
   }
 
 
-  /** Persist a batch received from the relay so reload includes remote edits. */
-  recordRemote(batch: OpBatch): void {
-    this.enqueue(batch)
+  /**
+   * Persist a batch received from the relay so reload includes remote edits.
+   * `serverSeq` is the relay's total-order position — materialize replays by it.
+   */
+  recordRemote(batch: OpBatch, serverSeq?: number): void {
+    this.enqueue(batch, serverSeq)
+  }
+
+
+  /**
+   * Record the relay-assigned `serverSeq` for a local batch (called on ack).
+   * Ordering the oplog by `serverSeq` at load time makes a reload converge to
+   * the same state live sync did, instead of raw local-append order.
+   */
+  async setServerSeq(localSeq: number, serverSeq: number): Promise<void> {
+    const engine = this.requireEngine()
+    const rec = await engine.get<OplogRecord>("oplog", [this.boardId, localSeq])
+    if (!rec || rec.serverSeq !== undefined) return
+    await engine.put<OplogRecord>("oplog", { ...rec, serverSeq })
   }
 
 
   /** Buffer a batch and schedule a debounced flush to the oplog. */
-  private enqueue(batch: OpBatch): void {
-    this.pending.push(batch)
+  private enqueue(batch: OpBatch, serverSeq?: number): void {
+    this.pending.push({ batch, serverSeq })
     if (this.timer === null) {
       this.timer = setTimeout(() => this.flushPending(), this.debounceMs)
     }
@@ -147,18 +164,18 @@ export class BoardPersistence {
     if (this.pending.length === 0) return
     const batches = this.pending
     this.pending = []
-    for (const batch of batches) {
-      this.queue = this.queue.then(() => this.append(batch))
+    for (const entry of batches) {
+      this.queue = this.queue.then(() => this.append(entry.batch, entry.serverSeq))
     }
   }
 
 
   /** Append one batch to the oplog (assigns next seq; de-dupes by batch id). */
-  private async append(batch: OpBatch): Promise<void> {
+  private async append(batch: OpBatch, serverSeq?: number): Promise<void> {
     if (this.seen.has(batch.id)) return
     this.seen.add(batch.id)
     this.seq += 1
-    await this.requireEngine().put<OplogRecord>("oplog", { boardId: this.boardId, seq: this.seq, batch })
+    await this.requireEngine().put<OplogRecord>("oplog", { boardId: this.boardId, seq: this.seq, batch, serverSeq })
   }
 
 
@@ -176,11 +193,20 @@ export class BoardPersistence {
     })
     const seq = records.length > 0 ? records[records.length - 1].seq : baseSeq
     if (records.length === 0) return { content: base, seq }
+    // Replay in relay (`serverSeq`) order so a reload converges the same way live
+    // sync did; unacked-local ops (no `serverSeq`) sort last, then by local seq.
+    // Stable within a serverSeq bucket, so all-local logs keep append order.
+    const ordered = [...records].sort((a, b) => {
+      const sa = a.serverSeq ?? Number.MAX_SAFE_INTEGER
+      const sb = b.serverSeq ?? Number.MAX_SAFE_INTEGER
+      return sa !== sb ? sa - sb : a.seq - b.seq
+    })
     const store = createCanvasStore({ initial: contentToScene(base) })
-    for (const r of records) {
+    for (const r of ordered) {
       this.seen.add(r.batch.id)
       store.applyBatch({ ...r.batch, origin: "remote" })
     }
+    pruneDanglingEdges(store)
     return { content: readContent(store), seq }
   }
 

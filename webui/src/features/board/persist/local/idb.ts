@@ -23,7 +23,14 @@ import { COLLECTIONS } from "./schema"
 export type SnapshotRecord = { content: BoardContent; seq: number }
 
 
-export type OplogRecord = { boardId: string; seq: number; batch: OpBatch }
+/**
+ * One committed batch in the local op-log.
+ * - `seq`: local oplog seq (per board) — orders IndexedDB entries for replay.
+ * - `serverSeq`: the relay-assigned order (undefined until acked). Materialize
+ *   replays in `serverSeq` order so a reload converges the same way live sync
+ *   does; unacked-local ops (no `serverSeq`) sort last (reconnect-order-wins).
+ */
+export type OplogRecord = { boardId: string; seq: number; batch: OpBatch; serverSeq?: number }
 
 
 /** Sync cursor per board: the highest local oplog seq the relay has acked. */

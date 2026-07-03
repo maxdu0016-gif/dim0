@@ -16,8 +16,12 @@ export type OutboundMessage =
   | { kind: "presence"; clientId: ClientId; state: PresenceState }
 
 
+/** A relay-sequenced batch (its position in the shared total order). */
+export type SeqBatch = { seq: number; batch: OpBatch }
+
+
 export type InboundMessage =
-  | { kind: "welcome"; seq: number; batches: OpBatch[] }
+  | { kind: "welcome"; seq: number; batches: SeqBatch[] }
   | { kind: "peer-op"; seq: number; batch: OpBatch }
   | { kind: "op-applied"; seq: number; client_seq: number }
   | { kind: "op-rejected"; client_seq: number; reason?: string }
