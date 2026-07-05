@@ -14,7 +14,7 @@ import asyncpg
 
 
 async def create_board_oplog_table(conn: asyncpg.Connection) -> None:
-    """Create the board op-log table when missing. Idempotent."""
+    """Create the board op-log table + batch-id index when missing. Idempotent."""
     await conn.execute(
         """
         CREATE TABLE IF NOT EXISTS board_oplog (
@@ -24,6 +24,14 @@ async def create_board_oplog_table(conn: asyncpg.Connection) -> None:
             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             PRIMARY KEY (board_id, seq)
         )
+        """
+    )
+    # Fast dedup lookup by (board_id, batch id) — a reconnecting client replays
+    # its outbox, so the relay must recognize an already-applied batch.
+    await conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS board_oplog_batch_id_idx
+        ON board_oplog (board_id, (batch->>'id'))
         """
     )
 
@@ -82,3 +90,16 @@ async def fetch_max_seq(conn: asyncpg.Connection, board_id: str) -> int:
         board_id,
     )
     return int(value)
+
+
+async def fetch_seq_for_batch(
+    conn: asyncpg.Connection,
+    board_id: str,
+    batch_id: str,
+) -> int | None:
+    """Return the seq a batch was already applied at, or None if never seen."""
+    return await conn.fetchval(
+        "SELECT seq FROM board_oplog WHERE board_id = $1 AND batch->>'id' = $2 LIMIT 1",
+        board_id,
+        batch_id,
+    )

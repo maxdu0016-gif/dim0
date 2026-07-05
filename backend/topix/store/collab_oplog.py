@@ -18,6 +18,7 @@ from topix.store.postgres.collab_oplog import (
     create_board_oplog_table,
     fetch_batches_since,
     fetch_max_seq,
+    fetch_seq_for_batch,
     insert_oplog_entry,
 )
 from topix.store.redis.store import RedisStore
@@ -67,6 +68,11 @@ class CollabOplogStore:
         """Highest durable seq for a board (0 when empty)."""
         async with self._require_pool().acquire() as conn:
             return await fetch_max_seq(conn, board_id)
+
+    async def seq_for_batch(self, board_id: str, batch_id: str) -> int | None:
+        """Seq a batch was applied at, or None — used to dedup outbox replays."""
+        async with self._require_pool().acquire() as conn:
+            return await fetch_seq_for_batch(conn, board_id, batch_id)
 
     async def next_seq(self, board_id: str) -> int:
         """Allocate the next monotonic seq for a board (atomic, restart-safe).

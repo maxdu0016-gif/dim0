@@ -94,6 +94,18 @@ async def test_max_seq_zero_when_empty(store):
     assert await store.max_seq(_board()) == 0
 
 
+async def test_seq_for_batch_finds_and_misses(store):
+    """Dedup lookup returns the seq of a known batch id, None for an unknown one."""
+    board = _board()
+    await store.append(board, 1, _batch(1))
+    await store.append(board, 2, _batch(2))
+    assert await store.seq_for_batch(board, "b1") == 1
+    assert await store.seq_for_batch(board, "b2") == 2
+    assert await store.seq_for_batch(board, "nope") is None
+    # Isolated per board.
+    assert await store.seq_for_batch(_board(), "b1") is None
+
+
 async def test_next_seq_is_monotonic(store):
     """Sequential allocations increase by one."""
     board = _board()

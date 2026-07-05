@@ -85,6 +85,12 @@ class _FakeOplog:
     async def max_seq(self, board_id: str) -> int:
         return max((s for s, _ in self.log.get(board_id, [])), default=0)
 
+    async def seq_for_batch(self, board_id: str, batch_id: str):
+        for s, b in self.log.get(board_id, []):
+            if b.get("id") == batch_id:
+                return s
+        return None
+
 
 class _FakeGraphStore:
     """Stub GraphStore covering the surface the collab router actually uses.
@@ -471,6 +477,49 @@ def test_ws_welcome_catch_up_mode_replays_buffered_batches():
             assert welcome["batches"][0]["id"] == "batch-n2"
 
 
+def test_ws_welcome_catch_up_proto_v2_tags_each_batch_with_seq():
+    """A v2 client's catch-up carries per-batch relay seq; v1 stays plain-batch.
+
+    The offline-first coordinator needs each catch-up batch's serverSeq to order
+    its reload the same way live sync did; the legacy client must be unaffected.
+    """
+    client, app = _build_app()
+    tickets = _mint_tickets(app, t1=("u1", "b1"), t2=("u2", "b1"), t3=("u3", "b1"))
+
+    with client.websocket_connect(f"/boards/b1/collab?ticket={tickets['t1']}") as sender:
+        _drain_welcome(sender)
+        for nid in ("n1", "n2"):
+            sender.send_json({
+                "kind": "op",
+                "client_seq": 1,
+                "batch": {
+                    "id": f"batch-{nid}",
+                    "clientId": "alice",
+                    "origin": "local",
+                    "ops": [{"type": "node.update", "id": nid, "patch": {"x": 1}, "prev": {}}],
+                },
+            })
+            sender.receive_json()
+
+        # v2 client: batches are {seq, batch}.
+        with client.websocket_connect(
+            f"/boards/b1/collab?ticket={tickets['t2']}&since_seq=0&proto=2"
+        ) as peer2:
+            welcome = peer2.receive_json()
+            assert welcome["mode"] == "catch-up"
+            assert [b["seq"] for b in welcome["batches"]] == [1, 2]
+            assert welcome["batches"][0]["batch"]["id"] == "batch-n1"
+
+        # v1 client (default): batches are plain OpBatch.
+        with client.websocket_connect(
+            f"/boards/b1/collab?ticket={tickets['t3']}&since_seq=0"
+        ) as peer1:
+            welcome = peer1.receive_json()
+            assert welcome["mode"] == "catch-up"
+            assert welcome["batches"][0]["id"] == "batch-n1"  # no seq wrapper
+            assert "seq" not in welcome["batches"][0]
+
+
 def test_ws_welcome_catch_up_is_unbounded_from_durable_log():
     """A long-drifted reconnect still catches up — the durable log has no ring cap.
 
@@ -680,6 +729,39 @@ def test_ws_op_seq_is_monotonic_across_ops():
             ack = ws.receive_json()
             assert ack["seq"] == client_seq
             assert ack["client_seq"] == client_seq
+
+
+def test_ws_duplicate_batch_is_deduped_not_reapplied():
+    """A replayed batch (same id) is re-acked at its original seq, applied once.
+
+    This is what makes the offline-first client's outbox replay safe against the
+    real relay: reconnect re-sends un-acked batches, and the server must not
+    double-apply or double-broadcast them.
+    """
+    client, app = _build_app()
+    tickets = _mint_tickets(app, t1=("u1", "b1"))
+
+    op = {
+        "kind": "op",
+        "client_seq": 1,
+        "batch": {
+            "id": "dup",
+            "clientId": "alice",
+            "origin": "local",
+            "ops": [{"type": "node.update", "id": "n1", "patch": {"x": 1}, "prev": {}}],
+        },
+    }
+    with client.websocket_connect(f"/boards/b1/collab?ticket={tickets['t1']}") as ws:
+        _drain_welcome(ws)
+        ws.send_json(op)
+        ack1 = ws.receive_json()
+        ws.send_json({**op, "client_seq": 2})  # reconnect replay of the same batch
+        ack2 = ws.receive_json()
+
+    assert ack1["kind"] == "op-applied" and ack2["kind"] == "op-applied"
+    assert ack1["seq"] == ack2["seq"]  # re-acked at the original seq
+    assert ack2["client_seq"] == 2  # but tagged to the resend's client_seq
+    assert len(app.graph_store.patch_calls) == 1  # applied to the graph exactly once
 
 
 def test_ws_two_peers_same_board_register_in_same_room():

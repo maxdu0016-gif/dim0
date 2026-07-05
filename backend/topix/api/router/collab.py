@@ -104,6 +104,16 @@ async def collab_ws(  # noqa: C901 — accept/auth/join/welcome/loop is a single
             "replace a folder view with the whole-board contents.",
         ),
     ] = None,
+    proto: Annotated[
+        int,
+        Query(
+            description="Wire protocol version. v1 (default, the legacy "
+            "use-ws-collab client): welcome catch-up sends `batches: OpBatch[]`. "
+            "v2 (the offline-first coordinator): sends `batches: {seq, batch}[]` "
+            "so each batch carries its relay seq for serverSeq-ordered replay.",
+            ge=1,
+        ),
+    ] = 1,
 ):
     """Per-board relay socket.
 
@@ -179,6 +189,7 @@ async def collab_ws(  # noqa: C901 — accept/auth/join/welcome/loop is a single
             board_id=graph_id,
             root_id=root_id,
             since_seq=since_seq,
+            proto=proto,
         )
     except Exception:
         logger.exception("collab welcome send failed board=%s", graph_id)
@@ -234,6 +245,7 @@ async def _send_welcome(
     board_id: str,
     root_id: str | None,
     since_seq: int | None,
+    proto: int = 1,
 ) -> None:
     """Send the welcome frame appropriate to the client's `since_seq`.
 
@@ -277,14 +289,21 @@ async def _send_welcome(
             })
             return
 
-        # Behind the head → catch up from the durable log.
+        # Behind the head → catch up from the durable log. v2 clients get each
+        # batch tagged with its relay seq (serverSeq-ordered replay); v1 clients
+        # get the legacy plain-batch list.
         entries = await oplog.batches_since(board_id, since_seq)
         if entries:
+            batches = (
+                [{"seq": s, "batch": b} for (s, b) in entries]
+                if proto >= 2
+                else [b for (_s, b) in entries]
+            )
             await websocket.send_json({
                 "kind": "welcome",
                 "mode": "catch-up",
                 "seq": seq,
-                "batches": [batch for (_s, batch) in entries],
+                "batches": batches,
             })
             return
 
@@ -345,7 +364,24 @@ async def _handle_message(  # noqa: C901 — flat kind-dispatch reads better tha
                 logger.debug("collab op-rejected send failed", exc_info=True)
             return
         ops = batch.get("ops") or []
+        batch_id = batch.get("id")
         async with room.lock:
+            # Idempotent replay: a reconnecting client re-sends its outbox. If we
+            # already applied this batch, re-ack at its original seq and stop —
+            # never apply, append, or broadcast it twice. (The check + append run
+            # under the room lock, so same-batch races on one worker serialize.)
+            if batch_id:
+                seen_seq = await oplog.seq_for_batch(board_id, batch_id)
+                if seen_seq is not None:
+                    try:
+                        await websocket.send_json({
+                            "kind": "op-applied",
+                            "seq": seen_seq,
+                            "client_seq": client_seq,
+                        })
+                    except Exception:
+                        logger.debug("collab op-applied (dedup) send failed", exc_info=True)
+                    return
             seq = await oplog.next_seq(board_id)
             room.seq = seq  # keep the in-memory head in sync for snapshot reads
             await apply_batch(
@@ -355,8 +391,14 @@ async def _handle_message(  # noqa: C901 — flat kind-dispatch reads better tha
                 ops=ops,
             )
             # Durable log: the source of truth for reconnect catch-up and a
-            # restart-safe seq. Idempotent by (board_id, seq).
-            await oplog.append(board_id, seq, batch)
+            # restart-safe seq. Idempotent by (board_id, seq). A durable-log
+            # hiccup must not fail the op — the factory already has it and peers
+            # still need the broadcast — so log and carry on (the missed entry
+            # self-heals on the next full snapshot).
+            try:
+                await oplog.append(board_id, seq, batch)
+            except Exception:
+                logger.exception("collab oplog append failed board=%s seq=%s", board_id, seq)
             # Also keep the in-memory ring warm (fast-path; not authoritative).
             room.remember_batch_unlocked(seq, batch)
             peer_op = json.dumps({"kind": "peer-op", "seq": seq, "batch": batch})
