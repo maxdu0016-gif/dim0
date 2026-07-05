@@ -8,9 +8,45 @@ import { InMemoryEngine } from "@/features/board/persist/local/in-memory-engine"
 import { BoardOutbox } from "@/features/board/persist/local/board-outbox"
 import { BoardPersistence } from "@/features/board/persist/local/board-persistence"
 import { attachBoardSync } from "./board-sync"
+import type { InboundMessage, RelayConnection } from "./wire"
 
 
 const BOARD = "b"
+
+
+/**
+ * A client wired to a hand-driven connection, so a test can push arbitrary
+ * inbound relay messages (snapshot welcome, kick, …) and observe the coordinator.
+ */
+const makeControlled = (id: string, opts: { onSnapshot?: (s: unknown, seq: number) => void } = {}) => {
+  const engine = new InMemoryEngine()
+  const persistence = new BoardPersistence(BOARD, { engine })
+  const store = freshStore(id)
+  persistence.attach(store)
+  const state = { deliver: null as ((m: InboundMessage) => void) | null, closed: false }
+  const conn: RelayConnection = {
+    send: () => {},
+    onMessage: (cb) => {
+      state.deliver = cb
+      return () => {
+        state.deliver = null
+      }
+    },
+    close: () => {
+      state.closed = true
+    },
+  }
+  const sync = attachBoardSync({
+    store,
+    persistence,
+    engine,
+    boardId: BOARD,
+    clientId: asClientId(id),
+    connect: () => conn,
+    onSnapshot: opts.onSnapshot,
+  })
+  return { store, sync, push: (m: InboundMessage) => state.deliver?.(m), get closed() { return state.closed } }
+}
 
 
 /** A full offline-first client: own engine (replica) + persistence + store + sync. */
@@ -25,7 +61,7 @@ const makeClient = (relay: MemoryRelay, id: string, opts: { canEdit?: boolean } 
     engine,
     boardId: BOARD,
     clientId: asClientId(id),
-    connect: () => relay.connect(asClientId(id), opts),
+    connect: (sinceSeq) => relay.connect(asClientId(id), { ...opts, sinceSeq }),
   })
   return { engine, persistence, store, sync }
 }
@@ -347,6 +383,31 @@ describe("E1.4 conflict resolution", () => {
     expect(labelOf(b.store, "n1")).toBe("offline-A")
     a.sync.detach()
     b.sync.detach()
+  })
+})
+
+
+describe("E1.5 protocol handlers", () => {
+  it("hydrates from a snapshot-mode welcome via onSnapshot", async () => {
+    let captured: { snapshot: unknown; seq: number } | null = null
+    const c = makeControlled("A", { onSnapshot: (snapshot, seq) => { captured = { snapshot, seq } } })
+
+    c.push({ kind: "welcome", mode: "snapshot", seq: 7, snapshot: { hello: "world" } })
+    await c.sync.settle()
+
+    expect(captured).toEqual({ snapshot: { hello: "world" }, seq: 7 })
+    c.sync.detach()
+  })
+
+
+  it("closes the connection on kick", async () => {
+    const c = makeControlled("A")
+    expect(c.closed).toBe(false)
+
+    c.push({ kind: "kick", reason: "room-full" })
+
+    expect(c.closed).toBe(true)
+    c.sync.detach()
   })
 })
 

@@ -49,8 +49,19 @@ export type BoardSyncOptions = {
   engine: StorageEngine
   boardId: string
   clientId: ClientId
-  /** Opens a fresh connection to the relay (called on attach + each reconnect). */
-  connect: () => RelayConnection
+  /**
+   * Opens a fresh connection to the relay (called on attach + each reconnect).
+   * `sinceSeq` is the highest relay seq seen so far — passed at connect time
+   * (the real WS carries it as a query param) so the relay picks the welcome
+   * mode (snapshot / catch-up / live).
+   */
+  connect: (sinceSeq: number) => RelayConnection
+  /**
+   * Hydrate the local replica from a `snapshot`-mode welcome (first connect /
+   * drift). Opaque here — the caller knows the server's snapshot shape. Omit in
+   * pure-harness tests where the relay never sends a snapshot.
+   */
+  onSnapshot?: (snapshot: unknown, seq: number) => void
 }
 
 
@@ -138,8 +149,15 @@ export const attachBoardSync = (opts: BoardSyncOptions): BoardSyncHandle => {
     switch (msg.kind) {
       case "welcome":
         lastServerSeq = Math.max(lastServerSeq, msg.seq)
-        for (const b of msg.batches) applyRemote(b.batch, b.seq)
-        enqueue(pump)
+        if (msg.mode === "snapshot") {
+          opts.onSnapshot?.(msg.snapshot, msg.seq) // hydrate the local replica
+          for (const [id, state] of Object.entries(msg.presence ?? {})) {
+            for (const cb of presenceListeners) cb(id as ClientId, state)
+          }
+        } else if (msg.mode === "catch-up") {
+          for (const b of msg.batches) applyRemote(b.batch, b.seq)
+        }
+        enqueue(pump) // live/snapshot/catch-up all resume the outbox
         break
       case "peer-op":
         lastServerSeq = Math.max(lastServerSeq, msg.seq)
@@ -171,13 +189,23 @@ export const attachBoardSync = (opts: BoardSyncOptions): BoardSyncHandle => {
       case "presence":
         for (const cb of presenceListeners) cb(msg.clientId, msg.state)
         break
+      case "presence-leave":
+        for (const cb of presenceListeners) cb(msg.clientId, null)
+        break
+      case "kick":
+        // The relay evicted us (e.g. plan cap). Drop the connection; the caller's
+        // reconnect supervisor decides whether/when to retry.
+        connection?.close()
+        connection = null
+        break
     }
   }
 
   const openConnection = (): void => {
-    connection = opts.connect()
+    // `sinceSeq` at connect time lets the relay pick the welcome mode; no separate
+    // hello-with-since_seq message (the real WS carries it as a query param).
+    connection = opts.connect(lastServerSeq)
     connection.onMessage(handle)
-    connection.send({ kind: "hello", clientId: opts.clientId, since_seq: lastServerSeq })
     enqueue(pump)
   }
 

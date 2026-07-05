@@ -2,18 +2,19 @@
  * In-memory relay for sync tests — a deterministic stand-in for the FastAPI/
  * Cloudflare relay, speaking the real wire protocol (`wire.ts`). It assigns a
  * monotonic per-board `seq`, keeps an op-log, acks the sender (`op-applied`),
- * fans ops out to peers (`peer-op`), answers `hello` with catch-up (`welcome`),
- * dedups by `batch.id` (idempotent replay), and rejects ops from viewers.
+ * fans ops out to peers (`peer-op`), sends a moded `welcome` on subscribe
+ * (catch-up / live, based on the connect-time `sinceSeq`), dedups by `batch.id`
+ * (idempotent replay), and rejects ops from viewers.
  *
- * `connect()` returns a `RelayConnection` — the same interface the real
- * WebSocket will implement — so the sync coordinator is exercised end-to-end.
- * Synchronous by design, so tests are deterministic and inspectable.
+ * `connect(clientId, { sinceSeq })` returns a `RelayConnection` — the same
+ * interface the real WebSocket will implement — so the sync coordinator is
+ * exercised end-to-end. Synchronous by design, so tests are deterministic.
  */
 import type { ClientId, OpBatch } from "@canvas-harness/core"
 import type { InboundMessage, OutboundMessage, RelayConnection } from "@/features/board/harness/sync/wire"
 
 
-type Conn = { canEdit: boolean; cb: ((m: InboundMessage) => void) | null }
+type Conn = { canEdit: boolean; sinceSeq: number; cb: ((m: InboundMessage) => void) | null }
 
 
 export class MemoryRelay {
@@ -30,13 +31,14 @@ export class MemoryRelay {
 
 
   /** Connect a client; returns a RelayConnection wired to this relay. */
-  connect(clientId: ClientId, opts: { canEdit?: boolean } = {}): RelayConnection {
-    const conn: Conn = { canEdit: opts.canEdit ?? true, cb: null }
+  connect(clientId: ClientId, opts: { canEdit?: boolean; sinceSeq?: number } = {}): RelayConnection {
+    const conn: Conn = { canEdit: opts.canEdit ?? true, sinceSeq: opts.sinceSeq ?? 0, cb: null }
     this.conns.set(clientId, conn)
     return {
       send: (msg) => this.handle(clientId, msg),
       onMessage: (cb) => {
         conn.cb = cb
+        this.sendWelcome(clientId, conn) // deliver welcome now the client can receive
         return () => {
           if (conn.cb === cb) conn.cb = null
         }
@@ -44,6 +46,19 @@ export class MemoryRelay {
       close: () => {
         this.conns.delete(clientId)
       },
+    }
+  }
+
+
+  /** Send the moded welcome for `sinceSeq`: catch-up if there's a tail, else live. */
+  private sendWelcome(clientId: ClientId, conn: Conn): void {
+    const batches = this.log
+      .filter((e) => e.seq > conn.sinceSeq && e.batch.clientId !== clientId)
+      .map((e) => ({ seq: e.seq, batch: e.batch }))
+    if (batches.length > 0) {
+      this.deliver(clientId, { kind: "welcome", mode: "catch-up", seq: this.seq, batches })
+    } else {
+      this.deliver(clientId, { kind: "welcome", mode: "live", seq: this.seq })
     }
   }
 
@@ -81,17 +96,15 @@ export class MemoryRelay {
         this.broadcast(clientId, { kind: "peer-op", seq: this.seq, batch: msg.batch })
         return
       }
-      case "hello": {
-        // Catch-up: ops after `since_seq`, excluding the joiner's own (no self-echo).
-        // Each carries its relay `seq` so the client can order it per-field LWW.
-        const batches = this.log
-          .filter((e) => e.seq > msg.since_seq && e.batch.clientId !== clientId)
-          .map((e) => ({ seq: e.seq, batch: e.batch }))
-        this.deliver(clientId, { kind: "welcome", seq: this.seq, batches })
+      case "hello":
+        // Presence handshake only; welcome is sent on subscribe, not here.
         return
-      }
       case "presence": {
         this.broadcast(clientId, { kind: "presence", clientId, state: msg.state })
+        return
+      }
+      case "presence-leave": {
+        this.broadcast(clientId, { kind: "presence-leave", clientId })
         return
       }
     }
