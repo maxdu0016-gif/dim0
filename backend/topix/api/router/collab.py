@@ -34,6 +34,7 @@ from topix.collab.capacity import get_room_cap_for_board
 from topix.collab.room import MAX_PRESENCE_PAYLOAD_BYTES, Client, Room, RoomRegistry
 from topix.collab.snapshot import read_snapshot_payload
 from topix.collab.tickets import consume_ticket, mint_ticket
+from topix.store.collab_oplog import CollabOplogStore
 from topix.store.graph import GraphStore
 
 logger = logging.getLogger(__name__)
@@ -128,6 +129,7 @@ async def collab_ws(  # noqa: C901 — accept/auth/join/welcome/loop is a single
     graph_store = websocket.app.graph_store
     user_billing_store = websocket.app.user_billing_store
     registry: RoomRegistry = websocket.app.collab_rooms
+    oplog: CollabOplogStore = websocket.app.collab_oplog
 
     # Owner's plan caps the room. Done BEFORE accept() so the rejected
     # joiner sees an HTTP 403 on the upgrade rather than an immediate
@@ -173,6 +175,7 @@ async def collab_ws(  # noqa: C901 — accept/auth/join/welcome/loop is a single
             room=room,
             client_id=client.client_id,
             graph_store=graph_store,
+            oplog=oplog,
             board_id=graph_id,
             root_id=root_id,
             since_seq=since_seq,
@@ -189,6 +192,7 @@ async def collab_ws(  # noqa: C901 — accept/auth/join/welcome/loop is a single
                 websocket=websocket,
                 raw=raw,
                 graph_store=graph_store,
+                oplog=oplog,
                 room=room,
                 client=client,
                 board_id=graph_id,
@@ -226,6 +230,7 @@ async def _send_welcome(
     room: Room,
     client_id: str,
     graph_store,
+    oplog: CollabOplogStore,
     board_id: str,
     root_id: str | None,
     since_seq: int | None,
@@ -234,7 +239,10 @@ async def _send_welcome(
 
     Acquires `room.lock` for the duration so a peer-op broadcast can't
     interleave between the seq read and the welcome send — the joining
-    client never observes a seq earlier than its welcome's seq.
+    client never observes a seq earlier than its welcome's seq. The head
+    seq and catch-up batches come from the DURABLE op-log, not the volatile
+    in-memory ring, so a client that reconnects after a server restart is
+    caught up correctly instead of being told it's live at seq 0.
 
     Snapshot mode carries the current `presence` map so a freshly-
     joining peer (or one rebuilding after a long drift) sees existing
@@ -243,7 +251,7 @@ async def _send_welcome(
     presence state untouched.
     """
     async with room.lock:
-        seq = room.seq
+        seq = await oplog.max_seq(board_id)  # durable head, survives restart
         # First connect → full snapshot.
         if since_seq is None:
             snapshot = await read_snapshot_payload(
@@ -269,18 +277,19 @@ async def _send_welcome(
             })
             return
 
-        # Within the ring's reach → catch-up.
-        batches = room.batches_since_unlocked(since_seq)
-        if batches is not None:
+        # Behind the head → catch up from the durable log.
+        entries = await oplog.batches_since(board_id, since_seq)
+        if entries:
             await websocket.send_json({
                 "kind": "welcome",
                 "mode": "catch-up",
                 "seq": seq,
-                "batches": batches,
+                "batches": [batch for (_s, batch) in entries],
             })
             return
 
-        # Drifted past the buffer floor → fall back to a full snapshot.
+        # No entries in range (e.g. the log was compacted below `since_seq`) →
+        # fall back to a full snapshot.
         snapshot = await read_snapshot_payload(
             graph_store=graph_store, board_id=board_id,
         )
@@ -300,6 +309,7 @@ async def _handle_message(  # noqa: C901 — flat kind-dispatch reads better tha
     websocket: WebSocket,
     raw: str,
     graph_store,
+    oplog: CollabOplogStore,
     room: Room,
     client: Client,
     board_id: str,
@@ -336,15 +346,18 @@ async def _handle_message(  # noqa: C901 — flat kind-dispatch reads better tha
             return
         ops = batch.get("ops") or []
         async with room.lock:
-            seq = room.next_seq_unlocked()
+            seq = await oplog.next_seq(board_id)
+            room.seq = seq  # keep the in-memory head in sync for snapshot reads
             await apply_batch(
                 graph_store=graph_store,
                 board_id=board_id,
                 user_id=user_id,
                 ops=ops,
             )
-            # Record in the ring so a reconnecting peer can catch up via
-            # `since_seq` without a full snapshot rebuild (Phase 1c.2).
+            # Durable log: the source of truth for reconnect catch-up and a
+            # restart-safe seq. Idempotent by (board_id, seq).
+            await oplog.append(board_id, seq, batch)
+            # Also keep the in-memory ring warm (fast-path; not authoritative).
             room.remember_batch_unlocked(seq, batch)
             peer_op = json.dumps({"kind": "peer-op", "seq": seq, "batch": batch})
             # Send under the lock so peer-op ordering across peers

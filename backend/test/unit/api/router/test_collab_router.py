@@ -61,6 +61,31 @@ class _FakeRedisStore:
         self.redis = _FakeRedis()
 
 
+class _FakeOplog:
+    """In-memory durable-oplog stand-in (append / catch-up / seq)."""
+
+    def __init__(self):
+        self.log: dict[str, list[tuple[int, dict]]] = {}
+        self._seq: dict[str, int] = {}
+
+    async def next_seq(self, board_id: str) -> int:
+        self._seq[board_id] = self._seq.get(board_id, 0) + 1
+        return self._seq[board_id]
+
+    async def append(self, board_id: str, seq: int, batch: dict) -> bool:
+        entries = self.log.setdefault(board_id, [])
+        if any(s == seq for s, _ in entries):
+            return False
+        entries.append((seq, batch))
+        return True
+
+    async def batches_since(self, board_id: str, since_seq: int, *, limit: int = 5000):
+        return [(s, b) for (s, b) in self.log.get(board_id, []) if s > since_seq][:limit]
+
+    async def max_seq(self, board_id: str) -> int:
+        return max((s for s, _ in self.log.get(board_id, [])), default=0)
+
+
 class _FakeGraphStore:
     """Stub GraphStore covering the surface the collab router actually uses.
 
@@ -161,6 +186,7 @@ def _build_app(
     app.graph_store = _FakeGraphStore(role=role, owner_uid=owner_uid)
     app.user_billing_store = _FakeUserBillingStore(plan=plan)
     app.redis_store = _FakeRedisStore()
+    app.collab_oplog = _FakeOplog()
     app.collab_rooms = RoomRegistry()
 
     async def _fake_current_user_uid():
@@ -445,54 +471,42 @@ def test_ws_welcome_catch_up_mode_replays_buffered_batches():
             assert welcome["batches"][0]["id"] == "batch-n2"
 
 
-def test_ws_welcome_falls_back_to_snapshot_when_since_seq_drifts_past_ring():
-    """`since_seq` older than the ring's oldest entry → snapshot fallback.
+def test_ws_welcome_catch_up_is_unbounded_from_durable_log():
+    """A long-drifted reconnect still catches up — the durable log has no ring cap.
 
-    Simulates a long-disconnected peer reconnecting after the buffer
-    has rotated past their last-known seq. The server still serves a
-    correct welcome — just a more expensive one.
+    Before E3, catch-up was served from a 500-entry in-memory ring, so a peer
+    that drifted past it fell back to a full snapshot. With the durable op-log,
+    catch-up covers the entire history, so even a `since_seq=0` reconnect after
+    many ops gets `mode=catch-up` with every batch (not a snapshot).
     """
-    # We can't easily fill 500 batches in a test; instead, exploit the
-    # boundary: any `since_seq` more than 1 less than the oldest in the
-    # ring triggers the fallback. With seq=2 and a ring containing
-    # batches at seqs 1 and 2, `since_seq=-100` is past the floor.
-    # We use an empty ring + `since_seq < room.seq` to trigger the same
-    # path: `batches_since_unlocked` returns None when the buffer is
-    # empty AND since_seq is behind room.seq.
     client, app = _build_app()
-    tickets = _mint_tickets(app, t1=("u1", "b1"))
+    tickets = _mint_tickets(app, t1=("u1", "b1"), t2=("u2", "b1"))
 
-    # Pre-advance seq without populating the buffer — this is
-    # artificial but exercises the "drifted past floor" path
-    # deterministically.
-    import asyncio
-    async def _pump_seq():
-        room, _ = await app.collab_rooms.join(
-            "b1", _NullSocket(), "system",
-        )
-        async with room.lock:
-            room.next_seq_unlocked()
-            room.next_seq_unlocked()
-            room.next_seq_unlocked()
-        return room
+    n_ops = 20
+    with client.websocket_connect(f"/boards/b1/collab?ticket={tickets['t1']}") as sender:
+        _drain_welcome(sender)
+        for i in range(n_ops):
+            sender.send_json({
+                "kind": "op",
+                "client_seq": 1,
+                "batch": {
+                    "id": f"batch-{i}",
+                    "clientId": "alice",
+                    "origin": "local",
+                    "ops": [{"type": "node.update", "id": f"n{i}", "patch": {"x": i}, "prev": {}}],
+                },
+            })
+            sender.receive_json()  # drain op-applied
 
-    asyncio.new_event_loop().run_until_complete(_pump_seq())
-
-    with client.websocket_connect(
-        f"/boards/b1/collab?ticket={tickets['t1']}&since_seq=0"
-    ) as ws:
-        welcome = ws.receive_json()
-        # since_seq=0 < room.seq=3 but buffer is empty → snapshot.
-        assert welcome["mode"] == "snapshot"
-        assert welcome["seq"] == 3
-        assert welcome["snapshot"] == {}
-
-
-class _NullSocket:
-    """Stand-in socket so we can bump `room.seq` without a real WS upgrade."""
-
-    async def send_text(self, _raw: str) -> None:
-        return None
+        with client.websocket_connect(
+            f"/boards/b1/collab?ticket={tickets['t2']}&since_seq=0"
+        ) as peer:
+            welcome = peer.receive_json()
+            assert welcome["mode"] == "catch-up"
+            assert welcome["seq"] == n_ops
+            assert len(welcome["batches"]) == n_ops
+            assert welcome["batches"][0]["id"] == "batch-0"
+            assert welcome["batches"][-1]["id"] == f"batch-{n_ops - 1}"
 
 
 # ---------------------------------------------------------------------------
