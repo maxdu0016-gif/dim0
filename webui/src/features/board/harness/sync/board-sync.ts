@@ -62,6 +62,12 @@ export type BoardSyncOptions = {
    * pure-harness tests where the relay never sends a snapshot.
    */
   onSnapshot?: (snapshot: unknown, seq: number) => void
+  /**
+   * Normalize a remote batch before it's applied to the store (theme colors,
+   * edge geometry). Mutates the passed copy — the coordinator applies it but
+   * persists the raw batch. Omit in the harness (batches are already local-shaped).
+   */
+  normalizeRemote?: (batch: OpBatch) => void
 }
 
 
@@ -105,14 +111,23 @@ export const attachBoardSync = (opts: BoardSyncOptions): BoardSyncHandle => {
    * `origin: "remote"` so nothing echoes back to the relay or re-persists.
    */
   const applyRemote = (batch: OpBatch, serverSeq: number): void => {
+    // Apply a NORMALIZED copy (theme colors + edge geometry) to the store, but
+    // persist the RAW batch — the raw carries theme-independent `_storedColors`,
+    // so a reload re-normalizes to whatever theme is active then. Skipping the
+    // clone when there's no normalizer keeps the harness path allocation-free.
+    let toApply = batch
+    if (opts.normalizeRemote) {
+      toApply = structuredClone(batch)
+      opts.normalizeRemote(toApply)
+    }
     const pend = [...pending.values()]
     for (let i = pend.length - 1; i >= 0; i--) {
       opts.store.applyBatch({ ...pend[i], ops: inverseBatch(pend[i]), origin: "remote" })
     }
-    opts.store.applyBatch({ ...batch, origin: "remote" })
+    opts.store.applyBatch({ ...toApply, origin: "remote" })
     for (const p of pend) opts.store.applyBatch({ ...p, origin: "remote" })
     pruneDanglingEdges(opts.store)
-    enqueue(() => opts.persistence.recordRemote(batch, serverSeq)) // durable across reload
+    enqueue(() => opts.persistence.recordRemote(batch, serverSeq)) // raw + durable across reload
   }
 
   /**

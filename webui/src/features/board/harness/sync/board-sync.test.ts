@@ -18,7 +18,10 @@ const BOARD = "b"
  * A client wired to a hand-driven connection, so a test can push arbitrary
  * inbound relay messages (snapshot welcome, kick, …) and observe the coordinator.
  */
-const makeControlled = (id: string, opts: { onSnapshot?: (s: unknown, seq: number) => void } = {}) => {
+const makeControlled = (
+  id: string,
+  opts: { onSnapshot?: (s: unknown, seq: number) => void; normalizeRemote?: (b: OpBatch) => void } = {},
+) => {
   const engine = new InMemoryEngine()
   const persistence = new BoardPersistence(BOARD, { engine })
   const store = freshStore(id)
@@ -44,6 +47,7 @@ const makeControlled = (id: string, opts: { onSnapshot?: (s: unknown, seq: numbe
     clientId: asClientId(id),
     connect: () => conn,
     onSnapshot: opts.onSnapshot,
+    normalizeRemote: opts.normalizeRemote,
   })
   return { store, sync, push: (m: InboundMessage) => state.deliver?.(m), get closed() { return state.closed } }
 }
@@ -407,6 +411,43 @@ describe("E1.5 protocol handlers", () => {
     c.push({ kind: "kick", reason: "room-full" })
 
     expect(c.closed).toBe(true)
+    c.sync.detach()
+  })
+
+
+  it("applies a normalized copy to the store but persists the raw batch", async () => {
+    // normalizeRemote appends " (themed)" to a node's label — stand-in for real
+    // theme/geometry normalization. The store must see the normalized value; the
+    // batch object handed in must stay raw (so persistence keeps it theme-free).
+    const c = makeControlled("A", {
+      normalizeRemote: (b) => {
+        for (const op of b.ops) {
+          if (op.type === "node.add") {
+            const data = op.node.data as DimNodeData
+            data.label = `${data.label} (themed)`
+          }
+        }
+      },
+    })
+    const raw: OpBatch = {
+      id: asBatchId("r1"),
+      clientId: asClientId("B"),
+      ts: 0,
+      origin: "remote",
+      ops: [{
+        type: "node.add",
+        node: {
+          id: asNodeId("n1"), type: "rect", x: 0, y: 0, z: 0, w: 100, h: 50, angle: 0,
+          groups: [], data: { label: "raw", meta: { v: 1, createdAt: 0, updatedAt: 0 } },
+        },
+      }],
+    }
+    c.push({ kind: "peer-op", seq: 1, batch: raw })
+    await c.sync.settle()
+
+    const label = (c.store.getAllNodes().find((n) => n.id === "n1")?.data as DimNodeData | undefined)?.label
+    expect(label).toBe("raw (themed)") // store got the normalized copy
+    expect((raw.ops[0] as { node: { data: DimNodeData } }).node.data.label).toBe("raw") // input untouched
     c.sync.detach()
   })
 })
