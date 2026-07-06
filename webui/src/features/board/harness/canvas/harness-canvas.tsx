@@ -68,6 +68,7 @@ import { CUSTOM_NODE_TYPES } from "./custom-node-types"
 import { useLocalPresence } from "./use-local-presence"
 import { useWsCollab } from "./use-ws-collab"
 import { useBoardSyncV2 } from "./use-board-sync-v2"
+import { useHistoryBatchIds } from "./use-history-batch-ids"
 import { isBoardSyncV2 } from "../sync/sync-engine-flag"
 import { useThumbnailCapture } from "./use-thumbnail-capture"
 import { useViewportPersistence } from "./use-viewport-persistence"
@@ -149,6 +150,10 @@ export function HarnessCanvas({ local = false }: { local?: boolean } = {}) {
     return () => setCanvasStoreRef(null)
   }, [store])
 
+  // First change subscriber: give undo/redo batches fresh ids so redo isn't
+  // dropped by batch-id dedup (local oplog + relay). Must precede persistence
+  // + collab so they observe the rewritten id.
+  useHistoryBatchIds(store)
   useBoardKeyboard(store)
   useViewportPersistence(store, boardId, rootId, ready)
   useCenterFromUrl(store, wrapRef, ready)
