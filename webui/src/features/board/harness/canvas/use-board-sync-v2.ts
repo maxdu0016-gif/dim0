@@ -25,6 +25,7 @@ import { buildLocalPresence } from "./presence-identity"
 import { BoardPersistence } from "@/features/board/persist/local/board-persistence"
 import { setBoardPersistenceRef } from "@/features/board/persist/local/board-persistence-ref"
 import { normalizeInboundBatch } from "../sync/inbound-normalize"
+import { enrichEdgeMidpoints } from "../sync/outbound-enrich"
 import { ReconnectSupervisor } from "../sync/reconnect-supervisor"
 import { attachBoardSync } from "../sync/board-sync"
 import type { BoardSyncHandle } from "../sync/board-sync"
@@ -96,6 +97,7 @@ export const useBoardSyncV2 = (
               applyGraphToStore(store, graph, { mode: "merge" })
             },
             normalizeRemote: (batch) => normalizeInboundBatch(batch, store),
+            enrichOutbound: (batch) => enrichEdgeMidpoints(batch, store),
           })
         })
       })

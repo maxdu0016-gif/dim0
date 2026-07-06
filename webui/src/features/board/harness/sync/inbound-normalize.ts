@@ -55,7 +55,7 @@ const rewriteOpColors = (op: Op, mode: ThemeMode): void => {
 
 
 /** World coords of an edge end (attached → node + offset; free → its point). */
-const endpointWorld = (end: Edge["source"] | Edge["target"], store: CanvasStore): Vec2 | null => {
+export const endpointWorld = (end: Edge["source"] | Edge["target"], store: CanvasStore): Vec2 | null => {
   if ("nodeId" in end) {
     const node = store.getNode(end.nodeId)
     if (!node) return null

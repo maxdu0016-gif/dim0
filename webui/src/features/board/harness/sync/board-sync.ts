@@ -70,6 +70,12 @@ export type BoardSyncOptions = {
    * persists the raw batch. Omit in the harness (batches are already local-shaped).
    */
   normalizeRemote?: (batch: OpBatch) => void
+  /**
+   * Transform a local batch just before it's sent to the relay (e.g. attach the
+   * server's `_midpoint` curve rep). Returns the batch to send (a clone, or the
+   * original unchanged) — the raw oplog is untouched. Omit in the harness.
+   */
+  enrichOutbound?: (batch: OpBatch) => OpBatch
 }
 
 
@@ -158,7 +164,8 @@ export const attachBoardSync = (opts: BoardSyncOptions): BoardSyncHandle => {
       clientSeq += 1
       inFlight.set(clientSeq, { seq: rec.seq, batchId: rec.batch.id })
       inFlightSeqs.add(rec.seq)
-      connection.send({ kind: "op", client_seq: clientSeq, batch: rec.batch })
+      const batch = opts.enrichOutbound ? opts.enrichOutbound(rec.batch) : rec.batch
+      connection.send({ kind: "op", client_seq: clientSeq, batch })
     }
   }
 
