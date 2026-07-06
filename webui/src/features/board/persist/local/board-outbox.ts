@@ -31,15 +31,18 @@ export class BoardOutbox {
 
   /**
    * Local batches not yet acked, in seq order (each record carries its oplog seq).
-   * Filters to `origin: 'local'` — the oplog also holds persisted remote ops
-   * (recordRemote), which must never be sent back to the relay (echo).
+   * Filters OUT `origin: 'remote'` only — the oplog also holds persisted remote
+   * ops (recordRemote) which must never be sent back to the relay (echo). Both
+   * `local` (edits) and `history` (undo/redo) must be sent, matching the legacy
+   * client's `origin !== 'remote'` send rule. (Filtering to `=== 'local'` dropped
+   * undo/redo: never synced, and stuck forever in the coordinator's rebase set.)
    */
   async pending(): Promise<OplogRecord[]> {
     const synced = await this.syncedSeq()
     const rows = await this.engine.list<OplogRecord>("oplog", {
       range: { lower: [this.boardId, synced], upper: [this.boardId, Number.MAX_SAFE_INTEGER], lowerOpen: true },
     })
-    return rows.filter((r) => r.batch.origin === "local")
+    return rows.filter((r) => r.batch.origin !== "remote")
   }
 
 

@@ -6,7 +6,7 @@ import type { StorageEngine } from "./engine"
 import { BoardOutbox } from "./board-outbox"
 
 
-const batch = (id: string, origin: "local" | "remote" = "local"): OpBatch => ({
+const batch = (id: string, origin: "local" | "remote" | "history" = "local"): OpBatch => ({
   id: asBatchId(id),
   clientId: asClientId("c"),
   ts: 0,
@@ -65,12 +65,14 @@ for (const { label, make } of engineCases) describe(`BoardOutbox (${label})`, ()
   })
 
 
-  it("pending() excludes persisted remote ops (no echo back to the relay)", async () => {
+  it("pending() sends local + history but excludes remote (no echo)", async () => {
+    // remote ops are recordRemote'd into the oplog and must NOT be sent back;
+    // history (undo/redo) MUST be sent, same as the legacy client.
     await engine.put("oplog", { boardId: "b", seq: 1, batch: batch("l1", "local") })
     await engine.put("oplog", { boardId: "b", seq: 2, batch: batch("r1", "remote") })
-    await engine.put("oplog", { boardId: "b", seq: 3, batch: batch("l2", "local") })
+    await engine.put("oplog", { boardId: "b", seq: 3, batch: batch("h1", "history") })
     const ob = new BoardOutbox(engine, "b")
-    expect((await ob.pending()).map((r) => r.batch.id)).toEqual(["l1", "l2"])
+    expect((await ob.pending()).map((r) => r.batch.id)).toEqual(["l1", "h1"])
   })
 
 

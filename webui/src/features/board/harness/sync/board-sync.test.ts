@@ -117,6 +117,61 @@ describe("board sync coordinator", () => {
   })
 
 
+  it("propagates an undo (history batch) to the other client", async () => {
+    // Undo applies its inverse as an origin:"history" batch. It must be sent to
+    // the relay (like the legacy client) — not dropped by the outbox and left
+    // stuck in the rebase set.
+    const relay = new MemoryRelay()
+    const a = makeClient(relay, "A")
+    const b = makeClient(relay, "B")
+
+    addNode(a.store, "n1", "hello")
+    await a.sync.settle()
+    await b.sync.settle()
+    expect(ids(b.store)).toEqual(["n1"]) // add propagated
+
+    a.store.undo() // history batch: remove n1
+    await a.sync.settle()
+    await b.sync.settle()
+
+    expect(ids(a.store)).toEqual([]) // undone locally
+    expect(ids(b.store)).toEqual([]) // undo reached the peer
+    expect(relay.log).toHaveLength(2) // add + undo both logged (not dropped)
+    a.sync.detach()
+    b.sync.detach()
+  })
+
+
+  it("a peer edit to an undone node still lands (no rebase churn)", async () => {
+    // Regression: a stuck history batch used to re-assert the undone value on
+    // EVERY peer-op, reverting an incoming change to that same node/field.
+    const relay = new MemoryRelay()
+    const a = makeClient(relay, "A")
+    const b = makeClient(relay, "B")
+
+    addNode(a.store, "n1", "v1")
+    await a.sync.settle()
+    setLabel(a.store, "n1", "v2")
+    await a.sync.settle()
+    await b.sync.settle()
+    expect(labelOf(b.store, "n1")).toBe("v2")
+
+    a.store.undo() // revert n1 label v2 → v1 (history batch)
+    await a.sync.settle()
+    await b.sync.settle()
+    expect(labelOf(b.store, "n1")).toBe("v1") // undo propagated
+
+    setLabel(b.store, "n1", "fromB") // peer edits the same node A undid
+    await b.sync.settle()
+    await a.sync.settle()
+
+    expect(labelOf(a.store, "n1")).toBe("fromB") // not reverted by a stuck undo
+    expect(labelOf(b.store, "n1")).toBe("fromB")
+    a.sync.detach()
+    b.sync.detach()
+  })
+
+
   it("converges concurrent edits both ways", async () => {
     const relay = new MemoryRelay()
     const a = makeClient(relay, "A")
