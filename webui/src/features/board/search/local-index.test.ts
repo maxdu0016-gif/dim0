@@ -19,6 +19,32 @@ describe("LocalSearchIndex", () => {
   })
 
 
+  it("does not crash when a node's label is not a string", async () => {
+    const store = freshStore("c")
+    const index = new LocalSearchIndex()
+    index.attach(store)
+
+    addNode(store, "n1", "ok")
+    await index.idle()
+    expect(await index.query("ok")).toContain("n1")
+
+    // A node type puts a non-string in data.label — must not reject the insert
+    // (which would otherwise poison the whole update queue).
+    store.updateNode(asNodeId("n1"), {
+      data: { label: { markdown: "x" } as unknown as string, meta: { v: 1, createdAt: 0, updatedAt: 0 } },
+    })
+    await index.idle()
+
+    expect(index.count()).toBe(1) // still indexed, just no title text
+    expect(await index.query("ok")).toHaveLength(0) // old title dropped on upsert
+
+    // The queue still works for later nodes.
+    addNode(store, "n2", "later")
+    await index.idle()
+    expect(await index.query("later")).toContain("n2")
+  })
+
+
   it("reflects updates: changed body becomes searchable, old text does not", async () => {
     const store = freshStore("c")
     const index = new LocalSearchIndex()

@@ -19,10 +19,19 @@ import type { DimNodeData } from "@/features/board/model"
 const SCHEMA = { title: "string", body: "string" } as const
 
 
+/**
+ * Coerce a value to a plain string for the index. `data.label` / `content` are
+ * typed `string`, but the store types `data` as generic and some node types put
+ * a non-string there — Orama's `"string"` schema then rejects the whole insert.
+ * A non-string just isn't full-text-indexed, which is correct.
+ */
+const asText = (value: unknown): string => (typeof value === "string" ? value : "")
+
+
 const docOf = (node: Node) => ({
   id: node.id,
-  title: (node.data as DimNodeData | undefined)?.label ?? "",
-  body: node.content ?? "",
+  title: asText((node.data as DimNodeData | undefined)?.label),
+  body: asText(node.content),
 })
 
 
