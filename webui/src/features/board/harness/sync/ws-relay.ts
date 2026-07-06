@@ -81,11 +81,11 @@ export const createWebSocketRelay = (opts: WebSocketRelayOptions): RelayConnecti
       return
     }
     if (closed) return
-    const params = new URLSearchParams({
-      ticket,
-      since_seq: String(opts.sinceSeq),
-      proto: "2",
-    })
+    const params = new URLSearchParams({ ticket, proto: "2" })
+    // Omit since_seq on first connect (0) so the relay sends a full snapshot —
+    // an existing board's base state lives in the factory, not the oplog from
+    // genesis. A positive cursor means reconnect → catch-up from there.
+    if (opts.sinceSeq > 0) params.set("since_seq", String(opts.sinceSeq))
     if (opts.rootId) params.set("root_id", opts.rootId)
     const url = opts.wsUrl(`/boards/${opts.boardId}/collab?${params.toString()}`)
     const s = opts.socketFactory

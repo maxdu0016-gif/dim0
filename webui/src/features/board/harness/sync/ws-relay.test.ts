@@ -78,6 +78,15 @@ describe("createWebSocketRelay", () => {
   })
 
 
+  it("omits since_seq on first connect (0) so the relay sends a snapshot", async () => {
+    const s = setup({ sinceSeq: 0 })
+    await tick()
+    const url = s.getUrl()
+    expect(url).toContain("proto=2")
+    expect(url).not.toContain("since_seq")
+  })
+
+
   it("buffers outbound frames until open, then flushes them", async () => {
     const s = setup()
     await tick()
