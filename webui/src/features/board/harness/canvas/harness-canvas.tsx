@@ -67,6 +67,8 @@ import { useStyleMemory } from "./use-style-memory"
 import { CUSTOM_NODE_TYPES } from "./custom-node-types"
 import { useLocalPresence } from "./use-local-presence"
 import { useWsCollab } from "./use-ws-collab"
+import { useBoardSyncV2 } from "./use-board-sync-v2"
+import { isBoardSyncV2 } from "../sync/sync-engine-flag"
 import { useThumbnailCapture } from "./use-thumbnail-capture"
 import { useViewportPersistence } from "./use-viewport-persistence"
 import { HarnessWrapRefProvider } from "./wrap-ref-provider"
@@ -169,11 +171,12 @@ export function HarnessCanvas({ local = false }: { local?: boolean } = {}) {
   )
   usePresentationMode(store, wrapRef, rendererRef)
 
-  // Collab is the only edit path (collab-archi §1). The WS adapter is
-  // mounted unconditionally; presence + local cursor tracking go with it.
-  // The server is the sole writer — no local REST save loop, so no
-  // save-status pill either.
-  useWsCollab(store, boardId, ready && !local, rootId)
+  // A synced board runs EITHER the legacy WS adapter OR the offline-first
+  // coordinator (v2), gated per-board (dev flag → later BoardMeta.syncEngine).
+  // Default is legacy, so untouched boards behave exactly as before.
+  const v2 = !local && boardId !== null && isBoardSyncV2(boardId)
+  useWsCollab(store, boardId, ready && !local && !v2, rootId)
+  useBoardSyncV2(store, boardId, ready && v2, rootId ?? null)
   useLocalPresence(store, wrapRef, ready)
 
   const { handleCreateDrag, handleClick } = useCreateHandlers(store, boardId, rootId, styleMemory)
@@ -288,6 +291,20 @@ export function HarnessCanvas({ local = false }: { local?: boolean } = {}) {
     setReady(false)
     setIsLoading(true)
 
+    // v2 synced board: the coordinator (useBoardSyncV2) hydrates via the welcome
+    // snapshot, so skip the REST hydrate here (running both would double-apply).
+    // Just mark ready + editable so its gate activates. (canEdit/role refinement
+    // from the ticket lands with presence in a later slice.)
+    if (v2) {
+      setCanEdit(true)
+      setBoardRole("owner")
+      setIsLoading(false)
+      setReady(true)
+      return () => {
+        cancelled = true
+      }
+    }
+
     // Local-only board: load from IndexedDB + attach local persistence. The
     // analog of the backend hydrate below — it fills the same empty store.
     if (local) {
@@ -353,7 +370,7 @@ export function HarnessCanvas({ local = false }: { local?: boolean } = {}) {
     return () => {
       cancelled = true
     }
-  }, [boardId, rootId, store, local, setIsLoading, setCanEdit, setBoardRole, setBoardLabel, setBoardVisibility])
+  }, [boardId, rootId, store, local, v2, setIsLoading, setCanEdit, setBoardRole, setBoardLabel, setBoardVisibility])
 
   return (
     <CanvasProvider store={store}>

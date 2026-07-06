@@ -20,7 +20,11 @@ const BOARD = "b"
  */
 const makeControlled = (
   id: string,
-  opts: { onSnapshot?: (s: unknown, seq: number) => void; normalizeRemote?: (b: OpBatch) => void } = {},
+  opts: {
+    onSnapshot?: (s: unknown, seq: number) => void
+    onWelcome?: () => void
+    normalizeRemote?: (b: OpBatch) => void
+  } = {},
 ) => {
   const engine = new InMemoryEngine()
   const persistence = new BoardPersistence(BOARD, { engine })
@@ -47,6 +51,7 @@ const makeControlled = (
     clientId: asClientId(id),
     connect: () => conn,
     onSnapshot: opts.onSnapshot,
+    onWelcome: opts.onWelcome,
     normalizeRemote: opts.normalizeRemote,
   })
   return { store, sync, push: (m: InboundMessage) => state.deliver?.(m), get closed() { return state.closed } }
@@ -400,6 +405,19 @@ describe("E1.5 protocol handlers", () => {
     await c.sync.settle()
 
     expect(captured).toEqual({ snapshot: { hello: "world" }, seq: 7 })
+    c.sync.detach()
+  })
+
+
+  it("fires onWelcome on any welcome mode (drives the reconnect supervisor)", async () => {
+    const seen: string[] = []
+    const c = makeControlled("A", { onWelcome: () => seen.push("welcome") })
+
+    c.push({ kind: "welcome", mode: "live", seq: 3 })
+    c.push({ kind: "welcome", mode: "catch-up", seq: 5, batches: [] })
+    await c.sync.settle()
+
+    expect(seen).toEqual(["welcome", "welcome"])
     c.sync.detach()
   })
 

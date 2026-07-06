@@ -62,6 +62,8 @@ export type BoardSyncOptions = {
    * pure-harness tests where the relay never sends a snapshot.
    */
   onSnapshot?: (snapshot: unknown, seq: number) => void
+  /** Fired on every welcome (any mode) — the connection is healthy. */
+  onWelcome?: () => void
   /**
    * Normalize a remote batch before it's applied to the store (theme colors,
    * edge geometry). Mutates the passed copy — the coordinator applies it but
@@ -164,6 +166,7 @@ export const attachBoardSync = (opts: BoardSyncOptions): BoardSyncHandle => {
     switch (msg.kind) {
       case "welcome":
         lastServerSeq = Math.max(lastServerSeq, msg.seq)
+        opts.onWelcome?.() // any mode = connected + healthy (resets the reconnect backoff)
         if (msg.mode === "snapshot") {
           opts.onSnapshot?.(msg.snapshot, msg.seq) // hydrate the local replica
           for (const [id, state] of Object.entries(msg.presence ?? {})) {
