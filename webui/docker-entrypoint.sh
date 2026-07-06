@@ -5,7 +5,12 @@ set -e
 # same image works in dev / staging / prod. Defaults match local dev.
 API_ORIGIN="${API_ORIGIN:-http://localhost:8888}"
 VITE_BILLING_ENABLED="${VITE_BILLING_ENABLED:-false}"
-VITE_MINI_APP_ORIGIN="${VITE_MINI_APP_ORIGIN:-http://localhost:5001}"
+# Empty by default → single-frontend mini-app mode: the runtime loads from
+# `/mini-app` same-origin in an OPAQUE (allow-scripts, NO allow-same-origin)
+# iframe (see mini-app/mount.tsx). Set to a real subdomain ONLY for opt-in
+# cross-origin mode. A non-empty value equal to the host origin is unsafe and
+# trips the mount's guard — which is what a stale localhost:5001 default did.
+VITE_MINI_APP_ORIGIN="${VITE_MINI_APP_ORIGIN:-}"
 VITE_HOST_ORIGIN="${VITE_HOST_ORIGIN:-http://localhost:3000}"
 
 # Generate the runtime config into the single frontend bundle. index.html loads
