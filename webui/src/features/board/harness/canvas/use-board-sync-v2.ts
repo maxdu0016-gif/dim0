@@ -19,7 +19,9 @@ import camelcaseKeys from "camelcase-keys"
 import { API_URL } from "@/config/api"
 import { mintCollabTicket } from "@/features/board/api/collab-ticket"
 import { getLocalStores } from "@/features/local-stores"
+import { useAppStore } from "@/store"
 import type { Graph } from "@/features/board/types/board"
+import { buildLocalPresence } from "./presence-identity"
 import { BoardPersistence } from "@/features/board/persist/local/board-persistence"
 import { setBoardPersistenceRef } from "@/features/board/persist/local/board-persistence-ref"
 import { normalizeInboundBatch } from "../sync/inbound-normalize"
@@ -40,6 +42,9 @@ export const useBoardSyncV2 = (
   enabled: boolean,
   rootId: string | null,
 ): void => {
+  const userEmail = useAppStore((s) => s.userEmail)
+  const userId = useAppStore((s) => s.userId)
+
   useEffect(() => {
     if (!enabled || !boardId) return
     let cancelled = false
@@ -57,6 +62,9 @@ export const useBoardSyncV2 = (
           if (cancelled || !persistence) return
           detachPersist = persistence.attach(store) // local replica: outbox + durable edits
           const clientId = store.clientId
+          // Seed local presence identity (name + color). Cursor/selection are
+          // filled in live by useLocalPresence; attachSync ships changes to peers.
+          store.presence.setLocal(buildLocalPresence(userEmail, userId, clientId))
           const supe = new ReconnectSupervisor({ reconnect: () => handle?.reconnect() })
           supervisor = supe
           handle = attachBoardSync({
@@ -110,5 +118,5 @@ export const useBoardSyncV2 = (
       const p = persistence
       if (p) void p.flush().finally(() => p.close())
     }
-  }, [store, boardId, enabled, rootId])
+  }, [store, boardId, enabled, rootId, userEmail, userId])
 }
