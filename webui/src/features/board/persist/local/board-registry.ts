@@ -84,6 +84,22 @@ export class BoardRegistry {
   }
 
 
+  /**
+   * Set which collab client a synced board mounts (`legacy` | `v2`). No-op if
+   * the board doesn't exist. Flipped when a board is promoted local → synced.
+   */
+  async setSyncEngine(
+    id: string,
+    syncEngine: "legacy" | "v2",
+    now: number = Date.now(),
+  ): Promise<void> {
+    const engine = this.requireEngine()
+    const existing = await engine.get<BoardMeta>("boards", id)
+    if (!existing) return
+    await engine.put("boards", { ...existing, syncEngine, updatedAt: now })
+  }
+
+
   /** Store a board's thumbnail (a data URL). No-op if the board doesn't exist. */
   async setThumbnail(id: string, thumbnail: string, now: number = Date.now()): Promise<void> {
     const engine = this.requireEngine()

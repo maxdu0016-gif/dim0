@@ -69,7 +69,7 @@ import { useLocalPresence } from "./use-local-presence"
 import { useWsCollab } from "./use-ws-collab"
 import { useBoardSyncV2 } from "./use-board-sync-v2"
 import { useHistoryBatchIds } from "./use-history-batch-ids"
-import { isBoardSyncV2 } from "../sync/sync-engine-flag"
+import { useSyncEngine } from "./use-sync-engine"
 import { useThumbnailCapture } from "./use-thumbnail-capture"
 import { useViewportPersistence } from "./use-viewport-persistence"
 import { HarnessWrapRefProvider } from "./wrap-ref-provider"
@@ -177,9 +177,11 @@ export function HarnessCanvas({ local = false }: { local?: boolean } = {}) {
   usePresentationMode(store, wrapRef, rendererRef)
 
   // A synced board runs EITHER the legacy WS adapter OR the offline-first
-  // coordinator (v2), gated per-board (dev flag → later BoardMeta.syncEngine).
-  // Default is legacy, so untouched boards behave exactly as before.
-  const v2 = !local && boardId !== null && isBoardSyncV2(boardId)
+  // coordinator (v2), gated per-board by `BoardMeta.syncEngine` (dev flag as an
+  // override). `null` while resolving — hydration below waits on it, so we never
+  // mount the wrong client first. Default is legacy: untouched boards are unchanged.
+  const syncEngine = useSyncEngine(boardId, local)
+  const v2 = syncEngine === "v2"
   useWsCollab(store, boardId, ready && !local && !v2, rootId)
   useBoardSyncV2(store, boardId, ready && v2, rootId ?? null)
   useLocalPresence(store, wrapRef, ready)
@@ -296,6 +298,14 @@ export function HarnessCanvas({ local = false }: { local?: boolean } = {}) {
     setReady(false)
     setIsLoading(true)
 
+    // Synced boards: wait until the engine is resolved so we hydrate the right
+    // way (v2 skips the REST hydrate). local boards never run a collab client.
+    if (!local && syncEngine === null) {
+      return () => {
+        cancelled = true
+      }
+    }
+
     // v2 synced board: the coordinator (useBoardSyncV2) hydrates via the welcome
     // snapshot, so skip the REST hydrate here (running both would double-apply).
     // Just mark ready + editable so its gate activates. (canEdit/role refinement
@@ -375,7 +385,7 @@ export function HarnessCanvas({ local = false }: { local?: boolean } = {}) {
     return () => {
       cancelled = true
     }
-  }, [boardId, rootId, store, local, v2, setIsLoading, setCanEdit, setBoardRole, setBoardLabel, setBoardVisibility])
+  }, [boardId, rootId, store, local, v2, syncEngine, setIsLoading, setCanEdit, setBoardRole, setBoardLabel, setBoardVisibility])
 
   return (
     <CanvasProvider store={store}>

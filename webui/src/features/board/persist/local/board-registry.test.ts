@@ -80,6 +80,26 @@ for (const { label, make } of engineCases) describe(`BoardRegistry (${label})`, 
   })
 
 
+  it("setSyncEngine flips the stored engine and bumps updatedAt; no-op if absent", async () => {
+    const reg = new BoardRegistry({ engine })
+    const board = newLocalBoard("Promotable", 1000)
+    await reg.createBoard(board)
+    expect((await reg.getBoard(board.id))?.syncEngine).toBeUndefined()
+
+    await reg.setSyncEngine(board.id, "v2", 5000)
+    const promoted = await reg.getBoard(board.id)
+    expect(promoted?.syncEngine).toBe("v2")
+    expect(promoted?.updatedAt).toBe(5000)
+    // other fields preserved
+    expect(promoted?.title).toBe("Promotable")
+    expect(promoted?.kind).toBe("local-only")
+
+    // no-op on a missing board (no throw, nothing created)
+    await reg.setSyncEngine("ghost", "v2")
+    expect(await reg.getBoard("ghost")).toBeUndefined()
+  })
+
+
   it("view state round-trips and is separate from content", async () => {
     const reg = new BoardRegistry({ engine })
     const board = newLocalBoard("Viewed", 1000)

@@ -1,13 +1,13 @@
 /**
- * Per-board sync-engine flag (dev scaffolding for the E1.5 cutover).
+ * Per-board sync-engine dev override (localStorage).
  *
- * Decides whether a synced board mounts the new offline-first coordinator (v2)
- * or the legacy `use-ws-collab` (default). Persisted in localStorage keyed by
- * board id so a cutover is per-board and survives reloads — the same shape the
- * real `BoardMeta.syncEngine` field will take, without a schema change yet.
+ * The source of truth for a synced board's engine is now `BoardMeta.syncEngine`
+ * (see `use-sync-engine`); this flag is a testing override that *forces* v2 on
+ * any board without touching its metadata, so v2 can be exercised on legacy
+ * backend boards that have no local meta yet.
  *
  * Toggle from the dev console: `dim0SyncV2.on("<boardId>")` then reload.
- * This whole module is deleted once the migration graduates to `BoardMeta`.
+ * Deleted once v2 is the default and the legacy client is retired.
  */
 const KEY = "dim0_sync_v2_boards"
 

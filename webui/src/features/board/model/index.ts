@@ -146,6 +146,11 @@ export type BoardMeta = {
   id: Id
   title: string
   kind: BoardKind
+  // Which collab client a `synced` board mounts. Absent ⇒ legacy `use-ws-collab`.
+  // Set to `"v2"` on boards born from (or promoted into) the offline-first
+  // coordinator. Ignored for `local-only` boards. Transient migration field:
+  // removed once every synced board is v2 and the legacy client is retired.
+  syncEngine?: "legacy" | "v2"
   ownerId?: Id
   acl?: Record<Id, BoardRole>
   visibility: "private" | "shared" | "public"
