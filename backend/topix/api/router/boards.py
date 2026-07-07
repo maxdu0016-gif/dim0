@@ -19,6 +19,7 @@ from topix.api.datatypes.requests import (
     LinkUpdateRequest,
     NoteUpdateRequest,
 )
+from topix.api.utils.billing.stripe_config import is_billing_active
 from topix.api.utils.decorators import with_standard_response
 from topix.api.utils.security import (
     get_current_user_uid,
@@ -29,8 +30,13 @@ from topix.api.utils.thumbnail import load_png_as_data_url, save_thumbnail
 from topix.collab.apply_ops import apply_batch
 from topix.datatypes.graph.graph import Graph
 from topix.datatypes.note.style import NodeType
+from topix.datatypes.user_billing import effective_plan
 from topix.store.chat import ChatStore
 from topix.store.graph import GraphStore
+
+# Synced-board cap for the free plan (local boards are unlimited). Mirrors the
+# frontend BOARD_LIMITS.free — keep the two in sync until a shared catalog exists.
+FREE_SYNCED_BOARD_LIMIT = 5
 
 router = APIRouter(
     prefix="/boards",
@@ -53,6 +59,28 @@ async def create_graph(
     new_graph = Graph(user_uid=user_id)
     await store.add_graph(graph=new_graph, user_uid=user_id)
     return {"graph_id": new_graph.uid}
+
+
+async def _enforce_synced_board_limit(
+    request: Request, store: GraphStore, user_id: str
+) -> None:
+    """Raise 402 if the free plan's synced-board cap is already reached.
+
+    No-op in OSS mode (billing off) and for paid plans (unlimited). Counts only
+    boards the user OWNS — shared-with-me boards don't count against their cap.
+    """
+    if not is_billing_active():
+        return
+    billing = await request.app.user_billing_store.get_user_billing(user_id)
+    plan = effective_plan(billing.plan, billing.status) if billing else "free"
+    if plan != "free":
+        return
+    owned = sum(1 for (_g, role, _e) in await store.list_graphs(user_id) if role == "owner")
+    if owned >= FREE_SYNCED_BOARD_LIMIT:
+        raise HTTPException(
+            status_code=402,
+            detail="Synced-board limit reached for your plan. Upgrade, or delete a synced board.",
+        )
 
 
 @router.post("/{graph_id}:adopt/", include_in_schema=False)
@@ -85,6 +113,10 @@ async def adopt_graph(
         if role != "owner":
             raise HTTPException(status_code=409, detail="board id already in use")
         return {"graph_id": graph_id, "adopted": False, "applied": 0}
+
+    # Enforce the synced-board cap at promotion (boards are one-way: no un-sync,
+    # so the cap can't be bypassed by demoting). Local boards stay unlimited.
+    await _enforce_synced_board_limit(request, store, user_id)
 
     graph = Graph(uid=graph_id, label=body.label)
     await store.add_graph(graph=graph, user_uid=user_id)

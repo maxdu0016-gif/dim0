@@ -35,15 +35,15 @@ const deps = (over: Partial<Parameters<typeof enableSync>[1]> = {}) => {
   const base = {
     signedIn: true,
     ownerId: "owner-1",
-    loadContent: vi.fn(async () => {
-      calls.push("load")
-      return content([node("n1")], [])
+    capture: vi.fn(async () => {
+      calls.push("capture")
+      return { content: content([node("n1")], []), seq: 7 }
     }),
     adopt: vi.fn(async () => {
       calls.push("adopt")
     }),
-    compact: vi.fn(async () => {
-      calls.push("compact")
+    foldBase: vi.fn(async () => {
+      calls.push("foldBase")
     }),
     markSynced: vi.fn(async () => {
       calls.push("markSynced")
@@ -59,20 +59,29 @@ describe("enableSync", () => {
     const res = await enableSync("b1", d)
     expect(res).toEqual({ ok: false, reason: "signed-out" })
     expect(d.adopt).not.toHaveBeenCalled()
-    expect(d.compact).not.toHaveBeenCalled()
+    expect(d.foldBase).not.toHaveBeenCalled()
     expect(d.markSynced).not.toHaveBeenCalled()
   })
 
-  it("success: adopt → compact → markSynced in order, with the board's ops + owner", async () => {
+  it("success: capture → adopt → foldBase → markSynced in order", async () => {
     const { deps: d, calls } = deps()
     const res = await enableSync("b1", d)
     expect(res).toEqual({ ok: true, boardId: "b1" })
-    expect(calls).toEqual(["load", "adopt", "compact", "markSynced"])
+    expect(calls).toEqual(["capture", "adopt", "foldBase", "markSynced"])
     expect(d.adopt).toHaveBeenCalledWith([{ type: "node.add", node: expect.objectContaining({ id: "n1" }) }])
     expect(d.markSynced).toHaveBeenCalledWith("owner-1")
   })
 
-  it("adopt fails: stays local (never marks synced)", async () => {
+  it("foldBase gets the captured base + seq (so the tail truncation is bounded)", async () => {
+    const { deps: d } = deps()
+    await enableSync("b1", d)
+    expect(d.foldBase).toHaveBeenCalledWith(
+      expect.objectContaining({ nodes: expect.any(Array) }),
+      7, // the captured seq — foldBase must truncate ONLY up to here
+    )
+  })
+
+  it("adopt fails: stays local (never folds or marks synced)", async () => {
     const { deps: d } = deps({
       adopt: vi.fn(async () => {
         throw new Error("network")
@@ -81,13 +90,13 @@ describe("enableSync", () => {
     const res = await enableSync("b1", d)
     expect(res.ok).toBe(false)
     expect(res).toMatchObject({ reason: "error" })
-    expect(d.compact).not.toHaveBeenCalled()
+    expect(d.foldBase).not.toHaveBeenCalled()
     expect(d.markSynced).not.toHaveBeenCalled()
   })
 
-  it("compact fails after adopt: stays local (never marks synced), so a retry is safe", async () => {
+  it("foldBase fails after adopt: stays local (never marks synced), so a retry is safe", async () => {
     const { deps: d } = deps({
-      compact: vi.fn(async () => {
+      foldBase: vi.fn(async () => {
         throw new Error("idb")
       }),
     })

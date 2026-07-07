@@ -142,6 +142,30 @@ export class BoardPersistence {
   }
 
 
+  /**
+   * Capture the current materialized base + the seq it reflects, WITHOUT
+   * truncating anything. Used by local→synced promotion to snapshot exactly the
+   * content shipped to the server; pair with `foldBase` once the server accepts.
+   */
+  async capture(): Promise<{ content: BoardContent; seq: number }> {
+    return this.materialize()
+  }
+
+
+  /**
+   * Fold a captured base (from `capture`) into the snapshot, truncating the oplog
+   * ONLY up to `seq`. Any batch appended after the capture (`seq' > seq` — e.g. an
+   * edit made during the adopt round-trip) is left in the oplog as pending, so
+   * the sync client still ships it to the server on connect. This is what makes
+   * promotion safe against edits during the sync window: the server gets the
+   * captured base via adopt, the window edits via the normal outbox replay.
+   */
+  async foldBase(content: BoardContent, seq: number): Promise<void> {
+    await this.writeSnapshot(content, seq)
+    if (seq > this.seq) this.seq = seq
+  }
+
+
   /** Close the engine if owned, and cancel any pending flush. */
   close(): void {
     if (this.timer !== null) {
