@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { AddIcon, CancelPlainIcon } from "@/components/icons"
+import { AddIcon, CancelPlainIcon, CloudSyncIcon } from "@/components/icons"
 import { UNTITLED_LABEL } from "@/features/board/const"
 import type { BoardMeta } from "@/features/board/model"
 import { formatDateForUI } from "@/features/board/utils/datetime"
@@ -16,11 +16,15 @@ export function LocalBoardCard({
   onOpen,
   onDelete,
   onRename,
+  onEnableSync,
+  syncing = false,
 }: {
   board: BoardMeta
   onOpen: () => void
   onDelete: () => void
   onRename: (title: string) => void
+  onEnableSync?: () => void
+  syncing?: boolean
 }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(board.title)
@@ -51,6 +55,23 @@ export function LocalBoardCard({
       >
         <CancelPlainIcon className="size-3.5" strokeWidth={2} />
       </button>
+
+      {onEnableSync && (
+        <button
+          type="button"
+          aria-label="Enable sync"
+          title="Enable sync — back up + share this board"
+          disabled={syncing}
+          className="absolute left-2 top-2 z-10 hidden items-center gap-1 rounded-md bg-background/80 px-1.5 py-1 text-xs text-muted-foreground shadow-sm hover:text-secondary-foreground disabled:opacity-60 group-hover:flex"
+          onClick={(e) => {
+            e.stopPropagation()
+            onEnableSync()
+          }}
+        >
+          <CloudSyncIcon className="size-3.5" strokeWidth={2} />
+          {syncing ? "Syncing…" : "Enable sync"}
+        </button>
+      )}
 
       {board.thumbnail ? (
         <img

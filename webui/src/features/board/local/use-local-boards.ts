@@ -69,5 +69,5 @@ export function useLocalBoards() {
     [refresh],
   )
 
-  return { boards, ready, createBoard, deleteBoard, renameBoard }
+  return { boards, ready, createBoard, deleteBoard, renameBoard, refresh }
 }

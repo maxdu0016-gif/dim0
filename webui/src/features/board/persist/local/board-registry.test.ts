@@ -100,6 +100,25 @@ for (const { label, make } of engineCases) describe(`BoardRegistry (${label})`, 
   })
 
 
+  it("markSynced promotes local → synced: sets kind, engine, owner; no-op if absent", async () => {
+    const reg = new BoardRegistry({ engine })
+    const board = newLocalBoard("Promote me", 1000)
+    await reg.createBoard(board)
+    expect((await reg.getBoard(board.id))?.kind).toBe("local-only")
+
+    await reg.markSynced(board.id, { syncEngine: "v2", ownerId: "owner-1" }, 6000)
+    const synced = await reg.getBoard(board.id)
+    expect(synced?.kind).toBe("synced")
+    expect(synced?.syncEngine).toBe("v2")
+    expect(synced?.ownerId).toBe("owner-1")
+    expect(synced?.updatedAt).toBe(6000)
+    expect(synced?.title).toBe("Promote me") // content/title preserved
+
+    await reg.markSynced("ghost", { syncEngine: "v2", ownerId: "x" })
+    expect(await reg.getBoard("ghost")).toBeUndefined()
+  })
+
+
   it("view state round-trips and is separate from content", async () => {
     const reg = new BoardRegistry({ engine })
     const board = newLocalBoard("Viewed", 1000)

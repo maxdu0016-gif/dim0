@@ -8,6 +8,7 @@ import { useListBoards } from "../api/list-boards"
 import { BoardCard, NewBoardCard } from "../components/board-card"
 import { LocalBoardCard, NewLocalBoardCard } from "../local/local-dashboard"
 import { useLocalBoards } from "../local/use-local-boards"
+import { useEnableSync } from "../local/use-enable-sync"
 import { partitionBoards } from "./partition-boards"
 
 
@@ -20,9 +21,10 @@ import { partitionBoards } from "./partition-boards"
 export function BoardsHome({ className }: { className?: string }) {
   const navigate = useNavigate()
   const userId = useAppStore((s) => s.userId)
-  const { boards: localBoards, ready, createBoard, deleteBoard, renameBoard } =
+  const { boards: localBoards, ready, createBoard, deleteBoard, renameBoard, refresh } =
     useLocalBoards()
   const { data: syncedBoards, isLoading } = useListBoards(userId)
+  const { enableSync, pendingId } = useEnableSync()
 
   const { onDevice, synced } = useMemo(
     () => partitionBoards(localBoards, syncedBoards),
@@ -66,6 +68,12 @@ export function BoardsHome({ className }: { className?: string }) {
                 onOpen={() => openLocal(board.id)}
                 onDelete={() => void deleteBoard(board.id)}
                 onRename={(title) => void renameBoard(board.id, title)}
+                onEnableSync={() => {
+                  void enableSync(board.id, board.title).then((r) => {
+                    if (r.ok) void refresh()
+                  })
+                }}
+                syncing={pendingId === board.id}
               />
             </CardCell>
           ))}

@@ -100,6 +100,29 @@ export class BoardRegistry {
   }
 
 
+  /**
+   * Promote a local board to synced: set `kind=synced`, the collab engine, and
+   * the owner. No-op if the board doesn't exist. Called after the adopt endpoint
+   * accepts the board (local → synced). Keeps the id + content unchanged.
+   */
+  async markSynced(
+    id: string,
+    opts: { syncEngine: "legacy" | "v2"; ownerId: string },
+    now: number = Date.now(),
+  ): Promise<void> {
+    const engine = this.requireEngine()
+    const existing = await engine.get<BoardMeta>("boards", id)
+    if (!existing) return
+    await engine.put("boards", {
+      ...existing,
+      kind: "synced",
+      syncEngine: opts.syncEngine,
+      ownerId: opts.ownerId,
+      updatedAt: now,
+    })
+  }
+
+
   /** Store a board's thumbnail (a data URL). No-op if the board doesn't exist. */
   async setThumbnail(id: string, thumbnail: string, now: number = Date.now()): Promise<void> {
     const engine = this.requireEngine()

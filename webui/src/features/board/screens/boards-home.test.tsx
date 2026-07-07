@@ -38,7 +38,11 @@ vi.mock("../local/use-local-boards", () => ({
     createBoard: vi.fn(),
     deleteBoard: vi.fn(),
     renameBoard: vi.fn(),
+    refresh: vi.fn(),
   }),
+}))
+vi.mock("../local/use-enable-sync", () => ({
+  useEnableSync: () => ({ enableSync: vi.fn(), pendingId: null }),
 }))
 vi.mock("../components/board-card", () => ({
   BoardCard: () => <div data-testid="synced-card" />,
