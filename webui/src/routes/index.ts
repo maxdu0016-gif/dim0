@@ -26,7 +26,6 @@ import { ForgotPasswordPage } from "@/features/signin/screens/forgot-password"
 import { ResetPasswordPage } from "@/features/signin/screens/reset-password"
 import { InstallScreen } from "@/features/install/screens/install-screen"
 import { ShareLandingScreen } from "@/features/sharing/screens/share-landing"
-import { LocalDashboard } from "@/features/board/local/local-dashboard"
 import { LocalBoardScreen } from "@/features/board/local/local-board-screen"
 
 
@@ -260,7 +259,9 @@ export const LocalDashboardUrl = "/local"
 const localDashboardRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: LocalDashboardUrl,
-  component: LocalDashboard,
+  // Same unified dashboard as `/boards`, but unguarded: a signed-out user lands
+  // here and sees the on-device group only (the synced group needs an account).
+  component: DashboardScreen,
 })
 
 export const LocalBoardUrl = "/local/$boardId"

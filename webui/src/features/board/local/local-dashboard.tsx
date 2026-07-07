@@ -1,74 +1,17 @@
 import { useState } from "react"
-import { useNavigate } from "@tanstack/react-router"
 import { AddIcon, CancelPlainIcon } from "@/components/icons"
-import { ThemedWelcome } from "@/features/agent/components/chat/welcome-message"
 import { UNTITLED_LABEL } from "@/features/board/const"
 import type { BoardMeta } from "@/features/board/model"
 import { formatDateForUI } from "@/features/board/utils/datetime"
-import { useLocalBoards } from "./use-local-boards"
 
 
-/**
- * Local-only board index — create / open / rename / delete boards with no
- * account, fully offline. Mirrors the backend dashboard's card grid but reads
- * the local registry and routes to `/local/$boardId`.
- */
-export function LocalDashboard() {
-  const { boards, ready, createBoard, deleteBoard, renameBoard } = useLocalBoards()
-  const navigate = useNavigate()
-
-  const open = (id: string): void => {
-    void navigate({ to: "/local/$boardId", params: { boardId: id } })
-  }
-
-  const handleCreate = async (): Promise<void> => {
-    const meta = await createBoard("Untitled board")
-    if (meta) open(meta.id)
-  }
-
-  const sorted = [...boards].sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0))
-
-  return (
-    <div className="w-full h-full">
-      <div className="pt-8 pb-4">
-        <ThemedWelcome name="Dog" message="Local Boards" />
-      </div>
-
-      <div className="mx-auto max-w-5xl p-4">
-        <div
-          className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 place-items-center"
-          role="list"
-          aria-label="Local boards"
-        >
-          <div className="w-full h-full flex justify-center items-center">
-            <NewBoardCard onClick={() => void handleCreate()} />
-          </div>
-
-          {sorted.map((board) => (
-            <div key={board.id} className="w-full h-full flex justify-center items-center">
-              <LocalBoardCard
-                board={board}
-                onOpen={() => open(board.id)}
-                onDelete={() => void deleteBoard(board.id)}
-                onRename={(title) => void renameBoard(board.id, title)}
-              />
-            </div>
-          ))}
-        </div>
-
-        {ready && sorted.length === 0 && (
-          <div className="text-center mt-8 text-muted-foreground">
-            No boards yet — create your first one above. No account needed.
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
+// Local-board card + "new" tile, rendered by the unified BoardsHome dashboard's
+// "On this device" group. (The standalone LocalDashboard screen was folded into
+// BoardsHome; these leaves stayed here since that's their only consumer.)
 
 
 /** A local board card: open on click, ✕ to delete (hover), double-click the title to rename. */
-function LocalBoardCard({
+export function LocalBoardCard({
   board,
   onOpen,
   onDelete,
@@ -159,8 +102,8 @@ function LocalBoardCard({
 }
 
 
-/** The "new board" tile. */
-function NewBoardCard({ onClick }: { onClick: () => void }) {
+/** The "new local board" tile. */
+export function NewLocalBoardCard({ onClick }: { onClick: () => void }) {
   return (
     <div
       className="w-64 h-60 flex flex-col items-center justify-center gap-1 p-1 overflow-hidden rounded-xl bg-transparent hover:bg-accent text-card-foreground border-2 border-dashed border-border hover:border-secondary-foreground hover:ring-2 hover:ring-secondary-foreground/10 shadow-none hover:shadow-sm transition-all cursor-pointer"
