@@ -26,6 +26,7 @@ import { BoardPersistence } from "@/features/board/persist/local/board-persisten
 import { setBoardPersistenceRef } from "@/features/board/persist/local/board-persistence-ref"
 import { normalizeInboundBatch } from "../sync/inbound-normalize"
 import { enrichEdgeMidpoints } from "../sync/outbound-enrich"
+import { dedupeRepeatUpdates } from "../sync/outbound-dedupe"
 import { ReconnectSupervisor } from "../sync/reconnect-supervisor"
 import { attachBoardSync } from "../sync/board-sync"
 import type { BoardSyncHandle } from "../sync/board-sync"
@@ -97,7 +98,8 @@ export const useBoardSyncV2 = (
               applyGraphToStore(store, graph, { mode: "merge" })
             },
             normalizeRemote: (batch) => normalizeInboundBatch(batch, store),
-            enrichOutbound: (batch) => enrichEdgeMidpoints(batch, store),
+            enrichOutbound: (batch) => enrichEdgeMidpoints(dedupeRepeatUpdates(batch), store),
+            coalesceMs: 75, // merge a burst (e.g. rotate's per-tick ops) into one send
           })
         })
       })

@@ -59,7 +59,11 @@ const makeControlled = (
 
 
 /** A full offline-first client: own engine (replica) + persistence + store + sync. */
-const makeClient = (relay: MemoryRelay, id: string, opts: { canEdit?: boolean } = {}) => {
+const makeClient = (
+  relay: MemoryRelay,
+  id: string,
+  opts: { canEdit?: boolean; coalesceMs?: number } = {},
+) => {
   const engine = new InMemoryEngine()
   const persistence = new BoardPersistence(BOARD, { engine })
   const store = freshStore(id)
@@ -70,7 +74,8 @@ const makeClient = (relay: MemoryRelay, id: string, opts: { canEdit?: boolean } 
     engine,
     boardId: BOARD,
     clientId: asClientId(id),
-    connect: (sinceSeq) => relay.connect(asClientId(id), { ...opts, sinceSeq }),
+    connect: (sinceSeq) => relay.connect(asClientId(id), { canEdit: opts.canEdit, sinceSeq }),
+    coalesceMs: opts.coalesceMs,
   })
   return { engine, persistence, store, sync }
 }
@@ -451,6 +456,91 @@ describe("E1.4 conflict resolution", () => {
 })
 
 
+describe("outbound coalescing (coalesceMs > 0)", () => {
+  it("merges a burst of same-node updates into ONE relay message and converges", async () => {
+    const relay = new MemoryRelay()
+    const a = makeClient(relay, "A", { coalesceMs: 75 })
+    const b = makeClient(relay, "B", { coalesceMs: 75 })
+    addNode(a.store, "n1")
+    await a.sync.settle()
+    await b.sync.settle()
+    const base = relay.log.length // the add is already sent
+
+    // Rotate-style flood: many rapid updates, NO settle between → they accumulate
+    // in the oplog; settle() force-flushes the debounce into one merged send.
+    for (let i = 1; i <= 10; i += 1) a.store.updateNode(asNodeId("n1"), { x: i })
+    await a.sync.settle()
+    await b.sync.settle()
+
+    expect(relay.log).toHaveLength(base + 1) // 10 updates → ONE message (deduped to 1 op)
+    expect(xOf(a.store, "n1")).toBe(10)
+    expect(xOf(b.store, "n1")).toBe(10) // peer converges to the final value
+    const outbox = new BoardOutbox(a.engine, BOARD)
+    expect(await outbox.pending()).toHaveLength(0) // the single ack drained the whole range
+    a.sync.detach()
+    b.sync.detach()
+  })
+
+
+  it("coalesces a mixed burst (adds + updates) into one message, converging correctly", async () => {
+    const relay = new MemoryRelay()
+    const a = makeClient(relay, "A", { coalesceMs: 75 })
+    const b = makeClient(relay, "B", { coalesceMs: 75 })
+    await a.sync.settle()
+    await b.sync.settle()
+    const base = relay.log.length
+
+    addNode(a.store, "n1")
+    a.store.updateNode(asNodeId("n1"), { x: 7 })
+    addNode(a.store, "n2")
+    await a.sync.settle()
+    await b.sync.settle()
+
+    expect(relay.log).toHaveLength(base + 1) // all three ops in one message
+    expect(ids(b.store)).toEqual(["n1", "n2"])
+    expect(xOf(b.store, "n1")).toBe(7)
+    a.sync.detach()
+    b.sync.detach()
+  })
+
+
+  it("does not re-send coalesced records after a reconnect (range cursor)", async () => {
+    const relay = new MemoryRelay()
+    const a = makeClient(relay, "A", { coalesceMs: 75 })
+    const b = makeClient(relay, "B", { coalesceMs: 75 })
+    addNode(a.store, "n1")
+    for (let i = 1; i <= 5; i += 1) a.store.updateNode(asNodeId("n1"), { x: i })
+    await a.sync.settle()
+    await b.sync.settle()
+    const logAfter = relay.log.length
+
+    a.sync.disconnect()
+    a.sync.reconnect()
+    await a.sync.settle()
+    await b.sync.settle()
+
+    expect(relay.log).toHaveLength(logAfter) // cursor covers the merged range → nothing re-sent
+    expect(await new BoardOutbox(a.engine, BOARD).pending()).toHaveLength(0)
+    a.sync.detach()
+    b.sync.detach()
+  })
+
+
+  it("sends each op separately when coalescing is off (coalesceMs = 0)", async () => {
+    const relay = new MemoryRelay()
+    const a = makeClient(relay, "A") // default: no coalescing
+    makeClient(relay, "B")
+    addNode(a.store, "n1")
+    a.store.updateNode(asNodeId("n1"), { x: 1 })
+    a.store.updateNode(asNodeId("n1"), { x: 2 })
+    await a.sync.settle()
+
+    expect(relay.log).toHaveLength(3) // add + 2 updates = 3 separate messages
+    a.sync.detach()
+  })
+})
+
+
 describe("E1.5 protocol handlers", () => {
   it("hydrates from a snapshot-mode welcome via onSnapshot", async () => {
     let captured: { snapshot: unknown; seq: number } | null = null
@@ -473,6 +563,59 @@ describe("E1.5 protocol handlers", () => {
     await c.sync.settle()
 
     expect(seen).toEqual(["welcome", "welcome"])
+    c.sync.detach()
+  })
+
+
+  it("ignores a self-echoed peer-op (does not double-apply own batch)", async () => {
+    const c = makeControlled("A")
+    // A batch tagged with THIS client's id, echoed back as a peer-op.
+    c.push({
+      kind: "peer-op",
+      seq: 1,
+      batch: {
+        id: asBatchId("mine"),
+        clientId: asClientId("A"),
+        ts: 0,
+        origin: "local",
+        ops: [{
+          type: "node.add",
+          node: {
+            id: asNodeId("n1"), type: "rect", x: 0, y: 0, z: 0, w: 100, h: 50, angle: 0,
+            groups: [], data: { label: "x", meta: { v: 1, createdAt: 0, updatedAt: 0 } },
+          },
+        }],
+      },
+    })
+    await c.sync.settle()
+
+    expect(ids(c.store)).toEqual([]) // self-echo ignored — not applied
+    c.sync.detach()
+  })
+
+
+  it("applies a genuine peer-op (different clientId)", async () => {
+    const c = makeControlled("A")
+    c.push({
+      kind: "peer-op",
+      seq: 1,
+      batch: {
+        id: asBatchId("theirs"),
+        clientId: asClientId("B"),
+        ts: 0,
+        origin: "local",
+        ops: [{
+          type: "node.add",
+          node: {
+            id: asNodeId("n1"), type: "rect", x: 0, y: 0, z: 0, w: 100, h: 50, angle: 0,
+            groups: [], data: { label: "x", meta: { v: 1, createdAt: 0, updatedAt: 0 } },
+          },
+        }],
+      },
+    })
+    await c.sync.settle()
+
+    expect(ids(c.store)).toEqual(["n1"]) // peer op applied
     c.sync.detach()
   })
 

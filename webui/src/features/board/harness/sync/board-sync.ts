@@ -36,6 +36,7 @@ import type {
   SyncAdapter,
 } from "@canvas-harness/core"
 import { BoardOutbox } from "@/features/board/persist/local/board-outbox"
+import type { OplogRecord } from "@/features/board/persist/local/idb"
 import type { BoardPersistence } from "@/features/board/persist/local/board-persistence"
 import type { StorageEngine } from "@/features/board/persist/local/engine"
 import { pruneDanglingEdges } from "@/features/board/persist/local/integrity"
@@ -76,6 +77,14 @@ export type BoardSyncOptions = {
    * original unchanged) — the raw oplog is untouched. Omit in the harness.
    */
   enrichOutbound?: (batch: OpBatch) => OpBatch
+  /**
+   * Debounce window (ms) for coalescing outbound sends. Local edits made within
+   * the window are merged into ONE relay message (their ops concatenated +
+   * deduped by `enrichOutbound`), so a per-tick gesture flood (rotate writes one
+   * op per pointermove) doesn't ship dozens of frames. 0 (default) sends each
+   * batch immediately — the harness uses 0 for determinism.
+   */
+  coalesceMs?: number
 }
 
 
@@ -99,7 +108,11 @@ export const attachBoardSync = (opts: BoardSyncOptions): BoardSyncHandle => {
   let connection: RelayConnection | null = null
   let clientSeq = 0
   let lastServerSeq = 0
-  const inFlight = new Map<number, { seq: number; batchId: string }>() // client_seq → oplog seq + batch id
+  let coalesceTimer: ReturnType<typeof setTimeout> | null = null
+  // client_seq → the oplog seqs + batch ids that send covered. Coalescing sends
+  // ONE message for many records, so a single ack advances the cursor over all
+  // of them (markSyncedTo(max) is monotonic → reconnect won't re-send them).
+  const inFlight = new Map<number, { seqs: number[]; batchIds: string[] }>()
   const rejected = new Set<number>() // oplog seqs the relay refused (don't resend)
   // Unacked local batches, in commit order — the rebase set (applied on top of
   // every remote op so local edits stay "latest"). Keyed by batch id; Map keeps
@@ -119,6 +132,11 @@ export const attachBoardSync = (opts: BoardSyncOptions): BoardSyncHandle => {
    * `origin: "remote"` so nothing echoes back to the relay or re-persists.
    */
   const applyRemote = (batch: OpBatch, serverSeq: number): void => {
+    // Self-echo guard: never apply our own batch back. The relay excludes the
+    // sender today, so this is defensive — but without it, an echoed batch would
+    // be applied as `remote` on top of the identical entry in `pending` (double
+    // apply via the rebase). Covers both peer-op and welcome catch-up.
+    if (batch.clientId === opts.clientId) return
     // Apply a NORMALIZED copy (theme colors + edge geometry) to the store, but
     // persist the RAW batch — the raw carries theme-independent `_storedColors`,
     // so a reload re-normalizes to whatever theme is active then. Skipping the
@@ -154,18 +172,34 @@ export const attachBoardSync = (opts: BoardSyncOptions): BoardSyncHandle => {
     pruneDanglingEdges(opts.store)
   }
 
+  // Merge records into one batch: concat ops in seq order, keep the latest
+  // batch's envelope (id/ts/origin). `enrichOutbound` then dedupes repeat
+  // same-target updates (the rotate flood collapses to one op per node).
+  const mergeBatches = (batches: OpBatch[]): OpBatch => ({
+    ...batches[batches.length - 1],
+    ops: batches.flatMap((b) => b.ops),
+  })
+
+  const sendRecords = (recs: OplogRecord[]): void => {
+    if (!connection || recs.length === 0) return
+    clientSeq += 1
+    inFlight.set(clientSeq, { seqs: recs.map((r) => r.seq), batchIds: recs.map((r) => r.batch.id) })
+    const merged = recs.length === 1 ? recs[0].batch : mergeBatches(recs.map((r) => r.batch))
+    const batch = opts.enrichOutbound ? opts.enrichOutbound(merged) : merged
+    connection.send({ kind: "op", client_seq: clientSeq, batch })
+  }
+
   const pump = async (): Promise<void> => {
     if (!connection) return
     await opts.persistence.flush() // ensure fresh local edits are in the oplog
     const unacked = await outbox.pending()
-    const inFlightSeqs = new Set([...inFlight.values()].map((r) => r.seq))
-    for (const rec of unacked) {
-      if (rejected.has(rec.seq) || inFlightSeqs.has(rec.seq)) continue
-      clientSeq += 1
-      inFlight.set(clientSeq, { seq: rec.seq, batchId: rec.batch.id })
-      inFlightSeqs.add(rec.seq)
-      const batch = opts.enrichOutbound ? opts.enrichOutbound(rec.batch) : rec.batch
-      connection.send({ kind: "op", client_seq: clientSeq, batch })
+    const inFlightSeqs = new Set([...inFlight.values()].flatMap((r) => r.seqs))
+    const eligible = unacked.filter((r) => !rejected.has(r.seq) && !inFlightSeqs.has(r.seq))
+    if (eligible.length === 0) return
+    if (opts.coalesceMs && opts.coalesceMs > 0) {
+      sendRecords(eligible) // one merged message for the whole debounce window
+    } else {
+      for (const rec of eligible) sendRecords([rec]) // one message per record
     }
   }
 
@@ -193,10 +227,10 @@ export const attachBoardSync = (opts: BoardSyncOptions): BoardSyncHandle => {
         const rec = inFlight.get(msg.client_seq)
         inFlight.delete(msg.client_seq)
         if (rec) {
-          pending.delete(rec.batchId) // acked → no longer rebased on top
+          for (const id of rec.batchIds) pending.delete(id) // acked → no longer rebased on top
           enqueue(async () => {
-            await outbox.markSyncedTo(rec.seq)
-            await opts.persistence.setServerSeq(rec.seq, msg.seq) // reload replays in relay order
+            await outbox.markSyncedTo(Math.max(...rec.seqs)) // one ack covers the merged range
+            for (const s of rec.seqs) await opts.persistence.setServerSeq(s, msg.seq) // reload replays in relay order
           })
         }
         break
@@ -205,9 +239,11 @@ export const attachBoardSync = (opts: BoardSyncOptions): BoardSyncHandle => {
         const rec = inFlight.get(msg.client_seq)
         inFlight.delete(msg.client_seq)
         if (rec) {
-          rejected.add(rec.seq) // don't resend a refused op
-          if (pending.has(rec.batchId)) rollbackPending(rec.batchId) // revert optimistic edit
-          enqueue(() => opts.persistence.removeBatch(rec.seq)) // don't resurrect on reload
+          for (const s of rec.seqs) rejected.add(s) // don't resend a refused op
+          for (const id of rec.batchIds) if (pending.has(id)) rollbackPending(id) // revert optimistic edit
+          enqueue(async () => {
+            for (const s of rec.seqs) await opts.persistence.removeBatch(s) // don't resurrect on reload
+          })
         }
         break
       }
@@ -226,6 +262,27 @@ export const attachBoardSync = (opts: BoardSyncOptions): BoardSyncHandle => {
     }
   }
 
+  // Local commits arm a debounce (coalesceMs) so a burst merges into one send;
+  // with coalesceMs=0 they pump immediately. Reconnect/catch-up pump directly.
+  const schedulePump = (): void => {
+    if (!opts.coalesceMs || opts.coalesceMs <= 0) {
+      enqueue(pump)
+      return
+    }
+    if (coalesceTimer !== null) return
+    coalesceTimer = setTimeout(() => {
+      coalesceTimer = null
+      enqueue(pump)
+    }, opts.coalesceMs)
+  }
+
+  const flushCoalesce = (): void => {
+    if (coalesceTimer === null) return
+    clearTimeout(coalesceTimer)
+    coalesceTimer = null
+    enqueue(pump)
+  }
+
   const openConnection = (): void => {
     // `sinceSeq` at connect time lets the relay pick the welcome mode; no separate
     // hello-with-since_seq message (the real WS carries it as a query param).
@@ -240,7 +297,7 @@ export const attachBoardSync = (opts: BoardSyncOptions): BoardSyncHandle => {
     // send source is the outbox, so the batch itself is only used for rebase.
     sendBatch: (batch: OpBatch) => {
       pending.set(batch.id, batch)
-      enqueue(pump)
+      schedulePump()
     },
     sendPresence: (patch: PresencePatch) => {
       const state = { ...patch, clientId: opts.clientId } as PresenceState
@@ -258,19 +315,29 @@ export const attachBoardSync = (opts: BoardSyncOptions): BoardSyncHandle => {
   const detachSync = attachSync(opts.store, adapter)
   openConnection()
 
+  const clearTimer = (): void => {
+    if (coalesceTimer !== null) {
+      clearTimeout(coalesceTimer)
+      coalesceTimer = null
+    }
+  }
+
   return {
     detach: () => {
+      clearTimer()
       detachSync()
       connection?.close()
       connection = null
     },
     disconnect: () => {
+      clearTimer()
       connection?.close()
       connection = null
       inFlight.clear() // un-acked ops re-pump on reconnect
     },
     reconnect: openConnection,
     settle: async () => {
+      flushCoalesce() // force any pending debounced send before draining
       // Drain until the work chain stops growing (acks/pumps enqueue more work).
       let seen: Promise<void>
       do {
