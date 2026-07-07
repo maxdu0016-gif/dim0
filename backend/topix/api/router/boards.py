@@ -13,6 +13,7 @@ from topix.agents.sessions import AssistantSession
 from topix.api.datatypes.requests import (
     AddLinksRequest,
     AddNotesRequest,
+    AdoptGraphRequest,
     BoardVisibilityUpdateRequest,
     GraphUpdateRequest,
     LinkUpdateRequest,
@@ -25,6 +26,7 @@ from topix.api.utils.security import (
     verify_board_read_access,
 )
 from topix.api.utils.thumbnail import load_png_as_data_url, save_thumbnail
+from topix.collab.apply_ops import apply_batch
 from topix.datatypes.graph.graph import Graph
 from topix.datatypes.note.style import NodeType
 from topix.store.chat import ChatStore
@@ -51,6 +53,49 @@ async def create_graph(
     new_graph = Graph(user_uid=user_id)
     await store.add_graph(graph=new_graph, user_uid=user_id)
     return {"graph_id": new_graph.uid}
+
+
+@router.post("/{graph_id}:adopt/", include_in_schema=False)
+@router.post("/{graph_id}:adopt")
+@with_standard_response
+async def adopt_graph(
+    response: Response,
+    request: Request,
+    graph_id: Annotated[str, Path(description="Client-provided board UID to adopt")],
+    body: AdoptGraphRequest,
+    user_id: Annotated[str, Depends(get_current_user_uid)],
+):
+    """Adopt a local-only board into a synced graph, preserving its UID.
+
+    Promotes a device-only board (local → synced): creates the graph under the
+    caller as owner with the board's existing UID, then rebuilds its content via
+    the same `apply_batch` path the collab relay uses. The stored graph is the
+    snapshot base a joining v2 client hydrates from, so no oplog seeding is
+    needed (seq starts at 0).
+
+    Idempotent: re-adopting a board the caller already owns is a no-op that
+    returns the same id, so a retried promotion is safe. A UID owned by someone
+    else is rejected (409) rather than overwritten.
+    """
+    store: GraphStore = request.app.graph_store
+
+    existing = await store.get_graph_metadata(graph_uid=graph_id)
+    if existing is not None:
+        role = await store.get_graph_role(graph_uid=graph_id, user_uid=user_id)
+        if role != "owner":
+            raise HTTPException(status_code=409, detail="board id already in use")
+        return {"graph_id": graph_id, "adopted": False, "applied": 0}
+
+    graph = Graph(uid=graph_id, label=body.label)
+    await store.add_graph(graph=graph, user_uid=user_id)
+    results = await apply_batch(
+        graph_store=store,
+        board_id=graph_id,
+        user_id=user_id,
+        ops=body.ops,
+    )
+    applied = sum(1 for r in results if r.applied)
+    return {"graph_id": graph_id, "adopted": True, "applied": applied}
 
 
 @router.patch("/{graph_id}/", include_in_schema=False)
