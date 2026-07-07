@@ -12,10 +12,13 @@ import {
 import { useInfiniteChats } from '@/features/agent/api/list-chats'
 import { useAppStore } from '@/store'
 import { useListBoards } from '@/features/board/api/list-boards'
+import { useLocalBoards } from '@/features/board/local/use-local-boards'
+import { useEnableSync } from '@/features/board/local/use-enable-sync'
 import { ChatMenuItem, NewChatItem } from './chat'
-import { BoardItem, DashboardMenuItem, NewBoardItem } from './board'
+import { BoardItem, DashboardMenuItem, LocalBoardItem, NewLocalBoardItem } from './board'
 import { ChatsDialog } from './chats-dialog'
 import { useMemo, useState } from 'react'
+import { useRouterState } from '@tanstack/react-router'
 import type { Chat } from '@/features/agent/types/chat'
 import { AwardIcon, ChatHistoryIcon, InstallAppIcon, LogoutIcon, UserProfileIcon } from '@/components/icons'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -68,10 +71,54 @@ export function AppSidebar({ onLogout }: AppSidebarProps) {
     userId
   })
   const { data: boards = [] } = useListBoards(userId)
+  const { boards: localBoards, createBoard, deleteBoard, refresh } = useLocalBoards()
+  const { enableSync, pendingId } = useEnableSync()
+  const pathname = useRouterState({ select: (s) => s.location.pathname })
 
   const chatHistoryItems = useMemo<Chat[]>(
     () => chatPagesData?.pages.flat() ?? [],
     [chatPagesData]
+  )
+
+  const openLocal = (id: string): void => {
+    void navigate({ to: "/local/$boardId", params: { boardId: id } })
+  }
+
+  const handleNewLocal = async (): Promise<void> => {
+    const meta = await createBoard("Untitled board")
+    if (meta) openLocal(meta.id)
+  }
+
+  // Only truly-local boards belong here; a promoted board flips to kind=synced
+  // and appears in the SYNCED group (from the backend list) instead.
+  const localOnly = useMemo(
+    () =>
+      localBoards
+        .filter((b) => b.kind === "local-only")
+        .sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0)),
+    [localBoards],
+  )
+
+  const localBoardItems = useMemo(
+    () =>
+      localOnly.map((b) => (
+        <LocalBoardItem
+          key={b.id}
+          label={b.title}
+          isActive={pathname === `/local/${b.id}`}
+          syncing={pendingId === b.id}
+          onOpen={() => openLocal(b.id)}
+          onEnableSync={() => {
+            void enableSync(b.id, b.title).then((r) => {
+              if (r.ok) void refresh()
+            })
+          }}
+          onDelete={() => void deleteBoard(b.id)}
+        />
+      )),
+    // openLocal/enableSync/deleteBoard/refresh are stable enough for this list.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [localOnly, pathname, pendingId],
   )
 
   const chatItems = useMemo(
@@ -154,11 +201,30 @@ export function AppSidebar({ onLogout }: AppSidebarProps) {
                 <SidebarMenu>
                   <HomeMenuItem />
                   <DashboardMenuItem />
-                  <NewBoardItem />
-                  {myBoardItems}
                 </SidebarMenu>
               </SidebarGroupContent>
             </SidebarGroup>
+
+            <SidebarGroup>
+              <SidebarGroupLabel><span>LOCAL</span></SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  <NewLocalBoardItem onClick={() => void handleNewLocal()} />
+                  {localBoardItems}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+
+            {myBoardItems.length > 0 && (
+              <SidebarGroup>
+                <SidebarGroupLabel><span>SYNCED</span></SidebarGroupLabel>
+                <SidebarGroupContent>
+                  <SidebarMenu>
+                    {myBoardItems}
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </SidebarGroup>
+            )}
 
             {sharedBoardItems.length > 0 && (
               <SidebarGroup>

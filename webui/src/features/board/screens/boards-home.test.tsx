@@ -118,6 +118,7 @@ describe("BoardsHome", () => {
     // "shared" is in both lists → shown once under Synced, dropped on-device.
     expect(count("local-card")).toBe(1)
     expect(count("synced-card")).toBe(2)
-    expect(count("new-synced")).toBe(1)
+    // No direct synced creation — synced boards come from promotion only.
+    expect(count("new-synced")).toBe(0)
   })
 })

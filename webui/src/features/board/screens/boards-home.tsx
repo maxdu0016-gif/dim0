@@ -5,7 +5,7 @@ import { ThemedWelcome } from "@/features/agent/components/chat/welcome-message"
 import { cn } from "@/lib/utils"
 import { useAppStore } from "@/store"
 import { useListBoards } from "../api/list-boards"
-import { BoardCard, NewBoardCard } from "../components/board-card"
+import { BoardCard } from "../components/board-card"
 import { LocalBoardCard, NewLocalBoardCard } from "../local/local-dashboard"
 import { useLocalBoards } from "../local/use-local-boards"
 import { useEnableSync } from "../local/use-enable-sync"
@@ -18,7 +18,13 @@ import { partitionBoards } from "./partition-boards"
  * users see only the on-device group; signing in reveals the synced group. A
  * promoted board renders once, under Synced (partitionBoards dedupes by id).
  */
-export function BoardsHome({ className }: { className?: string }) {
+export function BoardsHome({
+  className,
+  hideTitle = false,
+}: {
+  className?: string
+  hideTitle?: boolean
+}) {
   const navigate = useNavigate()
   const userId = useAppStore((s) => s.userId)
   const { boards: localBoards, ready, createBoard, deleteBoard, renameBoard, refresh } =
@@ -44,9 +50,11 @@ export function BoardsHome({ className }: { className?: string }) {
 
   return (
     <div className={cn("w-full h-full", className)}>
-      <div className="pt-8 pb-4">
-        <ThemedWelcome name="Dog" message="Note Boards" />
-      </div>
+      {!hideTitle && (
+        <div className="pt-8 pb-4">
+          <ThemedWelcome name="Dog" message="Note Boards" />
+        </div>
+      )}
 
       <div className="mx-auto max-w-5xl p-4 space-y-10">
         <Section
@@ -87,13 +95,10 @@ export function BoardsHome({ className }: { className?: string }) {
               isLoading
                 ? "Loading…"
                 : synced.length === 0
-                  ? "No synced boards yet. Create one, or enable sync on a local board."
+                  ? "No synced boards yet. Enable sync on a local board to back it up and share it."
                   : null
             }
           >
-            <CardCell>
-              <NewBoardCard />
-            </CardCell>
             {synced.map((board) => (
               <CardCell key={board.uid}>
                 <BoardCard board={board} />
