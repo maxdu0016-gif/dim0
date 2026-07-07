@@ -3,6 +3,7 @@ import { AddIcon, CancelPlainIcon, CloudSyncIcon } from "@/components/icons"
 import { UNTITLED_LABEL } from "@/features/board/const"
 import type { BoardMeta } from "@/features/board/model"
 import { formatDateForUI } from "@/features/board/utils/datetime"
+import { BoardKindBadge } from "@/features/board/components/board-kind-badge"
 
 
 // Local-board card + "new" tile, rendered by the unified BoardsHome dashboard's
@@ -112,11 +113,12 @@ export function LocalBoardCard({
             {board.title || UNTITLED_LABEL}
           </h4>
         )}
-        {dateString && (
-          <div className="w-full text-xs text-muted-foreground font-mono mt-1">
-            <span className="ml-auto">{dateString}</span>
-          </div>
-        )}
+        <div className="mt-1 flex w-full items-center justify-between gap-2">
+          <BoardKindBadge kind={board.kind} />
+          {dateString && (
+            <span className="text-xs text-muted-foreground font-mono">{dateString}</span>
+          )}
+        </div>
       </div>
     </div>
   )

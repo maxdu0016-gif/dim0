@@ -47,6 +47,7 @@ import { getLocalStores } from "@/features/local-stores"
 import { saveLocalThumbnail } from "@/features/board/local/save-local-thumbnail"
 import { setBoardPersistenceRef } from "@/features/board/persist/local/board-persistence-ref"
 import { ShareButton } from "@/features/sharing/share-button"
+import { BoardKindBadge } from "@/features/board/components/board-kind-badge"
 import { useBoardAppStore } from "../store/board-app-store"
 import { createBoardStore } from "../store/create-board-store"
 import { adaptEdgeColors, applyColorsToEdgeStyle } from "../theme/color-adapter"
@@ -516,6 +517,9 @@ function HarnessCanvasInner({
       <div className="absolute right-3 top-3 z-50 flex items-center gap-2">
         {canCollab && <HarnessPeerChip />}
         <HarnessReadonlyChip />
+        {/* Local boards have no collab chrome, so surface an explicit
+            "On device" badge so they're not mistaken for synced. */}
+        {!canCollab && <BoardKindBadge kind="local-only" />}
         {canCollab && <HarnessCollabStatus />}
         {canCollab && <ShareButton />}
       </div>
