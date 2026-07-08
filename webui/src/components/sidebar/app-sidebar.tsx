@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/sidebar'
 import { useInfiniteChats } from '@/features/agent/api/list-chats'
 import { useAppStore } from '@/store'
+import { isSignedIn } from '@/lib/auth'
 import { useListBoards } from '@/features/board/api/list-boards'
 import { useLocalBoards } from '@/features/board/local/use-local-boards'
 import { useEnableSync } from '@/features/board/local/use-enable-sync'
@@ -56,6 +57,9 @@ export function AppSidebar({ onLogout }: AppSidebarProps) {
   const userId = useAppStore(s => s.userId)
   const userEmail = useAppStore(s => s.userEmail)
   const userPlan = useAppStore(s => s.userPlan)
+  // Signed-out ("root") gets the same shell but a local-only nav: no Dashboard/
+  // Chats (both need the backend), and a sign-in CTA instead of the account menu.
+  const signedIn = isSignedIn(userId)
 
   const initials = useMemo(() => {
     if (!userEmail) return 'U'
@@ -200,7 +204,7 @@ export function AppSidebar({ onLogout }: AppSidebarProps) {
               <SidebarGroupContent>
                 <SidebarMenu>
                   <HomeMenuItem />
-                  <DashboardMenuItem />
+                  {signedIn && <DashboardMenuItem />}
                 </SidebarMenu>
               </SidebarGroupContent>
             </SidebarGroup>
@@ -237,26 +241,28 @@ export function AppSidebar({ onLogout }: AppSidebarProps) {
               </SidebarGroup>
             )}
 
-            <SidebarGroup>
-              <SidebarGroupLabel><span>CHATS</span></SidebarGroupLabel>
-              <SidebarGroupContent>
-                <SidebarMenu>
-                  <NewChatItem />
-                  <SidebarMenuSub>
-                    {chatItems}
-                  </SidebarMenuSub>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton
-                      onClick={() => setChatsDialogOpen(true)}
-                      className="font-medium text-xs"
-                    >
-                      <ChatHistoryIcon className="size-4 shrink-0" strokeWidth={2} />
-                      <span>View all chats</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
+            {signedIn && (
+              <SidebarGroup>
+                <SidebarGroupLabel><span>CHATS</span></SidebarGroupLabel>
+                <SidebarGroupContent>
+                  <SidebarMenu>
+                    <NewChatItem />
+                    <SidebarMenuSub>
+                      {chatItems}
+                    </SidebarMenuSub>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton
+                        onClick={() => setChatsDialogOpen(true)}
+                        className="font-medium text-xs"
+                      >
+                        <ChatHistoryIcon className="size-4 shrink-0" strokeWidth={2} />
+                        <span>View all chats</span>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </SidebarGroup>
+            )}
           </div>
         </div>
 
@@ -267,52 +273,62 @@ export function AppSidebar({ onLogout }: AppSidebarProps) {
             <SidebarMenu>
               <SidebarMenuItem>
                 <div className="flex items-center gap-2 w-full">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <SidebarMenuButton className="h-auto py-2 flex items-center gap-2 font-medium text-xs min-w-0 flex-1">
-                        <Avatar className="h-8 w-8 -ml-2 shrink-0">
-                          <AvatarImage alt={userEmail} />
-                          <AvatarFallback>{initials}</AvatarFallback>
-                        </Avatar>
-                        <div className="min-w-0 flex-1">
-                          <span
-                            className="truncate block"
-                            title={userEmail}
-                          >
-                            {userEmail}
-                          </span>
-                          {BILLING_ENABLED ? (
-                            <div className="mt-1">
-                              <TierBadge plan={userPlan} />
-                            </div>
-                          ) : null}
-                        </div>
-                      </SidebarMenuButton>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start" side="top" className="w-56">
-                      <DropdownMenuItem
-                        className='text-xs'
-                        onClick={() => navigate({ to: "/settings" })}
-                      >
-                        <UserProfileIcon className="mr-2 h-4 w-4" strokeWidth={2} />
-                        <span>Profile</span>
-                      </DropdownMenuItem>
-                      {BILLING_ENABLED ? (
+                  {signedIn ? (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <SidebarMenuButton className="h-auto py-2 flex items-center gap-2 font-medium text-xs min-w-0 flex-1">
+                          <Avatar className="h-8 w-8 -ml-2 shrink-0">
+                            <AvatarImage alt={userEmail} />
+                            <AvatarFallback>{initials}</AvatarFallback>
+                          </Avatar>
+                          <div className="min-w-0 flex-1">
+                            <span
+                              className="truncate block"
+                              title={userEmail}
+                            >
+                              {userEmail}
+                            </span>
+                            {BILLING_ENABLED ? (
+                              <div className="mt-1">
+                                <TierBadge plan={userPlan} />
+                              </div>
+                            ) : null}
+                          </div>
+                        </SidebarMenuButton>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start" side="top" className="w-56">
                         <DropdownMenuItem
-                          className='text-xs bg-gradient-to-br from-secondary-foreground/10 via-secondary-foreground/5 to-transparent text-secondary-foreground'
-                          onClick={() => navigate({ to: "/settings/billing" })}
+                          className='text-xs'
+                          onClick={() => navigate({ to: "/settings" })}
                         >
-                          <AwardIcon className="mr-2 h-4 w-4 text-secondary-foreground" strokeWidth={2} />
-                          <span>Upgrade Plan</span>
+                          <UserProfileIcon className="mr-2 h-4 w-4" strokeWidth={2} />
+                          <span>Profile</span>
                         </DropdownMenuItem>
-                      ) : null}
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={onLogout} className='text-xs'>
-                        <LogoutIcon className="mr-2 h-4 w-4" strokeWidth={2} />
-                        <span>Logout</span>
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                        {BILLING_ENABLED ? (
+                          <DropdownMenuItem
+                            className='text-xs bg-gradient-to-br from-secondary-foreground/10 via-secondary-foreground/5 to-transparent text-secondary-foreground'
+                            onClick={() => navigate({ to: "/settings/billing" })}
+                          >
+                            <AwardIcon className="mr-2 h-4 w-4 text-secondary-foreground" strokeWidth={2} />
+                            <span>Upgrade Plan</span>
+                          </DropdownMenuItem>
+                        ) : null}
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={onLogout} className='text-xs'>
+                          <LogoutIcon className="mr-2 h-4 w-4" strokeWidth={2} />
+                          <span>Logout</span>
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  ) : (
+                    <SidebarMenuButton
+                      className="h-auto py-2 flex items-center gap-2 font-medium text-xs min-w-0 flex-1 text-secondary-foreground"
+                      onClick={() => navigate({ to: "/signin" })}
+                    >
+                      <UserProfileIcon className="size-4 shrink-0" strokeWidth={2} />
+                      <span>Sign in to sync &amp; share</span>
+                    </SidebarMenuButton>
+                  )}
 
                   <div className="ml-auto shrink-0 pt-1">
                     <ModeToggle aria-label="Toggle theme" />

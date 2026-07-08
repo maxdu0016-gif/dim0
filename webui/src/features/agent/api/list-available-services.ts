@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query"
 import { AUTO_LLM_OPTION, defaultServices, type Services } from "../types/services"
 import { useChatStore } from "../store/chat-store"
 import { useEffect } from "react"
+import { useIsSignedIn } from "@/lib/auth"
 
 
 /**
@@ -98,10 +99,14 @@ export async function listAvailableServices(): Promise<Services> {
  */
 export const useListAvailableServices = () => {
   const syncDefaults = useChatStore((state) => state.syncDefaults)
+  const signedIn = useIsSignedIn()
 
   const { data: availableServices } = useQuery({
     queryKey: ["listAvailableServices"],
     queryFn: () => listAvailableServices(),
+    // Server-side MCP connectors: never needed logged-out or on a device-only
+    // board (the local agent runs via BYOK), and firing it logged-out 401s.
+    enabled: signedIn,
     staleTime: Infinity,
   })
 

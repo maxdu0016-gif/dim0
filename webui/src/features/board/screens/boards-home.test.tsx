@@ -100,7 +100,8 @@ describe("BoardsHome", () => {
     container.remove()
   })
 
-  it("signed out: renders only the on-device group", () => {
+  it("signed out (root sentinel): renders only the on-device group", () => {
+    state.userId = "root" // the real logged-out value — truthy, so a naive !!userId would leak
     state.localBoards = [local("a"), local("b")]
     render()
     expect(headings()).toEqual(["On this device"])

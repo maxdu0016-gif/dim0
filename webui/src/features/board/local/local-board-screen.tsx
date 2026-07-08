@@ -44,7 +44,7 @@ export function LocalBoardScreen() {
   }, [boardId, openBoard])
 
   return (
-    <div className="fixed inset-0 h-full w-full overflow-hidden bg-background">
+    <div className="absolute inset-0 h-full w-full overflow-hidden bg-background">
       <div className="relative h-full w-full">
         <HarnessCanvas local />
 

@@ -4,6 +4,7 @@ import { useNavigate } from "@tanstack/react-router"
 import { ThemedWelcome } from "@/features/agent/components/chat/welcome-message"
 import { cn } from "@/lib/utils"
 import { useAppStore } from "@/store"
+import { isSignedIn } from "@/lib/auth"
 import { useListBoards } from "../api/list-boards"
 import { BoardCard } from "../components/board-card"
 import { LocalBoardCard, NewLocalBoardCard } from "../local/local-dashboard"
@@ -46,7 +47,7 @@ export function BoardsHome({
     if (meta) openLocal(meta.id)
   }
 
-  const signedIn = !!userId
+  const signedIn = isSignedIn(userId)
 
   return (
     <div className={cn("w-full h-full", className)}>

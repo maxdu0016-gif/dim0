@@ -16,7 +16,7 @@ import { getEmailVerificationStatus } from "@/api"
 import { SubscriptionsScreen } from "@/features/newsfeed/screens/subscriptions"
 import { NewsfeedsScreen } from "@/features/newsfeed/screens/newsfeeds"
 import { NewsfeedLinearPage } from "@/features/newsfeed/screens/newsfeed-linear-page"
-import { HomePage } from "@/features/home/screens/home"
+import { IndexHome } from "@/features/home/screens/index-home"
 import { DashboardScreen } from "@/features/board/screens/dashboard-screen"
 import { NotFoundPage } from "@/components/not-found"
 import { SettingsScreen } from "@/features/user-settings/screens/settings-screen"
@@ -103,8 +103,26 @@ const resetPasswordRoute = createRoute({
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/",
-  beforeLoad: requireVerifiedAuth,
-  component: HomePage,
+  // The front door is open: signed-out users land on the local dashboard.
+  // Only enforce auth/email-verification once a user is genuinely signed in. A
+  // missing OR stale/expired token is treated as logged-out (clear + fall
+  // through) so the front door never bounces to /signin.
+  beforeLoad: async () => {
+    const token = getAccessToken()
+    if (!token) return
+    try {
+      const payload = decodeJwt(token)
+      if (payload.exp && payload.exp * 1000 < Date.now()) {
+        clearTokens()
+        return
+      }
+    } catch {
+      clearTokens()
+      return
+    }
+    await requireVerifiedAuth()
+  },
+  component: IndexHome,
 })
 
 const homeRoute = createRoute({
