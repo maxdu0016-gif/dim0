@@ -21,7 +21,7 @@ describe("managedLlmClient", () => {
     const post = vi.fn<LlmTurnPost>(async () =>
       completion({ role: "assistant", content: "ok", refusal: null }),
     )
-    const llm = managedLlmClient("auto", post)
+    const llm = managedLlmClient("auto", { post })
     await llm.complete(messages, [])
 
     const body = post.mock.calls[0][0]
@@ -35,7 +35,7 @@ describe("managedLlmClient", () => {
     const post = vi.fn<LlmTurnPost>(async () =>
       completion({ role: "assistant", content: "the answer", refusal: null }),
     )
-    const turn = await managedLlmClient("auto", post).complete(messages, [])
+    const turn = await managedLlmClient("auto", { post }).complete(messages, [])
     expect(turn).toEqual({ kind: "text", text: "the answer" })
   })
 
@@ -50,7 +50,7 @@ describe("managedLlmClient", () => {
         ],
       }),
     )
-    const turn = await managedLlmClient("claude-opus-4.8", post).complete(messages, [
+    const turn = await managedLlmClient("claude-opus-4.8", { post }).complete(messages, [
       { name: "create_note", description: "d", parameters: { type: "object" } },
     ])
     expect(turn.kind).toBe("tool_calls")
@@ -63,7 +63,7 @@ describe("managedLlmClient", () => {
     const post = vi.fn<LlmTurnPost>(async () =>
       completion({ role: "assistant", content: "x", refusal: null }),
     )
-    await managedLlmClient("auto", post).complete(messages, [
+    await managedLlmClient("auto", { post }).complete(messages, [
       { name: "f", description: "d", parameters: { type: "object" } },
     ])
     const body = post.mock.calls[0][0]
@@ -91,7 +91,7 @@ describe("managedLlmClient.completeStream", () => {
       { type: "delta", text: "lo" },
       { type: "final", message: { role: "assistant", content: "Hello", refusal: null } },
     )
-    const llm = managedLlmClient("auto", undefined, streamPost)
+    const llm = managedLlmClient("auto", { streamPost })
     const events = await drain(llm.completeStream!(messages, []))
     expect(events).toEqual([
       { kind: "delta", text: "Hel" },
@@ -110,7 +110,7 @@ describe("managedLlmClient.completeStream", () => {
         tool_calls: [{ id: "c1", type: "function", function: { name: "create_note", arguments: "{}" } }],
       },
     })
-    const events = await drain(managedLlmClient("auto", undefined, streamPost).completeStream!(messages, []))
+    const events = await drain(managedLlmClient("auto", { streamPost }).completeStream!(messages, []))
     expect(events).toEqual([
       { kind: "final", turn: { kind: "tool_calls", calls: [{ id: "c1", name: "create_note", arguments: "{}" }] } },
     ])

@@ -13,6 +13,7 @@ import { apiFetch } from "@/api"
 import { defineTool, type AgentEvent, type Tool } from "./types"
 import type { SearchClient, SearchResult } from "./services/clients"
 import { resolveService } from "./services/resolve"
+import { runIdHeaders } from "./services/run"
 
 
 type SearchResponse = { answer: string; results: SearchResult[] }
@@ -22,25 +23,35 @@ type SearchResponse = { answer: string; results: SearchResult[] }
 export type SearchPost = (body: { query: string; engine?: string }) => Promise<SearchResponse>
 
 
-const defaultSearchPost: SearchPost = async (body) => {
-  const res = await apiFetch<{ data: SearchResponse }>({ path: "/ai/search", method: "POST", body })
+const makeDefaultSearchPost = (runId?: string): SearchPost => async (body) => {
+  const res = await apiFetch<{ data: SearchResponse }>({
+    path: "/ai/search",
+    method: "POST",
+    body,
+    headers: runIdHeaders(runId),
+  })
   return res.data
 }
 
 
 /** Managed web-search client — our keys, via the `/ai/search` proxy. */
-export const managedSearchClient = (post: SearchPost = defaultSearchPost, engine?: string): SearchClient => ({
-  async search(query: string): Promise<SearchResult[]> {
-    const { results } = await post({ query, ...(engine ? { engine } : {}) })
-    return results
-  },
-})
+export const managedSearchClient = (
+  opts: { runId?: string; engine?: string; post?: SearchPost } = {},
+): SearchClient => {
+  const post = opts.post ?? makeDefaultSearchPost(opts.runId)
+  return {
+    async search(query: string): Promise<SearchResult[]> {
+      const { results } = await post({ query, ...(opts.engine ? { engine: opts.engine } : {}) })
+      return results
+    },
+  }
+}
 
 
 /** Resolve the search service to a client, or null when unavailable. */
-export const resolveSearchClient = (opts: { signedIn: boolean }): SearchClient | null => {
+export const resolveSearchClient = (opts: { signedIn: boolean; runId?: string }): SearchClient | null => {
   const resolution = resolveService("search", { signedIn: opts.signedIn, byok: {} })
-  return resolution.mode === "managed" ? managedSearchClient() : null
+  return resolution.mode === "managed" ? managedSearchClient({ runId: opts.runId }) : null
 }
 
 

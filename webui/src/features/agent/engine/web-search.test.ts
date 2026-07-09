@@ -10,14 +10,14 @@ const response = (results: { url: string; title?: string; content?: string }[]) 
 describe("managedSearchClient", () => {
   it("posts the query and returns the results", async () => {
     const post = vi.fn<SearchPost>(async () => response([{ url: "https://a.com", title: "A", content: "…" }]))
-    const results = await managedSearchClient(post).search("cats")
+    const results = await managedSearchClient({ post }).search("cats")
     expect(post).toHaveBeenCalledWith({ query: "cats" })
     expect(results).toEqual([{ url: "https://a.com", title: "A", content: "…" }])
   })
 
   it("includes the engine when configured", async () => {
     const post = vi.fn<SearchPost>(async () => response([]))
-    await managedSearchClient(post, "tavily").search("q")
+    await managedSearchClient({ post, engine: "tavily" }).search("q")
     expect(post).toHaveBeenCalledWith({ query: "q", engine: "tavily" })
   })
 })

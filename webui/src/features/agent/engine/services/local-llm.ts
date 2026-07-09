@@ -13,7 +13,7 @@ import { llmClientFromResolution } from "./clients"
 import { resolveService } from "./resolve"
 
 
-export type AgentLlmOptions = { signedIn: boolean }
+export type AgentLlmOptions = { signedIn: boolean; runId?: string }
 
 
 /** Build the agent's LLM client from a BYOK config + auth, via the resolver. */
@@ -28,5 +28,7 @@ export const resolveAgentLlm = (
       ? { llm: { provider: config.provider, apiKey: config.apiKey, model: config.model } }
       : {},
   })
-  return llmClientFromResolution(resolution, (r) => managedLlmClient(r.model ?? "auto"))
+  return llmClientFromResolution(resolution, (r) =>
+    managedLlmClient(r.model ?? "auto", { runId: opts.runId }),
+  )
 }

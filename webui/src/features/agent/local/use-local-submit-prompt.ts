@@ -8,6 +8,7 @@ import { collectWebSearchSources, makeWebSearchTool, resolveSearchClient } from 
 import { makeCodeInterpreterTool, resolveCodeClient } from "@/features/agent/engine/code-interpreter"
 import { makeFetchTool, resolveFetchClient } from "@/features/agent/engine/fetch-url"
 import { postProcessUrlCitations } from "@/features/agent/utils/citations"
+import { isOverQuotaError } from "@/features/agent/engine/services/run"
 import { createFlushGate } from "@/features/agent/utils/stream/throttle"
 import { useIsSignedIn } from "@/lib/auth"
 import { agentBuildTools, searchNotes } from "@/features/agent/engine/tools"
@@ -51,9 +52,13 @@ export function useLocalSubmitPrompt(boardId: string) {
     async (prompt: string): Promise<void> => {
       const store = getCanvasStoreRef()
       const config = asConfig()
+      // One run id per user message: every managed call in this turn (LLM +
+      // tools) carries it, so the server meters the whole run as a single unit
+      // (deduped by X-Run-Id; see backend meter_run).
+      const runId = generateUuid()
       // The agent's LLM: BYOK if a key is set, else managed (our keys) when
       // signed in. Null only when signed out with no key.
-      const llm = store ? resolveAgentLlm(config, { signedIn }) : null
+      const llm = store ? resolveAgentLlm(config, { signedIn, runId }) : null
       // Current folder layer at submit time — new notes are born here (not
       // rescoped after the fact). Read imperatively so it's always current.
       const rootId = useBoardAppStore.getState().rootId
@@ -117,9 +122,9 @@ export function useLocalSubmitPrompt(boardId: string) {
         const search = getSearchIndexRef() ?? undefined
         // External services are managed (signed in); include each tool only when
         // resolvable, so a signed-out user isn't offered an unavailable capability.
-        const webSearch = resolveSearchClient({ signedIn })
-        const code = resolveCodeClient({ signedIn })
-        const fetchUrl = resolveFetchClient({ signedIn })
+        const webSearch = resolveSearchClient({ signedIn, runId })
+        const code = resolveCodeClient({ signedIn, runId })
+        const fetchUrl = resolveFetchClient({ signedIn, runId })
         const tools = [
           ...AGENT_TOOLS,
           ...(webSearch ? [makeWebSearchTool(webSearch)] : []),
@@ -163,15 +168,20 @@ export function useLocalSubmitPrompt(boardId: string) {
         await arrangeCreatedNodes(store, createdNodeIds)
       } catch (e) {
         agentLog.error("runAgent", e)
-        // Mark it as an error so it doesn't read like a normal answer.
-        events.push({ type: "assistant_text", text: `⚠️ Agent error: ${e instanceof Error ? e.message : String(e)}` })
+        // Mark it as an error so it doesn't read like a normal answer. An
+        // over-quota rejection (429) gets a friendly upgrade nudge instead of a
+        // raw error string.
+        const text = isOverQuotaError(e)
+          ? "⚠️ You've reached your daily AI limit. Upgrade your plan, or add your own API key in settings to keep going."
+          : `⚠️ Agent error: ${e instanceof Error ? e.message : String(e)}`
+        events.push({ type: "assistant_text", text })
         render(false)
       } finally {
         await persist(label)
         const { chatUid: savedUid, messages } = useLocalMessagesStore.getState()
         agentLog.turnDone(savedUid, messages.length)
         // Auto-label a still-"Untitled" board from its first turn (fire-and-forget).
-        void maybeAutoLabelBoard(boardId, messages, resolveAgentLlm(config, { signedIn }))
+        void maybeAutoLabelBoard(boardId, messages, resolveAgentLlm(config, { signedIn, runId }))
       }
     },
     [asConfig, signedIn, setMessages, setChatUid, persist, boardId],

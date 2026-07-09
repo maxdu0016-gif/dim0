@@ -6,14 +6,14 @@ import { makeFetchTool, managedFetchClient, resolveFetchClient, type FetchPost }
 describe("managedFetchClient", () => {
   it("posts the url and returns the page content", async () => {
     const post = vi.fn<FetchPost>(async () => ({ url: "https://a.com", title: "A", text: "body" }))
-    const page = await managedFetchClient(post).fetch("https://a.com")
+    const page = await managedFetchClient({ post }).fetch("https://a.com")
     expect(post).toHaveBeenCalledWith({ url: "https://a.com" })
     expect(page).toEqual({ url: "https://a.com", title: "A", text: "body" })
   })
 
   it("maps a null title to undefined", async () => {
     const post = vi.fn<FetchPost>(async () => ({ url: "https://a.com", title: null, text: "b" }))
-    expect((await managedFetchClient(post).fetch("https://a.com")).title).toBeUndefined()
+    expect((await managedFetchClient({ post }).fetch("https://a.com")).title).toBeUndefined()
   })
 })
 

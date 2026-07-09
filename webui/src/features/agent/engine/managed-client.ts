@@ -12,6 +12,7 @@ import { apiFetch, fetchWithAuthRaw } from "@/api"
 import { API_URL } from "@/config/api"
 import { handleStreamingResponse } from "../utils/stream/digest"
 import { fromOpenAiMessage, toOpenAiMessages, toOpenAiTools } from "./byok-client"
+import { runIdHeaders } from "./services/run"
 import type { LlmClient, LlmMessage, LlmStreamEvent, LlmToolDef, LlmTurn } from "./types"
 
 
@@ -34,18 +35,19 @@ export type ManagedStreamLine =
 export type LlmStreamPost = (body: ManagedRequest) => AsyncIterable<ManagedStreamLine>
 
 
-const defaultPost: LlmTurnPost = async (body) => {
+const makeDefaultPost = (runId?: string): LlmTurnPost => async (body) => {
   const res = await apiFetch<{ data: { choices: { message: ChatCompletionMessage }[] } }>({
     path: "/ai/llm",
     method: "POST",
     body,
+    headers: runIdHeaders(runId),
   })
   return res.data
 }
 
 
-const defaultStreamPost: LlmStreamPost = async function* (body) {
-  const headers = new Headers({ "Content-Type": "application/json" })
+const makeDefaultStreamPost = (runId?: string): LlmStreamPost => async function* (body) {
+  const headers = new Headers({ "Content-Type": "application/json", ...runIdHeaders(runId) })
   const res = await fetchWithAuthRaw(new URL("/ai/llm/stream", API_URL).toString(), {
     method: "POST",
     headers,
@@ -61,7 +63,7 @@ export class ManagedLlmClient implements LlmClient {
   private readonly post: LlmTurnPost
   private readonly streamPost: LlmStreamPost
 
-  constructor(model: string, post: LlmTurnPost = defaultPost, streamPost: LlmStreamPost = defaultStreamPost) {
+  constructor(model: string, post: LlmTurnPost, streamPost: LlmStreamPost) {
     this.model = model
     this.post = post
     this.streamPost = streamPost
@@ -95,9 +97,15 @@ export class ManagedLlmClient implements LlmClient {
 /**
  * Build a managed LLM client. `model` is a canonical catalog id or `"auto"`; the
  * SERVER resolves it to a concrete provider model within the plan's tiers.
+ * `runId` tags the whole run for metering; `post`/`streamPost` override the
+ * transport in tests.
  */
 export const managedLlmClient = (
   model: string,
-  post?: LlmTurnPost,
-  streamPost?: LlmStreamPost,
-): LlmClient => new ManagedLlmClient(model, post, streamPost)
+  opts: { runId?: string; post?: LlmTurnPost; streamPost?: LlmStreamPost } = {},
+): LlmClient =>
+  new ManagedLlmClient(
+    model,
+    opts.post ?? makeDefaultPost(opts.runId),
+    opts.streamPost ?? makeDefaultStreamPost(opts.runId),
+  )

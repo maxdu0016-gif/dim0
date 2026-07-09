@@ -16,14 +16,14 @@ const resp = (over: Partial<Awaited<ReturnType<CodePost>>> = {}) => ({
 describe("managedCodeClient", () => {
   it("maps a success result to ok:true (no error)", async () => {
     const post = vi.fn<CodePost>(async () => resp({ stdout: "42\n" }))
-    const result = await managedCodeClient(post).run("print(6*7)", "python")
+    const result = await managedCodeClient({ post }).run("print(6*7)", "python")
     expect(post).toHaveBeenCalledWith({ code: "print(6*7)", language: "python" })
     expect(result).toEqual({ ok: true, stdout: "42\n", stderr: "", error: undefined })
   })
 
   it("maps an error result to ok:false with the stderr as error", async () => {
     const post = vi.fn<CodePost>(async () => resp({ status: "error", stderr: "NameError: x" }))
-    const result = await managedCodeClient(post).run("print(x)", "python")
+    const result = await managedCodeClient({ post }).run("print(x)", "python")
     expect(result.ok).toBe(false)
     expect(result.error).toBe("NameError: x")
   })

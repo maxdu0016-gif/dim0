@@ -11,6 +11,7 @@ import { apiFetch } from "@/api"
 import { defineTool, type Tool } from "./types"
 import type { CodeClient, CodeResult } from "./services/clients"
 import { resolveService } from "./services/resolve"
+import { runIdHeaders } from "./services/run"
 
 
 type CodeResponse = {
@@ -25,31 +26,39 @@ type CodeResponse = {
 export type CodePost = (body: { code: string; language: string }) => Promise<CodeResponse>
 
 
-const defaultCodePost: CodePost = async (body) => {
-  const res = await apiFetch<{ data: CodeResponse }>({ path: "/ai/code", method: "POST", body })
+const makeDefaultCodePost = (runId?: string): CodePost => async (body) => {
+  const res = await apiFetch<{ data: CodeResponse }>({
+    path: "/ai/code",
+    method: "POST",
+    body,
+    headers: runIdHeaders(runId),
+  })
   return res.data
 }
 
 
 /** Managed code client — runs in our Daytona sandbox via the `/ai/code` proxy. */
-export const managedCodeClient = (post: CodePost = defaultCodePost): CodeClient => ({
-  async run(code: string, language: string): Promise<CodeResult> {
-    const r = await post({ code, language })
-    const ok = r.status === "success"
-    return {
-      ok,
-      stdout: r.stdout,
-      stderr: r.stderr,
-      error: ok ? undefined : r.stderr || r.status,
-    }
-  },
-})
+export const managedCodeClient = (opts: { runId?: string; post?: CodePost } = {}): CodeClient => {
+  const post = opts.post ?? makeDefaultCodePost(opts.runId)
+  return {
+    async run(code: string, language: string): Promise<CodeResult> {
+      const r = await post({ code, language })
+      const ok = r.status === "success"
+      return {
+        ok,
+        stdout: r.stdout,
+        stderr: r.stderr,
+        error: ok ? undefined : r.stderr || r.status,
+      }
+    },
+  }
+}
 
 
 /** Resolve the code service to a client, or null when unavailable. */
-export const resolveCodeClient = (opts: { signedIn: boolean }): CodeClient | null => {
+export const resolveCodeClient = (opts: { signedIn: boolean; runId?: string }): CodeClient | null => {
   const resolution = resolveService("code", { signedIn: opts.signedIn, byok: {} })
-  return resolution.mode === "managed" ? managedCodeClient() : null
+  return resolution.mode === "managed" ? managedCodeClient({ runId: opts.runId }) : null
 }
 
 

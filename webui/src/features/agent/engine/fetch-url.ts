@@ -8,6 +8,7 @@ import { apiFetch } from "@/api"
 import { defineTool, type Tool } from "./types"
 import type { FetchClient, PageContent } from "./services/clients"
 import { resolveService } from "./services/resolve"
+import { runIdHeaders } from "./services/run"
 
 
 type FetchResponse = { url: string; title: string | null; text: string }
@@ -17,25 +18,33 @@ type FetchResponse = { url: string; title: string | null; text: string }
 export type FetchPost = (body: { url: string }) => Promise<FetchResponse>
 
 
-const defaultFetchPost: FetchPost = async (body) => {
-  const res = await apiFetch<{ data: FetchResponse }>({ path: "/ai/fetch", method: "POST", body })
+const makeDefaultFetchPost = (runId?: string): FetchPost => async (body) => {
+  const res = await apiFetch<{ data: FetchResponse }>({
+    path: "/ai/fetch",
+    method: "POST",
+    body,
+    headers: runIdHeaders(runId),
+  })
   return res.data
 }
 
 
 /** Managed fetch client — reads a page via the `/ai/fetch` proxy. */
-export const managedFetchClient = (post: FetchPost = defaultFetchPost): FetchClient => ({
-  async fetch(url: string): Promise<PageContent> {
-    const r = await post({ url })
-    return { url: r.url, title: r.title ?? undefined, text: r.text }
-  },
-})
+export const managedFetchClient = (opts: { runId?: string; post?: FetchPost } = {}): FetchClient => {
+  const post = opts.post ?? makeDefaultFetchPost(opts.runId)
+  return {
+    async fetch(url: string): Promise<PageContent> {
+      const r = await post({ url })
+      return { url: r.url, title: r.title ?? undefined, text: r.text }
+    },
+  }
+}
 
 
 /** Resolve the fetch service to a client, or null when unavailable. */
-export const resolveFetchClient = (opts: { signedIn: boolean }): FetchClient | null => {
+export const resolveFetchClient = (opts: { signedIn: boolean; runId?: string }): FetchClient | null => {
   const resolution = resolveService("fetch", { signedIn: opts.signedIn, byok: {} })
-  return resolution.mode === "managed" ? managedFetchClient() : null
+  return resolution.mode === "managed" ? managedFetchClient({ runId: opts.runId }) : null
 }
 
 
