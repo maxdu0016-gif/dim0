@@ -4,6 +4,7 @@ import { getCanvasStoreRef } from "@/features/board/harness/canvas-store-ref"
 import { arrangeCreatedNodes } from "@/features/board/harness/agent/arrange-created-nodes"
 import { runAgent } from "@/features/agent/engine/agent-loop"
 import { resolveAgentLlm } from "@/features/agent/engine/services/local-llm"
+import { makeWebSearchTool, resolveSearchClient } from "@/features/agent/engine/web-search"
 import { createFlushGate } from "@/features/agent/utils/stream/throttle"
 import { useIsSignedIn } from "@/lib/auth"
 import { agentBuildTools, searchNotes } from "@/features/agent/engine/tools"
@@ -111,7 +112,11 @@ export function useLocalSubmitPrompt(boardId: string) {
       try {
         const system = planSystemPrompt(new Date().toLocaleString())
         const search = getSearchIndexRef() ?? undefined
-        for await (const ev of runAgent({ system, userMessage: prompt, history, tools: AGENT_TOOLS, llm, ctx: { store, rootId, search } })) {
+        // Web search is available as a managed service (signed in); include the
+        // tool only when resolvable, so a signed-out user isn't offered it.
+        const webSearch = resolveSearchClient({ signedIn })
+        const tools = webSearch ? [...AGENT_TOOLS, makeWebSearchTool(webSearch)] : AGENT_TOOLS
+        for await (const ev of runAgent({ system, userMessage: prompt, history, tools, llm, ctx: { store, rootId, search } })) {
           events.push(ev)
           // Track notes created this turn so we can arrange them afterward.
           if (

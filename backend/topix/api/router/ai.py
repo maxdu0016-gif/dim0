@@ -22,6 +22,12 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from topix.agents.assistant.auto_model import classify_auto_model_complexity
+from topix.agents.websearch.tools import (
+    search_exa,
+    search_linkup,
+    search_perplexity,
+    search_tavily,
+)
 from topix.api.utils.decorators import with_standard_response
 from topix.api.utils.rate_limit.entitlements import resolve_entitlement_context
 from topix.api.utils.rate_limit.policy import resolve_allowed_model_tiers
@@ -183,3 +189,49 @@ async def ai_llm_stream(
         yield json.dumps({"type": "final", "message": message}) + "\n"
 
     return StreamingResponse(generate(), media_type="application/x-ndjson")
+
+
+_SEARCH_FNS = {
+    "perplexity": search_perplexity,
+    "tavily": search_tavily,
+    "linkup": search_linkup,
+    "exa": search_exa,
+}
+
+
+class AiSearchRequest(BaseModel):
+    """A managed web search: a query + which engine (our keys)."""
+
+    query: str
+    engine: str = "perplexity"
+    max_results: int = 10
+
+
+@router.post("/search/", include_in_schema=False)
+@router.post("/search")
+@with_standard_response
+async def ai_search(
+    response: Response,
+    request: Request,
+    body: AiSearchRequest,
+    user_id: Annotated[str, Depends(get_current_user_uid)],
+):
+    """Run one web search with our provider keys; returns `{answer, results}`."""
+    fn = _SEARCH_FNS.get(body.engine)
+    if fn is None:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, f"Unsupported search engine '{body.engine}'"
+        )
+    output = await fn(body.query, max_results=body.max_results)
+    return {
+        "answer": output.answer,
+        "results": [
+            {
+                "url": r.url,
+                "title": r.title,
+                "content": r.content,
+                "source_domain": r.source_domain,
+            }
+            for r in output.search_results
+        ],
+    }
