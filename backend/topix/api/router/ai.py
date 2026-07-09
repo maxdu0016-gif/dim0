@@ -3,19 +3,22 @@
 The client agent orchestrates locally; this endpoint forwards ONE model turn to
 the provider with OUR keys, resolved through the shared catalog (multi-provider,
 per-plan tier gating, and `"auto"` routing). It is deliberately NOT the full
-agent — just a metered egress for a single completion. Per-run metering and
-streaming land in later slices.
+agent — just a metered egress for a single completion (streaming or not).
+Per-run metering lands in a later slice.
 
 Wire shape is OpenAI-compatible on purpose: the client already maps our messages
 to OpenAI form (`toOpenAiMessages`/`toOpenAiTools`) and back (`fromOpenAiMessage`),
 so a managed turn reuses the exact BYOK mapping — only the transport differs.
 """
 
+import json
+
 from typing import Annotated, Any, Literal
 
 import litellm
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from topix.agents.assistant.auto_model import classify_auto_model_complexity
@@ -112,3 +115,71 @@ async def ai_llm(
 
     result = await litellm.acompletion(**kwargs)
     return {"choices": [{"message": _message_to_dict(result.choices[0].message)}]}
+
+
+def _accumulate_tool_call(slots: dict[int, dict[str, Any]], tc: Any) -> None:
+    """Fold one streamed tool-call fragment (by index) into the assembling slots."""
+    slot = slots.setdefault(getattr(tc, "index", 0), {"id": None, "name": None, "arguments": ""})
+    if getattr(tc, "id", None):
+        slot["id"] = tc.id
+    fn = getattr(tc, "function", None)
+    if fn and getattr(fn, "name", None):
+        slot["name"] = fn.name
+    if fn and getattr(fn, "arguments", None):
+        slot["arguments"] += fn.arguments
+
+
+@router.post("/llm/stream/", include_in_schema=False)
+@router.post("/llm/stream")
+async def ai_llm_stream(
+    request: Request,
+    body: AiLlmRequest,
+    user_id: Annotated[str, Depends(get_current_user_uid)],
+):
+    """Stream one model turn as NDJSON delta lines + a final message.
+
+    `{type:"delta",text}` per token, then `{type:"final",message}`. Tier/model
+    resolution (and any 403/503) runs before streaming, so errors are plain HTTP.
+    """
+    entitlement = await resolve_entitlement_context(request, user_id)
+    allowed_tiers = resolve_allowed_model_tiers(entitlement.plan)
+    model_code = await _resolve_managed_model(body.model, body.messages, allowed_tiers)
+
+    kwargs: dict[str, Any] = {
+        "model": model_code,
+        "messages": body.messages,
+        "drop_params": True,
+        "stream": True,
+    }
+    if body.tools:
+        kwargs["tools"] = body.tools
+        kwargs["tool_choice"] = "auto"
+    if body.reasoning_effort:
+        kwargs["reasoning_effort"] = body.reasoning_effort
+
+    async def generate():
+        content = ""
+        slots: dict[int, dict[str, Any]] = {}
+        stream = await litellm.acompletion(**kwargs)
+        async for chunk in stream:
+            choices = getattr(chunk, "choices", None) or []
+            delta = choices[0].delta if choices else None
+            if delta is None:
+                continue
+            piece = getattr(delta, "content", None)
+            if piece:
+                content += piece
+                yield json.dumps({"type": "delta", "text": piece}) + "\n"
+            for tc in getattr(delta, "tool_calls", None) or []:
+                _accumulate_tool_call(slots, tc)
+
+        message: dict[str, Any] = {"role": "assistant", "content": content or None}
+        if slots:
+            message["tool_calls"] = [
+                {"id": s["id"], "type": "function",
+                 "function": {"name": s["name"], "arguments": s["arguments"]}}
+                for s in slots.values()
+            ]
+        yield json.dumps({"type": "final", "message": message}) + "\n"
+
+    return StreamingResponse(generate(), media_type="application/x-ndjson")

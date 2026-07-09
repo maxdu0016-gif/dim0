@@ -35,8 +35,21 @@ export type LlmToolDef = {
 }
 
 
+/** A streamed model turn: text deltas as they arrive, then the final turn. */
+export type LlmStreamEvent =
+  | { kind: "delta"; text: string }
+  | { kind: "final"; turn: LlmTurn }
+
+
 export interface LlmClient {
+  /** One turn, resolved atomically (used by tests + as the non-streaming fallback). */
   complete(messages: LlmMessage[], tools: LlmToolDef[]): Promise<LlmTurn>
+  /**
+   * Optional streaming variant: yields text deltas then a `final` turn. When a
+   * client implements it, the agent loop prefers it so the answer renders
+   * token-by-token; otherwise the loop falls back to `complete`.
+   */
+  completeStream?(messages: LlmMessage[], tools: LlmToolDef[]): AsyncIterable<LlmStreamEvent>
 }
 
 

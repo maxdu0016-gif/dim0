@@ -5,6 +5,8 @@ endpoint's own logic — model resolution, tier gating, `auto` clamping, and the
 OpenAI-shaped response mapping — is exercised deterministically without network.
 """
 
+import json
+
 from types import SimpleNamespace
 
 from fastapi import FastAPI
@@ -142,3 +144,81 @@ def test_tools_are_forwarded_with_tool_choice_auto(monkeypatch):
     })
     assert cap["tool_choice"] == "auto"
     assert cap["tools"][0]["function"]["name"] == "f"
+
+
+def _install_stream_resolution(monkeypatch):
+    """Deterministic model resolution for the streaming endpoint (auto → lite)."""
+    async def _entitlement(_request, _uid):
+        return SimpleNamespace(plan="free")
+
+    monkeypatch.setattr(ai_module, "resolve_entitlement_context", _entitlement)
+    monkeypatch.setattr(ai_module, "resolve_allowed_model_tiers", lambda _plan: {"lite"})
+
+    async def _classify(_msgs):
+        return "simple"
+
+    monkeypatch.setattr(ai_module, "classify_auto_model_complexity", _classify)
+    monkeypatch.setattr(ai_module.catalog, "default_resolved",
+                        lambda tier=None: SimpleNamespace(call="call-lite"))
+
+
+def _lines(res):
+    return [json.loads(line) for line in res.text.splitlines() if line.strip()]
+
+
+def _delta_chunk(content):
+    return SimpleNamespace(choices=[SimpleNamespace(delta=SimpleNamespace(content=content, tool_calls=None))])
+
+
+def test_stream_emits_text_deltas_then_final_message(monkeypatch):
+    """Streaming yields a delta line per token, then a final assembled message."""
+    _install_stream_resolution(monkeypatch)
+
+    async def _gen():
+        yield _delta_chunk("Hel")
+        yield _delta_chunk("lo")
+
+    async def _acompletion(**kwargs):
+        assert kwargs.get("stream") is True
+        return _gen()
+
+    monkeypatch.setattr(ai_module.litellm, "acompletion", _acompletion)
+
+    res = _client().post("/ai/llm/stream", json={"model": "auto", "messages": [{"role": "user", "content": "hi"}]})
+    assert res.status_code == 200
+    lines = _lines(res)
+    assert lines[0] == {"type": "delta", "text": "Hel"}
+    assert lines[1] == {"type": "delta", "text": "lo"}
+    assert lines[-1]["type"] == "final"
+    assert lines[-1]["message"]["content"] == "Hello"
+
+
+def test_stream_assembles_tool_call_fragments(monkeypatch):
+    """Tool-call fragments streamed by index are stitched into the final message."""
+    _install_stream_resolution(monkeypatch)
+
+    def _tc_chunk(index, tc_id=None, name=None, args=""):
+        fn = SimpleNamespace(name=name, arguments=args)
+        tc = SimpleNamespace(index=index, id=tc_id, function=fn)
+        return SimpleNamespace(choices=[SimpleNamespace(delta=SimpleNamespace(content=None, tool_calls=[tc]))])
+
+    async def _gen():
+        yield _tc_chunk(0, tc_id="c1", name="create_note", args='{"a"')
+        yield _tc_chunk(0, args=":1}")
+
+    async def _acompletion(**kwargs):
+        return _gen()
+
+    monkeypatch.setattr(ai_module.litellm, "acompletion", _acompletion)
+
+    res = _client().post("/ai/llm/stream", json={
+        "model": "auto",
+        "messages": [{"role": "user", "content": "make a note"}],
+        "tools": [{"type": "function", "function": {"name": "create_note", "parameters": {}}}],
+    })
+    final = _lines(res)[-1]
+    assert final["type"] == "final"
+    call = final["message"]["tool_calls"][0]
+    assert call["id"] == "c1"
+    assert call["function"]["name"] == "create_note"
+    assert call["function"]["arguments"] == '{"a":1}'

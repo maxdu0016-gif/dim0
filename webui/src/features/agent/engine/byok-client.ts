@@ -11,12 +11,15 @@
 import OpenAI from "openai"
 import type {
   ChatCompletion,
+  ChatCompletionChunk,
   ChatCompletionCreateParamsNonStreaming,
+  ChatCompletionCreateParamsStreaming,
   ChatCompletionMessage,
   ChatCompletionMessageParam,
   ChatCompletionTool,
 } from "openai/resources/chat/completions"
-import type { LlmClient, LlmMessage, LlmToolCall, LlmToolDef, LlmTurn } from "./types"
+import type { LlmClient, LlmMessage, LlmStreamEvent, LlmToolCall, LlmToolDef, LlmTurn } from "./types"
+import { assembleStreamedTurn } from "./stream-assemble"
 import { agentLog } from "./debug"
 
 
@@ -32,9 +35,13 @@ export type ByokConfig = {
 }
 
 
-/** The single SDK method we depend on — injectable so tests avoid the network. */
+/** The SDK methods we depend on — injectable so tests avoid the network.
+ *  `createStream` is optional: a completer without it just has no streaming. */
 export type ChatCompleter = {
   create(params: ChatCompletionCreateParamsNonStreaming): Promise<ChatCompletion>
+  createStream?(
+    params: ChatCompletionCreateParamsStreaming,
+  ): Promise<AsyncIterable<ChatCompletionChunk>>
 }
 
 
@@ -94,7 +101,10 @@ export const makeCompleter = (config: ByokConfig): ChatCompleter => {
     baseURL: config.baseURL ?? BASE_URLS[config.provider],
     dangerouslyAllowBrowser: true,
   })
-  return { create: (params) => client.chat.completions.create(params) }
+  return {
+    create: (params) => client.chat.completions.create(params),
+    createStream: (params) => client.chat.completions.create(params),
+  }
 }
 
 
@@ -130,6 +140,35 @@ export class ByokLlmClient implements LlmClient {
       // Surface the real provider error (bad key, unknown model, rate limit)
       // instead of letting it masquerade as an empty answer upstream.
       agentLog.error(`llm.complete(${this.model})`, err)
+      throw err
+    }
+  }
+
+
+  /**
+   * Streaming turn. Uses the completer's streaming path when available (real
+   * provider), else degrades to a single `final` event from `complete` — so the
+   * loop can always prefer `completeStream` regardless of the injected completer.
+   */
+  async *completeStream(
+    messages: LlmMessage[],
+    tools: LlmToolDef[],
+  ): AsyncGenerator<LlmStreamEvent> {
+    const shared = {
+      model: this.model,
+      messages: toOpenAiMessages(messages),
+      ...(tools.length > 0 ? { tools: toOpenAiTools(tools), tool_choice: "auto" as const } : {}),
+    }
+    if (!this.completer.createStream) {
+      yield { kind: "final", turn: await this.complete(messages, tools) }
+      return
+    }
+    agentLog.llmRequest(this.model, messages, tools)
+    try {
+      const stream = await this.completer.createStream({ ...shared, stream: true })
+      yield* assembleStreamedTurn(stream)
+    } catch (err) {
+      agentLog.error(`llm.completeStream(${this.model})`, err)
       throw err
     }
   }

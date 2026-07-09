@@ -1,32 +1,41 @@
 /**
  * Managed LLM client (G2) — the agent's LLM turn routed through OUR server.
  *
- * Instead of calling a provider directly (BYOK), a managed turn POSTs to
- * `/ai/llm`, which forwards to the provider with our keys and resolves the model
- * (multi-provider, `"auto"` routing, per-plan tier gating). Because the wire is
- * OpenAI-shaped, this is just a different `ChatCompleter` behind the SAME
- * `ByokLlmClient` — the message/tool mapping is reused verbatim, only the
- * transport differs. Metering (per run) + streaming land in later slices.
+ * Instead of calling a provider directly (BYOK), a managed turn hits `/ai/llm`
+ * (non-streaming) or `/ai/llm/stream` (NDJSON deltas), which forward to the
+ * provider with our keys and resolve the model (multi-provider, `"auto"`, tier
+ * gating). The wire is OpenAI-shaped, so message/tool mapping is reused from the
+ * BYOK client — only the transport differs. Metering (per run) lands in G4.
  */
-import type {
-  ChatCompletion,
-  ChatCompletionCreateParamsNonStreaming,
-} from "openai/resources/chat/completions"
-import { apiFetch } from "@/api"
-import { ByokLlmClient, type ChatCompleter } from "./byok-client"
-import type { LlmClient } from "./types"
+import type { ChatCompletionMessage } from "openai/resources/chat/completions"
+import { apiFetch, fetchWithAuthRaw } from "@/api"
+import { API_URL } from "@/config/api"
+import { handleStreamingResponse } from "../utils/stream/digest"
+import { fromOpenAiMessage, toOpenAiMessages, toOpenAiTools } from "./byok-client"
+import type { LlmClient, LlmMessage, LlmStreamEvent, LlmToolDef, LlmTurn } from "./types"
 
 
-/** Post one turn to `/ai/llm`; returns the OpenAI-shaped choices. Injectable for tests. */
-export type LlmTurnPost = (body: {
-  model: string
-  messages: unknown
-  tools?: unknown
-}) => Promise<{ choices: ChatCompletion["choices"] }>
+type ManagedRequest = { model: string; messages: unknown; tools?: unknown }
+
+
+/** POST one turn to `/ai/llm`; returns the OpenAI-shaped choices. Injectable for tests. */
+export type LlmTurnPost = (
+  body: ManagedRequest,
+) => Promise<{ choices: { message: ChatCompletionMessage }[] }>
+
+
+/** One line of the `/ai/llm/stream` NDJSON: a text delta, or the final message. */
+export type ManagedStreamLine =
+  | { type: "delta"; text: string }
+  | { type: "final"; message: ChatCompletionMessage }
+
+
+/** POST one turn to `/ai/llm/stream`; yields NDJSON lines. Injectable for tests. */
+export type LlmStreamPost = (body: ManagedRequest) => AsyncIterable<ManagedStreamLine>
 
 
 const defaultPost: LlmTurnPost = async (body) => {
-  const res = await apiFetch<{ data: { choices: ChatCompletion["choices"] } }>({
+  const res = await apiFetch<{ data: { choices: { message: ChatCompletionMessage }[] } }>({
     path: "/ai/llm",
     method: "POST",
     body,
@@ -35,22 +44,60 @@ const defaultPost: LlmTurnPost = async (body) => {
 }
 
 
-/** A `ChatCompleter` that forwards to `/ai/llm` (our keys) instead of a provider. */
-export const createManagedCompleter = (post: LlmTurnPost = defaultPost): ChatCompleter => ({
-  async create(params: ChatCompletionCreateParamsNonStreaming): Promise<ChatCompletion> {
-    const result = await post({
-      model: params.model,
-      messages: params.messages,
-      ...(params.tools ? { tools: params.tools } : {}),
-    })
-    return { choices: result.choices } as ChatCompletion
-  },
-})
+const defaultStreamPost: LlmStreamPost = async function* (body) {
+  const headers = new Headers({ "Content-Type": "application/json" })
+  const res = await fetchWithAuthRaw(new URL("/ai/llm/stream", API_URL).toString(), {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) throw new Error(`/ai/llm/stream failed: ${res.status}`)
+  yield* handleStreamingResponse<ManagedStreamLine>(res)
+}
+
+
+export class ManagedLlmClient implements LlmClient {
+  private readonly model: string
+  private readonly post: LlmTurnPost
+  private readonly streamPost: LlmStreamPost
+
+  constructor(model: string, post: LlmTurnPost = defaultPost, streamPost: LlmStreamPost = defaultStreamPost) {
+    this.model = model
+    this.post = post
+    this.streamPost = streamPost
+  }
+
+  private body(messages: LlmMessage[], tools: LlmToolDef[]): ManagedRequest {
+    return {
+      model: this.model,
+      messages: toOpenAiMessages(messages),
+      ...(tools.length > 0 ? { tools: toOpenAiTools(tools) } : {}),
+    }
+  }
+
+  async complete(messages: LlmMessage[], tools: LlmToolDef[]): Promise<LlmTurn> {
+    const result = await this.post(this.body(messages, tools))
+    return fromOpenAiMessage(result.choices[0]?.message)
+  }
+
+  async *completeStream(
+    messages: LlmMessage[],
+    tools: LlmToolDef[],
+  ): AsyncGenerator<LlmStreamEvent> {
+    for await (const line of this.streamPost(this.body(messages, tools))) {
+      if (line.type === "delta") yield { kind: "delta", text: line.text }
+      else yield { kind: "final", turn: fromOpenAiMessage(line.message) }
+    }
+  }
+}
 
 
 /**
  * Build a managed LLM client. `model` is a canonical catalog id or `"auto"`; the
  * SERVER resolves it to a concrete provider model within the plan's tiers.
  */
-export const managedLlmClient = (model: string, post?: LlmTurnPost): LlmClient =>
-  new ByokLlmClient(createManagedCompleter(post), model)
+export const managedLlmClient = (
+  model: string,
+  post?: LlmTurnPost,
+  streamPost?: LlmStreamPost,
+): LlmClient => new ManagedLlmClient(model, post, streamPost)

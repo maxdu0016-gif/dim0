@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest"
 import type { ChatCompletion } from "openai/resources/chat/completions"
-import type { LlmMessage } from "./types"
-import { managedLlmClient, type LlmTurnPost } from "./managed-client"
+import type { LlmMessage, LlmStreamEvent } from "./types"
+import { managedLlmClient, type LlmStreamPost, type LlmTurnPost, type ManagedStreamLine } from "./managed-client"
 
 
 
@@ -68,5 +68,51 @@ describe("managedLlmClient", () => {
     ])
     const body = post.mock.calls[0][0]
     expect((body.tools as { function: { name: string } }[])[0].function.name).toBe("f")
+  })
+})
+
+
+const streamOf = (...lines: ManagedStreamLine[]): LlmStreamPost =>
+  async function* () {
+    for (const line of lines) yield line
+  }
+
+
+describe("managedLlmClient.completeStream", () => {
+  const drain = async (it: AsyncIterable<LlmStreamEvent>): Promise<LlmStreamEvent[]> => {
+    const out: LlmStreamEvent[] = []
+    for await (const ev of it) out.push(ev)
+    return out
+  }
+
+  it("maps NDJSON delta lines to delta events and the final message to a turn", async () => {
+    const streamPost = streamOf(
+      { type: "delta", text: "Hel" },
+      { type: "delta", text: "lo" },
+      { type: "final", message: { role: "assistant", content: "Hello", refusal: null } },
+    )
+    const llm = managedLlmClient("auto", undefined, streamPost)
+    const events = await drain(llm.completeStream!(messages, []))
+    expect(events).toEqual([
+      { kind: "delta", text: "Hel" },
+      { kind: "delta", text: "lo" },
+      { kind: "final", turn: { kind: "text", text: "Hello" } },
+    ])
+  })
+
+  it("maps a final tool-call message to a tool_calls turn", async () => {
+    const streamPost = streamOf({
+      type: "final",
+      message: {
+        role: "assistant",
+        content: null,
+        refusal: null,
+        tool_calls: [{ id: "c1", type: "function", function: { name: "create_note", arguments: "{}" } }],
+      },
+    })
+    const events = await drain(managedLlmClient("auto", undefined, streamPost).completeStream!(messages, []))
+    expect(events).toEqual([
+      { kind: "final", turn: { kind: "tool_calls", calls: [{ id: "c1", name: "create_note", arguments: "{}" }] } },
+    ])
   })
 })

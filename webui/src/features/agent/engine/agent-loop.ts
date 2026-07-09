@@ -4,7 +4,7 @@
  * construction — the LLM is injected, so tests use a scripted mock.
  */
 import { z } from "zod"
-import type { AgentEvent, LlmClient, LlmMessage, LlmToolDef, Tool, ToolContext } from "./types"
+import type { AgentEvent, LlmClient, LlmMessage, LlmToolDef, LlmTurn, Tool, ToolContext } from "./types"
 import { agentLog } from "./debug"
 
 
@@ -62,7 +62,24 @@ export async function* runAgent(opts: RunAgentOptions): AsyncGenerator<AgentEven
   messages.push({ role: "user", content: opts.userMessage })
 
   for (let turn = 0; turn < maxTurns; turn += 1) {
-    const result = await opts.llm.complete(messages, defs)
+    // Prefer streaming: emit cumulative `assistant_text` per delta so the UI
+    // renders token-by-token; fall back to a single atomic turn otherwise.
+    let result: LlmTurn
+    if (opts.llm.completeStream) {
+      let acc = ""
+      let final: LlmTurn | null = null
+      for await (const ev of opts.llm.completeStream(messages, defs)) {
+        if (ev.kind === "delta") {
+          acc += ev.text
+          yield { type: "assistant_text", text: acc }
+        } else {
+          final = ev.turn
+        }
+      }
+      result = final ?? { kind: "text", text: acc }
+    } else {
+      result = await opts.llm.complete(messages, defs)
+    }
 
     if (result.kind === "text") {
       messages.push({ role: "assistant", content: result.text })
