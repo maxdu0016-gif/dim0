@@ -1,6 +1,7 @@
 import type { AgentResponse, ReasoningStep, ToolCallStep, ToolExecutionState, ToolName } from "../../types/stream"
 import { RAW_MESSAGE, ToolNameDescription, isReasoningTextToolName } from "../../types/stream"
 import { simpleTransform } from "./transform"
+import { createFlushGate } from "./throttle"
 import type {
   CreateNoteOutput,
   EditNoteOutput,
@@ -166,8 +167,7 @@ export async function* buildResponse(
     annotationsCap = 1000
   } = opts
 
-  const minIntervalMs = Math.max(1, Math.floor(1000 / maxFps))
-  let lastYieldAt = 0
+  const gate = createFlushGate({ maxFps, safetyMaxIntervalMs })
   let bufferedChars = 0
 
   const stepsById = new Map<string, StepAccum>()
@@ -214,11 +214,9 @@ export async function* buildResponse(
 
   const maybeYield = async (force = false) => {
     const now = Date.now()
-    const dueByTime = now - lastYieldAt >= minIntervalMs
-    const hitSafety = now - lastYieldAt >= safetyMaxIntervalMs
     const hitSize = bufferedChars >= sizeThresholdChars
 
-    if (force || shouldBurstYield || hitSize || hitSafety || (dueByTime && bufferedChars > 0)) {
+    if (gate.shouldFlush(now, { force: force || shouldBurstYield || hitSize, hasPending: bufferedChars > 0 })) {
       for (const id of order) {
         const s = stepsById.get(id)!
         if (s.dirty) {
@@ -229,7 +227,7 @@ export async function* buildResponse(
 
       shouldBurstYield = false
       const resp: AgentResponse = { steps: order.map(id => toReasoningStep(stepsById.get(id)!)) }
-      lastYieldAt = now
+      gate.markFlushed(now)
       bufferedChars = 0
       return { response: resp, isStop: false }
     }

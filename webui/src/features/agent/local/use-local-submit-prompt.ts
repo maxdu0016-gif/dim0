@@ -4,6 +4,7 @@ import { getCanvasStoreRef } from "@/features/board/harness/canvas-store-ref"
 import { arrangeCreatedNodes } from "@/features/board/harness/agent/arrange-created-nodes"
 import { runAgent } from "@/features/agent/engine/agent-loop"
 import { resolveAgentLlm } from "@/features/agent/engine/services/local-llm"
+import { createFlushGate } from "@/features/agent/utils/stream/throttle"
 import { useIsSignedIn } from "@/lib/auth"
 import { agentBuildTools, searchNotes } from "@/features/agent/engine/tools"
 import { skillTools } from "@/features/agent/engine/skills"
@@ -103,6 +104,10 @@ export function useLocalSubmitPrompt(boardId: string) {
       }
 
       const createdNodeIds: string[] = []
+      // Coalesce token-delta repaints to ~10fps (shared with the backend-agent
+      // stream builder). Structural events (tool start/result) force an
+      // immediate repaint; the final frame below always flushes.
+      const gate = createFlushGate()
       try {
         const system = planSystemPrompt(new Date().toLocaleString())
         const search = getSearchIndexRef() ?? undefined
@@ -116,7 +121,11 @@ export function useLocalSubmitPrompt(boardId: string) {
           ) {
             createdNodeIds.push(String((ev.result as { id: unknown }).id))
           }
-          render(true)
+          const now = Date.now()
+          if (gate.shouldFlush(now, { force: ev.type !== "assistant_text" })) {
+            render(true)
+            gate.markFlushed(now)
+          }
         }
         render(false)
         // Post-turn arrange (frontend analog of backend rearrange_created_notes).
