@@ -1,26 +1,32 @@
 /**
- * LLM acquisition for the local agent, routed through the service resolver.
+ * LLM acquisition for the client agent, routed through the service resolver.
  *
- * G1: managed transport isn't wired yet, so this yields the BYOK client (or
- * null) — identical to the prior direct `ByokLlmClient.fromConfig`, but now
- * through the resolver seam. G2 replaces the hard-coded `managed off` with real
- * auth + entitlement + a managed-client maker, and everything downstream is
- * unchanged.
+ * G2: managed transport is live. A signed-in user with no BYOK key resolves to
+ * the managed LLM (our keys, server-resolved model + tiers); a BYOK key wins by
+ * default; signed-out with no key is off. The agent loop downstream is unchanged
+ * — it just receives an `LlmClient`.
  */
 import type { ByokConfig } from "../byok-client"
 import type { LlmClient } from "../types"
+import { managedLlmClient } from "../managed-client"
 import { llmClientFromResolution } from "./clients"
 import { resolveService } from "./resolve"
 
 
-/** Build the local agent's LLM client from a BYOK config, via the resolver. */
-export const resolveLocalLlm = (config: ByokConfig | null): LlmClient | null => {
+export type AgentLlmOptions = { signedIn: boolean }
+
+
+/** Build the agent's LLM client from a BYOK config + auth, via the resolver. */
+export const resolveAgentLlm = (
+  config: ByokConfig | null,
+  opts: AgentLlmOptions,
+): LlmClient | null => {
   const resolution = resolveService("llm", {
-    signedIn: false, // G1: managed not yet available — BYOK-or-off, as before
-    managedAllowed: () => false,
+    signedIn: opts.signedIn,
+    // LLM managed is allowed whenever signed in; the server enforces plan tiers.
     byok: config
       ? { llm: { provider: config.provider, apiKey: config.apiKey, model: config.model } }
       : {},
   })
-  return llmClientFromResolution(resolution)
+  return llmClientFromResolution(resolution, (r) => managedLlmClient(r.model ?? "auto"))
 }

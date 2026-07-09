@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react"
 import { getCanvasStoreRef } from "@/features/board/harness/canvas-store-ref"
 import { runAgent } from "@/features/agent/engine/agent-loop"
-import { resolveLocalLlm } from "@/features/agent/engine/services/local-llm"
+import { resolveAgentLlm } from "@/features/agent/engine/services/local-llm"
 import { createNote, linkNotes, updateNote } from "@/features/agent/engine/tools"
 import type { AgentEvent } from "@/features/agent/engine/types"
 import { useByokStore } from "@/features/agent/byok/byok-store"
@@ -35,7 +35,7 @@ export function useLocalAgent() {
       setRunning(true)
       setEvents([])
       try {
-        const llm = resolveLocalLlm(config)
+        const llm = resolveAgentLlm(config, { signedIn: false })
         if (!llm) {
           setError("Set your API key first.")
           return

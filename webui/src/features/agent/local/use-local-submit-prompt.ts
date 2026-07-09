@@ -3,7 +3,8 @@ import { generateUuid, trimText } from "@/lib/common"
 import { getCanvasStoreRef } from "@/features/board/harness/canvas-store-ref"
 import { arrangeCreatedNodes } from "@/features/board/harness/agent/arrange-created-nodes"
 import { runAgent } from "@/features/agent/engine/agent-loop"
-import { resolveLocalLlm } from "@/features/agent/engine/services/local-llm"
+import { resolveAgentLlm } from "@/features/agent/engine/services/local-llm"
+import { useIsSignedIn } from "@/lib/auth"
 import { agentBuildTools, searchNotes } from "@/features/agent/engine/tools"
 import { skillTools } from "@/features/agent/engine/skills"
 import { getSearchIndexRef } from "@/features/board/search/search-index-ref"
@@ -36,6 +37,7 @@ const mintId = (): string => `local-${Date.now()}-${counter++}`
  */
 export function useLocalSubmitPrompt(boardId: string) {
   const asConfig = useByokStore((s) => s.asConfig)
+  const signedIn = useIsSignedIn()
   const setMessages = useLocalMessagesStore((s) => s.setMessages)
   const setChatUid = useLocalMessagesStore((s) => s.setChatUid)
   const persist = useLocalMessagesStore((s) => s.persist)
@@ -44,6 +46,9 @@ export function useLocalSubmitPrompt(boardId: string) {
     async (prompt: string): Promise<void> => {
       const store = getCanvasStoreRef()
       const config = asConfig()
+      // The agent's LLM: BYOK if a key is set, else managed (our keys) when
+      // signed in. Null only when signed out with no key.
+      const llm = store ? resolveAgentLlm(config, { signedIn }) : null
       // Current folder layer at submit time — new notes are born here (not
       // rescoped after the fact). Read imperatively so it's always current.
       const rootId = useBoardAppStore.getState().rootId
@@ -81,7 +86,7 @@ export function useLocalSubmitPrompt(boardId: string) {
         setMessages(useLocalMessagesStore.getState().messages.map((m) => (m.id === assistantId ? msg : m)))
       }
 
-      if (!store || !config) {
+      if (!store || !llm) {
         patch({ ...base, content: { markdown: store ? "Set your API key first." : "No active board." }, streaming: false })
         await persist(label)
         return
@@ -99,8 +104,6 @@ export function useLocalSubmitPrompt(boardId: string) {
 
       const createdNodeIds: string[] = []
       try {
-        const llm = resolveLocalLlm(config)
-        if (!llm) throw new Error("Set your API key first.")
         const system = planSystemPrompt(new Date().toLocaleString())
         const search = getSearchIndexRef() ?? undefined
         for await (const ev of runAgent({ system, userMessage: prompt, history, tools: AGENT_TOOLS, llm, ctx: { store, rootId, search } })) {
@@ -128,9 +131,9 @@ export function useLocalSubmitPrompt(boardId: string) {
         const { chatUid: savedUid, messages } = useLocalMessagesStore.getState()
         agentLog.turnDone(savedUid, messages.length)
         // Auto-label a still-"Untitled" board from its first turn (fire-and-forget).
-        void maybeAutoLabelBoard(boardId, messages, resolveLocalLlm(config))
+        void maybeAutoLabelBoard(boardId, messages, resolveAgentLlm(config, { signedIn }))
       }
     },
-    [asConfig, setMessages, setChatUid, persist, boardId],
+    [asConfig, signedIn, setMessages, setChatUid, persist, boardId],
   )
 }

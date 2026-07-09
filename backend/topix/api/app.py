@@ -12,6 +12,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from topix.api.router import (
+    ai,
     billing,
     boards,
     chats,
@@ -139,6 +140,7 @@ def create_app(stage: StageEnum):
         allow_headers=["*"],
     )
 
+    app.include_router(ai.router)
     app.include_router(boards.router)
     app.include_router(chats.router)
     app.include_router(collab.router)

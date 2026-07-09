@@ -11,6 +11,7 @@ import { NotesSearchDialog } from "@/features/board/local/notes-search-dialog"
 import { useBoardAppStore } from "@/features/board/harness/store/board-app-store"
 import { FloatingAssistant } from "@/features/board/components/flow/floating-assistant/floating-assistant"
 import { requestPersistentStorage } from "@/features/board/persist/local/persist-storage"
+import { useIsSignedIn } from "@/lib/auth"
 
 
 /**
@@ -27,7 +28,10 @@ export function LocalBoardScreen() {
     select: (s: { root_id?: string }) => s?.root_id,
   })
   const setBoardScope = useBoardAppStore((s) => s.setBoardScope)
-  const configured = useByokStore((s) => s.configured)
+  const byokConfigured = useByokStore((s) => s.configured)
+  const signedIn = useIsSignedIn()
+  // The assistant is usable with a BYOK key OR when signed in (managed keys).
+  const canUseAgent = byokConfigured || signedIn
   const openBoard = useLocalMessagesStore((s) => s.openBoard)
   const [sheetOpen, setSheetOpen] = useState(false)
 
@@ -53,7 +57,7 @@ export function LocalBoardScreen() {
         <NotesSearchDialog boardId={boardId} />
 
         {/* Island composes turns; hidden while the full sheet is open (parity with online). */}
-        {!sheetOpen && configured && (
+        {!sheetOpen && canUseAgent && (
           <FloatingAssistant
             boardId={boardId}
             local
@@ -61,7 +65,7 @@ export function LocalBoardScreen() {
           />
         )}
 
-        {!configured && (
+        {!canUseAgent && (
           <div className="absolute bottom-4 left-1/2 z-[60] w-[min(580px,calc(100vw-4rem))] -translate-x-1/2">
             <ByokPanel />
           </div>
