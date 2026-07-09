@@ -17,7 +17,7 @@ from typing import Annotated, Any, Literal
 
 import litellm
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
@@ -33,10 +33,34 @@ from topix.agents.websearch.tools import (
 from topix.api.utils.decorators import with_standard_response
 from topix.api.utils.rate_limit.entitlements import resolve_entitlement_context
 from topix.api.utils.rate_limit.policy import resolve_allowed_model_tiers
+from topix.api.utils.rate_limit.service import enforce_rate_limit
 from topix.api.utils.security import get_current_user_uid
 from topix.config import catalog
 
 router = APIRouter(prefix="/ai", tags=["ai"])
+
+# A run's managed calls share one metered unit for up to this long.
+RUN_TTL_SECONDS = 3600
+
+
+async def meter_run(
+    request: Request,
+    user_id: Annotated[str, Depends(get_current_user_uid)],
+    x_run_id: Annotated[str | None, Header()] = None,
+) -> None:
+    """Meter one whole agent run against the plan's AI quota.
+
+    The FIRST managed call of a run (deduped by the `X-Run-Id` header) enforces
+    the quota (429 when over); later calls in the same run are free. A call with
+    no run id is metered on its own. This is the decision-#1 "one run = one unit"
+    rule, reusing the shared rate limiter.
+    """
+    if x_run_id:
+        redis = request.app.redis_store
+        first = await redis.set_if_absent(f"airun:{user_id}:{x_run_id}", RUN_TTL_SECONDS)
+        if not first:
+            return
+    await enforce_rate_limit(request, user_id)
 
 
 class AiLlmRequest(BaseModel):
@@ -108,6 +132,7 @@ async def ai_llm(
     request: Request,
     body: AiLlmRequest,
     user_id: Annotated[str, Depends(get_current_user_uid)],
+    _meter: Annotated[None, Depends(meter_run)],
 ):
     """Forward one model turn with our keys. Returns `{choices:[{message}]}`."""
     entitlement = await resolve_entitlement_context(request, user_id)
@@ -143,6 +168,7 @@ async def ai_llm_stream(
     request: Request,
     body: AiLlmRequest,
     user_id: Annotated[str, Depends(get_current_user_uid)],
+    _meter: Annotated[None, Depends(meter_run)],
 ):
     """Stream one model turn as NDJSON delta lines + a final message.
 
@@ -217,6 +243,7 @@ async def ai_search(
     request: Request,
     body: AiSearchRequest,
     user_id: Annotated[str, Depends(get_current_user_uid)],
+    _meter: Annotated[None, Depends(meter_run)],
 ):
     """Run one web search with our provider keys; returns `{answer, results}`."""
     fn = _SEARCH_FNS.get(body.engine)
@@ -254,6 +281,7 @@ async def ai_code(
     request: Request,
     body: AiCodeRequest,
     user_id: Annotated[str, Depends(get_current_user_uid)],
+    _meter: Annotated[None, Depends(meter_run)],
 ):
     """Run code in an isolated sandbox with our Daytona account; returns the result.
 
@@ -283,6 +311,7 @@ async def ai_fetch(
     request: Request,
     body: AiFetchRequest,
     user_id: Annotated[str, Depends(get_current_user_uid)],
+    _meter: Annotated[None, Depends(meter_run)],
 ):
     """Read one URL's content with our keys; returns `{url, title, text}`."""
     output = await fetch_content(body.url)
