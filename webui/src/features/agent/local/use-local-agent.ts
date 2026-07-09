@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react"
 import { getCanvasStoreRef } from "@/features/board/harness/canvas-store-ref"
 import { runAgent } from "@/features/agent/engine/agent-loop"
-import { ByokLlmClient } from "@/features/agent/engine/byok-client"
+import { resolveLocalLlm } from "@/features/agent/engine/services/local-llm"
 import { createNote, linkNotes, updateNote } from "@/features/agent/engine/tools"
 import type { AgentEvent } from "@/features/agent/engine/types"
 import { useByokStore } from "@/features/agent/byok/byok-store"
@@ -35,7 +35,11 @@ export function useLocalAgent() {
       setRunning(true)
       setEvents([])
       try {
-        const llm = ByokLlmClient.fromConfig(config)
+        const llm = resolveLocalLlm(config)
+        if (!llm) {
+          setError("Set your API key first.")
+          return
+        }
         for await (const ev of runAgent({ userMessage: prompt, tools: BUILD_TOOLS, llm, ctx: { store } })) {
           setEvents((prev) => [...prev, ev])
         }

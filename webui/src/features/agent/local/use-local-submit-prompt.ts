@@ -3,7 +3,7 @@ import { generateUuid, trimText } from "@/lib/common"
 import { getCanvasStoreRef } from "@/features/board/harness/canvas-store-ref"
 import { arrangeCreatedNodes } from "@/features/board/harness/agent/arrange-created-nodes"
 import { runAgent } from "@/features/agent/engine/agent-loop"
-import { ByokLlmClient } from "@/features/agent/engine/byok-client"
+import { resolveLocalLlm } from "@/features/agent/engine/services/local-llm"
 import { agentBuildTools, searchNotes } from "@/features/agent/engine/tools"
 import { skillTools } from "@/features/agent/engine/skills"
 import { getSearchIndexRef } from "@/features/board/search/search-index-ref"
@@ -99,7 +99,8 @@ export function useLocalSubmitPrompt(boardId: string) {
 
       const createdNodeIds: string[] = []
       try {
-        const llm = ByokLlmClient.fromConfig(config)
+        const llm = resolveLocalLlm(config)
+        if (!llm) throw new Error("Set your API key first.")
         const system = planSystemPrompt(new Date().toLocaleString())
         const search = getSearchIndexRef() ?? undefined
         for await (const ev of runAgent({ system, userMessage: prompt, history, tools: AGENT_TOOLS, llm, ctx: { store, rootId, search } })) {
@@ -127,7 +128,7 @@ export function useLocalSubmitPrompt(boardId: string) {
         const { chatUid: savedUid, messages } = useLocalMessagesStore.getState()
         agentLog.turnDone(savedUid, messages.length)
         // Auto-label a still-"Untitled" board from its first turn (fire-and-forget).
-        void maybeAutoLabelBoard(boardId, messages, config ? ByokLlmClient.fromConfig(config) : null)
+        void maybeAutoLabelBoard(boardId, messages, resolveLocalLlm(config))
       }
     },
     [asConfig, setMessages, setChatUid, persist, boardId],
