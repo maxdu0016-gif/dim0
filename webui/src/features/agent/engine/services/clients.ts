@@ -12,10 +12,9 @@ import { ByokLlmClient, type ByokProvider } from "../byok-client"
 import type { ServiceResolution } from "./kinds"
 
 
-// ── forward-declared shapes for the non-LLM services (impls in G3) ──
+// ── forward-declared shapes for the non-LLM services ──
 export type SearchResult = { url: string; title?: string; snippet?: string; content?: string }
 export type CodeResult = { ok: boolean; stdout?: string; stderr?: string; error?: string }
-export type ImageResult = { url?: string; b64?: string; alt?: string }
 export type PageContent = { url: string; title?: string; text: string }
 
 
@@ -26,11 +25,6 @@ export interface SearchClient {
 
 export interface CodeClient {
   run(code: string, language: string): Promise<CodeResult>
-}
-
-
-export interface ImageClient {
-  generate(prompt: string): Promise<ImageResult>
 }
 
 

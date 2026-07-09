@@ -12,16 +12,10 @@
  * resolution logic (`resolve.ts`) is trivially unit-testable.
  */
 
-export type ServiceKind = "llm" | "search" | "code" | "image" | "navigate"
+export type ServiceKind = "llm" | "search" | "code" | "fetch"
 
 
-export const SERVICE_KINDS: readonly ServiceKind[] = [
-  "llm",
-  "search",
-  "code",
-  "image",
-  "navigate",
-]
+export const SERVICE_KINDS: readonly ServiceKind[] = ["llm", "search", "code", "fetch"]
 
 
 export type ServiceMode = "byok" | "managed" | "off"

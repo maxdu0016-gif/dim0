@@ -67,11 +67,11 @@ describe("resolveService", () => {
     const r = resolveAllServices(ctx({
       signedIn: true,
       byok: { search: { provider: "tavily", apiKey: "t" } },
-      managedAllowed: (k) => k !== "image", // image vetoed by plan
+      managedAllowed: (k) => k !== "fetch", // fetch vetoed by plan
     }))
     expect(r.search.mode).toBe("byok")   // own key
     expect(r.llm.mode).toBe("managed")   // signed in, no key
-    expect(r.image.mode).toBe("off")     // vetoed + no key
+    expect(r.fetch.mode).toBe("off")     // vetoed + no key
     expect(r.code.mode).toBe("managed")
   })
 

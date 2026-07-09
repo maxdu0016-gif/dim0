@@ -24,6 +24,7 @@ from pydantic import BaseModel
 from topix.agents.assistant.auto_model import classify_auto_model_complexity
 from topix.agents.assistant.code import execute_code
 from topix.agents.websearch.tools import (
+    fetch_content,
     search_exa,
     search_linkup,
     search_perplexity,
@@ -265,4 +266,29 @@ async def ai_code(
         "stdout": output.stdout,
         "stderr": output.stderr,
         "duration_ms": output.duration_ms,
+    }
+
+
+class AiFetchRequest(BaseModel):
+    """A managed URL fetch: read one page's content (our keys)."""
+
+    url: str
+
+
+@router.post("/fetch/", include_in_schema=False)
+@router.post("/fetch")
+@with_standard_response
+async def ai_fetch(
+    response: Response,
+    request: Request,
+    body: AiFetchRequest,
+    user_id: Annotated[str, Depends(get_current_user_uid)],
+):
+    """Read one URL's content with our keys; returns `{url, title, text}`."""
+    output = await fetch_content(body.url)
+    first = output.search_results[0] if output.search_results else None
+    return {
+        "url": body.url,
+        "title": first.title if first else None,
+        "text": (first.content if first else "") or output.answer or "",
     }
