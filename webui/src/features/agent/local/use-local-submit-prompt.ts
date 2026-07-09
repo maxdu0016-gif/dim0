@@ -4,7 +4,8 @@ import { getCanvasStoreRef } from "@/features/board/harness/canvas-store-ref"
 import { arrangeCreatedNodes } from "@/features/board/harness/agent/arrange-created-nodes"
 import { runAgent } from "@/features/agent/engine/agent-loop"
 import { resolveAgentLlm } from "@/features/agent/engine/services/local-llm"
-import { makeWebSearchTool, resolveSearchClient } from "@/features/agent/engine/web-search"
+import { collectWebSearchSources, makeWebSearchTool, resolveSearchClient } from "@/features/agent/engine/web-search"
+import { postProcessUrlCitations } from "@/features/agent/utils/citations"
 import { createFlushGate } from "@/features/agent/utils/stream/throttle"
 import { useIsSignedIn } from "@/lib/auth"
 import { agentBuildTools, searchNotes } from "@/features/agent/engine/tools"
@@ -130,6 +131,22 @@ export function useLocalSubmitPrompt(boardId: string) {
           if (gate.shouldFlush(now, { force: ev.type !== "assistant_text" })) {
             render(true)
             gate.markFlushed(now)
+          }
+        }
+        // Snap any mangled/truncated links in the final answer back to the real
+        // web-search sources, so the sources panel (parsed from the text) is
+        // accurate. In-place so the final render + persistence use the fix.
+        const sources = collectWebSearchSources(events)
+        if (sources.length > 0) {
+          const answer = latestAssistantText(events)
+          const corrected = postProcessUrlCitations(answer, sources)
+          if (corrected !== answer) {
+            for (let i = events.length - 1; i >= 0; i -= 1) {
+              if (events[i].type === "assistant_text") {
+                events[i] = { type: "assistant_text", text: corrected }
+                break
+              }
+            }
           }
         }
         render(false)

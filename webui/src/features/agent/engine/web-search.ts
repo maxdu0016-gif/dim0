@@ -10,7 +10,7 @@
  */
 import { z } from "zod"
 import { apiFetch } from "@/api"
-import { defineTool, type Tool } from "./types"
+import { defineTool, type AgentEvent, type Tool } from "./types"
 import type { SearchClient, SearchResult } from "./services/clients"
 import { resolveService } from "./services/resolve"
 
@@ -41,6 +41,26 @@ export const managedSearchClient = (post: SearchPost = defaultSearchPost, engine
 export const resolveSearchClient = (opts: { signedIn: boolean }): SearchClient | null => {
   const resolution = resolveService("search", { signedIn: opts.signedIn, byok: {} })
   return resolution.mode === "managed" ? managedSearchClient() : null
+}
+
+
+/** Collect the source URLs the `web_search` tool surfaced across a run (deduped,
+ *  in order) — fed to citation correction so the answer's links are the real ones. */
+export const collectWebSearchSources = (events: AgentEvent[]): string[] => {
+  const urls: string[] = []
+  const seen = new Set<string>()
+  for (const ev of events) {
+    if (ev.type !== "tool_result" || ev.toolName !== "web_search") continue
+    const results = (ev.result as { results?: { url?: unknown }[] } | undefined)?.results
+    for (const r of results ?? []) {
+      const url = typeof r.url === "string" ? r.url : null
+      if (url && !seen.has(url)) {
+        seen.add(url)
+        urls.push(url)
+      }
+    }
+  }
+  return urls
 }
 
 

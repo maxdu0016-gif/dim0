@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest"
 import type { SearchClient } from "./services/clients"
-import type { ToolContext } from "./types"
-import { makeWebSearchTool, managedSearchClient, resolveSearchClient, type SearchPost } from "./web-search"
+import type { AgentEvent, ToolContext } from "./types"
+import { collectWebSearchSources, makeWebSearchTool, managedSearchClient, resolveSearchClient, type SearchPost } from "./web-search"
 
 
 const response = (results: { url: string; title?: string; content?: string }[]) => ({ answer: "", results })
@@ -43,5 +43,23 @@ describe("resolveSearchClient", () => {
 
   it("signed out → null (no BYOK web search from the browser)", () => {
     expect(resolveSearchClient({ signedIn: false })).toBeNull()
+  })
+})
+
+
+describe("collectWebSearchSources", () => {
+  it("collects web_search result URLs, deduped and in order; ignores other events", () => {
+    const events: AgentEvent[] = [
+      { type: "tool_start", toolName: "web_search", args: {} },
+      { type: "tool_result", toolName: "web_search", result: { results: [{ url: "https://a.com" }, { url: "https://b.com" }] } },
+      { type: "tool_result", toolName: "create_note", result: { id: "n1" } },
+      { type: "tool_result", toolName: "web_search", result: { results: [{ url: "https://b.com" }, { url: "https://c.com" }] } },
+      { type: "assistant_text", text: "done" },
+    ]
+    expect(collectWebSearchSources(events)).toEqual(["https://a.com", "https://b.com", "https://c.com"])
+  })
+
+  it("returns [] when there were no web_search results", () => {
+    expect(collectWebSearchSources([{ type: "assistant_text", text: "hi" }, { type: "done" }])).toEqual([])
   })
 })
