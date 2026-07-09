@@ -22,6 +22,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from topix.agents.assistant.auto_model import classify_auto_model_complexity
+from topix.agents.assistant.code import execute_code
 from topix.agents.websearch.tools import (
     search_exa,
     search_linkup,
@@ -234,4 +235,34 @@ async def ai_search(
             }
             for r in output.search_results
         ],
+    }
+
+
+class AiCodeRequest(BaseModel):
+    """A managed code-interpreter run: source + language (executed on our Daytona)."""
+
+    code: str
+    language: str = "python"
+
+
+@router.post("/code/", include_in_schema=False)
+@router.post("/code")
+@with_standard_response
+async def ai_code(
+    response: Response,
+    request: Request,
+    body: AiCodeRequest,
+    user_id: Annotated[str, Depends(get_current_user_uid)],
+):
+    """Run code in an isolated sandbox with our Daytona account; returns the result.
+
+    `execute_code` self-handles an unrunnable language + unconfigured Daytona
+    (returns an error result rather than raising), so this stays a thin proxy.
+    """
+    output = await execute_code(body.code, body.language)
+    return {
+        "status": output.status,
+        "stdout": output.stdout,
+        "stderr": output.stderr,
+        "duration_ms": output.duration_ms,
     }
