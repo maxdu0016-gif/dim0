@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react"
 import {
   ChevronDownIcon,
   CircleClusterIcon,
@@ -97,6 +98,89 @@ const VIEW_OPTIONS = [
 ]
 
 
+const TRAY_H = 46
+const TRAY_R = 13
+
+
+/**
+ * SVG silhouette for the toolbar "tray": concave top corners that flare OUTWARD
+ * to the top edge, convex rounded bottom corners, open top. One path, sized to
+ * the measured content width so the corners stay circular at any width.
+ */
+const trayPath = (w: number, h: number, r: number): string =>
+  `M0 0 A${r} ${r} 0 0 1 ${r} ${r}` +
+  ` L${r} ${h - r} A${r} ${r} 0 0 0 ${2 * r} ${h}` +
+  ` L${w - 2 * r} ${h} A${r} ${r} 0 0 0 ${w - r} ${h - r}` +
+  ` L${w - r} ${r} A${r} ${r} 0 0 1 ${w} 0`
+
+
+/**
+ * Toolbar shell shaped as a flared tray docked to the top edge. The blurred,
+ * themed fill is clipped to the path; a hairline SVG stroke draws the outline;
+ * a drop-shadow (stronger on hover) follows the silhouette. Width is measured
+ * from the content row so the path fits the current toolbar exactly.
+ */
+function FlaredTray({
+  children,
+  className,
+  ...rest
+}: { children: React.ReactNode } & React.HTMLAttributes<HTMLDivElement>) {
+  const rowRef = useRef<HTMLDivElement>(null)
+  const [w, setW] = useState(0)
+  const [hover, setHover] = useState(false)
+
+  useEffect(() => {
+    const el = rowRef.current
+    if (!el) return
+    const ro = new ResizeObserver(([e]) => setW(Math.round(e.contentRect.width)))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
+  const d = w > 0 ? trayPath(w, TRAY_H, TRAY_R) : ""
+
+  return (
+    <div
+      className={cn("absolute left-1/2 top-0 z-50 -translate-x-1/2", className)}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      {...rest}
+    >
+      <div
+        className="relative"
+        style={{
+          filter: hover
+            ? "drop-shadow(0 10px 22px rgba(0,0,0,0.16))"
+            : "drop-shadow(0 2px 4px rgba(0,0,0,0.06))",
+          transition: "filter .2s ease",
+        }}
+      >
+        {d && (
+          <>
+            <div
+              className="pointer-events-none absolute inset-0 bg-sidebar/85 backdrop-blur-md backdrop-saturate-150"
+              style={{ clipPath: `path('${d}')` }}
+            />
+            <svg
+              className="pointer-events-none absolute inset-0"
+              width={w}
+              height={TRAY_H}
+              style={{ overflow: "visible" }}
+              aria-hidden
+            >
+              <path d={d} fill="none" stroke="var(--border)" strokeWidth={1} />
+            </svg>
+          </>
+        )}
+        <div ref={rowRef} className="relative flex items-center gap-1 px-4" style={{ height: TRAY_H }}>
+          {children}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+
 export function HarnessToolbar() {
   const tool = useBoardAppStore((s) => s.tool)
   const setTool = useBoardAppStore((s) => s.setTool)
@@ -117,15 +201,8 @@ export function HarnessToolbar() {
   const ActiveViewIcon = activeView.icon
 
   return (
-    <div
-      className={cn(
-        "absolute left-1/2 top-0 z-50 flex -translate-x-1/2 items-center gap-1",
-        // Docked tab: flush to the top edge, open top (no top border/rounding),
-        // rounded bottom — reads as a drawer hanging from the edge. Shadow on hover.
-        "rounded-b-xl border-x border-b border-border/60 shadow-none transition-shadow hover:shadow-md backdrop-blur-md backdrop-saturate-150",
-        "bg-sidebar text-sidebar-foreground supports-[backdrop-filter]:bg-sidebar/80",
-        "p-1",
-      )}
+    <FlaredTray
+      className="text-sidebar-foreground"
       role="toolbar"
       aria-label="Board toolbar"
       data-coachmark="toolbar"
@@ -358,6 +435,6 @@ export function HarnessToolbar() {
       )}
 
       <HarnessToolbarMore />
-    </div>
+    </FlaredTray>
   )
 }
