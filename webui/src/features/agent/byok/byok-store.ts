@@ -5,7 +5,18 @@ import type { ByokConfig, ByokProvider } from "@/features/agent/engine/byok-clie
 const STORAGE_KEY = "dim0.byok"
 
 
-type Stored = { provider: ByokProvider; apiKey: string; model: string }
+/** Web-search providers a user can bring a key for (relayed through our proxy). */
+export type SearchEngine = "perplexity" | "tavily" | "linkup" | "exa"
+
+
+type Stored = {
+  provider: ByokProvider
+  apiKey: string
+  model: string
+  searchEngine?: SearchEngine
+  searchKey?: string
+  codeKey?: string
+}
 
 
 /** Read a remembered config from localStorage (opt-in). */
@@ -25,14 +36,26 @@ const defaultModel = (provider: ByokProvider): string =>
 
 
 type ByokState = {
+  // Models (LLM) — called direct from the browser.
   provider: ByokProvider
   apiKey: string
   model: string
-  remember: boolean
   configured: boolean
+  // Web search — relayed through our proxy with the user's key.
+  searchEngine: SearchEngine
+  searchKey: string
+  // Code interpreter (Daytona) — relayed through our proxy.
+  codeKey: string
+  remember: boolean
   setConfig: (cfg: { provider: ByokProvider; apiKey: string; model: string; remember: boolean }) => void
+  setSearch: (cfg: { engine: SearchEngine; apiKey: string }) => void
+  setCode: (cfg: { apiKey: string }) => void
   clear: () => void
   asConfig: () => ByokConfig | null
+  /** The search BYOK credential (engine + key), or null when no key is set. */
+  searchByok: () => { engine: SearchEngine; apiKey: string } | null
+  /** The code (Daytona) BYOK key, or null when unset. */
+  codeByok: () => string | null
 }
 
 
@@ -40,32 +63,39 @@ const initial = load()
 
 
 /**
- * BYOK config (provider + key + model). In-memory by default; "remember on this
- * device" opt-in persists to localStorage. The key is sent ONLY to the provider,
- * never to our servers — and never persisted unless the user opts in.
+ * BYOK config across services: models (provider + key + model), web search
+ * (engine + key), and code (Daytona key). In-memory by default; "remember on
+ * this device" persists all of it to localStorage. Keys are sent only to the
+ * provider — directly for models, or relayed per-request by our proxy (never
+ * stored) for search/code — and never persisted unless the user opts in.
  */
 export const useByokStore = create<ByokState>((set, get) => ({
   provider: initial?.provider ?? "openrouter",
   apiKey: initial?.apiKey ?? "",
   model: initial?.model ?? "",
-  remember: initial !== null,
   configured: Boolean(initial?.apiKey),
+  searchEngine: initial?.searchEngine ?? "perplexity",
+  searchKey: initial?.searchKey ?? "",
+  codeKey: initial?.codeKey ?? "",
+  remember: initial !== null,
 
   setConfig: ({ provider, apiKey, model, remember }) => {
     set({ provider, apiKey, model, remember, configured: Boolean(apiKey) })
-    try {
-      if (remember && apiKey) {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify({ provider, apiKey, model }))
-      } else {
-        localStorage.removeItem(STORAGE_KEY)
-      }
-    } catch {
-      // storage unavailable — config stays in-memory only
-    }
+    persist(get)
+  },
+
+  setSearch: ({ engine, apiKey }) => {
+    set({ searchEngine: engine, searchKey: apiKey })
+    persist(get)
+  },
+
+  setCode: ({ apiKey }) => {
+    set({ codeKey: apiKey })
+    persist(get)
   },
 
   clear: () => {
-    set({ apiKey: "", configured: false, remember: false })
+    set({ apiKey: "", configured: false, searchKey: "", codeKey: "", remember: false })
     try {
       localStorage.removeItem(STORAGE_KEY)
     } catch {
@@ -78,4 +108,32 @@ export const useByokStore = create<ByokState>((set, get) => ({
     if (!apiKey) return null
     return { provider, apiKey, model: model.trim() || defaultModel(provider) }
   },
+
+  searchByok: () => {
+    const { searchEngine, searchKey } = get()
+    return searchKey.trim() ? { engine: searchEngine, apiKey: searchKey.trim() } : null
+  },
+
+  codeByok: () => {
+    const { codeKey } = get()
+    return codeKey.trim() || null
+  },
 }))
+
+
+/** Write the current config to localStorage when "remember" is on; else clear it. */
+function persist(get: () => ByokState): void {
+  const { provider, apiKey, model, searchEngine, searchKey, codeKey, remember } = get()
+  try {
+    if (remember && (apiKey || searchKey || codeKey)) {
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ provider, apiKey, model, searchEngine, searchKey, codeKey }),
+      )
+    } else {
+      localStorage.removeItem(STORAGE_KEY)
+    }
+  } catch {
+    // storage unavailable — config stays in-memory only
+  }
+}

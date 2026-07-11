@@ -1,17 +1,19 @@
 /**
- * Code interpreter as a service (G3) — a managed `CodeClient` + the
- * `code_interpreter` agent tool + resolution.
+ * Code interpreter as a service — a managed `CodeClient` + the `code_interpreter`
+ * agent tool + resolution.
  *
- * Managed-only: execution runs in our Daytona sandbox via `/ai/code` (a browser
- * can't run a sandbox, and we don't relay a user's Daytona key). Resolves to
- * managed (signed in) or off.
+ * Execution runs in a Daytona sandbox via `/ai/code` (a browser can't run a
+ * sandbox). "Our keys first, yours as fallback": a signed-in user runs on our
+ * Daytona account; if that's over quota (429) and the user has a BYOK Daytona
+ * key, the run is retried with `X-Provider-Key` (relayed, not stored).
+ * Signed-out has no authed proxy → off.
  */
 import { z } from "zod"
 import { apiFetch } from "@/api"
 import { defineTool, type Tool } from "./types"
 import type { CodeClient, CodeResult } from "./services/clients"
 import { resolveService } from "./services/resolve"
-import { runIdHeaders } from "./services/run"
+import { isOverQuotaError, runIdHeaders } from "./services/run"
 
 
 type CodeResponse = {
@@ -26,20 +28,28 @@ type CodeResponse = {
 export type CodePost = (body: { code: string; language: string }) => Promise<CodeResponse>
 
 
-const makeDefaultCodePost = (runId?: string): CodePost => async (body) => {
-  const res = await apiFetch<{ data: CodeResponse }>({
-    path: "/ai/code",
-    method: "POST",
-    body,
-    headers: runIdHeaders(runId),
-  })
-  return res.data
+const makeDefaultCodePost = (runId?: string, byokKey?: string): CodePost => async (body) => {
+  const call = (extra?: Record<string, string>) =>
+    apiFetch<{ data: CodeResponse }>({
+      path: "/ai/code",
+      method: "POST",
+      body,
+      headers: { ...runIdHeaders(runId), ...extra },
+    })
+  try {
+    return (await call()).data
+  } catch (e) {
+    if (byokKey && isOverQuotaError(e)) return (await call({ "X-Provider-Key": byokKey })).data
+    throw e
+  }
 }
 
 
-/** Managed code client — runs in our Daytona sandbox via the `/ai/code` proxy. */
-export const managedCodeClient = (opts: { runId?: string; post?: CodePost } = {}): CodeClient => {
-  const post = opts.post ?? makeDefaultCodePost(opts.runId)
+/** Managed code client — our Daytona via `/ai/code`, BYOK key as fallback. */
+export const managedCodeClient = (
+  opts: { runId?: string; byokKey?: string; post?: CodePost } = {},
+): CodeClient => {
+  const post = opts.post ?? makeDefaultCodePost(opts.runId, opts.byokKey)
   return {
     async run(code: string, language: string): Promise<CodeResult> {
       const r = await post({ code, language })
@@ -56,9 +66,14 @@ export const managedCodeClient = (opts: { runId?: string; post?: CodePost } = {}
 
 
 /** Resolve the code service to a client, or null when unavailable. */
-export const resolveCodeClient = (opts: { signedIn: boolean; runId?: string }): CodeClient | null => {
+export const resolveCodeClient = (opts: {
+  signedIn: boolean
+  runId?: string
+  byokKey?: string | null
+}): CodeClient | null => {
   const resolution = resolveService("code", { signedIn: opts.signedIn, byok: {} })
-  return resolution.mode === "managed" ? managedCodeClient({ runId: opts.runId }) : null
+  if (resolution.mode !== "managed") return null
+  return managedCodeClient({ runId: opts.runId, byokKey: opts.byokKey ?? undefined })
 }
 
 

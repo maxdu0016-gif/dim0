@@ -15,6 +15,9 @@ const s = vi.hoisted(() => ({
   apiKey: "",
   model: "",
   remember: false,
+  searchEngine: "perplexity" as "perplexity" | "tavily" | "linkup" | "exa",
+  searchKey: "",
+  codeKey: "",
 }))
 
 
@@ -26,8 +29,13 @@ vi.mock("@/features/agent/byok/byok-store", () => {
     get model() { return s.model },
     get remember() { return s.remember },
     get configured() { return s.configured },
+    get searchEngine() { return s.searchEngine },
+    get searchKey() { return s.searchKey },
+    get codeKey() { return s.codeKey },
     asConfig: () => (s.apiKey ? { provider: s.provider, apiKey: s.apiKey, model: s.model || "openai/gpt-5.4" } : null),
     setConfig: () => {},
+    setSearch: () => {},
+    setCode: () => {},
     clear: () => {},
   }
   return { useByokStore: (sel?: (st: typeof state) => unknown) => (sel ? sel(state) : state) }
@@ -64,6 +72,9 @@ describe("ServicesPanel", () => {
     s.apiKey = ""
     s.model = ""
     s.remember = false
+    s.searchEngine = "perplexity"
+    s.searchKey = ""
+    s.codeKey = ""
   })
 
   afterEach(() => {
@@ -92,7 +103,7 @@ describe("ServicesPanel", () => {
     expect(text()).not.toContain("Our keys")
   })
 
-  it("signed in: every service uses our keys, no BYOK form, no gating", () => {
+  it("signed in: every service uses our keys, no gating, fallback slots shown", () => {
     s.signedIn = true
     render()
     expect(text()).toContain("our keys first")
@@ -101,7 +112,10 @@ describe("ServicesPanel", () => {
     expect(occurrences("Our keys")).toBe(4)
     expect(signinLinks()).toBe(0)
     expect(text()).not.toContain("Needs an account")
-    expect(hasKeyForm()).toBe(false)
+    // signed-in exposes the over-limit fallback key slots (models + search + code)
+    expect(hasKeyForm()).toBe(true)
+    expect(text()).toContain("Daytona")
+    expect(text()).toContain("over your plan's limit")
   })
 
   it("signed in with a saved key still prefers our keys (key is superseded)", () => {
@@ -109,8 +123,8 @@ describe("ServicesPanel", () => {
     s.configured = true
     s.apiKey = "sk-or-abc"
     render()
+    // Managed for all four (incl. models) despite the saved key → not superseded.
     expect(text()).toContain("Our keys · auto")
-    expect(text()).not.toContain("Your key")
-    expect(hasKeyForm()).toBe(false)
+    expect(occurrences("Our keys")).toBe(4)
   })
 })

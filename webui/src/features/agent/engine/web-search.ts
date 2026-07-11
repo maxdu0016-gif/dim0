@@ -1,19 +1,19 @@
 /**
- * Web search as a service (G3) — a managed `SearchClient` + the `web_search`
- * agent tool + resolution.
+ * Web search as a service — a managed `SearchClient` + the `web_search` agent
+ * tool + resolution.
  *
- * Managed-only in practice: search providers block browser CORS and our rule
- * forbids relaying a user's key, so BYOK web search isn't viable from the
- * browser. The `search` service therefore resolves to managed (signed in) or
- * off; the server (`/ai/search`) runs it with our keys. The BYOK seam stays in
- * the resolver for any provider that ever allows direct browser calls.
+ * The provider APIs aren't browser-reachable (CORS), so search always goes
+ * through `/ai/search`. "Our keys first, yours as fallback": a signed-in user
+ * hits our proxy with our keys; if that's over quota (429) and the user has a
+ * BYOK search key, the same call is retried with `X-Provider-Key` (relayed,
+ * not stored). Signed-out has no authed proxy → off.
  */
 import { z } from "zod"
 import { apiFetch } from "@/api"
 import { defineTool, type AgentEvent, type Tool } from "./types"
 import type { SearchClient, SearchResult } from "./services/clients"
 import { resolveService } from "./services/resolve"
-import { runIdHeaders } from "./services/run"
+import { isOverQuotaError, runIdHeaders } from "./services/run"
 
 
 type SearchResponse = { answer: string; results: SearchResult[] }
@@ -23,22 +23,29 @@ type SearchResponse = { answer: string; results: SearchResult[] }
 export type SearchPost = (body: { query: string; engine?: string }) => Promise<SearchResponse>
 
 
-const makeDefaultSearchPost = (runId?: string): SearchPost => async (body) => {
-  const res = await apiFetch<{ data: SearchResponse }>({
-    path: "/ai/search",
-    method: "POST",
-    body,
-    headers: runIdHeaders(runId),
-  })
-  return res.data
+const makeDefaultSearchPost = (runId?: string, byokKey?: string): SearchPost => async (body) => {
+  const call = (extra?: Record<string, string>) =>
+    apiFetch<{ data: SearchResponse }>({
+      path: "/ai/search",
+      method: "POST",
+      body,
+      headers: { ...runIdHeaders(runId), ...extra },
+    })
+  try {
+    return (await call()).data
+  } catch (e) {
+    // Over our quota → fall back to the user's own key (relayed, not stored).
+    if (byokKey && isOverQuotaError(e)) return (await call({ "X-Provider-Key": byokKey })).data
+    throw e
+  }
 }
 
 
-/** Managed web-search client — our keys, via the `/ai/search` proxy. */
+/** Managed web-search client — our keys via `/ai/search`, BYOK key as fallback. */
 export const managedSearchClient = (
-  opts: { runId?: string; engine?: string; post?: SearchPost } = {},
+  opts: { runId?: string; engine?: string; byokKey?: string; post?: SearchPost } = {},
 ): SearchClient => {
-  const post = opts.post ?? makeDefaultSearchPost(opts.runId)
+  const post = opts.post ?? makeDefaultSearchPost(opts.runId, opts.byokKey)
   return {
     async search(query: string): Promise<SearchResult[]> {
       const { results } = await post({ query, ...(opts.engine ? { engine: opts.engine } : {}) })
@@ -49,9 +56,14 @@ export const managedSearchClient = (
 
 
 /** Resolve the search service to a client, or null when unavailable. */
-export const resolveSearchClient = (opts: { signedIn: boolean; runId?: string }): SearchClient | null => {
+export const resolveSearchClient = (opts: {
+  signedIn: boolean
+  runId?: string
+  byok?: { engine: string; apiKey: string } | null
+}): SearchClient | null => {
   const resolution = resolveService("search", { signedIn: opts.signedIn, byok: {} })
-  return resolution.mode === "managed" ? managedSearchClient({ runId: opts.runId }) : null
+  if (resolution.mode !== "managed") return null
+  return managedSearchClient({ runId: opts.runId, engine: opts.byok?.engine, byokKey: opts.byok?.apiKey })
 }
 
 

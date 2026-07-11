@@ -43,6 +43,8 @@ const mintId = (): string => `local-${Date.now()}-${counter++}`
  */
 export function useLocalSubmitPrompt(boardId: string) {
   const asConfig = useByokStore((s) => s.asConfig)
+  const searchByok = useByokStore((s) => s.searchByok)
+  const codeByok = useByokStore((s) => s.codeByok)
   const signedIn = useIsSignedIn()
   const setMessages = useLocalMessagesStore((s) => s.setMessages)
   const setChatUid = useLocalMessagesStore((s) => s.setChatUid)
@@ -122,8 +124,8 @@ export function useLocalSubmitPrompt(boardId: string) {
         const search = getSearchIndexRef() ?? undefined
         // External services are managed (signed in); include each tool only when
         // resolvable, so a signed-out user isn't offered an unavailable capability.
-        const webSearch = resolveSearchClient({ signedIn, runId })
-        const code = resolveCodeClient({ signedIn, runId })
+        const webSearch = resolveSearchClient({ signedIn, runId, byok: searchByok() })
+        const code = resolveCodeClient({ signedIn, runId, byokKey: codeByok() })
         const fetchUrl = resolveFetchClient({ signedIn, runId })
         const tools = [
           ...AGENT_TOOLS,
@@ -184,6 +186,6 @@ export function useLocalSubmitPrompt(boardId: string) {
         void maybeAutoLabelBoard(boardId, messages, resolveAgentLlm(config, { signedIn, runId }))
       }
     },
-    [asConfig, signedIn, setMessages, setChatUid, persist, boardId],
+    [asConfig, searchByok, codeByok, signedIn, setMessages, setChatUid, persist, boardId],
   )
 }

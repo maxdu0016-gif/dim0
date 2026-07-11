@@ -89,8 +89,8 @@ export function ByokKeyForm({ onSaved }: { onSaved?: () => void }) {
       </button>
 
       <p className="text-[11px] leading-snug text-muted-foreground">
-        Your key is sent directly to the provider, never to dim0&apos;s servers. It stays in memory
-        unless you choose to remember it.
+        Sent directly to the provider, never to dim0&apos;s servers — and kept only if you choose to
+        remember it.
       </p>
     </div>
   )
