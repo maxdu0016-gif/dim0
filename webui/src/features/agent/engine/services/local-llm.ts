@@ -10,24 +10,23 @@ import type { ByokConfig } from "../byok-client"
 import type { LlmClient } from "../types"
 import { managedLlmClient } from "../managed-client"
 import { llmClientFromResolution } from "./clients"
+import { agentResolveContext } from "./context"
 import { resolveService } from "./resolve"
 
 
 export type AgentLlmOptions = { signedIn: boolean; runId?: string }
 
 
-/** Build the agent's LLM client from a BYOK config + auth, via the resolver. */
+/**
+ * Build the agent's LLM client from a BYOK config + auth, via the resolver.
+ * "Our keys first": signed in → managed even with a saved key; signed out → the
+ * saved key (BYOK), or null when there's neither.
+ */
 export const resolveAgentLlm = (
   config: ByokConfig | null,
   opts: AgentLlmOptions,
 ): LlmClient | null => {
-  const resolution = resolveService("llm", {
-    signedIn: opts.signedIn,
-    // LLM managed is allowed whenever signed in; the server enforces plan tiers.
-    byok: config
-      ? { llm: { provider: config.provider, apiKey: config.apiKey, model: config.model } }
-      : {},
-  })
+  const resolution = resolveService("llm", agentResolveContext({ signedIn: opts.signedIn, byok: config }))
   return llmClientFromResolution(resolution, (r) =>
     managedLlmClient(r.model ?? "auto", { runId: opts.runId }),
   )

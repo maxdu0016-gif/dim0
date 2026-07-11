@@ -120,7 +120,7 @@ export function HarnessToolbar() {
     <div
       className={cn(
         "absolute left-1/2 top-2 z-50 flex -translate-x-1/2 items-center gap-1",
-        "rounded-xl border border-border/60 shadow-md backdrop-blur-md backdrop-saturate-150",
+        "rounded-xl border border-border/60 shadow-none transition-shadow hover:shadow-md backdrop-blur-md backdrop-saturate-150",
         "bg-sidebar text-sidebar-foreground supports-[backdrop-filter]:bg-sidebar/80",
         "p-1",
       )}

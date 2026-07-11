@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils"
 import { SendMessageError } from "@/features/agent/api/send-message"
 import { useChatSubmit } from "@/features/agent/hooks/use-chat-submit"
 import { buildMessageContext, useHasMessageContext } from "@/features/agent/hooks/use-message-context"
+import { ServicesButton } from "@/features/agent/services/services-button"
 import { ProgressLine } from "./progress-line"
 import { useCurrentAssistantMessage } from "./use-current-assistant-message"
 import { useBoardAppStore } from "../../../harness/store/board-app-store"
@@ -115,6 +116,7 @@ export const FloatingIsland = ({ boardId, onOpenFullSheet }: FloatingIslandProps
           <span className='shrink-0 text-sm text-muted-foreground/70 font-mono px-1 select-none hidden sm:inline'>
             ⌘↵
           </span>
+          <ServicesButton />
         </div>
       </div>
       <p className='text-center text-[11px] text-muted-foreground/70 px-3'>

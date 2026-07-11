@@ -2,7 +2,8 @@ import { useEffect, useState } from "react"
 import { useParams, useSearch } from "@tanstack/react-router"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Chat } from "@/features/agent/components/chat-view"
-import { ByokPanel } from "@/features/agent/byok/byok-panel"
+import { ServicesPanel } from "@/features/agent/services/services-panel"
+import { SERVICES_SHELL } from "@/features/agent/services/shell"
 import { useByokStore } from "@/features/agent/byok/byok-store"
 import { useLocalMessagesStore } from "@/features/agent/store/local-messages-store"
 import { HarnessCanvas } from "@/features/board/harness/canvas"
@@ -66,8 +67,10 @@ export function LocalBoardScreen() {
         )}
 
         {!canUseAgent && (
-          <div className="absolute bottom-4 left-1/2 z-[60] w-[min(580px,calc(100vw-4rem))] -translate-x-1/2">
-            <ByokPanel />
+          <div className="absolute bottom-4 left-1/2 z-[60] w-[min(400px,calc(100vw-4rem))] -translate-x-1/2">
+            <div className={`${SERVICES_SHELL} p-3`}>
+              <ServicesPanel />
+            </div>
           </div>
         )}
 

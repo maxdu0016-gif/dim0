@@ -16,7 +16,7 @@ import { SettingsBillingUrl } from '@/routes'
 import { WelcomeMessage } from './welcome-message'
 import { StarterPromptPills } from './starter-prompts'
 import { InputSettings } from './input-settings/settings'
-import { ByokSettingsButton } from '@/features/agent/byok/byok-settings-button'
+import { ServicesButton } from '@/features/agent/services/services-button'
 import { useIsBoardCreationLimited, FREE_PLAN_BOARD_LIMIT_TOOLTIP } from '@/features/board/lib/board-limit'
 
 // shadcn/ui
@@ -245,7 +245,7 @@ export const InputBar = ({
       <div className="flex items-center justify-between gap-3">
         <div className="flex min-w-0 flex-wrap items-center gap-1">
           {local ? (
-            <ByokSettingsButton />
+            <ServicesButton />
           ) : (
             <InputSettings
               showBoardContextOption={enableSelectionContext}
