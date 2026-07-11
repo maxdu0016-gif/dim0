@@ -35,7 +35,7 @@ def test_fetch_maps_first_result_to_page_content(monkeypatch):
     """The first extracted result maps to {url, title, text}."""
     seen = {}
 
-    async def _fake(url):
+    async def _fake(url, api_key=None):
         seen["url"] = url
         return SimpleNamespace(
             answer="",
@@ -53,7 +53,7 @@ def test_fetch_maps_first_result_to_page_content(monkeypatch):
 
 def test_fetch_falls_back_to_answer_when_no_results(monkeypatch):
     """No extracted results → text falls back to the output answer, title None."""
-    async def _fake(url):
+    async def _fake(url, api_key=None):
         return SimpleNamespace(answer="fallback text", search_results=[])
 
     monkeypatch.setattr(ai_module, "fetch_content", _fake)
@@ -61,3 +61,16 @@ def test_fetch_falls_back_to_answer_when_no_results(monkeypatch):
     data = res.json()["data"]
     assert data["title"] is None
     assert data["text"] == "fallback text"
+
+
+def test_fetch_relays_the_byok_key(monkeypatch):
+    """An `X-Provider-Key` header is forwarded to `fetch_content` (BYOK relay)."""
+    seen = {}
+
+    async def _fake(url, api_key=None):
+        seen["api_key"] = api_key
+        return SimpleNamespace(answer="x", search_results=[])
+
+    monkeypatch.setattr(ai_module, "fetch_content", _fake)
+    _client().post("/ai/fetch", json={"url": "https://a.com"}, headers={"X-Provider-Key": "tvly-user"})
+    assert seen["api_key"] == "tvly-user"

@@ -44,9 +44,10 @@ def test_search_dispatches_to_the_engine_and_maps_results(monkeypatch):
     """A known engine runs and its results map to {answer, results}."""
     calls = {}
 
-    async def _fake(query, max_results=10):
+    async def _fake(query, max_results=10, api_key=None):
         calls["query"] = query
         calls["max_results"] = max_results
+        calls["api_key"] = api_key
         return _fake_output()
 
     monkeypatch.setitem(ai_module._SEARCH_FNS, "perplexity", _fake)
@@ -57,17 +58,34 @@ def test_search_dispatches_to_the_engine_and_maps_results(monkeypatch):
     assert data["answer"] == "cats are great"
     assert data["results"][0]["url"] == "https://a.com"
     assert data["results"][0]["title"] == "A"
-    assert calls == {"query": "cats", "max_results": 10}
+    # managed call: no BYOK key forwarded
+    assert calls == {"query": "cats", "max_results": 10, "api_key": None}
 
 
 def test_search_defaults_to_perplexity(monkeypatch):
     """Omitting the engine uses perplexity."""
-    async def _fake(query, max_results=10):
+    async def _fake(query, max_results=10, api_key=None):
         return _fake_output()
 
     monkeypatch.setitem(ai_module._SEARCH_FNS, "perplexity", _fake)
     res = _client().post("/ai/search", json={"query": "cats"})
     assert res.status_code == 200
+
+
+def test_search_relays_the_byok_provider_key(monkeypatch):
+    """An `X-Provider-Key` header is forwarded to the provider fn (BYOK relay)."""
+    calls = {}
+
+    async def _fake(query, max_results=10, api_key=None):
+        calls["api_key"] = api_key
+        return _fake_output()
+
+    monkeypatch.setitem(ai_module._SEARCH_FNS, "perplexity", _fake)
+    res = _client().post(
+        "/ai/search", json={"query": "cats"}, headers={"X-Provider-Key": "pplx-user"}
+    )
+    assert res.status_code == 200
+    assert calls["api_key"] == "pplx-user"
 
 
 def test_unknown_engine_is_400(monkeypatch):

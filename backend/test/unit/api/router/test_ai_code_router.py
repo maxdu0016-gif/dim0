@@ -35,7 +35,7 @@ def test_code_run_maps_the_execution_result(monkeypatch):
     """A successful run maps status/stdout/stderr/duration_ms through."""
     calls = {}
 
-    async def _fake(code, language="python"):
+    async def _fake(code, language="python", api_key=None):
         calls["code"] = code
         calls["language"] = language
         return SimpleNamespace(status="success", stdout="42\n", stderr="", duration_ms=12)
@@ -49,11 +49,24 @@ def test_code_run_maps_the_execution_result(monkeypatch):
     assert calls == {"code": "print(6*7)", "language": "python"}
 
 
+def test_code_relays_the_byok_daytona_key(monkeypatch):
+    """An `X-Provider-Key` header is forwarded to `execute_code` (BYOK relay)."""
+    seen = {}
+
+    async def _fake(code, language="python", api_key=None):
+        seen["api_key"] = api_key
+        return SimpleNamespace(status="success", stdout="", stderr="", duration_ms=1)
+
+    monkeypatch.setattr(ai_module, "execute_code", _fake)
+    _client().post("/ai/code", json={"code": "1+1"}, headers={"X-Provider-Key": "dtn-user"})
+    assert seen["api_key"] == "dtn-user"
+
+
 def test_code_defaults_language_to_python(monkeypatch):
     """Omitting language runs python."""
     seen = {}
 
-    async def _fake(code, language="python"):
+    async def _fake(code, language="python", api_key=None):
         seen["language"] = language
         return SimpleNamespace(status="success", stdout="", stderr="", duration_ms=1)
 
@@ -64,7 +77,7 @@ def test_code_defaults_language_to_python(monkeypatch):
 
 def test_code_error_result_is_passed_through(monkeypatch):
     """An error result (e.g. bad language / unconfigured Daytona) maps through as-is."""
-    async def _fake(code, language="python"):
+    async def _fake(code, language="python", api_key=None):
         return SimpleNamespace(status="error", stdout="", stderr="boom", duration_ms=3)
 
     monkeypatch.setattr(ai_module, "execute_code", _fake)

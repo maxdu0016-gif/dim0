@@ -47,6 +47,7 @@ async def meter_run(
     request: Request,
     user_id: Annotated[str, Depends(get_current_user_uid)],
     x_run_id: Annotated[str | None, Header()] = None,
+    x_provider_key: Annotated[str | None, Header()] = None,
 ) -> None:
     """Meter one whole agent run against the plan's AI quota.
 
@@ -54,7 +55,12 @@ async def meter_run(
     the quota (429 when over); later calls in the same run are free. A call with
     no run id is metered on its own. This is the decision-#1 "one run = one unit"
     rule, reusing the shared rate limiter.
+
+    A BYOK call (carrying `X-Provider-Key`) is on the user's own provider key, so
+    it's never charged against our quota — skip metering entirely.
     """
+    if x_provider_key:
+        return
     if x_run_id:
         redis = request.app.redis_store
         first = await redis.set_if_absent(f"airun:{user_id}:{x_run_id}", RUN_TTL_SECONDS)
@@ -244,14 +250,19 @@ async def ai_search(
     body: AiSearchRequest,
     user_id: Annotated[str, Depends(get_current_user_uid)],
     _meter: Annotated[None, Depends(meter_run)],
+    x_provider_key: Annotated[str | None, Header()] = None,
 ):
-    """Run one web search with our provider keys; returns `{answer, results}`."""
+    """Run one web search; returns `{answer, results}`.
+
+    Uses our provider key by default, or relays the user's `X-Provider-Key`
+    (BYOK) for this call only — never stored.
+    """
     fn = _SEARCH_FNS.get(body.engine)
     if fn is None:
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST, f"Unsupported search engine '{body.engine}'"
         )
-    output = await fn(body.query, max_results=body.max_results)
+    output = await fn(body.query, max_results=body.max_results, api_key=x_provider_key)
     return {
         "answer": output.answer,
         "results": [
@@ -282,13 +293,16 @@ async def ai_code(
     body: AiCodeRequest,
     user_id: Annotated[str, Depends(get_current_user_uid)],
     _meter: Annotated[None, Depends(meter_run)],
+    x_provider_key: Annotated[str | None, Header()] = None,
 ):
-    """Run code in an isolated sandbox with our Daytona account; returns the result.
+    """Run code in an isolated sandbox; returns the result.
 
-    `execute_code` self-handles an unrunnable language + unconfigured Daytona
-    (returns an error result rather than raising), so this stays a thin proxy.
+    Uses our Daytona account by default, or relays the user's `X-Provider-Key`
+    (BYOK) for this run only — never stored. `execute_code` self-handles an
+    unrunnable language + unconfigured Daytona (returns an error result rather
+    than raising), so this stays a thin proxy.
     """
-    output = await execute_code(body.code, body.language)
+    output = await execute_code(body.code, body.language, api_key=x_provider_key)
     return {
         "status": output.status,
         "stdout": output.stdout,
@@ -312,9 +326,14 @@ async def ai_fetch(
     body: AiFetchRequest,
     user_id: Annotated[str, Depends(get_current_user_uid)],
     _meter: Annotated[None, Depends(meter_run)],
+    x_provider_key: Annotated[str | None, Header()] = None,
 ):
-    """Read one URL's content with our keys; returns `{url, title, text}`."""
-    output = await fetch_content(body.url)
+    """Read one URL's content; returns `{url, title, text}`.
+
+    Uses our key by default, or relays the user's `X-Provider-Key` (BYOK, a
+    Tavily key) for this call only — never stored.
+    """
+    output = await fetch_content(body.url, api_key=x_provider_key)
     first = output.search_results[0] if output.search_results else None
     return {
         "url": body.url,

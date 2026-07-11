@@ -88,6 +88,15 @@ def test_no_run_id_meters_every_call(monkeypatch):
     assert calls == ["u1", "u1"]
 
 
+def test_byok_call_is_not_metered(monkeypatch):
+    """A call carrying X-Provider-Key (BYOK) is on the user's key — never charged."""
+    calls, enforce = _recorder()
+    client = _app(monkeypatch, enforce)
+    res = client.post("/_probe", headers={"X-Run-Id": "run-1", "X-Provider-Key": "sk-user"})
+    assert res.status_code == 200
+    assert calls == []  # BYOK bypasses our quota entirely
+
+
 def test_over_quota_first_call_returns_429(monkeypatch):
     """When the quota is exhausted, the run's first call is rejected."""
     async def enforce(_request, _uid):
