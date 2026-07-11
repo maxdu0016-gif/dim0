@@ -111,11 +111,13 @@ test.describe("local-only boards (no account, frontend-only)", () => {
     await page.goto("/local")
     await createLocalBoard(page)
 
-    // BYOK: the empty-state config panel is inline — enter a key and save.
+    // No model key yet → island is grayed; open the Services popover from the
+    // key icon, set a model key, save (the Models form's Save is the first one).
+    await page.getByRole("button", { name: "Service and model settings" }).click()
     await page.getByPlaceholder(/sk-/).fill("sk-test-123")
-    await page.getByRole("button", { name: "Save" }).click()
+    await page.getByRole("button", { name: "Save" }).first().click()
 
-    // Ask the agent (the floating island submits on Enter).
+    // Island ungrays → ask the agent (the floating island submits on Enter).
     await page.getByPlaceholder(/Ask about this board/).fill("create a note")
     await page.getByPlaceholder(/Ask about this board/).press("Enter")
 
