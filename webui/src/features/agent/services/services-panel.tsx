@@ -33,8 +33,15 @@ export function ServicesPanel({ onSaved }: { onSaved?: () => void }) {
   const signedIn = useIsSignedIn()
   const configured = useByokStore((s) => s.configured)
   const asConfig = useByokStore((s) => s.asConfig)
+  const searchByok = useByokStore((s) => s.searchByok)
+  const codeByok = useByokStore((s) => s.codeByok)
   const resolutions = resolveAllServices(
-    agentResolveContext({ signedIn, byok: configured ? asConfig() : null }),
+    agentResolveContext({
+      signedIn,
+      llm: configured ? asConfig() : null,
+      search: searchByok(),
+      code: codeByok(),
+    }),
   )
 
   return (
@@ -53,26 +60,25 @@ export function ServicesPanel({ onSaved }: { onSaved?: () => void }) {
         past your plan&apos;s daily limit.
       </p>
 
-      <Section icon={SparklesIcon} label="Models" status={<Pill kind="llm" mode={resolutions.llm.mode} signedIn={signedIn} />}>
+      <Section icon={SparklesIcon} label="Models" status={<Pill kind="llm" mode={resolutions.llm.mode} />}>
         <ByokKeyForm onSaved={onSaved} />
       </Section>
 
-      <Section icon={GlobeIcon} label="Web search" status={<Pill kind="search" mode={resolutions.search.mode} signedIn={signedIn} />}>
-        {signedIn ? <SearchByokCard /> : <GatedNote />}
+      <Section icon={GlobeIcon} label="Web search" status={<Pill kind="search" mode={resolutions.search.mode} />}>
+        <SearchByokCard />
       </Section>
 
-      <Section icon={CodeInterpreterIcon} label="Code interpreter" status={<Pill kind="code" mode={resolutions.code.mode} signedIn={signedIn} />}>
-        {signedIn ? <CodeByokCard /> : <GatedNote />}
+      <Section icon={CodeInterpreterIcon} label="Code interpreter" status={<Pill kind="code" mode={resolutions.code.mode} />}>
+        <CodeByokCard />
       </Section>
 
-      <Section icon={LinkIcon} label="Fetch" status={<Pill kind="fetch" mode={resolutions.fetch.mode} signedIn={signedIn} />} />
+      <Section icon={LinkIcon} label="Fetch" status={<Pill kind="fetch" mode={resolutions.fetch.mode} />} />
 
       <div className="mt-3 flex gap-2 border-t border-border pt-3">
         <LockIcon />
         <span className="text-[11px] leading-snug text-muted-foreground">
-          Your keys stay in this browser. For search &amp; code they&apos;re forwarded per-request
-          through our proxy to the provider and never saved on our servers; models call the provider
-          directly.
+          Keys stay in this browser. For search &amp; code they&apos;re forwarded per-request through
+          our proxy to the provider and never saved on our servers; models call the provider directly.
         </span>
       </div>
     </div>
@@ -111,20 +117,12 @@ type Tone = "managed" | "byok"
 
 
 /** Source status for one row. */
-function Pill({ kind, mode, signedIn }: { kind: ServiceKind; mode: "managed" | "byok" | "off"; signedIn: boolean }) {
+function Pill({ kind, mode }: { kind: ServiceKind; mode: "managed" | "byok" | "off" }) {
   if (mode === "managed") return <Chip tone="managed" label={kind === "llm" ? "Our keys · auto" : "Our keys"} />
   if (mode === "byok") return <Chip tone="byok" label="Your key" />
-  if (kind === "llm") return <span className="text-xs text-muted-foreground">Set a key below</span>
-  return (
-    <span className="flex items-center gap-2 whitespace-nowrap text-xs text-muted-foreground">
-      Needs an account
-      {!signedIn && (
-        <a href="/signin" className="font-medium text-secondary-foreground underline-offset-2 hover:underline">
-          Sign in
-        </a>
-      )}
-    </span>
-  )
+  // off — fetch has no key slot; the rest expose one right below.
+  if (kind === "fetch") return <span className="text-xs text-muted-foreground">Needs an account</span>
+  return <span className="text-xs text-muted-foreground">Set a key below</span>
 }
 
 
@@ -182,7 +180,7 @@ function SearchByokCard() {
         <SaveButton disabled={key === savedKey} onClick={() => setSearch({ engine, apiKey: key.trim() })} />
       </div>
       <p className="mt-2 text-[11px] leading-snug text-muted-foreground">
-        Relayed through us · used when you&apos;re over your plan&apos;s limit.
+        Relayed through us — used when signed out or over your plan&apos;s limit.
       </p>
     </div>
   )
@@ -226,15 +224,6 @@ function SaveButton({ disabled, onClick }: { disabled: boolean; onClick: () => v
     >
       Save
     </button>
-  )
-}
-
-
-function GatedNote() {
-  return (
-    <p className="px-0.5 text-xs leading-snug text-muted-foreground">
-      Sign in to use web search &amp; code — they run through our service, so they need an account.
-    </p>
   )
 }
 

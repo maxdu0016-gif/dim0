@@ -23,29 +23,31 @@ type SearchResponse = { answer: string; results: SearchResult[] }
 export type SearchPost = (body: { query: string; engine?: string }) => Promise<SearchResponse>
 
 
-const makeDefaultSearchPost = (runId?: string, byokKey?: string): SearchPost => async (body) => {
-  const call = (extra?: Record<string, string>) =>
+const makeDefaultSearchPost = (runId?: string, byokKey?: string, alwaysByok = false): SearchPost => async (body) => {
+  const call = (withKey: boolean) =>
     apiFetch<{ data: SearchResponse }>({
       path: "/ai/search",
       method: "POST",
       body,
-      headers: { ...runIdHeaders(runId), ...extra },
+      headers: { ...runIdHeaders(runId), ...(withKey && byokKey ? { "X-Provider-Key": byokKey } : {}) },
     })
+  // byok mode: the user's key IS the source → send it up front. managed mode:
+  // our keys first, fall back to the user's key only if we're over quota (429).
+  if (alwaysByok && byokKey) return (await call(true)).data
   try {
-    return (await call()).data
+    return (await call(false)).data
   } catch (e) {
-    // Over our quota → fall back to the user's own key (relayed, not stored).
-    if (byokKey && isOverQuotaError(e)) return (await call({ "X-Provider-Key": byokKey })).data
+    if (byokKey && isOverQuotaError(e)) return (await call(true)).data
     throw e
   }
 }
 
 
-/** Managed web-search client — our keys via `/ai/search`, BYOK key as fallback. */
+/** Managed web-search client — our keys via `/ai/search`, BYOK key as fallback (or the source in byok mode). */
 export const managedSearchClient = (
-  opts: { runId?: string; engine?: string; byokKey?: string; post?: SearchPost } = {},
+  opts: { runId?: string; engine?: string; byokKey?: string; alwaysByok?: boolean; post?: SearchPost } = {},
 ): SearchClient => {
-  const post = opts.post ?? makeDefaultSearchPost(opts.runId, opts.byokKey)
+  const post = opts.post ?? makeDefaultSearchPost(opts.runId, opts.byokKey, opts.alwaysByok)
   return {
     async search(query: string): Promise<SearchResult[]> {
       const { results } = await post({ query, ...(opts.engine ? { engine: opts.engine } : {}) })
@@ -55,15 +57,27 @@ export const managedSearchClient = (
 }
 
 
-/** Resolve the search service to a client, or null when unavailable. */
+/** Resolve the search service to a client, or null when unavailable. A saved
+ *  key makes search available even signed-out (relayed); signed-in prefers our
+ *  keys with the key as the over-limit fallback. */
 export const resolveSearchClient = (opts: {
   signedIn: boolean
   runId?: string
   byok?: { engine: string; apiKey: string } | null
 }): SearchClient | null => {
-  const resolution = resolveService("search", { signedIn: opts.signedIn, byok: {} })
-  if (resolution.mode !== "managed") return null
-  return managedSearchClient({ runId: opts.runId, engine: opts.byok?.engine, byokKey: opts.byok?.apiKey })
+  const cred = opts.byok?.apiKey ? { provider: opts.byok.engine, apiKey: opts.byok.apiKey } : undefined
+  const resolution = resolveService("search", {
+    signedIn: opts.signedIn,
+    preferManaged: opts.signedIn,
+    byok: cred ? { search: cred } : {},
+  })
+  if (resolution.mode === "off") return null
+  return managedSearchClient({
+    runId: opts.runId,
+    engine: opts.byok?.engine,
+    byokKey: opts.byok?.apiKey,
+    alwaysByok: resolution.mode === "byok",
+  })
 }
 
 

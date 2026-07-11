@@ -2,9 +2,6 @@ import { useEffect, useState } from "react"
 import { useParams, useSearch } from "@tanstack/react-router"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Chat } from "@/features/agent/components/chat-view"
-import { ServicesPanel } from "@/features/agent/services/services-panel"
-import { SERVICES_SHELL } from "@/features/agent/services/shell"
-import { useByokStore } from "@/features/agent/byok/byok-store"
 import { useLocalMessagesStore } from "@/features/agent/store/local-messages-store"
 import { HarnessCanvas } from "@/features/board/harness/canvas"
 import { LocalFolderBreadcrumb } from "@/features/board/local/local-folder-breadcrumb"
@@ -12,7 +9,6 @@ import { NotesSearchDialog } from "@/features/board/local/notes-search-dialog"
 import { useBoardAppStore } from "@/features/board/harness/store/board-app-store"
 import { FloatingAssistant } from "@/features/board/components/flow/floating-assistant/floating-assistant"
 import { requestPersistentStorage } from "@/features/board/persist/local/persist-storage"
-import { useIsSignedIn } from "@/lib/auth"
 
 
 /**
@@ -29,10 +25,6 @@ export function LocalBoardScreen() {
     select: (s: { root_id?: string }) => s?.root_id,
   })
   const setBoardScope = useBoardAppStore((s) => s.setBoardScope)
-  const byokConfigured = useByokStore((s) => s.configured)
-  const signedIn = useIsSignedIn()
-  // The assistant is usable with a BYOK key OR when signed in (managed keys).
-  const canUseAgent = byokConfigured || signedIn
   const openBoard = useLocalMessagesStore((s) => s.openBoard)
   const [sheetOpen, setSheetOpen] = useState(false)
 
@@ -57,21 +49,14 @@ export function LocalBoardScreen() {
 
         <NotesSearchDialog boardId={boardId} />
 
-        {/* Island composes turns; hidden while the full sheet is open (parity with online). */}
-        {!sheetOpen && canUseAgent && (
+        {/* Island composes turns; hidden while the full sheet is open (parity with
+            online). It grays itself and lights the key icon when no model key is set. */}
+        {!sheetOpen && (
           <FloatingAssistant
             boardId={boardId}
             local
             onOpenFullSheet={() => setSheetOpen(true)}
           />
-        )}
-
-        {!canUseAgent && (
-          <div className="absolute bottom-4 left-1/2 z-[60] w-[min(400px,calc(100vw-4rem))] -translate-x-1/2">
-            <div className={`${SERVICES_SHELL} p-3`}>
-              <ServicesPanel />
-            </div>
-          </div>
         )}
 
         <Sheet open={sheetOpen} onOpenChange={setSheetOpen} modal={false} disablePointerDismissal>

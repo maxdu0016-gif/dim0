@@ -28,28 +28,31 @@ type CodeResponse = {
 export type CodePost = (body: { code: string; language: string }) => Promise<CodeResponse>
 
 
-const makeDefaultCodePost = (runId?: string, byokKey?: string): CodePost => async (body) => {
-  const call = (extra?: Record<string, string>) =>
+const makeDefaultCodePost = (runId?: string, byokKey?: string, alwaysByok = false): CodePost => async (body) => {
+  const call = (withKey: boolean) =>
     apiFetch<{ data: CodeResponse }>({
       path: "/ai/code",
       method: "POST",
       body,
-      headers: { ...runIdHeaders(runId), ...extra },
+      headers: { ...runIdHeaders(runId), ...(withKey && byokKey ? { "X-Provider-Key": byokKey } : {}) },
     })
+  // byok mode → run on the user's Daytona key directly; managed → ours first,
+  // fall back to their key on a 429 (over quota).
+  if (alwaysByok && byokKey) return (await call(true)).data
   try {
-    return (await call()).data
+    return (await call(false)).data
   } catch (e) {
-    if (byokKey && isOverQuotaError(e)) return (await call({ "X-Provider-Key": byokKey })).data
+    if (byokKey && isOverQuotaError(e)) return (await call(true)).data
     throw e
   }
 }
 
 
-/** Managed code client — our Daytona via `/ai/code`, BYOK key as fallback. */
+/** Managed code client — our Daytona via `/ai/code`, BYOK key as fallback (or the source in byok mode). */
 export const managedCodeClient = (
-  opts: { runId?: string; byokKey?: string; post?: CodePost } = {},
+  opts: { runId?: string; byokKey?: string; alwaysByok?: boolean; post?: CodePost } = {},
 ): CodeClient => {
-  const post = opts.post ?? makeDefaultCodePost(opts.runId, opts.byokKey)
+  const post = opts.post ?? makeDefaultCodePost(opts.runId, opts.byokKey, opts.alwaysByok)
   return {
     async run(code: string, language: string): Promise<CodeResult> {
       const r = await post({ code, language })
@@ -65,15 +68,26 @@ export const managedCodeClient = (
 }
 
 
-/** Resolve the code service to a client, or null when unavailable. */
+/** Resolve the code service to a client, or null when unavailable. A saved
+ *  Daytona key makes code available even signed-out (relayed); signed-in prefers
+ *  our account with the key as the over-limit fallback. */
 export const resolveCodeClient = (opts: {
   signedIn: boolean
   runId?: string
   byokKey?: string | null
 }): CodeClient | null => {
-  const resolution = resolveService("code", { signedIn: opts.signedIn, byok: {} })
-  if (resolution.mode !== "managed") return null
-  return managedCodeClient({ runId: opts.runId, byokKey: opts.byokKey ?? undefined })
+  const cred = opts.byokKey ? { provider: "daytona", apiKey: opts.byokKey } : undefined
+  const resolution = resolveService("code", {
+    signedIn: opts.signedIn,
+    preferManaged: opts.signedIn,
+    byok: cred ? { code: cred } : {},
+  })
+  if (resolution.mode === "off") return null
+  return managedCodeClient({
+    runId: opts.runId,
+    byokKey: opts.byokKey ?? undefined,
+    alwaysByok: resolution.mode === "byok",
+  })
 }
 
 

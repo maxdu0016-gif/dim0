@@ -26,7 +26,7 @@ export const resolveAgentLlm = (
   config: ByokConfig | null,
   opts: AgentLlmOptions,
 ): LlmClient | null => {
-  const resolution = resolveService("llm", agentResolveContext({ signedIn: opts.signedIn, byok: config }))
+  const resolution = resolveService("llm", agentResolveContext({ signedIn: opts.signedIn, llm: config }))
   return llmClientFromResolution(resolution, (r) =>
     managedLlmClient(r.model ?? "auto", { runId: opts.runId }),
   )

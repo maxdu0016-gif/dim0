@@ -33,6 +33,8 @@ vi.mock("@/features/agent/byok/byok-store", () => {
     get searchKey() { return s.searchKey },
     get codeKey() { return s.codeKey },
     asConfig: () => (s.apiKey ? { provider: s.provider, apiKey: s.apiKey, model: s.model || "openai/gpt-5.4" } : null),
+    searchByok: () => (s.searchKey ? { engine: s.searchEngine, apiKey: s.searchKey } : null),
+    codeByok: () => s.codeKey || null,
     setConfig: () => {},
     setSearch: () => {},
     setCode: () => {},
@@ -82,25 +84,32 @@ describe("ServicesPanel", () => {
     container.remove()
   })
 
-  it("signed out, no key: models needs a key, managed-only services are gated", () => {
+  it("signed out, no key: every service exposes a key slot; only fetch needs an account", () => {
     render()
     expect(text()).toContain("on-device · your key")
-    expect(text()).toContain("Set a key below")           // models row (llm off)
-    // search + code + fetch are gated, each with a Sign in CTA
-    expect(occurrences("Needs an account")).toBe(3)
-    expect(signinLinks()).toBe(3)
-    expect(hasKeyForm()).toBe(true)                        // BYOK form shown signed-out
+    // models + search + code each say "Set a key below" (their slot is present)
+    expect(occurrences("Set a key below")).toBe(3)
+    expect(occurrences("Needs an account")).toBe(1) // fetch only (no BYOK slot)
+    expect(signinLinks()).toBe(0)                   // BYOK works locally now — no sign-in push
+    expect(hasKeyForm()).toBe(true)
     expect(text()).not.toContain("Our keys")
   })
 
-  it("signed out, key saved: models = Your key, others still gated", () => {
+  it("signed out, model key saved: models = Your key; search/code still settable", () => {
     s.configured = true
     s.apiKey = "sk-or-abc"
     render()
-    expect(text()).toContain("Your key")                  // models resolves to byok
-    expect(occurrences("Needs an account")).toBe(3)
+    expect(text()).toContain("Your key")            // models resolves to byok
+    expect(text()).toContain("Daytona")             // code slot present signed-out
     expect(hasKeyForm()).toBe(true)
     expect(text()).not.toContain("Our keys")
+  })
+
+  it("signed out, a search key makes web search resolve to Your key", () => {
+    s.searchKey = "exa-abc"
+    s.searchEngine = "exa"
+    render()
+    expect(occurrences("Your key")).toBe(1)         // search row → byok
   })
 
   it("signed in: every service uses our keys, no gating, fallback slots shown", () => {
