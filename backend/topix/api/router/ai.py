@@ -19,6 +19,7 @@ import litellm
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response, status
 from fastapi.responses import StreamingResponse
+from fastapi.security import OAuth2PasswordBearer
 from pydantic import BaseModel
 
 from topix.agents.assistant.auto_model import classify_auto_model_complexity
@@ -34,33 +35,75 @@ from topix.api.utils.decorators import with_standard_response
 from topix.api.utils.rate_limit.entitlements import resolve_entitlement_context
 from topix.api.utils.rate_limit.policy import resolve_allowed_model_tiers
 from topix.api.utils.rate_limit.service import enforce_rate_limit
-from topix.api.utils.security import get_current_user_uid
+from topix.api.utils.security import decode_and_validate_token, get_current_user_uid
 from topix.config import catalog
 
 router = APIRouter(prefix="/ai", tags=["ai"])
 
 # A run's managed calls share one metered unit for up to this long.
 RUN_TTL_SECONDS = 3600
+# Light abuse guard for the unauthenticated BYOK relay (per client IP, per minute).
+BYOK_IP_PER_MINUTE = 120
+
+# Token is OPTIONAL here: a BYOK relay call (X-Provider-Key) may be tokenless.
+_oauth2_optional = OAuth2PasswordBearer(tokenUrl="/users/signin", auto_error=False)
+
+
+async def optional_user_uid(
+    token: Annotated[str | None, Depends(_oauth2_optional)] = None,
+) -> str | None:
+    """Resolve the user uid from a bearer token, or None when absent/invalid.
+
+    Unlike `get_current_user_uid` this never raises — it lets a BYOK relay call
+    proceed tokenless while a managed call is rejected downstream (see
+    `meter_run`).
+    """
+    if not token:
+        return None
+    try:
+        return decode_and_validate_token(token, expected_type="access").get("sub")
+    except HTTPException:
+        return None
+
+
+def _client_ip(request: Request) -> str:
+    """Best-effort client IP for rate-limiting (first X-Forwarded-For hop, else peer)."""
+    fwd = request.headers.get("x-forwarded-for")
+    if fwd:
+        return fwd.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
 
 
 async def meter_run(
     request: Request,
-    user_id: Annotated[str, Depends(get_current_user_uid)],
+    user_id: Annotated[str | None, Depends(optional_user_uid)] = None,
     x_run_id: Annotated[str | None, Header()] = None,
     x_provider_key: Annotated[str | None, Header()] = None,
 ) -> None:
     """Meter one whole agent run against the plan's AI quota.
 
-    The FIRST managed call of a run (deduped by the `X-Run-Id` header) enforces
-    the quota (429 when over); later calls in the same run are free. A call with
-    no run id is metered on its own. This is the decision-#1 "one run = one unit"
-    rule, reusing the shared rate limiter.
-
-    A BYOK call (carrying `X-Provider-Key`) is on the user's own provider key, so
-    it's never charged against our quota — skip metering entirely.
+    - A BYOK call (`X-Provider-Key`) runs on the user's own provider key: it's
+      never charged against our quota. It may be tokenless (local user), so it's
+      only guarded by a light per-IP cap.
+    - A managed call requires auth. The FIRST managed call of a run (deduped by
+      `X-Run-Id`) enforces the quota (429 when over); later calls in the run are
+      free; a call with no run id is metered on its own ("one run = one unit").
     """
     if x_provider_key:
+        redis = getattr(request.app, "redis_store", None)
+        if redis is not None:
+            ok, _ = await redis.check_fixed_window_quota(
+                _client_ip(request), BYOK_IP_PER_MINUTE, "minute", scope="byok_relay"
+            )
+            if not ok:
+                raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "Slow down")
         return
+    if user_id is None:
+        raise HTTPException(
+            status.HTTP_401_UNAUTHORIZED,
+            "Authentication required",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     if x_run_id:
         redis = request.app.redis_store
         first = await redis.set_if_absent(f"airun:{user_id}:{x_run_id}", RUN_TTL_SECONDS)
@@ -248,7 +291,7 @@ async def ai_search(
     response: Response,
     request: Request,
     body: AiSearchRequest,
-    user_id: Annotated[str, Depends(get_current_user_uid)],
+    user_id: Annotated[str | None, Depends(optional_user_uid)],
     _meter: Annotated[None, Depends(meter_run)],
     x_provider_key: Annotated[str | None, Header()] = None,
 ):
@@ -291,7 +334,7 @@ async def ai_code(
     response: Response,
     request: Request,
     body: AiCodeRequest,
-    user_id: Annotated[str, Depends(get_current_user_uid)],
+    user_id: Annotated[str | None, Depends(optional_user_uid)],
     _meter: Annotated[None, Depends(meter_run)],
     x_provider_key: Annotated[str | None, Header()] = None,
 ):
@@ -324,7 +367,7 @@ async def ai_fetch(
     response: Response,
     request: Request,
     body: AiFetchRequest,
-    user_id: Annotated[str, Depends(get_current_user_uid)],
+    user_id: Annotated[str | None, Depends(optional_user_uid)],
     _meter: Annotated[None, Depends(meter_run)],
     x_provider_key: Annotated[str | None, Header()] = None,
 ):

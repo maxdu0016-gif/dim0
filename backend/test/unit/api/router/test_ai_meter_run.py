@@ -1,7 +1,8 @@
 """Unit tests for the `meter_run` dependency — one whole agent run = one unit.
 
-A fake Redis provides the SET-NX dedup; `enforce_rate_limit` is monkeypatched to
-record calls (or raise 429), so we assert *when* a run is charged.
+A fake Redis provides the SET-NX dedup + the per-IP BYOK window; enforce_rate_limit
+is monkeypatched to record calls (or raise 429), so we assert *when* a run is
+charged, that BYOK calls skip our quota, and that a managed call needs auth.
 """
 
 from fastapi import Depends, FastAPI, HTTPException, status
@@ -9,15 +10,15 @@ from fastapi.testclient import TestClient
 
 import topix.api.router.ai as ai_module
 
-from topix.api.router.ai import meter_run
-from topix.api.utils.security import get_current_user_uid
+from topix.api.router.ai import meter_run, optional_user_uid
 
 
 class _FakeRedis:
-    """Minimal SET-NX-EX: first call for a key wins, repeats return False."""
+    """SET-NX-EX dedup + a fixed-window counter for the BYOK per-IP guard."""
 
-    def __init__(self) -> None:
+    def __init__(self, ip_over: bool = False) -> None:
         self.seen: set[str] = set()
+        self.ip_over = ip_over
 
     async def set_if_absent(self, key: str, ttl_seconds: int) -> bool:
         if key in self.seen:
@@ -25,17 +26,20 @@ class _FakeRedis:
         self.seen.add(key)
         return True
 
+    async def check_fixed_window_quota(self, key, limit, period, scope="tier_usage"):
+        return (not self.ip_over, 60)
 
-def _app(monkeypatch, enforce) -> TestClient:
-    """App exposing a probe route guarded by meter_run, with enforce stubbed."""
+
+def _app(monkeypatch, enforce, uid: str | None = "u1", redis: _FakeRedis | None = None) -> TestClient:
+    """App exposing a probe route guarded by meter_run, with enforce + auth stubbed."""
     app = FastAPI()
-    app.redis_store = _FakeRedis()
+    app.redis_store = redis or _FakeRedis()
     monkeypatch.setattr(ai_module, "enforce_rate_limit", enforce)
 
     async def _uid():
-        return "u1"
+        return uid
 
-    app.dependency_overrides[get_current_user_uid] = _uid
+    app.dependency_overrides[optional_user_uid] = _uid
 
     @app.post("/_probe")
     async def _probe(_: None = Depends(meter_run)):
@@ -95,6 +99,32 @@ def test_byok_call_is_not_metered(monkeypatch):
     res = client.post("/_probe", headers={"X-Run-Id": "run-1", "X-Provider-Key": "sk-user"})
     assert res.status_code == 200
     assert calls == []  # BYOK bypasses our quota entirely
+
+
+def test_byok_call_works_without_auth(monkeypatch):
+    """A tokenless (local) user may relay BYOK — no auth required for that path."""
+    calls, enforce = _recorder()
+    client = _app(monkeypatch, enforce, uid=None)  # no signed-in user
+    res = client.post("/_probe", headers={"X-Provider-Key": "sk-user"})
+    assert res.status_code == 200
+    assert calls == []
+
+
+def test_byok_call_over_ip_cap_is_429(monkeypatch):
+    """The unauthenticated BYOK relay is guarded by a per-IP cap."""
+    calls, enforce = _recorder()
+    client = _app(monkeypatch, enforce, uid=None, redis=_FakeRedis(ip_over=True))
+    res = client.post("/_probe", headers={"X-Provider-Key": "sk-user"})
+    assert res.status_code == 429
+
+
+def test_managed_call_without_auth_is_401(monkeypatch):
+    """A managed call (no provider key) with no user is rejected."""
+    calls, enforce = _recorder()
+    client = _app(monkeypatch, enforce, uid=None)
+    res = client.post("/_probe", headers={"X-Run-Id": "run-1"})
+    assert res.status_code == 401
+    assert calls == []
 
 
 def test_over_quota_first_call_returns_429(monkeypatch):
