@@ -25,7 +25,6 @@ export function ByokKeyForm({ onSaved }: { onSaved?: () => void }) {
   const [provider, setProvider] = useState<ByokProvider>(store.provider)
   const [apiKey, setApiKey] = useState(store.llm[store.provider]?.apiKey ?? "")
   const [model, setModel] = useState(store.llm[store.provider]?.model ?? "")
-  const [remember, setRemember] = useState(store.remember)
 
   // Switch the shown key/model to the picked provider's saved credential —
   // each provider keeps its own, so neither overwrites the other.
@@ -38,7 +37,7 @@ export function ByokKeyForm({ onSaved }: { onSaved?: () => void }) {
 
   const save = (): void => {
     if (!apiKey.trim()) return
-    store.setLlm({ provider, apiKey: apiKey.trim(), model: model.trim(), remember })
+    store.setLlm({ provider, apiKey: apiKey.trim(), model: model.trim() })
     onSaved?.()
   }
 
@@ -83,11 +82,6 @@ export function ByokKeyForm({ onSaved }: { onSaved?: () => void }) {
         />
       </label>
 
-      <label className="flex items-center gap-2 text-xs text-muted-foreground">
-        <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
-        Remember on this device
-      </label>
-
       <button
         type="button"
         onClick={save}
@@ -98,8 +92,8 @@ export function ByokKeyForm({ onSaved }: { onSaved?: () => void }) {
       </button>
 
       <p className="text-[11px] leading-snug text-muted-foreground">
-        Sent directly to the provider, never to dim0&apos;s servers — and kept only if you choose to
-        remember it.
+        Sent directly to the provider, never to dim0&apos;s servers. Kept on this device until you
+        Forget keys.
       </p>
     </div>
   )

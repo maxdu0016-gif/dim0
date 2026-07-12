@@ -65,9 +65,8 @@ type ByokState = {
   search: Partial<Record<SearchEngine, string>>
   // Code interpreter (Daytona) — relayed through our proxy.
   codeKey: string
-  remember: boolean
   /** Save a provider's model key + model, and make it the active provider. */
-  setLlm: (cfg: { provider: ByokProvider; apiKey: string; model: string; remember: boolean }) => void
+  setLlm: (cfg: { provider: ByokProvider; apiKey: string; model: string }) => void
   /** Switch the active model provider (keys are preserved per provider). */
   setProvider: (provider: ByokProvider) => void
   /** Switch the active search engine (keys are preserved per engine). */
@@ -94,9 +93,10 @@ const configuredFor = (provider: ByokProvider, llm: Partial<Record<ByokProvider,
  * BYOK config across services, keyed per provider/engine so several keys
  * coexist (OpenRouter + OpenAI, Tavily + Linkup, …). `provider`/`searchEngine`
  * are the ACTIVE selections; `configured` tracks whether the active model
- * provider has a key. In-memory by default; "remember on this device" persists.
- * Keys go only to the provider (direct for models, relayed per-request for
- * search/code) and are never persisted unless the user opts in.
+ * provider has a key. Persisted to localStorage on this device by default (so
+ * keys survive reloads/redeploys); `clear()` forgets them. Keys go only to the
+ * provider (direct for models, relayed per-request for search/code) — never to
+ * our servers.
  */
 export const useByokStore = create<ByokState>((set, get) => ({
   provider: initial?.provider ?? "openrouter",
@@ -105,11 +105,10 @@ export const useByokStore = create<ByokState>((set, get) => ({
   searchEngine: initial?.searchEngine ?? "perplexity",
   search: initial?.search ?? {},
   codeKey: initial?.codeKey ?? "",
-  remember: initial !== null,
 
-  setLlm: ({ provider, apiKey, model, remember }) => {
+  setLlm: ({ provider, apiKey, model }) => {
     const llm = { ...get().llm, [provider]: { apiKey, model } }
-    set({ provider, llm, remember, configured: configuredFor(provider, llm) })
+    set({ provider, llm, configured: configuredFor(provider, llm) })
     persist(get)
   },
 
@@ -134,7 +133,7 @@ export const useByokStore = create<ByokState>((set, get) => ({
   },
 
   clear: () => {
-    set({ llm: {}, configured: false, search: {}, codeKey: "", remember: false })
+    set({ llm: {}, configured: false, search: {}, codeKey: "" })
     try {
       localStorage.removeItem(STORAGE_KEY)
     } catch {
@@ -163,11 +162,11 @@ const hasAnyKey = (s: ByokState): boolean =>
   Object.values(s.llm).some((c) => c?.apiKey) || Object.values(s.search).some(Boolean) || Boolean(s.codeKey)
 
 
-/** Write the current config to localStorage when "remember" is on; else clear it. */
+/** Persist the config to localStorage on this device (until `clear()`). */
 function persist(get: () => ByokState): void {
-  const { provider, llm, searchEngine, search, codeKey, remember } = get()
+  const { provider, llm, searchEngine, search, codeKey } = get()
   try {
-    if (remember && hasAnyKey(get())) {
+    if (hasAnyKey(get())) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({ provider, llm, searchEngine, search, codeKey }))
     } else {
       localStorage.removeItem(STORAGE_KEY)
