@@ -18,6 +18,7 @@ import type { AgentEvent } from "@/features/agent/engine/types"
 import { planSystemPrompt } from "@/features/agent/prompts"
 import { useByokStore } from "@/features/agent/byok/byok-store"
 import { useChatStore } from "@/features/agent/store/chat-store"
+import { byokModelForId } from "@/features/agent/types/model-catalog"
 import { useBoardAppStore } from "@/features/board/harness/store/board-app-store"
 import { useLocalMessagesStore } from "@/features/agent/store/local-messages-store"
 import type { ChatMessage } from "@/features/agent/types/chat"
@@ -49,6 +50,7 @@ export function useLocalSubmitPrompt(boardId: string) {
   const codeByok = useByokStore((s) => s.codeByok)
   // The active model chosen in Settings → General (shared with the online chat).
   const llmModel = useChatStore((s) => s.llmModel)
+  const llmCatalog = useChatStore((s) => s.llmCatalog)
   const signedIn = useIsSignedIn()
   const setMessages = useLocalMessagesStore((s) => s.setMessages)
   const setChatUid = useLocalMessagesStore((s) => s.setChatUid)
@@ -62,9 +64,15 @@ export function useLocalSubmitPrompt(boardId: string) {
       // tools) carries it, so the server meters the whole run as a single unit
       // (deduped by X-Run-Id; see backend meter_run).
       const runId = generateUuid()
+      // Translate the selected model to the BYOK provider's model string (used
+      // only on the signed-out/direct path); undefined for "auto".
+      const byokModel =
+        config && llmModel && llmModel !== "auto"
+          ? byokModelForId(llmCatalog, llmModel, config.provider)
+          : undefined
       // The agent's LLM: BYOK if a key is set, else managed (our keys) when
       // signed in. Null only when signed out with no key.
-      const llm = store ? resolveAgentLlm(config, { signedIn, runId, model: llmModel }) : null
+      const llm = store ? resolveAgentLlm(config, { signedIn, runId, model: llmModel, byokModel }) : null
       // Current folder layer at submit time — new notes are born here (not
       // rescoped after the fact). Read imperatively so it's always current.
       const rootId = useBoardAppStore.getState().rootId
@@ -191,9 +199,9 @@ export function useLocalSubmitPrompt(boardId: string) {
         const { chatUid: savedUid, messages } = useLocalMessagesStore.getState()
         agentLog.turnDone(savedUid, messages.length)
         // Auto-label a still-"Untitled" board from its first turn (fire-and-forget).
-        void maybeAutoLabelBoard(boardId, messages, resolveAgentLlm(config, { signedIn, runId, model: llmModel }))
+        void maybeAutoLabelBoard(boardId, messages, resolveAgentLlm(config, { signedIn, runId, model: llmModel, byokModel }))
       }
     },
-    [asConfig, searchByok, searchEngine, codeByok, llmModel, signedIn, setMessages, setChatUid, persist, boardId],
+    [asConfig, searchByok, searchEngine, codeByok, llmModel, llmCatalog, signedIn, setMessages, setChatUid, persist, boardId],
   )
 }

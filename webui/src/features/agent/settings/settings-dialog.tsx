@@ -14,6 +14,7 @@ import { ByokKeyForm } from "@/features/agent/byok/byok-key-form"
 import { ModelChoiceMenu } from "@/features/agent/components/chat/input-settings/model-card"
 import { useChatStore } from "@/features/agent/store/chat-store"
 import { useListAvailableServices } from "@/features/agent/api/list-available-services"
+import { useModelCatalog } from "@/features/agent/api/use-model-catalog"
 import { agentResolveContext } from "@/features/agent/engine/services/context"
 import { resolveAllServices } from "@/features/agent/engine/services/resolve"
 import type { ServiceKind } from "@/features/agent/engine/services/kinds"
@@ -48,7 +49,8 @@ const fieldClass =
  */
 export function SettingsDialog({ trigger }: { trigger: React.ReactNode }) {
   const [section, setSection] = useState<SectionId>("general")
-  useListAvailableServices() // populate the managed catalog (no-op signed-out)
+  useModelCatalog() // public model list — populates the picker for everyone
+  useListAvailableServices() // signed-in: search/code/tool availability
 
   return (
     <Dialog>

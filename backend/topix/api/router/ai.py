@@ -121,6 +121,19 @@ class AiLlmRequest(BaseModel):
     reasoning_effort: Literal["low", "medium", "high"] | None = None
 
 
+@router.get("/models/", include_in_schema=False)
+@router.get("/models")
+@with_standard_response
+async def ai_models(response: Response):
+    """Public model catalog for the client picker (no auth, no plan filter).
+
+    Returns every declared model with its per-provider routes so a signed-out /
+    BYOK user can pick a model too; plan tiers are enforced at call time on the
+    managed path.
+    """
+    return {"llm": catalog.public_llm_catalog()}
+
+
 async def _resolve_managed_model(
     model: str, messages: list[dict[str, Any]], allowed_tiers: set[str]
 ) -> str:

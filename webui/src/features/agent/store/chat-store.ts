@@ -2,6 +2,7 @@ import { create } from "zustand"
 import type { ToolName } from "../types/stream"
 import type { LlmModel } from "../types/llm"
 import type { WebSearchEngine } from "../types/web"
+import type { PublicModel } from "../types/model-catalog"
 import { AUTO_LLM_OPTION, defaultServices, type Services } from "../types/services"
 
 const DEFAULT_LLM_MODEL: LlmModel = "auto"
@@ -24,6 +25,9 @@ export interface ChatStore {
   useDeepResearch: boolean
   enableMessageBoardContextSelection: boolean
   services: Services
+  /** Full public model catalog (id → per-provider routes) for BYOK translation. */
+  llmCatalog: PublicModel[]
+  setModelCatalog: (models: PublicModel[]) => void
   setLlmModel: (model: LlmModel) => void
   setWebSearchEngine: (engine: WebSearchEngine) => void
   setEnabledTools: (tools: ToolName[]) => void
@@ -70,6 +74,30 @@ export const useChatStore = create<ChatStore>((set) => ({
 
   services: defaultServices(),
 
+  llmCatalog: [],
+
+  // The model picker's options come from the public catalog (everyone, incl.
+  // signed-out BYOK) — the single source for services.llm.
+  setModelCatalog: (models) =>
+    set((state) => {
+      const llm = [
+        AUTO_LLM_OPTION,
+        ...models.map((m) => ({
+          name: m.id,
+          label: m.label,
+          family: m.family,
+          tier: m.tier ?? undefined,
+          available: true,
+        })),
+      ]
+      const valid = llm.some((o) => o.name === state.llmModel)
+      return {
+        llmCatalog: models,
+        services: { ...state.services, llm },
+        llmModel: valid ? state.llmModel : DEFAULT_LLM_MODEL,
+      }
+    }),
+
   setLlmModel: (model) => set({ llmModel: model }),
 
   setWebSearchEngine: (engine) => set({ webSearchEngine: engine }),
@@ -85,27 +113,8 @@ export const useChatStore = create<ChatStore>((set) => ({
   ),
 
   syncDefaults: (services: Services) => {
-    const servicesWithAuto: Services = {
-      ...services,
-      llm: [
-        AUTO_LLM_OPTION,
-        ...services.llm.filter((service) => service.name !== "auto"),
-      ],
-    }
-
-    set((state) => {
-      const currentLlm = servicesWithAuto.llm.find((service) => (
-        service.name === state.llmModel && service.available
-      ))
-      const defaultLlm = servicesWithAuto.llm.find((service) => (
-        service.name === DEFAULT_LLM_MODEL && service.available
-      ))
-      const firstAvailableLlm = servicesWithAuto.llm.find((service) => service.available)
-      const selectedLlm = currentLlm ?? defaultLlm ?? firstAvailableLlm
-
-      return selectedLlm ? { llmModel: selectedLlm.name } : {}
-    })
-
+    // The model list is owned by the public catalog (setModelCatalog); /utils/services
+    // only informs search/code/tool availability, so keep the existing llm here.
     const firstAvailableSearch = services.search.find((service) => service.available)
     if (firstAvailableSearch) {
       set({ webSearchEngine: firstAvailableSearch.name as WebSearchEngine })
@@ -138,6 +147,6 @@ export const useChatStore = create<ChatStore>((set) => ({
     }
     set({ enabledTools })
 
-    set({ services: servicesWithAuto })
+    set((state) => ({ services: { ...services, llm: state.services.llm } }))
   }
 }))
