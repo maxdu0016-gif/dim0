@@ -138,7 +138,11 @@ export function useLocalSubmitPrompt(boardId: string) {
           ...(fetchUrl ? [makeFetchTool(fetchUrl)] : []),
         ]
         for await (const ev of runAgent({ system, userMessage: prompt, history, tools, llm, ctx: { store, rootId, search } })) {
-          events.push(ev)
+          // Streaming yields a cumulative assistant_text per token — replace the
+          // previous snapshot in place instead of appending one event per token.
+          const prev = events[events.length - 1]
+          if (ev.type === "assistant_text" && prev?.type === "assistant_text") events[events.length - 1] = ev
+          else events.push(ev)
           // Track notes created this turn so we can arrange them afterward.
           if (
             ev.type === "tool_result" &&

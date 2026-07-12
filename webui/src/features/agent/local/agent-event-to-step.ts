@@ -84,7 +84,11 @@ export const stepsFromEvents = (events: AgentEvent[], boardId: string): Reasonin
         openByTool.delete(ev.toolName)
       }
     } else if (ev.type === "assistant_text") {
-      steps.push({ type: "reasoning_step", id: `text-${seq++}`, reasoning: "", message: ev.text })
+      // Streaming emits a cumulative assistant_text per token; coalesce a run of
+      // them into ONE step (update its message) instead of a line per token.
+      const last = steps[steps.length - 1]
+      if (last && last.type === "reasoning_step") last.message = ev.text
+      else steps.push({ type: "reasoning_step", id: `text-${seq++}`, reasoning: "", message: ev.text })
     }
   }
   return steps

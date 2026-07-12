@@ -51,6 +51,33 @@ describe("stepsFromEvents", () => {
   })
 
 
+  it("coalesces a run of cumulative streaming deltas into ONE reasoning step", () => {
+    const events: AgentEvent[] = [
+      { type: "assistant_text", text: "Nap" },
+      { type: "assistant_text", text: "Napoleon" },
+      { type: "assistant_text", text: "Napoleon was" },
+      { type: "assistant_text", text: "Napoleon was both" },
+    ]
+    const steps = stepsFromEvents(events, "b")
+    expect(steps).toHaveLength(1) // not one line per token
+    expect(steps[0]).toMatchObject({ type: "reasoning_step", message: "Napoleon was both" })
+  })
+
+
+  it("keeps assistant_text runs separated by a tool call", () => {
+    const events: AgentEvent[] = [
+      { type: "assistant_text", text: "thinking" },
+      { type: "assistant_text", text: "thinking hard" },
+      { type: "tool_start", toolName: "write_note", args: { label: "N" } },
+      { type: "tool_result", toolName: "write_note", result: { id: "n1" } },
+      { type: "assistant_text", text: "done" },
+      { type: "assistant_text", text: "done now" },
+    ]
+    const reasoning = stepsFromEvents(events, "b").filter((s) => s.type === "reasoning_step")
+    expect(reasoning.map((s) => (s.type === "reasoning_step" ? s.message : ""))).toEqual(["thinking hard", "done now"])
+  })
+
+
   it("latestAssistantText returns the last assistant message", () => {
     expect(
       latestAssistantText([
