@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils"
 import { SendMessageError } from "@/features/agent/api/send-message"
 import { useChatSubmit } from "@/features/agent/hooks/use-chat-submit"
 import { buildMessageContext, useHasMessageContext } from "@/features/agent/hooks/use-message-context"
-import { ServicesButton } from "@/features/agent/services/services-button"
+import { SettingsButton } from "@/features/agent/settings/settings-button"
 import { useHasUsableModel } from "@/features/agent/services/use-agent-availability"
 import { ProgressLine } from "./progress-line"
 import { useCurrentAssistantMessage } from "./use-current-assistant-message"
@@ -125,7 +125,7 @@ export const FloatingIsland = ({ boardId, onOpenFullSheet }: FloatingIslandProps
             ⌘↵
           </span>
           </div>
-          <ServicesButton emphasize={!hasModel} />
+          <SettingsButton emphasize={!hasModel} />
         </div>
       </div>
       <p className='text-center text-[11px] text-muted-foreground/70 px-3'>

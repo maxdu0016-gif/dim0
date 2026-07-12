@@ -11,12 +11,12 @@ import { SendButton } from './send-button'
 import TextareaAutosize from 'react-textarea-autosize'
 import { useChat } from '../../hooks/chat-context'
 import { useBoardAppStore } from '@/features/board/harness/store/board-app-store'
-import { useNavigate, useParams } from '@tanstack/react-router'
+import { useNavigate } from '@tanstack/react-router'
 import { SettingsBillingUrl } from '@/routes'
 import { WelcomeMessage } from './welcome-message'
 import { StarterPromptPills } from './starter-prompts'
-import { InputSettings } from './input-settings/settings'
-import { ServicesButton } from '@/features/agent/services/services-button'
+import { MessageBoardContextChoiceMenu } from './input-settings/message-board-context'
+import { SettingsButton } from '@/features/agent/settings/settings-button'
 import { useIsBoardCreationLimited, FREE_PLAN_BOARD_LIMIT_TOOLTIP } from '@/features/board/lib/board-limit'
 
 // shadcn/ui
@@ -104,10 +104,6 @@ export const InputBar = ({
 
   const submit = useChatSubmit()
   const navigate = useNavigate()
-  const boardParams = useParams({ from: "/boards/$id", shouldThrow: false })
-  const boardRouteId = boardParams?.id
-  const settingsBoardId = attachedBoardId ?? boardRouteId
-  const memorySearchAvailable = Boolean(settingsBoardId)
 
   const isBoardCreationLimited = useIsBoardCreationLimited()
   // Only the home composer (autoCreateBoard) is gated by the limit; existing
@@ -244,14 +240,8 @@ export const InputBar = ({
 
       <div className="flex items-center justify-between gap-3">
         <div className="flex min-w-0 flex-wrap items-center gap-1">
-          {local ? (
-            <ServicesButton />
-          ) : (
-            <InputSettings
-              showBoardContextOption={enableSelectionContext}
-              memorySearchAvailable={memorySearchAvailable}
-            />
-          )}
+          <SettingsButton />
+          {!local && enableSelectionContext && <MessageBoardContextChoiceMenu />}
         </div>
 
         <div className="flex items-center gap-2">

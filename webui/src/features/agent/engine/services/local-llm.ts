@@ -14,13 +14,21 @@ import { agentResolveContext } from "./context"
 import { resolveService } from "./resolve"
 
 
-export type AgentLlmOptions = { signedIn: boolean; runId?: string }
+export type AgentLlmOptions = {
+  signedIn: boolean
+  runId?: string
+  /** The user-selected catalog model for the MANAGED path (General dropdown);
+   *  "auto" or undefined lets the server route. Ignored for BYOK (which uses
+   *  the provider's own model from the config). */
+  model?: string
+}
 
 
 /**
  * Build the agent's LLM client from a BYOK config + auth, via the resolver.
  * "Our keys first": signed in → managed even with a saved key; signed out → the
- * saved key (BYOK), or null when there's neither.
+ * saved key (BYOK), or null when there's neither. `opts.model` picks the managed
+ * catalog model; BYOK uses the provider model from `config`.
  */
 export const resolveAgentLlm = (
   config: ByokConfig | null,
@@ -28,6 +36,6 @@ export const resolveAgentLlm = (
 ): LlmClient | null => {
   const resolution = resolveService("llm", agentResolveContext({ signedIn: opts.signedIn, llm: config }))
   return llmClientFromResolution(resolution, (r) =>
-    managedLlmClient(r.model ?? "auto", { runId: opts.runId }),
+    managedLlmClient(opts.model ?? r.model ?? "auto", { runId: opts.runId }),
   )
 }

@@ -17,6 +17,7 @@ import { getSearchIndexRef } from "@/features/board/search/search-index-ref"
 import type { AgentEvent } from "@/features/agent/engine/types"
 import { planSystemPrompt } from "@/features/agent/prompts"
 import { useByokStore } from "@/features/agent/byok/byok-store"
+import { useChatStore } from "@/features/agent/store/chat-store"
 import { useBoardAppStore } from "@/features/board/harness/store/board-app-store"
 import { useLocalMessagesStore } from "@/features/agent/store/local-messages-store"
 import type { ChatMessage } from "@/features/agent/types/chat"
@@ -45,6 +46,8 @@ export function useLocalSubmitPrompt(boardId: string) {
   const asConfig = useByokStore((s) => s.asConfig)
   const searchByok = useByokStore((s) => s.searchByok)
   const codeByok = useByokStore((s) => s.codeByok)
+  // The active model chosen in Settings → General (shared with the online chat).
+  const llmModel = useChatStore((s) => s.llmModel)
   const signedIn = useIsSignedIn()
   const setMessages = useLocalMessagesStore((s) => s.setMessages)
   const setChatUid = useLocalMessagesStore((s) => s.setChatUid)
@@ -60,7 +63,7 @@ export function useLocalSubmitPrompt(boardId: string) {
       const runId = generateUuid()
       // The agent's LLM: BYOK if a key is set, else managed (our keys) when
       // signed in. Null only when signed out with no key.
-      const llm = store ? resolveAgentLlm(config, { signedIn, runId }) : null
+      const llm = store ? resolveAgentLlm(config, { signedIn, runId, model: llmModel }) : null
       // Current folder layer at submit time — new notes are born here (not
       // rescoped after the fact). Read imperatively so it's always current.
       const rootId = useBoardAppStore.getState().rootId
@@ -183,9 +186,9 @@ export function useLocalSubmitPrompt(boardId: string) {
         const { chatUid: savedUid, messages } = useLocalMessagesStore.getState()
         agentLog.turnDone(savedUid, messages.length)
         // Auto-label a still-"Untitled" board from its first turn (fire-and-forget).
-        void maybeAutoLabelBoard(boardId, messages, resolveAgentLlm(config, { signedIn, runId }))
+        void maybeAutoLabelBoard(boardId, messages, resolveAgentLlm(config, { signedIn, runId, model: llmModel }))
       }
     },
-    [asConfig, searchByok, codeByok, signedIn, setMessages, setChatUid, persist, boardId],
+    [asConfig, searchByok, codeByok, llmModel, signedIn, setMessages, setChatUid, persist, boardId],
   )
 }
