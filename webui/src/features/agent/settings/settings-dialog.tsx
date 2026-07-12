@@ -228,15 +228,22 @@ function ProvidersPane() {
 function SearchPane() {
   const signedIn = useIsSignedIn()
   const engine = useByokStore((s) => s.searchEngine)
-  const savedKey = useByokStore((s) => s.searchKey)
-  const setSearch = useByokStore((s) => s.setSearch)
+  const keys = useByokStore((s) => s.search)
+  const setSearchEngine = useByokStore((s) => s.setSearchEngine)
+  const setSearchKey = useByokStore((s) => s.setSearchKey)
   const managed = useChatStore((s) => s.services.search)
-  const [key, setKey] = useState(savedKey)
+  // Local draft for the ACTIVE engine's key; re-seeded when the active changes.
+  const [key, setKey] = useState(keys[engine] ?? "")
+  const [editing, setEditing] = useState(engine)
+  if (editing !== engine) {
+    setEditing(engine)
+    setKey(keys[engine] ?? "")
+  }
   const active = SEARCH_ENGINES.find((e) => e.id === engine) ?? SEARCH_ENGINES[0]
 
   const managedAvailable = (id: SearchEngine): boolean =>
     signedIn && (managed.find((s) => s.name === id)?.available ?? false)
-  const usable = (id: SearchEngine): boolean => managedAvailable(id) || (!!savedKey && engine === id)
+  const usable = (id: SearchEngine): boolean => managedAvailable(id) || !!keys[id]
 
   return (
     <div>
@@ -250,7 +257,7 @@ function SearchPane() {
             <button
               key={e.id}
               type="button"
-              onClick={() => setSearch({ engine: e.id, apiKey: e.id === engine ? savedKey : "" })}
+              onClick={() => setSearchEngine(e.id)}
               className={cn(
                 "flex w-full items-center justify-between gap-2 border-b border-border/60 px-3 py-2.5 text-left text-sm last:border-b-0 transition-colors",
                 isActive ? "bg-secondary/60" : "hover:bg-accent",
@@ -279,7 +286,7 @@ function SearchPane() {
           placeholder={active.placeholder}
           className={fieldClass}
         />
-        <SaveButton disabled={key === savedKey} onClick={() => setSearch({ engine, apiKey: key.trim() })} />
+        <SaveButton disabled={key === (keys[engine] ?? "")} onClick={() => setSearchKey(engine, key.trim())} />
       </div>
     </div>
   )

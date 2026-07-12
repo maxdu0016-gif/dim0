@@ -9,21 +9,41 @@ const STORAGE_KEY = "dim0.byok"
 export type SearchEngine = "perplexity" | "tavily" | "linkup" | "exa"
 
 
+/** A model provider's own BYOK credential. */
+type LlmCred = { apiKey: string; model: string }
+
+
 type Stored = {
   provider: ByokProvider
-  apiKey: string
-  model: string
-  searchEngine?: SearchEngine
-  searchKey?: string
-  codeKey?: string
+  /** Per-provider model keys — each provider keeps its own key + model. */
+  llm: Partial<Record<ByokProvider, LlmCred>>
+  searchEngine: SearchEngine
+  /** Per-engine search keys — set one without clearing the others. */
+  search: Partial<Record<SearchEngine, string>>
+  codeKey: string
 }
 
 
-/** Read a remembered config from localStorage (opt-in). */
+/** Read a remembered config from localStorage (opt-in), migrating the old
+ *  single-key shape ({apiKey, searchKey}) into the per-provider maps. */
 const load = (): Stored | null => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    return raw ? (JSON.parse(raw) as Stored) : null
+    if (!raw) return null
+    const p = JSON.parse(raw) as Partial<Stored> & {
+      apiKey?: string
+      model?: string
+      searchKey?: string
+    }
+    const provider = p.provider ?? "openrouter"
+    const searchEngine = p.searchEngine ?? "perplexity"
+    return {
+      provider,
+      llm: p.llm ?? (p.apiKey ? { [provider]: { apiKey: p.apiKey, model: p.model ?? "" } } : {}),
+      searchEngine,
+      search: p.search ?? (p.searchKey ? { [searchEngine]: p.searchKey } : {}),
+      codeKey: p.codeKey ?? "",
+    }
   } catch {
     return null
   }
@@ -36,23 +56,29 @@ const defaultModel = (provider: ByokProvider): string =>
 
 
 type ByokState = {
-  // Models (LLM) — called direct from the browser.
+  // Models (LLM) — called direct from the browser. Per-provider keys.
   provider: ByokProvider
-  apiKey: string
-  model: string
+  llm: Partial<Record<ByokProvider, LlmCred>>
   configured: boolean
-  // Web search — relayed through our proxy with the user's key.
+  // Web search — relayed through our proxy. Per-engine keys.
   searchEngine: SearchEngine
-  searchKey: string
+  search: Partial<Record<SearchEngine, string>>
   // Code interpreter (Daytona) — relayed through our proxy.
   codeKey: string
   remember: boolean
-  setConfig: (cfg: { provider: ByokProvider; apiKey: string; model: string; remember: boolean }) => void
-  setSearch: (cfg: { engine: SearchEngine; apiKey: string }) => void
+  /** Save a provider's model key + model, and make it the active provider. */
+  setLlm: (cfg: { provider: ByokProvider; apiKey: string; model: string; remember: boolean }) => void
+  /** Switch the active model provider (keys are preserved per provider). */
+  setProvider: (provider: ByokProvider) => void
+  /** Switch the active search engine (keys are preserved per engine). */
+  setSearchEngine: (engine: SearchEngine) => void
+  /** Save one engine's key without touching the others. */
+  setSearchKey: (engine: SearchEngine, apiKey: string) => void
   setCode: (cfg: { apiKey: string }) => void
   clear: () => void
+  /** The active provider's config (key + model), or null when it has no key. */
   asConfig: () => ByokConfig | null
-  /** The search BYOK credential (engine + key), or null when no key is set. */
+  /** The active engine's search credential, or null when it has no key. */
   searchByok: () => { engine: SearchEngine; apiKey: string } | null
   /** The code (Daytona) BYOK key, or null when unset. */
   codeByok: () => string | null
@@ -60,32 +86,45 @@ type ByokState = {
 
 
 const initial = load()
+const configuredFor = (provider: ByokProvider, llm: Partial<Record<ByokProvider, LlmCred>>): boolean =>
+  Boolean(llm[provider]?.apiKey)
 
 
 /**
- * BYOK config across services: models (provider + key + model), web search
- * (engine + key), and code (Daytona key). In-memory by default; "remember on
- * this device" persists all of it to localStorage. Keys are sent only to the
- * provider — directly for models, or relayed per-request by our proxy (never
- * stored) for search/code — and never persisted unless the user opts in.
+ * BYOK config across services, keyed per provider/engine so several keys
+ * coexist (OpenRouter + OpenAI, Tavily + Linkup, …). `provider`/`searchEngine`
+ * are the ACTIVE selections; `configured` tracks whether the active model
+ * provider has a key. In-memory by default; "remember on this device" persists.
+ * Keys go only to the provider (direct for models, relayed per-request for
+ * search/code) and are never persisted unless the user opts in.
  */
 export const useByokStore = create<ByokState>((set, get) => ({
   provider: initial?.provider ?? "openrouter",
-  apiKey: initial?.apiKey ?? "",
-  model: initial?.model ?? "",
-  configured: Boolean(initial?.apiKey),
+  llm: initial?.llm ?? {},
+  configured: configuredFor(initial?.provider ?? "openrouter", initial?.llm ?? {}),
   searchEngine: initial?.searchEngine ?? "perplexity",
-  searchKey: initial?.searchKey ?? "",
+  search: initial?.search ?? {},
   codeKey: initial?.codeKey ?? "",
   remember: initial !== null,
 
-  setConfig: ({ provider, apiKey, model, remember }) => {
-    set({ provider, apiKey, model, remember, configured: Boolean(apiKey) })
+  setLlm: ({ provider, apiKey, model, remember }) => {
+    const llm = { ...get().llm, [provider]: { apiKey, model } }
+    set({ provider, llm, remember, configured: configuredFor(provider, llm) })
     persist(get)
   },
 
-  setSearch: ({ engine, apiKey }) => {
-    set({ searchEngine: engine, searchKey: apiKey })
+  setProvider: (provider) => {
+    set({ provider, configured: configuredFor(provider, get().llm) })
+    persist(get)
+  },
+
+  setSearchEngine: (engine) => {
+    set({ searchEngine: engine })
+    persist(get)
+  },
+
+  setSearchKey: (engine, apiKey) => {
+    set({ search: { ...get().search, [engine]: apiKey }, searchEngine: engine })
     persist(get)
   },
 
@@ -95,7 +134,7 @@ export const useByokStore = create<ByokState>((set, get) => ({
   },
 
   clear: () => {
-    set({ apiKey: "", configured: false, searchKey: "", codeKey: "", remember: false })
+    set({ llm: {}, configured: false, search: {}, codeKey: "", remember: false })
     try {
       localStorage.removeItem(STORAGE_KEY)
     } catch {
@@ -104,32 +143,32 @@ export const useByokStore = create<ByokState>((set, get) => ({
   },
 
   asConfig: () => {
-    const { provider, apiKey, model } = get()
-    if (!apiKey) return null
-    return { provider, apiKey, model: model.trim() || defaultModel(provider) }
+    const { provider, llm } = get()
+    const cred = llm[provider]
+    if (!cred?.apiKey) return null
+    return { provider, apiKey: cred.apiKey, model: cred.model.trim() || defaultModel(provider) }
   },
 
   searchByok: () => {
-    const { searchEngine, searchKey } = get()
-    return searchKey.trim() ? { engine: searchEngine, apiKey: searchKey.trim() } : null
+    const { searchEngine, search } = get()
+    const apiKey = search[searchEngine]
+    return apiKey?.trim() ? { engine: searchEngine, apiKey: apiKey.trim() } : null
   },
 
-  codeByok: () => {
-    const { codeKey } = get()
-    return codeKey.trim() || null
-  },
+  codeByok: () => get().codeKey.trim() || null,
 }))
+
+
+const hasAnyKey = (s: ByokState): boolean =>
+  Object.values(s.llm).some((c) => c?.apiKey) || Object.values(s.search).some(Boolean) || Boolean(s.codeKey)
 
 
 /** Write the current config to localStorage when "remember" is on; else clear it. */
 function persist(get: () => ByokState): void {
-  const { provider, apiKey, model, searchEngine, searchKey, codeKey, remember } = get()
+  const { provider, llm, searchEngine, search, codeKey, remember } = get()
   try {
-    if (remember && (apiKey || searchKey || codeKey)) {
-      localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify({ provider, apiKey, model, searchEngine, searchKey, codeKey }),
-      )
+    if (remember && hasAnyKey(get())) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ provider, llm, searchEngine, search, codeKey }))
     } else {
       localStorage.removeItem(STORAGE_KEY)
     }

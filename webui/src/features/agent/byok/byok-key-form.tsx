@@ -23,13 +23,22 @@ const fieldClass =
 export function ByokKeyForm({ onSaved }: { onSaved?: () => void }) {
   const store = useByokStore()
   const [provider, setProvider] = useState<ByokProvider>(store.provider)
-  const [apiKey, setApiKey] = useState(store.apiKey)
-  const [model, setModel] = useState(store.model)
+  const [apiKey, setApiKey] = useState(store.llm[store.provider]?.apiKey ?? "")
+  const [model, setModel] = useState(store.llm[store.provider]?.model ?? "")
   const [remember, setRemember] = useState(store.remember)
+
+  // Switch the shown key/model to the picked provider's saved credential —
+  // each provider keeps its own, so neither overwrites the other.
+  const pickProvider = (id: ByokProvider): void => {
+    setProvider(id)
+    const cred = useByokStore.getState().llm[id]
+    setApiKey(cred?.apiKey ?? "")
+    setModel(cred?.model ?? "")
+  }
 
   const save = (): void => {
     if (!apiKey.trim()) return
-    store.setConfig({ provider, apiKey: apiKey.trim(), model: model.trim(), remember })
+    store.setLlm({ provider, apiKey: apiKey.trim(), model: model.trim(), remember })
     onSaved?.()
   }
 
@@ -40,7 +49,7 @@ export function ByokKeyForm({ onSaved }: { onSaved?: () => void }) {
           <button
             key={p.id}
             type="button"
-            onClick={() => setProvider(p.id)}
+            onClick={() => pickProvider(p.id)}
             className={cn(
               "flex-1 rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
               provider === p.id
