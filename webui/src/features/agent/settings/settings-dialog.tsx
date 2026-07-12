@@ -12,6 +12,7 @@ import { useIsSignedIn } from "@/lib/auth"
 import { useByokStore, type SearchEngine } from "@/features/agent/byok/byok-store"
 import { ByokKeyForm } from "@/features/agent/byok/byok-key-form"
 import { ModelChoiceMenu } from "@/features/agent/components/chat/input-settings/model-card"
+import { useChatStore } from "@/features/agent/store/chat-store"
 import { useListAvailableServices } from "@/features/agent/api/list-available-services"
 import { agentResolveContext } from "@/features/agent/engine/services/context"
 import { resolveAllServices } from "@/features/agent/engine/services/resolve"
@@ -42,14 +43,12 @@ const fieldClass =
 /**
  * Unified agent settings — a dialog with a left nav (General / Model providers /
  * Web search / Code) and a right pane. General is the everyday surface: pick the
- * active model (catalog dropdown + Auto) and see each tool's resolved source.
- * The provider sections hold BYOK keys. Replaces the flat popover + the legacy
- * tools menu.
+ * active model, and see each tool's usable/not marker with a shortcut into its
+ * key section. The provider sections hold BYOK keys. "Our keys first."
  */
 export function SettingsDialog({ trigger }: { trigger: React.ReactNode }) {
   const [section, setSection] = useState<SectionId>("general")
-  // Populate the managed model catalog (no-op when signed out).
-  useListAvailableServices()
+  useListAvailableServices() // populate the managed catalog (no-op signed-out)
 
   return (
     <Dialog>
@@ -79,7 +78,7 @@ export function SettingsDialog({ trigger }: { trigger: React.ReactNode }) {
             ))}
           </nav>
           <div className="flex-1 overflow-y-auto p-5 scrollbar-thin">
-            {section === "general" && <GeneralPane />}
+            {section === "general" && <GeneralPane onNavigate={setSection} />}
             {section === "models" && <ProvidersPane />}
             {section === "search" && <SearchPane />}
             {section === "code" && <CodePane />}
@@ -87,6 +86,17 @@ export function SettingsDialog({ trigger }: { trigger: React.ReactNode }) {
         </div>
       </DialogContent>
     </Dialog>
+  )
+}
+
+
+/** Usable/not status dot — green when the service resolves, red otherwise. */
+function StatusDot({ usable }: { usable: boolean }) {
+  return (
+    <span
+      className={cn("size-2 shrink-0 rounded-full", usable ? "bg-emerald-500" : "bg-red-500")}
+      aria-label={usable ? "usable" : "not set up"}
+    />
   )
 }
 
@@ -101,8 +111,8 @@ function PaneTitle({ title, hint }: { title: string; hint?: string }) {
 }
 
 
-/** General: the active model + a per-tool availability summary. */
-function GeneralPane() {
+/** General: the active model + a per-tool usable marker with a shortcut to keys. */
+function GeneralPane({ onNavigate }: { onNavigate: (s: SectionId) => void }) {
   const signedIn = useIsSignedIn()
   const configured = useByokStore((s) => s.configured)
   const asConfig = useByokStore((s) => s.asConfig)
@@ -117,51 +127,70 @@ function GeneralPane() {
     }),
   )
 
-  const tools: { kind: ServiceKind; label: string; icon: ComponentType<{ className?: string }> }[] = [
-    { kind: "search", label: "Web search", icon: GlobeIcon },
-    { kind: "code", label: "Code interpreter", icon: CodeInterpreterIcon },
+  const tools: { kind: ServiceKind; label: string; icon: ComponentType<{ className?: string }>; section?: SectionId }[] = [
+    { kind: "search", label: "Web search", icon: GlobeIcon, section: "search" },
+    { kind: "code", label: "Code interpreter", icon: CodeInterpreterIcon, section: "code" },
     { kind: "fetch", label: "Fetch", icon: LinkIcon },
   ]
+
+  const modelUsable = resolutions.llm.mode !== "off"
 
   return (
     <div>
       <PaneTitle title="General" hint="We use our keys by default. Add your own under each service." />
 
-      <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-        Model
-      </label>
+      <div className="mb-1 flex items-center gap-2">
+        <StatusDot usable={modelUsable} />
+        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Model</span>
+      </div>
       <div className="rounded-lg border border-border">
         <ModelChoiceMenu display="row" />
       </div>
-      <p className="mb-5 mt-1.5 text-[11px] text-muted-foreground">
-        Auto picks a model per task. Signed-in models come from our catalog; a BYOK key adds your own.
-      </p>
+      {modelUsable ? (
+        <p className="mb-5 mt-1.5 text-[11px] text-muted-foreground">
+          Auto picks a model per task. Signed-in models come from our catalog; a BYOK key adds your own.
+        </p>
+      ) : (
+        <button
+          type="button"
+          onClick={() => onNavigate("models")}
+          className="mb-5 mt-1.5 text-[11px] font-medium text-secondary-foreground underline-offset-2 hover:underline"
+        >
+          Set a model key →
+        </button>
+      )}
 
       <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Tools</div>
       <div className="divide-y divide-border/60 rounded-lg border border-border">
-        {tools.map(({ kind, label, icon: Icon }) => (
-          <div key={kind} className="flex items-center justify-between gap-3 px-3 py-2.5">
-            <span className="flex items-center gap-2 text-sm">
-              <Icon className="size-4 shrink-0 text-muted-foreground" />
-              {label}
-            </span>
-            <SourcePill mode={resolutions[kind].mode} kind={kind} />
-          </div>
-        ))}
+        {tools.map(({ kind, label, icon: Icon, section }) => {
+          const mode = resolutions[kind].mode
+          return (
+            <div key={kind} className="flex items-center justify-between gap-3 px-3 py-2.5">
+              <span className="flex items-center gap-2 text-sm">
+                <StatusDot usable={mode !== "off"} />
+                <Icon className="size-4 shrink-0 text-muted-foreground" />
+                {label}
+              </span>
+              {mode === "managed" ? (
+                <Chip tone="managed" label="Our keys" />
+              ) : mode === "byok" ? (
+                <Chip tone="byok" label="Your key" />
+              ) : section ? (
+                <button
+                  type="button"
+                  onClick={() => onNavigate(section)}
+                  className="text-xs font-medium text-secondary-foreground underline-offset-2 hover:underline"
+                >
+                  Set a key →
+                </button>
+              ) : (
+                <span className="text-xs text-muted-foreground">Needs an account</span>
+              )}
+            </div>
+          )
+        })}
       </div>
     </div>
-  )
-}
-
-
-function SourcePill({ mode, kind }: { mode: "managed" | "byok" | "off"; kind: ServiceKind }) {
-  if (mode === "managed")
-    return <Chip tone="managed" label="Our keys" />
-  if (mode === "byok") return <Chip tone="byok" label="Your key" />
-  return (
-    <span className="text-xs text-muted-foreground">
-      {kind === "fetch" ? "Needs an account" : "Set a key"}
-    </span>
   )
 }
 
@@ -174,7 +203,6 @@ function Chip({ tone, label }: { tone: "managed" | "byok"; label: string }) {
         tone === "managed" ? "bg-secondary text-secondary-foreground" : "border border-border text-foreground",
       )}
     >
-      <span className={cn("size-1.5 rounded-full", tone === "managed" ? "bg-emerald-500" : "bg-amber-500")} />
       {label}
     </span>
   )
@@ -191,33 +219,58 @@ function ProvidersPane() {
 }
 
 
+/**
+ * Web search: a list of engine options with a usable marker. Available engines
+ * (our keys when signed in, or a saved BYOK key) are selectable; the rest are
+ * greyed until you add a key below. The picked engine is the one the agent uses;
+ * if none is picked the resolver takes the first available.
+ */
 function SearchPane() {
+  const signedIn = useIsSignedIn()
   const engine = useByokStore((s) => s.searchEngine)
   const savedKey = useByokStore((s) => s.searchKey)
   const setSearch = useByokStore((s) => s.setSearch)
+  const managed = useChatStore((s) => s.services.search)
   const [key, setKey] = useState(savedKey)
   const active = SEARCH_ENGINES.find((e) => e.id === engine) ?? SEARCH_ENGINES[0]
 
+  const managedAvailable = (id: SearchEngine): boolean =>
+    signedIn && (managed.find((s) => s.name === id)?.available ?? false)
+  const usable = (id: SearchEngine): boolean => managedAvailable(id) || (!!savedKey && engine === id)
+
   return (
     <div>
-      <PaneTitle title="Web search" hint="Our keys by default. Add a provider key to use your own (relayed, never stored)." />
-      <div className="mb-3 flex gap-1 rounded-lg border border-border bg-background/40 p-0.5">
-        {SEARCH_ENGINES.map((e) => (
-          <button
-            key={e.id}
-            type="button"
-            onClick={() => setSearch({ engine: e.id, apiKey: savedKey })}
-            className={cn(
-              "flex-1 rounded-md px-2 py-1.5 text-xs font-medium transition-colors",
-              e.id === engine
-                ? "bg-secondary text-secondary-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            {e.label}
-          </button>
-        ))}
+      <PaneTitle title="Web search" hint="Pick a provider. Available ones use our keys; add your own key to enable another (relayed, never stored)." />
+
+      <div className="mb-4 overflow-hidden rounded-lg border border-border">
+        {SEARCH_ENGINES.map((e) => {
+          const isUsable = usable(e.id)
+          const isActive = e.id === engine
+          return (
+            <button
+              key={e.id}
+              type="button"
+              onClick={() => setSearch({ engine: e.id, apiKey: e.id === engine ? savedKey : "" })}
+              className={cn(
+                "flex w-full items-center justify-between gap-2 border-b border-border/60 px-3 py-2.5 text-left text-sm last:border-b-0 transition-colors",
+                isActive ? "bg-secondary/60" : "hover:bg-accent",
+              )}
+            >
+              <span className={cn("flex items-center gap-2", !isUsable && !isActive && "text-muted-foreground")}>
+                <StatusDot usable={isUsable} />
+                {e.label}
+              </span>
+              {isActive && (
+                <span className="text-[11px] font-medium text-secondary-foreground">
+                  {isUsable ? "Selected" : "Add key ↓"}
+                </span>
+              )}
+            </button>
+          )
+        })}
       </div>
+
+      <label className="mb-1 block text-xs font-medium text-muted-foreground">Your {active.label} key</label>
       <div className="flex gap-2">
         <input
           type="password"

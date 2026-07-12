@@ -63,6 +63,8 @@ export const managedSearchClient = (
 export const resolveSearchClient = (opts: {
   signedIn: boolean
   runId?: string
+  /** The user-selected engine (used on the managed path too). */
+  engine?: string
   byok?: { engine: string; apiKey: string } | null
 }): SearchClient | null => {
   const cred = opts.byok?.apiKey ? { provider: opts.byok.engine, apiKey: opts.byok.apiKey } : undefined
@@ -74,7 +76,7 @@ export const resolveSearchClient = (opts: {
   if (resolution.mode === "off") return null
   return managedSearchClient({
     runId: opts.runId,
-    engine: opts.byok?.engine,
+    engine: opts.byok?.engine ?? opts.engine,
     byokKey: opts.byok?.apiKey,
     alwaysByok: resolution.mode === "byok",
   })
