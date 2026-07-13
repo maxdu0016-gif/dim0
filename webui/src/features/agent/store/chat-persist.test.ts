@@ -63,6 +63,30 @@ describe("chat-persist", () => {
   })
 
 
+  it("normalizes a persisted raw_message tool step into reasoning on load", async () => {
+    const withSteps: ChatMessage = {
+      ...msg("m1", "answer"),
+      properties: {
+        reasoning: {
+          type: "reasoning",
+          reasoning: [
+            { type: "tool_call", id: "t1", name: "raw_message", thought: "", output: '{"results":[]}', state: "completed", eventMessages: [], arguments: { input: {} } },
+            { type: "tool_call", id: "t2", name: "memory_search", thought: "", output: "{}", state: "completed", eventMessages: [], arguments: { input: {} } },
+          ],
+        },
+      },
+    }
+    await saveMessages("c1", "b1", [withSteps])
+
+    const [loaded] = await loadMessages("c1")
+    const steps = loaded.properties.reasoning!.reasoning
+    // old raw_message tool step → reasoning (renders as text, not a boxed card)
+    expect(steps.find((s) => s.id === "t1")?.type).toBe("reasoning_step")
+    // a real tool stays a tool_call (boxed)
+    expect(steps.find((s) => s.id === "t2")?.type).toBe("tool_call")
+  })
+
+
   it("preserves a chat's label when a later save omits it", async () => {
     await saveMessages("c1", "b1", [msg("m1", "a")], "Labeled")
     await saveMessages("c1", "b1", [msg("m1", "a"), msg("m2", "b")]) // no label

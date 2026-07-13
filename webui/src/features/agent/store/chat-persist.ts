@@ -6,12 +6,32 @@
  * connection, no per-call opens).
  */
 import { getLocalStores } from "@/features/local-stores"
+import { normalizeReasoningSteps } from "@/features/agent/types/stream"
 import type { ChatMessage, LocalChat } from "@/features/agent/types/chat"
 
 
+/**
+ * Normalize a persisted message's reasoning steps on load — folding text-like
+ * "tool" steps (raw_message / synthesizer / answer_reformulate) into reasoning
+ * steps, exactly as the online path does. Fixes messages saved before the local
+ * step-building was aligned, which would otherwise re-render a text step as a
+ * boxed "Reasoning" tool card.
+ */
+const normalizeMessage = (m: ChatMessage): ChatMessage => {
+  const steps = m.properties?.reasoning?.reasoning
+  if (!steps?.length) return m
+  return {
+    ...m,
+    properties: { ...m.properties, reasoning: { type: "reasoning", reasoning: normalizeReasoningSteps(steps) } },
+  }
+}
+
+
 /** Load a chat's persisted messages in conversation order. */
-export const loadMessages = async (chatUid: string): Promise<ChatMessage[]> =>
-  (await getLocalStores()).chats.getMessages(chatUid)
+export const loadMessages = async (chatUid: string): Promise<ChatMessage[]> => {
+  const messages = await (await getLocalStores()).chats.getMessages(chatUid)
+  return messages.map(normalizeMessage)
+}
 
 
 /** Persist a chat's full transcript and stamp its record (optional label). */
