@@ -6,7 +6,6 @@ import type {
   CreateNoteOutput,
   EditNoteOutput,
   WriteNoteOutput,
-  WebSearchOutput,
   ToolOutput,
   Annotation,
   UrlAnnotation
@@ -445,12 +444,12 @@ export function extractStepDescription(step: ReasoningStep): { reasoning: string
 
 
 /**
- * Extracts URL annotations from a web search tool step.
+ * Extracts URL annotations from a web_search-typed tool step (web_search or
+ * fetch/navigate), for the per-step inline source list.
  */
 export function getWebSearchUrls(step: ReasoningStep): UrlAnnotation[] {
-  if (step.type === "tool_call" && step.name === "web_search" && typeof step.output !== "string") {
-    const out = step.output as WebSearchOutput
-    return out.searchResults
+  if (step.type === "tool_call" && typeof step.output !== "string" && step.output.type === "web_search") {
+    return step.output.searchResults
   }
   return []
 }

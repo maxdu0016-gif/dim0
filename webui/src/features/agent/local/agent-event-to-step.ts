@@ -1,6 +1,6 @@
 import type { ReasoningStep, ToolCallStep, ToolName } from "@/features/agent/types/stream"
 import { normalizeReasoningSteps } from "@/features/agent/types/stream"
-import type { ToolOutput } from "@/features/agent/types/tool-outputs"
+import type { ToolOutput, UrlAnnotation } from "@/features/agent/types/tool-outputs"
 import type { AgentEvent } from "@/features/agent/engine/types"
 
 
@@ -36,6 +36,17 @@ const noteLabel = (args: unknown): string | null =>
   asStr(field(args, "label")) ?? asStr(field(args, "title")) ?? null
 
 
+// Build a `UrlAnnotation` from a raw {url, title, content} record, or null when
+// it has no usable URL.
+const toUrlAnnotation = (raw: unknown): UrlAnnotation | null => {
+  const url = asStr(field(raw, "url"))
+  if (!url) return null
+  const title = asStr(field(raw, "title"))
+  const content = asStr(field(raw, "content"))
+  return { type: "url", url, ...(title ? { title } : {}), ...(content ? { content } : {}) }
+}
+
+
 /** Build the UI ToolOutput a tool-step renders, from the engine's args + result. */
 const toOutput = (name: string, args: unknown, result: unknown, boardId: string): ToolOutput => {
   const id = asStr(field(result, "id")) ?? ""
@@ -55,6 +66,20 @@ const toOutput = (name: string, args: unknown, result: unknown, boardId: string)
       graphUid: boardId,
       label: asStr(field(args, "label")) ?? null,
     }
+  }
+  if (name === "web_search") {
+    // Result: { results: [{ url, title, content }] } → structured sources the
+    // per-step list + end-of-message "Sources" pill can read (they gate on a
+    // web_search-typed output, not a JSON string).
+    const raw = field(result, "results")
+    const searchResults = (Array.isArray(raw) ? raw : []).map(toUrlAnnotation).filter((r): r is UrlAnnotation => r !== null)
+    return { type: "web_search", answer: "", searchResults }
+  }
+  if (name === "fetch") {
+    // Result: { url, title, text } for one page → a single-source web_search
+    // output so a fetched link surfaces alongside search sources.
+    const ann = toUrlAnnotation(result)
+    return ann ? { type: "web_search", answer: "", searchResults: [ann] } : JSON.stringify(result)
   }
   if (name.startsWith("learn_generate")) {
     return `Loaded ${name.replace("learn_generate_", "").replace(/_/g, " ")} guidance`

@@ -107,6 +107,62 @@ describe("stepsFromEvents", () => {
   })
 
 
+  it("maps a web_search result to a structured web_search output (sources surface)", () => {
+    const steps = stepsFromEvents(
+      [
+        { type: "tool_start", toolName: "web_search", args: { query: "napoleon" } },
+        {
+          type: "tool_result",
+          toolName: "web_search",
+          result: {
+            results: [
+              { url: "https://a.com", title: "A", content: "ca" },
+              { url: "https://b.com", title: "B" },
+              { title: "no url — dropped" },
+            ],
+          },
+        },
+      ],
+      "b",
+    )
+    const step = steps[0]
+    expect(step.type === "tool_call" && step.name).toBe("web_search")
+    if (step.type === "tool_call" && typeof step.output !== "string") {
+      expect(step.output).toEqual({
+        type: "web_search",
+        answer: "",
+        searchResults: [
+          { type: "url", url: "https://a.com", title: "A", content: "ca" },
+          { type: "url", url: "https://b.com", title: "B" },
+        ],
+      })
+    } else {
+      throw new Error("expected a structured web_search output, got a string")
+    }
+  })
+
+
+  it("maps a fetch result to a single-source web_search output (navigate)", () => {
+    const [step] = stepsFromEvents(
+      [
+        { type: "tool_start", toolName: "fetch", args: { url: "https://a.com" } },
+        { type: "tool_result", toolName: "fetch", result: { url: "https://a.com", title: "A", text: "body" } },
+      ],
+      "b",
+    )
+    expect(step.type === "tool_call" && step.name).toBe("navigate")
+    if (step.type === "tool_call" && typeof step.output !== "string") {
+      expect(step.output).toEqual({
+        type: "web_search",
+        answer: "",
+        searchResults: [{ type: "url", url: "https://a.com", title: "A" }],
+      })
+    } else {
+      throw new Error("expected a structured web_search output, got a string")
+    }
+  })
+
+
   it("coalesces a run of cumulative streaming deltas into ONE reasoning step", () => {
     const events: AgentEvent[] = [
       { type: "assistant_text", text: "Nap" },
