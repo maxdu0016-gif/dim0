@@ -14,6 +14,7 @@ import type { Node } from "@canvas-harness/core"
 import type { DimEdgeData, DimNodeData } from "@/features/board/model"
 import { pickRandomColorOfShade } from "@/features/board/lib/colors/tailwind"
 import { AUTOFIT_DISABLED_TYPES } from "@/features/board/harness/convert/note-to-node"
+import { beneathBorderOrigin } from "@/features/board/harness/agent/beneath-border"
 import { validateMiniAppSource } from "@/features/mini-app/validate"
 import { defineTool } from "./types"
 import type { Tool } from "./types"
@@ -82,18 +83,21 @@ export const createNote = defineTool({
     id: z.string().optional().describe("Optional explicit id; omit to auto-generate."),
     title: z.string().optional().describe("Short note title (the heading, stored separately from the body)."),
     body: z.string().optional().describe("The note body — prose or markdown."),
-    x: z.number().optional().describe("Optional x canvas position; defaults to 0 (auto-arranged after the turn)."),
-    y: z.number().optional().describe("Optional y canvas position; defaults to 0 (auto-arranged after the turn)."),
+    x: z.number().optional().describe("Optional x canvas position; defaults beneath existing content (auto-arranged after the turn)."),
+    y: z.number().optional().describe("Optional y canvas position; defaults beneath existing content (auto-arranged after the turn)."),
   }),
-  run: async ({ id, title = "", body = "", x = 0, y = 0 }, ctx) => {
+  run: async ({ id, title = "", body = "", x, y }, ctx) => {
     const nodeId = asNodeId(id || ctx.store.generateId())
     const { w, h } = noteGeometry("rect", body)
+    // Default new notes beneath the current graph border (mirrors the backend's
+    // compute_note_position); explicit coords from the model still win.
+    const origin = beneathBorderOrigin(ctx.store)
     ctx.store.batch(() => {
       ctx.store.addNode({
         id: nodeId,
         type: "rect",
-        x,
-        y,
+        x: x ?? origin.x,
+        y: y ?? origin.y,
         w,
         h,
         angle: 0,
@@ -212,12 +216,15 @@ export const writeNote = defineTool({
 
     const id = asNodeId(note_id || ctx.store.generateId())
     const { w, h } = noteGeometry(nodeType, content)
+    // Born beneath the current graph border (mirrors the backend's
+    // compute_note_position); a multi-note turn is re-laid-out afterward.
+    const origin = beneathBorderOrigin(ctx.store)
     ctx.store.batch(() => {
       ctx.store.addNode({
         id,
         type: nodeType,
-        x: 0,
-        y: 0,
+        x: origin.x,
+        y: origin.y,
         w,
         h,
         angle: 0,

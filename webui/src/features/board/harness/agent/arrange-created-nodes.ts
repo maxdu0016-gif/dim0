@@ -2,10 +2,7 @@ import { asNodeId, type CanvasStore, type Edge } from "@canvas-harness/core"
 import type { LinkEdge, NoteNode } from "@/features/board/types/flow"
 import { autoLayout } from "@/features/board/lib/graph/auto-layout"
 import { defaultLayoutOptions, type Direction } from "@/features/board/lib/graph/settings"
-
-
-// Gap between existing board content and a freshly-arranged cluster.
-const TAIL_GAP_Y = 120
+import { NOTE_TAIL_GAP } from "./beneath-border"
 
 
 type XY = { x: number; y: number }
@@ -207,7 +204,7 @@ export const arrangeCreatedNodes = async (store: CanvasStore, createdIds: string
   // Translate the laid-out cluster below existing (non-created) content.
   const others = store.getAllNodes().filter((n) => !ids.has(String(n.id)))
   const originX = others.length ? Math.min(...others.map((n) => n.x)) : 0
-  const originY = others.length ? Math.max(...others.map((n) => n.y + n.h)) + TAIL_GAP_Y : 0
+  const originY = others.length ? Math.max(...others.map((n) => n.y + n.h)) + NOTE_TAIL_GAP : 0
   const xs = [...positions.values()].map((p) => p.x)
   const ys = [...positions.values()].map((p) => p.y)
   const dx = originX - Math.min(...xs)
