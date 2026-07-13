@@ -160,16 +160,10 @@ function FlaredTray({
       >
         {d && (
           <>
-            {/* Liquid glass: a heavily frosted, vibrancy-boosted base — more
-                see-through than a flat panel so the canvas refracts through. */}
+            {/* Frosted, vibrancy-boosted backdrop — more see-through than a flat
+                panel so the canvas blurs through. No sheen/gradient. */}
             <div
               className="pointer-events-none absolute inset-0 bg-sidebar/60 backdrop-blur-xl backdrop-saturate-[1.8]"
-              style={{ clipPath: `path('${d}')` }}
-            />
-            {/* Specular sheen: light catching the top of the glass, fading out
-                downward — this is what reads as a lit glass surface. */}
-            <div
-              className="pointer-events-none absolute inset-0 bg-gradient-to-b from-white/35 via-white/[0.06] to-transparent dark:from-white/12 dark:via-white/[0.02]"
               style={{ clipPath: `path('${d}')` }}
             />
             <svg
@@ -180,8 +174,6 @@ function FlaredTray({
               aria-hidden
             >
               <path d={d} fill="none" stroke="var(--border)" strokeWidth={1} />
-              {/* Luminous inner rim — a faint bright edge, the glassy highlight. */}
-              <path d={d} fill="none" stroke="white" strokeOpacity={0.14} strokeWidth={1} />
             </svg>
           </>
         )}
