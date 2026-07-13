@@ -52,6 +52,9 @@ const mintId = (): string => `local-${Date.now()}-${counter++}`
  * labels it from the opening prompt.
  */
 export function useLocalSubmitPrompt(boardId: string) {
+  // Source of truth for the client agent: byok-store (keys + search engine) plus
+  // service availability. Deliberately NOT chat-store's webSearchEngine /
+  // enabledTools / useDeepResearch — those feed only the retiring backend path.
   const asConfig = useByokStore((s) => s.asConfig)
   const searchByok = useByokStore((s) => s.searchByok)
   const searchEngine = useByokStore((s) => s.searchEngine)

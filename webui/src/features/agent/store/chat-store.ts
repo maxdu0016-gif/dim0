@@ -17,11 +17,26 @@ const DEFAULT_LLM_MODEL: LlmModel = "auto"
  * @property setStream - Function to set the stream for a specific chat.
  * @property clearStream - Function to clear the stream for a specific chat.
  */
+/**
+ * Chat/agent UI state.
+ *
+ * Source-of-truth boundary — read this before wiring the local agent:
+ * the fields marked LEGACY below feed ONLY the online submit path
+ * (`use-submit-prompt` → `send-message` → the backend agent that retires in
+ * G5). The in-browser client agent (`use-local-submit-prompt`) does NOT read
+ * them — its web-search engine comes from `byok-store.searchEngine` and its
+ * tool set is gated by service availability. Do not wire the local path to the
+ * LEGACY fields; they get deleted with the backend path.
+ */
 export interface ChatStore {
   isStreaming: boolean
+  /** Shared: the selected model id / "auto" (both submit paths read this). */
   llmModel: LlmModel
+  /** LEGACY (backend path only). Local agent uses `byok-store.searchEngine`. */
   webSearchEngine: WebSearchEngine
+  /** LEGACY (backend path only). Local agent gates tools by service availability. */
   enabledTools: ToolName[]
+  /** LEGACY (backend path only). The local agent has no deep-research mode. */
   useDeepResearch: boolean
   enableMessageBoardContextSelection: boolean
   services: Services
