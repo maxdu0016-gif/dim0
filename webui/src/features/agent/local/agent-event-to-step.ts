@@ -1,4 +1,5 @@
 import type { ReasoningStep, ToolCallStep, ToolName } from "@/features/agent/types/stream"
+import { normalizeReasoningSteps } from "@/features/agent/types/stream"
 import type { ToolOutput } from "@/features/agent/types/tool-outputs"
 import type { AgentEvent } from "@/features/agent/engine/types"
 
@@ -95,7 +96,10 @@ export const stepsFromEvents = (events: AgentEvent[], boardId: string): Reasonin
       else steps.push({ type: "reasoning_step", id: `text-${seq++}`, reasoning: "", message: ev.text })
     }
   }
-  return steps
+  // Match the online path: fold text-like "tool" steps (raw_message / synthesizer
+  // / answer_reformulate) into reasoning_steps so the UI renders them as text,
+  // not as tool rows — keeping the reasoning-vs-tool differentiation consistent.
+  return normalizeReasoningSteps(steps)
 }
 
 

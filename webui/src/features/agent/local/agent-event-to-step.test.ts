@@ -70,10 +70,20 @@ describe("stepsFromEvents", () => {
   })
 
 
-  it("an unknown tool falls back to raw_message, which has an icon", () => {
-    const [step] = stepsFromEvents([{ type: "tool_start", toolName: "totally_unknown_tool", args: {} }], "b")
-    expect(step.type === "tool_call" && step.name).toBe("raw_message")
-    expect(ToolNameIcon.raw_message).toBeDefined() // used to be missing → crash
+  it("a text-like/unknown tool step is normalized to reasoning (not a tool row)", () => {
+    // Unknown → raw_message, which normalizeReasoningSteps folds into a
+    // reasoning_step — so it renders as text, keeping reasoning vs tool distinct.
+    const steps = stepsFromEvents(
+      [
+        { type: "tool_start", toolName: "totally_unknown_tool", args: {} },
+        { type: "tool_result", toolName: "totally_unknown_tool", result: "hmm" },
+      ],
+      "b",
+    )
+    expect(steps.some((s) => s.type === "reasoning_step")).toBe(true)
+    expect(steps.some((s) => s.type === "tool_call" && s.name === "raw_message")).toBe(false)
+    // the icon still exists as a safety net for any stray raw_message row
+    expect(ToolNameIcon.raw_message).toBeDefined()
   })
 
 
