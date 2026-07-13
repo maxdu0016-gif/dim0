@@ -132,7 +132,10 @@ function FlaredTray({
   useEffect(() => {
     const el = rowRef.current
     if (!el) return
-    const ro = new ResizeObserver(([e]) => setW(Math.round(e.contentRect.width)))
+    // Measure the BORDER box (offsetWidth) so the tray path spans the full row
+    // incl. its horizontal padding. contentRect excludes padding, which drew the
+    // path ~32px short and let the rightmost ("…") button spill past the border.
+    const ro = new ResizeObserver(() => setW(el.offsetWidth))
     ro.observe(el)
     return () => ro.disconnect()
   }, [])
@@ -172,7 +175,9 @@ function FlaredTray({
             </svg>
           </>
         )}
-        <div ref={rowRef} className="relative flex items-center gap-1 px-4" style={{ height: TRAY_H }}>
+        {/* px chosen so the first/last button sit ~5px inside the tray's side
+            border (x = TRAY_R), matching the ~5px top/bottom gap → balanced. */}
+        <div ref={rowRef} className="relative flex items-center gap-1 px-[18px]" style={{ height: TRAY_H }}>
           {children}
         </div>
       </div>
