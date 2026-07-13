@@ -1,4 +1,5 @@
 import { useCallback } from "react"
+import { useNavigate } from "@tanstack/react-router"
 import { generateUuid, trimText } from "@/lib/common"
 import { getCanvasStoreRef } from "@/features/board/harness/canvas-store-ref"
 import { arrangeCreatedNodes } from "@/features/board/harness/agent/arrange-created-nodes"
@@ -66,6 +67,7 @@ export function useLocalSubmitPrompt(boardId: string) {
   const setMessages = useLocalMessagesStore((s) => s.setMessages)
   const setChatUid = useLocalMessagesStore((s) => s.setChatUid)
   const persist = useLocalMessagesStore((s) => s.persist)
+  const navigate = useNavigate()
 
   return useCallback(
     async (prompt: string, options: LocalSubmitOptions = {}): Promise<void> => {
@@ -208,6 +210,16 @@ export function useLocalSubmitPrompt(boardId: string) {
         render(false)
         // Post-turn arrange (frontend analog of backend rearrange_created_notes).
         await arrangeCreatedNodes(store, createdNodeIds)
+        // Recenter the canvas on the freshly created nodes — parity with the
+        // online path's `?center=` navigation, which useCenterFromUrl reads to
+        // fit the union rect (zoom-capped) and select them.
+        if (createdNodeIds.length > 0) {
+          void navigate({
+            to: ".",
+            replace: true,
+            search: (prev: Record<string, unknown>) => ({ ...prev, center: createdNodeIds.join(",") }),
+          })
+        }
       } catch (e) {
         agentLog.error("runAgent", e)
         // Mark it as an error so it doesn't read like a normal answer. An
@@ -226,6 +238,6 @@ export function useLocalSubmitPrompt(boardId: string) {
         void maybeAutoLabelBoard(boardId, messages, resolveAgentLlm(config, { signedIn, runId, model: llmModel, byokModel }))
       }
     },
-    [asConfig, searchByok, searchEngine, codeByok, llmModel, llmCatalog, signedIn, setMessages, setChatUid, persist, boardId],
+    [asConfig, searchByok, searchEngine, codeByok, llmModel, llmCatalog, signedIn, setMessages, setChatUid, persist, boardId, navigate],
   )
 }
