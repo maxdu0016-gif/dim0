@@ -29,7 +29,10 @@ export const useChatSubmit = () => {
   return useCallback(
     async (text: string, options: SubmitOptions = {}): Promise<void> => {
       if (local) {
-        await localSubmit(text)
+        // Forward the whole options object so submit-time inputs (e.g. the
+        // selected-node messageContext) can't silently vanish at the seam; the
+        // local hook consumes what applies and ignores backend-only fields.
+        await localSubmit(text, options)
         return
       }
       await backendSubmit(text, options)

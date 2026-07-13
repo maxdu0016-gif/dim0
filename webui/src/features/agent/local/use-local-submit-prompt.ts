@@ -26,6 +26,14 @@ import { agentLog } from "@/features/agent/engine/debug"
 import { latestAssistantText, stepsFromEvents } from "./agent-event-to-step"
 import { toLlmHistory } from "./chat-history"
 import { maybeAutoLabelBoard } from "./describe-board"
+import { wrapWithMessageContext } from "./message-context"
+
+
+/** Submit-time inputs forwarded from the composer; backend-only fields are ignored. */
+type LocalSubmitOptions = {
+  /** Selected-node / active-surface context to prepend to the agent's prompt. */
+  messageContext?: string
+}
 
 
 // Note-building tools + full-text search + on-demand skill loaders.
@@ -57,7 +65,9 @@ export function useLocalSubmitPrompt(boardId: string) {
   const persist = useLocalMessagesStore((s) => s.persist)
 
   return useCallback(
-    async (prompt: string): Promise<void> => {
+    async (prompt: string, options: LocalSubmitOptions = {}): Promise<void> => {
+      // Selected-node / surface context, captured at submit time by the composer.
+      const messageContext = options.messageContext?.trim() || undefined
       const store = getCanvasStoreRef()
       const config = asConfig()
       // One run id per user message: every managed call in this turn (LLM +
@@ -92,7 +102,17 @@ export function useLocalSubmitPrompt(boardId: string) {
       // shows a real timestamp instead of "Pending…".
       const createdAt = new Date().toISOString()
       const assistantId = mintId()
-      const userMessage: ChatMessage = { id: mintId(), role: "user", content: { markdown: prompt }, chatUid, properties: {}, createdAt }
+      // Display the raw prompt; stash the context under properties.context so the
+      // "Context" chip renders (mirrors the online path). The agent itself gets
+      // the wrapped prompt below.
+      const userMessage: ChatMessage = {
+        id: mintId(),
+        role: "user",
+        content: { markdown: prompt },
+        chatUid,
+        properties: messageContext ? { context: { type: "text", text: messageContext } } : {},
+        createdAt,
+      }
       const base: ChatMessage = {
         id: assistantId,
         role: "assistant",
@@ -145,7 +165,8 @@ export function useLocalSubmitPrompt(boardId: string) {
           ...(code ? [makeCodeInterpreterTool(code)] : []),
           ...(fetchUrl ? [makeFetchTool(fetchUrl)] : []),
         ]
-        for await (const ev of runAgent({ system, userMessage: prompt, history, tools, llm, ctx: { store, rootId, search } })) {
+        const userMessageForAgent = wrapWithMessageContext(prompt, messageContext)
+        for await (const ev of runAgent({ system, userMessage: userMessageForAgent, history, tools, llm, ctx: { store, rootId, search } })) {
           // Streaming yields a cumulative assistant_text per token — replace the
           // previous snapshot in place instead of appending one event per token.
           const prev = events[events.length - 1]
