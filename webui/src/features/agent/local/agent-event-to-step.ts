@@ -11,7 +11,13 @@ const field = (o: unknown, k: string): unknown =>
 const asStr = (v: unknown): string | undefined => (typeof v === "string" ? v : undefined)
 
 
-/** Map an engine tool name to the UI ToolName the chat renderers switch on. */
+/**
+ * Map an engine tool name to the UI ToolName the chat renderers switch on. An
+ * unmapped tool keeps its own name (rendered as a generic tool card with a
+ * humanized title + fallback icon) — NOT `raw_message`, which the UI treats as
+ * assistant reasoning text (title "Reasoning") and would mis-render a real tool
+ * call as a boxed "Reasoning" step.
+ */
 const toToolName = (name: string): ToolName => {
   if (name === "create_note" || name === "write_note") return "create_note"
   if (name === "update_note" || name === "edit_note") return "edit_note"
@@ -21,8 +27,7 @@ const toToolName = (name: string): ToolName => {
   if (name === "code_interpreter") return "code_interpreter"
   if (name === "search_notes") return "memory_search"
   if (name === "fetch") return "navigate"
-  if (name.startsWith("learn_generate")) return name as ToolName
-  return "raw_message"
+  return name as ToolName
 }
 
 

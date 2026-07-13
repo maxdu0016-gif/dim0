@@ -70,19 +70,22 @@ describe("stepsFromEvents", () => {
   })
 
 
-  it("a text-like/unknown tool step is normalized to reasoning (not a tool row)", () => {
-    // Unknown → raw_message, which normalizeReasoningSteps folds into a
-    // reasoning_step — so it renders as text, keeping reasoning vs tool distinct.
-    const steps = stepsFromEvents(
-      [
-        { type: "tool_start", toolName: "totally_unknown_tool", args: {} },
-        { type: "tool_result", toolName: "totally_unknown_tool", result: "hmm" },
-      ],
-      "b",
-    )
-    expect(steps.some((s) => s.type === "reasoning_step")).toBe(true)
-    expect(steps.some((s) => s.type === "tool_call" && s.name === "raw_message")).toBe(false)
-    // the icon still exists as a safety net for any stray raw_message row
+  it("an unmapped tool stays a tool (keeps its name), never a fake 'Reasoning' step", () => {
+    // list_boards / any future tool must render as a boxed tool card, NOT fall
+    // through to raw_message (whose title is "Reasoning") — that was the bug.
+    for (const toolName of ["list_boards", "totally_unknown_tool"]) {
+      const [step] = stepsFromEvents(
+        [
+          { type: "tool_start", toolName, args: {} },
+          { type: "tool_result", toolName, result: { ok: true } },
+        ],
+        "b",
+      )
+      expect(step.type).toBe("tool_call")
+      expect(step.type === "tool_call" && step.name).toBe(toolName)
+      expect(step.type === "tool_call" && step.name).not.toBe("raw_message")
+    }
+    // raw_message still has an icon as a safety net (online engine can emit it).
     expect(ToolNameIcon.raw_message).toBeDefined()
   })
 
