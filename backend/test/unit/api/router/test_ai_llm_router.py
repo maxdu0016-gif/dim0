@@ -227,3 +227,32 @@ def test_stream_assembles_tool_call_fragments(monkeypatch):
     assert call["id"] == "c1"
     assert call["function"]["name"] == "create_note"
     assert call["function"]["arguments"] == '{"a":1}'
+
+
+def test_stream_announces_tool_start_before_args_finish(monkeypatch):
+    """The tool name is announced (tool_start) as soon as it's known, once, before final."""
+    _install_stream_resolution(monkeypatch)
+
+    def _tc_chunk(index, tc_id=None, name=None, args=""):
+        fn = SimpleNamespace(name=name, arguments=args)
+        tc = SimpleNamespace(index=index, id=tc_id, function=fn)
+        return SimpleNamespace(choices=[SimpleNamespace(delta=SimpleNamespace(content=None, tool_calls=[tc]))])
+
+    async def _gen():
+        yield _tc_chunk(0, tc_id="c1", name="write_note", args="")  # name known, no args yet
+        yield _tc_chunk(0, args='{"content":"a long note"}')        # args stream after
+
+    async def _acompletion(**kwargs):
+        return _gen()
+
+    monkeypatch.setattr(ai_module.litellm, "acompletion", _acompletion)
+
+    res = _client().post("/ai/llm/stream", json={
+        "model": "auto",
+        "messages": [{"role": "user", "content": "write a note"}],
+        "tools": [{"type": "function", "function": {"name": "write_note", "parameters": {}}}],
+    })
+    lines = _lines(res)
+    assert lines[0] == {"type": "tool_start", "id": "c1", "name": "write_note"}
+    assert sum(1 for line in lines if line["type"] == "tool_start") == 1  # once, not per arg chunk
+    assert lines[-1]["type"] == "final"

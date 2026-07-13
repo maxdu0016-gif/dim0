@@ -35,9 +35,12 @@ export type LlmToolDef = {
 }
 
 
-/** A streamed model turn: text deltas as they arrive, then the final turn. */
+/** A streamed model turn: text deltas as they arrive, an early `tool_start` the
+ *  moment a tool call's name is known (before its arguments finish streaming),
+ *  then the final turn. */
 export type LlmStreamEvent =
   | { kind: "delta"; text: string }
+  | { kind: "tool_start"; name: string; id?: string }
   | { kind: "final"; turn: LlmTurn }
 
 

@@ -72,6 +72,10 @@ export async function* runAgent(opts: RunAgentOptions): AsyncGenerator<AgentEven
         if (ev.kind === "delta") {
           acc += ev.text
           yield { type: "assistant_text", text: acc }
+        } else if (ev.kind === "tool_start") {
+          // Early signal: show the tool the moment its name is known; args are
+          // filled in when the call actually runs below.
+          yield { type: "tool_start", toolName: ev.name, args: {} }
         } else {
           final = ev.turn
         }

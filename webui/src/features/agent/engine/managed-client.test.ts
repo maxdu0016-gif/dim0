@@ -100,6 +100,15 @@ describe("managedLlmClient.completeStream", () => {
     ])
   })
 
+  it("maps an early tool_start line to a tool_start event", async () => {
+    const streamPost = streamOf(
+      { type: "tool_start", name: "write_note", id: "c1" },
+      { type: "final", message: { role: "assistant", content: null, refusal: null, tool_calls: [{ id: "c1", type: "function", function: { name: "write_note", arguments: "{}" } }] } },
+    )
+    const events = await drain(managedLlmClient("auto", { streamPost }).completeStream!(messages, []))
+    expect(events[0]).toEqual({ kind: "tool_start", name: "write_note", id: "c1" })
+  })
+
   it("maps a final tool-call message to a tool_calls turn", async () => {
     const streamPost = streamOf({
       type: "final",

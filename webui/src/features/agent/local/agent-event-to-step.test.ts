@@ -70,6 +70,23 @@ describe("stepsFromEvents", () => {
   })
 
 
+  it("coalesces the early name-only tool_start with the execution one (args) into a single step", () => {
+    const steps = stepsFromEvents(
+      [
+        { type: "tool_start", toolName: "write_note", args: {} }, // early: name known, no args yet
+        { type: "tool_start", toolName: "write_note", args: { content: "hi", label: "N" } }, // execution: args
+        { type: "tool_result", toolName: "write_note", result: { id: "n1" } },
+      ],
+      "b",
+    )
+    const tools = steps.filter((s) => s.type === "tool_call")
+    expect(tools).toHaveLength(1) // not duplicated by the two tool_starts
+    const tool = tools[0]
+    expect(tool.type === "tool_call" && tool.state).toBe("completed")
+    expect(tool.type === "tool_call" && tool.arguments?.input).toEqual({ content: "hi", label: "N" })
+  })
+
+
   it("an unmapped tool stays a tool (keeps its name), never a fake 'Reasoning' step", () => {
     // list_boards / any future tool must render as a boxed tool card, NOT fall
     // through to raw_message (whose title is "Reasoning") — that was the bug.

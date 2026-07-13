@@ -13,6 +13,7 @@ export async function* assembleStreamedTurn(
 ): AsyncGenerator<LlmStreamEvent> {
   let text = ""
   const calls = new Map<number, { id: string; name: string; arguments: string }>()
+  const announced = new Set<number>()
 
   for await (const chunk of chunks) {
     const delta = chunk.choices[0]?.delta
@@ -27,6 +28,12 @@ export async function* assembleStreamedTurn(
       if (tc.function?.name) slot.name = tc.function.name
       if (tc.function?.arguments) slot.arguments += tc.function.arguments
       calls.set(tc.index, slot)
+      // Announce the tool the instant its name is known — before the (possibly
+      // long) arguments finish — so the UI shows it immediately, not after a pause.
+      if (slot.name && !announced.has(tc.index)) {
+        announced.add(tc.index)
+        yield { kind: "tool_start", name: slot.name, id: slot.id || undefined }
+      }
     }
   }
 

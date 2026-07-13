@@ -232,10 +232,12 @@ async def ai_llm_stream(
     user_id: Annotated[str, Depends(get_current_user_uid)],
     _meter: Annotated[None, Depends(meter_run)],
 ):
-    """Stream one model turn as NDJSON delta lines + a final message.
+    """Stream one model turn as NDJSON lines.
 
-    `{type:"delta",text}` per token, then `{type:"final",message}`. Tier/model
-    resolution (and any 403/503) runs before streaming, so errors are plain HTTP.
+    `{type:"delta",text}` per token, `{type:"tool_start",id,name}` the moment a
+    tool call's name is known (before its args finish), then `{type:"final",
+    message}`. Tier/model resolution (and any 403/503) runs before streaming, so
+    errors are plain HTTP.
     """
     entitlement = await resolve_entitlement_context(request, user_id)
     allowed_tiers = resolve_allowed_model_tiers(entitlement.plan)
@@ -256,6 +258,7 @@ async def ai_llm_stream(
     async def generate():
         content = ""
         slots: dict[int, dict[str, Any]] = {}
+        announced: set[int] = set()
         stream = await litellm.acompletion(**kwargs)
         async for chunk in stream:
             choices = getattr(chunk, "choices", None) or []
@@ -267,7 +270,14 @@ async def ai_llm_stream(
                 content += piece
                 yield json.dumps({"type": "delta", "text": piece}) + "\n"
             for tc in getattr(delta, "tool_calls", None) or []:
+                idx = getattr(tc, "index", 0)
                 _accumulate_tool_call(slots, tc)
+                # Announce the tool the instant its name is known — before its
+                # (possibly long) arguments finish — so the client shows it now.
+                slot = slots.get(idx)
+                if slot and slot.get("name") and idx not in announced:
+                    announced.add(idx)
+                    yield json.dumps({"type": "tool_start", "id": slot["id"], "name": slot["name"]}) + "\n"
 
         message: dict[str, Any] = {"role": "assistant", "content": content or None}
         if slots:

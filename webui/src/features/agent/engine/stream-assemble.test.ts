@@ -36,8 +36,20 @@ describe("assembleStreamedTurn", () => {
       toolChunk(0, undefined, undefined, 'tle":"x"}'),
     ))
     expect(events).toEqual([
+      { kind: "tool_start", name: "create_note", id: "c1" }, // announced as soon as the name is known
       { kind: "final", turn: { kind: "tool_calls", calls: [{ id: "c1", name: "create_note", arguments: '{"title":"x"}' }] } },
     ])
+  })
+
+  it("announces tool_start once (on the name), before the args finish", async () => {
+    const events = await collect(chunksOf(
+      toolChunk(0, "c1", "write_note", ""),                       // name known, no args yet
+      toolChunk(0, undefined, undefined, '{"content":"a very '),  // args stream…
+      toolChunk(0, undefined, undefined, 'long note"}'),
+    ))
+    expect(events[0]).toEqual({ kind: "tool_start", name: "write_note", id: "c1" })
+    expect(events.filter((e) => e.kind === "tool_start")).toHaveLength(1) // not one per arg chunk
+    expect(events.at(-1)).toMatchObject({ kind: "final", turn: { kind: "tool_calls" } })
   })
 
   it("assembles two parallel tool calls at different indices", async () => {
@@ -45,8 +57,11 @@ describe("assembleStreamedTurn", () => {
       toolChunk(0, "a", "f", "{}"),
       toolChunk(1, "b", "g", "{}"),
     ))
+    expect(events.filter((e) => e.kind === "tool_start")).toEqual([
+      { kind: "tool_start", name: "f", id: "a" },
+      { kind: "tool_start", name: "g", id: "b" },
+    ])
     const final = events.at(-1)
-    expect(final?.kind).toBe("final")
     if (final?.kind === "final" && final.turn.kind === "tool_calls") {
       expect(final.turn.calls.map((c) => c.id)).toEqual(["a", "b"])
     }

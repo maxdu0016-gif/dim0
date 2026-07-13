@@ -25,9 +25,11 @@ export type LlmTurnPost = (
 ) => Promise<{ choices: { message: ChatCompletionMessage }[] }>
 
 
-/** One line of the `/ai/llm/stream` NDJSON: a text delta, or the final message. */
+/** One line of the `/ai/llm/stream` NDJSON: a text delta, an early tool-start
+ *  (name known before args finish), or the final message. */
 export type ManagedStreamLine =
   | { type: "delta"; text: string }
+  | { type: "tool_start"; name: string; id?: string }
   | { type: "final"; message: ChatCompletionMessage }
 
 
@@ -88,6 +90,7 @@ export class ManagedLlmClient implements LlmClient {
   ): AsyncGenerator<LlmStreamEvent> {
     for await (const line of this.streamPost(this.body(messages, tools))) {
       if (line.type === "delta") yield { kind: "delta", text: line.text }
+      else if (line.type === "tool_start") yield { kind: "tool_start", name: line.name, id: line.id }
       else yield { kind: "final", turn: fromOpenAiMessage(line.message) }
     }
   }

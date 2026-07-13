@@ -74,6 +74,13 @@ export const stepsFromEvents = (events: AgentEvent[], boardId: string): Reasonin
   let seq = 0
   for (const ev of events) {
     if (ev.type === "tool_start") {
+      // A second tool_start for an already-open tool is the execution filling in
+      // the args after the early name-only signal — update, don't duplicate.
+      const open = openByTool.get(ev.toolName)
+      if (open) {
+        if (ev.args && Object.keys(ev.args).length > 0) open.arguments = { input: ev.args }
+        continue
+      }
       const step: ToolCallStep = {
         type: "tool_call",
         id: `tool-${seq++}`,
