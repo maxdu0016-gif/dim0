@@ -6,7 +6,7 @@ import { Popover, PopoverAnchor, PopoverTrigger } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
 import { useChat } from "@/features/agent/hooks/chat-context"
 import { useChatMessages } from "@/features/agent/hooks/use-chat-messages"
-import { isReasoningTextStep, isToolCallStep, ToolNameIcon } from "@/features/agent/types/stream"
+import { DEFAULT_TOOL_ICON, isReasoningTextStep, isToolCallStep, ToolNameIcon } from "@/features/agent/types/stream"
 import type { ToolCallStep } from "@/features/agent/types/stream"
 import { getToolTitle } from "@/features/agent/utils/stream/build"
 import { StepsPopoverContent } from "./steps-popover-content"
@@ -85,7 +85,7 @@ export const ProgressLine = () => {
   }, [isThisChatStreaming])
 
   if (isThisChatStreaming && activeTool) {
-    const Icon = ToolNameIcon[activeTool.name]
+    const Icon = ToolNameIcon[activeTool.name] ?? DEFAULT_TOOL_ICON
     return (
       <div className='w-full px-3 pt-3'>
         <div className='inline-flex max-w-full items-center gap-1.5 rounded-full bg-secondary/40 px-3 py-1.5'>

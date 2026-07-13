@@ -16,6 +16,10 @@ const toToolName = (name: string): ToolName => {
   if (name === "update_note" || name === "edit_note") return "edit_note"
   if (name === "get_note") return "get_note"
   if (name === "link_notes") return "link_notes"
+  if (name === "web_search") return "web_search"
+  if (name === "code_interpreter") return "code_interpreter"
+  if (name === "search_notes") return "memory_search"
+  if (name === "fetch") return "navigate"
   if (name.startsWith("learn_generate")) return name as ToolName
   return "raw_message"
 }

@@ -51,6 +51,22 @@ describe("stepsFromEvents", () => {
   })
 
 
+  it("maps local-engine tools to icon'd UI names (no undefined-icon crash)", () => {
+    // search_notes / fetch used to fall through to raw_message, which has no
+    // icon in ToolNameIcon → the ProgressLine 'Element type is invalid' crash.
+    const cases: [string, string][] = [
+      ["search_notes", "memory_search"],
+      ["web_search", "web_search"],
+      ["code_interpreter", "code_interpreter"],
+      ["fetch", "navigate"],
+    ]
+    for (const [toolName, expected] of cases) {
+      const [step] = stepsFromEvents([{ type: "tool_start", toolName, args: {} }], "b")
+      expect(step.type === "tool_call" && step.name).toBe(expected)
+    }
+  })
+
+
   it("coalesces a run of cumulative streaming deltas into ONE reasoning step", () => {
     const events: AgentEvent[] = [
       { type: "assistant_text", text: "Nap" },

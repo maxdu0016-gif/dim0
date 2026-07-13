@@ -179,6 +179,11 @@ export const ToolNameIcon: Record<string, AppIconComponent> = {
 }
 
 
+/** Fallback icon for a tool name not in `ToolNameIcon` — keeps a missing entry
+ *  from rendering `undefined` (React "Element type is invalid" crash). */
+export const DEFAULT_TOOL_ICON: AppIconComponent = NoteIcon
+
+
 export const RAW_MESSAGE: ToolName = "raw_message"
 
 
