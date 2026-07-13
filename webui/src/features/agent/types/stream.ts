@@ -153,7 +153,10 @@ export const ToolNameDescription: Record<ToolName, string> = {
 }
 
 
-export const ToolNameIcon: Record<string, AppIconComponent> = {
+// Keyed by the full ToolName union so the compiler flags any missing icon —
+// a missing entry rendered `undefined` (React "Element type is invalid").
+export const ToolNameIcon: Record<ToolName, AppIconComponent> = {
+  raw_message: NoteIcon,
   answer_reformulate: NoteIcon,
   web_search: BrowserSearchIcon,
   memory_search: MemorySearchIcon,

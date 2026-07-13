@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import type { AgentEvent } from "@/features/agent/engine/types"
+import { ToolNameIcon } from "@/features/agent/types/stream"
 import { latestAssistantText, stepsFromEvents } from "./agent-event-to-step"
 
 
@@ -63,7 +64,16 @@ describe("stepsFromEvents", () => {
     for (const [toolName, expected] of cases) {
       const [step] = stepsFromEvents([{ type: "tool_start", toolName, args: {} }], "b")
       expect(step.type === "tool_call" && step.name).toBe(expected)
+      // …and every mapped name must resolve to a real icon (else the row crashes).
+      expect(ToolNameIcon[expected as keyof typeof ToolNameIcon]).toBeDefined()
     }
+  })
+
+
+  it("an unknown tool falls back to raw_message, which has an icon", () => {
+    const [step] = stepsFromEvents([{ type: "tool_start", toolName: "totally_unknown_tool", args: {} }], "b")
+    expect(step.type === "tool_call" && step.name).toBe("raw_message")
+    expect(ToolNameIcon.raw_message).toBeDefined() // used to be missing → crash
   })
 
 
