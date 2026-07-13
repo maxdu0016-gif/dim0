@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react"
 import { useParams, useSearch } from "@tanstack/react-router"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
+import { Button } from "@/components/ui/button"
+import { ArrowExpandIcon, SparklesIcon } from "@/components/icons"
 import { Chat } from "@/features/agent/components/chat-view"
 import { useLocalMessagesStore } from "@/features/agent/store/local-messages-store"
 import { HarnessCanvas } from "@/features/board/harness/canvas"
@@ -66,14 +68,35 @@ export function LocalBoardScreen() {
             showClose={false}
             className="z-[60] w-full border-l border-border/70 bg-background p-0 text-sidebar-foreground md:w-[500px] md:max-w-[92vw]"
           >
+            {/* Radix Dialog primitive requires an accessible title for content. */}
             <SheetHeader className="sr-only">
               <SheetTitle>Board Assistant</SheetTitle>
             </SheetHeader>
-            <div className="relative h-full w-full">
+            {/* Visible header — without it the top is flush to the sheet edge and
+                there's no way to close the chat (parity with CopilotSheet). */}
+            <div className="flex items-center justify-between gap-3 px-4 py-3">
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <div className="flex size-6 items-center justify-center rounded-md bg-gradient-to-br from-wiki-link to-secondary-foreground shadow-sm">
+                  <SparklesIcon className="size-3.5 text-primary-foreground" weight="fill" />
+                </div>
+                Board Assistant
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setSheetOpen(false)}
+                title="Close"
+                aria-label="Close"
+              >
+                <ArrowExpandIcon className="size-4" strokeWidth={2} />
+              </Button>
+            </div>
+            <div className="relative flex-1 overflow-y-auto scrollbar-thin">
               {sheetOpen && (
                 <Chat
                   local
                   initialBoardId={boardId}
+                  className="relative"
                   showHistoricalChats
                   enableSelectionContext
                 />
