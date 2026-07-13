@@ -83,20 +83,25 @@ export const resolveSearchClient = (opts: {
 }
 
 
-/** Collect the source URLs the `web_search` tool surfaced across a run (deduped,
- *  in order) — fed to citation correction so the answer's links are the real ones. */
-export const collectWebSearchSources = (events: AgentEvent[]): string[] => {
+/** Collect the source URLs a run surfaced across `web_search` (results[].url) and
+ *  `fetch` (the fetched page's url), deduped and in order — fed to citation
+ *  correction so the answer's links are the real ones. */
+export const collectSourceUrls = (events: AgentEvent[]): string[] => {
   const urls: string[] = []
   const seen = new Set<string>()
+  const add = (url: unknown) => {
+    if (typeof url === "string" && url && !seen.has(url)) {
+      seen.add(url)
+      urls.push(url)
+    }
+  }
   for (const ev of events) {
-    if (ev.type !== "tool_result" || ev.toolName !== "web_search") continue
-    const results = (ev.result as { results?: { url?: unknown }[] } | undefined)?.results
-    for (const r of results ?? []) {
-      const url = typeof r.url === "string" ? r.url : null
-      if (url && !seen.has(url)) {
-        seen.add(url)
-        urls.push(url)
-      }
+    if (ev.type !== "tool_result") continue
+    if (ev.toolName === "web_search") {
+      const results = (ev.result as { results?: { url?: unknown }[] } | undefined)?.results
+      for (const r of results ?? []) add(r.url)
+    } else if (ev.toolName === "fetch") {
+      add((ev.result as { url?: unknown } | undefined)?.url)
     }
   }
   return urls

@@ -4,7 +4,7 @@ import { getCanvasStoreRef } from "@/features/board/harness/canvas-store-ref"
 import { arrangeCreatedNodes } from "@/features/board/harness/agent/arrange-created-nodes"
 import { runAgent } from "@/features/agent/engine/agent-loop"
 import { resolveAgentLlm } from "@/features/agent/engine/services/local-llm"
-import { collectWebSearchSources, makeWebSearchTool, resolveSearchClient } from "@/features/agent/engine/web-search"
+import { collectSourceUrls, makeWebSearchTool, resolveSearchClient } from "@/features/agent/engine/web-search"
 import { makeCodeInterpreterTool, resolveCodeClient } from "@/features/agent/engine/code-interpreter"
 import { makeFetchTool, resolveFetchClient } from "@/features/agent/engine/fetch-url"
 import { postProcessUrlCitations } from "@/features/agent/utils/citations"
@@ -168,7 +168,7 @@ export function useLocalSubmitPrompt(boardId: string) {
         // Snap any mangled/truncated links in the final answer back to the real
         // web-search sources, so the sources panel (parsed from the text) is
         // accurate. In-place so the final render + persistence use the fix.
-        const sources = collectWebSearchSources(events)
+        const sources = collectSourceUrls(events)
         if (sources.length > 0) {
           const answer = latestAssistantText(events)
           const corrected = postProcessUrlCitations(answer, sources)
