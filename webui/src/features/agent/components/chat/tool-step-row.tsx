@@ -183,7 +183,7 @@ export const ToolArgsRows = ({
       const implicitKey =
         stepName === "web_search" || stepName === "memory_search"
           ? "query"
-          : stepName === "navigate"
+          : stepName === "fetch"
             ? "url"
             : stepName === "code_interpreter"
               ? "code"

@@ -59,7 +59,7 @@ describe("stepsFromEvents", () => {
       ["search_notes", "memory_search"],
       ["web_search", "web_search"],
       ["code_interpreter", "code_interpreter"],
-      ["fetch", "navigate"],
+      ["fetch", "fetch"],
     ]
     for (const [toolName, expected] of cases) {
       const [step] = stepsFromEvents([{ type: "tool_start", toolName, args: {} }], "b")
@@ -142,7 +142,7 @@ describe("stepsFromEvents", () => {
   })
 
 
-  it("maps a fetch result to a single-source web_search output (navigate)", () => {
+  it("maps a fetch result to a single-source web_search output (fetch)", () => {
     const [step] = stepsFromEvents(
       [
         { type: "tool_start", toolName: "fetch", args: { url: "https://a.com" } },
@@ -150,7 +150,7 @@ describe("stepsFromEvents", () => {
       ],
       "b",
     )
-    expect(step.type === "tool_call" && step.name).toBe("navigate")
+    expect(step.type === "tool_call" && step.name).toBe("fetch")
     if (step.type === "tool_call" && typeof step.output !== "string") {
       expect(step.output).toEqual({
         type: "web_search",

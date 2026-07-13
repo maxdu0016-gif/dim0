@@ -23,7 +23,7 @@ const source = (url: string, title: string): WebSearchOutput => ({
 
 
 describe("extractAnswerWebSources", () => {
-  it("aggregates and dedupes sources across web_search AND navigate steps", () => {
+  it("aggregates and dedupes sources across web_search AND fetch steps", () => {
     const answer: AgentResponse = {
       steps: [
         toolStep("web_search", {
@@ -34,8 +34,8 @@ describe("extractAnswerWebSources", () => {
             { type: "url", url: "https://b.com", title: "B" },
           ],
         }),
-        toolStep("navigate", source("https://c.com", "C")),
-        toolStep("navigate", source("https://a.com", "A dup")), // deduped by url
+        toolStep("fetch", source("https://c.com", "C")),
+        toolStep("fetch", source("https://a.com", "A dup")), // deduped by url
       ],
     }
     expect(extractAnswerWebSources(answer).map((s) => s.url)).toEqual([
@@ -47,7 +47,7 @@ describe("extractAnswerWebSources", () => {
 
 
   it("ignores steps whose output is a plain string (no structured sources)", () => {
-    const answer: AgentResponse = { steps: [toolStep("navigate", "<UrlContent url=...>plain</UrlContent>")] }
+    const answer: AgentResponse = { steps: [toolStep("fetch", "<UrlContent url=...>plain</UrlContent>")] }
     expect(extractAnswerWebSources(answer)).toEqual([])
   })
 })

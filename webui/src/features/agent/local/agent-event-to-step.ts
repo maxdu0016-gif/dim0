@@ -26,7 +26,7 @@ const toToolName = (name: string): ToolName => {
   if (name === "web_search") return "web_search"
   if (name === "code_interpreter") return "code_interpreter"
   if (name === "search_notes") return "memory_search"
-  if (name === "fetch") return "navigate"
+  if (name === "fetch") return "fetch"
   return name as ToolName
 }
 

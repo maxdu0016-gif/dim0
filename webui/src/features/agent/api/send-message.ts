@@ -84,8 +84,17 @@ export async function* sendMessage(
   const headers = new Headers()
   headers.set("Content-Type", "application/json")
 
+  // The legacy chat runtime (retires in G5) still names the fetch tool
+  // "navigate" in its AgentToolName enum, so translate on the way out.
+  const wirePayload = {
+    ...payload,
+    ...(payload.enabledTools
+      ? { enabledTools: payload.enabledTools.map((t) => (t === "fetch" ? "navigate" : t)) }
+      : {}),
+  }
+
   const body = JSON.stringify(
-    snakecaseKeys(payload as unknown as Record<string, unknown>, { deep: true })
+    snakecaseKeys(wirePayload as unknown as Record<string, unknown>, { deep: true })
   )
 
   const response = await fetchWithAuthRaw(url.toString(), {

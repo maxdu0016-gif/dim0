@@ -56,7 +56,7 @@ export const useChatStore = create<ChatStore>((set) => ({
     "write_note",
     "edit_note",
     "link_notes",
-    "navigate",
+    "fetch",
     "image_generation",
     "display_stock_widget",
     "display_weather_widget",
@@ -136,8 +136,8 @@ export const useChatStore = create<ChatStore>((set) => ({
     if (services.code.filter((service) => service.available).length > 0) {
       enabledTools.push("code_interpreter")
     }
-    if (services.navigate.filter((service) => service.available).length > 0) {
-      enabledTools.push("navigate")
+    if (services.fetch.filter((service) => service.available).length > 0) {
+      enabledTools.push("fetch")
     }
     if (services.search.filter((service) => service.available).length > 0) {
       enabledTools.push("web_search")

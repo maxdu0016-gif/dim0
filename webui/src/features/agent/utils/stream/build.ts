@@ -363,7 +363,7 @@ export function extractStepDescription(step: ReasoningStep): { reasoning: string
   if (
     step.name === "web_search" ||
     step.name === "memory_search" ||
-    step.name === "navigate" ||
+    step.name === "fetch" ||
     step.name === "code_interpreter"
   ) {
     input = extractInputOrQuery(step) || undefined

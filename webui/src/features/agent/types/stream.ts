@@ -113,7 +113,7 @@ export type ToolName =
   | "outline_generator"
   | "web_collector"
   | "synthesizer"
-  | "navigate"
+  | "fetch"
   | "raw_message"
   | "image_description"
   | "topic_illustrator"
@@ -139,7 +139,7 @@ export const ToolNameDescription: Record<ToolName, string> = {
   outline_generator: "Generate outline",
   web_collector: "Collect web content",
   synthesizer: "Synthesize response",
-  navigate: "Fetch and analyze web page content",
+  fetch: "Fetch and analyze web page content",
   raw_message: "Reasoning",
   image_description: "Describe image",
   topic_illustrator: "Illustrate topic",
@@ -163,7 +163,7 @@ export const ToolNameIcon: Record<ToolName, AppIconComponent> = {
   outline_generator: OutlineGeneratorIcon,
   web_collector: WebCollectorIcon,
   synthesizer: NoteIcon,
-  navigate: BrowserSearchIcon,
+  fetch: BrowserSearchIcon,
   code_interpreter: ToolCodeIcon,
   write_note: WriteNoteToolIcon,
   create_note: CreateNoteIcon,
@@ -190,6 +190,19 @@ export const DEFAULT_TOOL_ICON: AppIconComponent = NoteIcon
 export const RAW_MESSAGE: ToolName = "raw_message"
 
 
+/** Legacy tool-name aliases → canonical `ToolName`. The retiring backend runtime
+ *  (and persisted history) emits `"navigate"` for what is now `"fetch"`; map it
+ *  on ingestion so old messages and the live legacy stream still render. */
+const TOOL_NAME_ALIASES: Record<string, ToolName> = {
+  navigate: "fetch",
+}
+
+
+/** Resolve a raw wire/persisted tool name to its canonical `ToolName`. */
+export const canonicalToolName = (name: string): ToolName =>
+  TOOL_NAME_ALIASES[name] ?? (name as ToolName)
+
+
 /**
  * Checks whether a tool name should be rendered as reasoning/message text.
  */
@@ -203,8 +216,12 @@ export const isReasoningTextToolName = (toolName: ToolName) =>
  * Normalizes text-like tool steps into reasoning text steps for rendering.
  */
 export const normalizeReasoningStep = (step: ReasoningStep): ReasoningStep => {
-  if (step.type !== "tool_call" || !isReasoningTextToolName(step.name)) {
-    return step
+  if (step.type !== "tool_call") return step
+  // Canonicalize legacy/persisted names (e.g. "navigate" → "fetch") so old
+  // messages resolve a real icon/title.
+  const name = canonicalToolName(step.name)
+  if (!isReasoningTextToolName(name)) {
+    return name === step.name ? step : { ...step, name }
   }
 
   return {
@@ -212,7 +229,7 @@ export const normalizeReasoningStep = (step: ReasoningStep): ReasoningStep => {
     id: step.id,
     reasoning: step.thought || "",
     message: typeof step.output === "string" ? step.output : "",
-    isSynthesis: step.name === "synthesizer",
+    isSynthesis: name === "synthesizer",
   }
 }
 
