@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest"
+import { beforeEach, describe, expect, it, vi } from "vitest"
 import { resetIdb } from "@/test/canvas"
 import { IndexedDbEngine } from "@/features/board/persist/local/indexeddb-engine"
 import { newLocalBoard } from "@/features/board/persist/local/board-registry"
@@ -58,5 +58,20 @@ describe("getLocalStores (singleton)", () => {
     const stores = await getLocalStores()
     await stores.boards.createBoard(newLocalBoard("Via singleton", 1000))
     expect(await stores.boards.listBoards()).toHaveLength(1)
+  })
+
+
+  it("does not cache a failed open — a later call retries and succeeds", async () => {
+    resetLocalStores() // clear any singleton from earlier tests
+    const spy = vi.spyOn(IndexedDbEngine, "open").mockRejectedValueOnce(new Error("open failed"))
+
+    await expect(getLocalStores()).rejects.toThrow("open failed")
+    // The rejected open must NOT be cached: the next call retries (spy falls
+    // through to the real open) and resolves.
+    const stores = await getLocalStores()
+    expect(stores.engine).toBeDefined()
+
+    spy.mockRestore()
+    resetLocalStores()
   })
 })

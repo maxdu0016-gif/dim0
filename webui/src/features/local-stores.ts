@@ -41,10 +41,17 @@ let opening: Promise<LocalStores> | null = null
 export const getLocalStores = async (): Promise<LocalStores> => {
   if (singleton) return singleton
   if (!opening) {
-    opening = IndexedDbEngine.open().then((engine) => {
-      singleton = createLocalStores(engine)
-      return singleton
-    })
+    opening = IndexedDbEngine.open()
+      .then((engine) => {
+        singleton = createLocalStores(engine)
+        return singleton
+      })
+      .catch((err) => {
+        // Don't cache a rejected open — otherwise one transient failure poisons
+        // every later call. Reset so the next getLocalStores() retries.
+        opening = null
+        throw err
+      })
   }
   return opening
 }
