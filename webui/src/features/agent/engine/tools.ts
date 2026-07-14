@@ -106,7 +106,7 @@ export const createNote = defineTool({
         data: { label: title, parentId: ctx.rootId ?? undefined, meta: meta(), _storedColors: randomNoteColors() } satisfies DimNodeData,
       })
     })
-    return { id: String(nodeId) }
+    return { id: String(nodeId), created: true }
   },
 })
 
@@ -210,7 +210,9 @@ export const writeNote = defineTool({
             ...(autoFitStyle ? { style: { ...(node.style ?? {}), ...autoFitStyle } } : {}),
           }),
         )
-        return { id: String(id) }
+        // Rewrote an existing (user-placed) note — NOT a creation, so the turn
+        // must not re-arrange or recenter it.
+        return { id: String(id), created: false }
       }
     }
 
@@ -234,7 +236,7 @@ export const writeNote = defineTool({
         data: { label: label ?? "", parentId: ctx.rootId ?? undefined, meta: meta(), _storedColors: randomNoteColors() } satisfies DimNodeData,
       })
     })
-    return { id: String(id) }
+    return { id: String(id), created: true }
   },
 })
 

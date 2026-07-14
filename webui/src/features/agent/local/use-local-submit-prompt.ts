@@ -177,11 +177,14 @@ export function useLocalSubmitPrompt(boardId: string) {
           const prev = events[events.length - 1]
           if (ev.type === "assistant_text" && prev?.type === "assistant_text") events[events.length - 1] = ev
           else events.push(ev)
-          // Track notes created this turn so we can arrange them afterward.
+          // Track notes CREATED this turn so we can arrange + recenter them. A
+          // write_note that rewrote an existing note reports `created: false` —
+          // excluding it keeps a user-placed note from being relocated/reselected.
           if (
             ev.type === "tool_result" &&
             (ev.toolName === "write_note" || ev.toolName === "create_note") &&
-            ev.result && typeof ev.result === "object" && "id" in ev.result
+            ev.result && typeof ev.result === "object" && "id" in ev.result &&
+            (ev.result as { created?: unknown }).created === true
           ) {
             createdNodeIds.push(String((ev.result as { id: unknown }).id))
           }

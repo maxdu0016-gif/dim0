@@ -57,6 +57,36 @@ describe("agent tools stamp the current layer (parentId) at creation", () => {
 })
 
 
+describe("create/rewrite reporting (drives post-turn arrange + recenter)", () => {
+  it("create_note reports created:true", async () => {
+    const store = freshStore("c")
+    const res = (await createNote.run({ title: "New" }, { store, rootId: null })) as { created: boolean }
+    expect(res.created).toBe(true)
+  })
+
+
+  it("write_note of a NEW note reports created:true", async () => {
+    const store = freshStore("c")
+    const res = (await writeNote.run({ content: "body" }, { store, rootId: null })) as { created: boolean }
+    expect(res.created).toBe(true)
+  })
+
+
+  it("write_note REWRITE of an existing note reports created:false and leaves its position", async () => {
+    const store = freshStore("c")
+    const made = (await createNote.run({ title: "Orig", x: 500, y: 700 }, { store, rootId: null })) as { id: string }
+    const before = store.getNode(asNodeId(made.id))!
+    const res = (await writeNote.run({ note_id: made.id, content: "rewritten" }, { store, rootId: null })) as {
+      id: string
+      created: boolean
+    }
+    expect(res.created).toBe(false) // excluded from createdNodeIds → not re-arranged/recentered
+    const after = store.getNode(asNodeId(made.id))!
+    expect({ x: after.x, y: after.y }).toEqual({ x: before.x, y: before.y }) // unmoved
+  })
+})
+
+
 describe("search_notes", () => {
   it("finds notes by title/body via the attached index", async () => {
     const store = freshStore("c")
