@@ -308,9 +308,10 @@ async def _send_welcome(
             return
 
         # No entries in range (e.g. the log was compacted below `since_seq`) →
-        # fall back to a full snapshot.
+        # fall back to a full snapshot. Scope it to `root_id` like the
+        # first-connect path, or a folder-scoped client gets the whole board.
         snapshot = await read_snapshot_payload(
-            graph_store=graph_store, board_id=board_id,
+            graph_store=graph_store, board_id=board_id, root_id=root_id,
         )
         await websocket.send_json({
             "kind": "welcome",

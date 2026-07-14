@@ -377,6 +377,40 @@ def test_ws_welcome_snapshot_omits_root_id_by_default():
     assert captured["root_id"] is None
 
 
+def test_ws_welcome_catchup_fallback_snapshot_respects_root_id():
+    """A catch-up that finds no entries falls back to a snapshot — scoped to root_id.
+
+    Regression: the fallback branch called read_snapshot_payload WITHOUT root_id,
+    so a folder-scoped client that drifted past the log got the whole board.
+    """
+    client, app = _build_app()
+    captured: dict = {}
+
+    async def _capture_get_graph(*, graph_uid, root_id=None):
+        captured["root_id"] = root_id
+        return None
+
+    app.graph_store.get_graph = _capture_get_graph
+
+    # Head is ahead of since_seq, but no entries in range → snapshot fallback.
+    async def _empty_since(board_id, since_seq, *, limit=5000):
+        return []
+
+    async def _max(board_id):
+        return 10
+
+    app.collab_oplog.batches_since = _empty_since
+    app.collab_oplog.max_seq = _max
+
+    tickets = _mint_tickets(app, t1=("u1", "b1"))
+    with client.websocket_connect(
+        f"/boards/b1/collab?ticket={tickets['t1']}&since_seq=5&root_id=folder-42"
+    ) as ws:
+        welcome = ws.receive_json()
+    assert welcome["mode"] == "snapshot"  # fell back, not catch-up
+    assert captured["root_id"] == "folder-42"  # scoped, not whole-board
+
+
 def test_ws_welcome_snapshot_carries_graph_payload():
     """Welcome snapshot includes the dumped Graph when one exists.
 
