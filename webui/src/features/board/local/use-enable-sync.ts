@@ -3,6 +3,7 @@ import { useNavigate } from "@tanstack/react-router"
 import { useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { useAppStore } from "@/store"
+import { isSignedIn } from "@/lib/auth"
 import { getLocalStores } from "@/features/local-stores"
 import { BoardPersistence } from "@/features/board/persist/local/board-persistence"
 import { adoptBoard } from "@/features/board/api/adopt-board"
@@ -34,7 +35,9 @@ export function useEnableSync() {
 
   const run = useCallback(
     async (boardId: string, label?: string): Promise<EnableSyncResult> => {
-      if (!userId) {
+      // The logged-out userId is the sentinel "root" (truthy), so `!userId`
+      // never catches it — gate on isSignedIn (a synced board needs an owner).
+      if (!isSignedIn(userId)) {
         void navigate({ to: "/signin" })
         return { ok: false, reason: "signed-out" }
       }
