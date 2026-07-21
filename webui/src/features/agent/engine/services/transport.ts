@@ -38,11 +38,15 @@ const jsonHeaders = (extra?: Record<string, string>): Headers =>
 
 
 /**
- * Fold the HTTP status into the thrown error's message with `429` kept as a
- * standalone token, so `isOverQuotaError`'s `\b429\b` match keeps working (it
- * drives the over-quota → BYOK fallback across the search/code clients).
+ * Build the error for a non-2xx service reply. Keeps the status as a standalone
+ * token so `isOverQuotaError`'s `\b429\b` match keeps working (it drives the
+ * over-quota → BYOK fallback), and folds in the server's body (best-effort) so
+ * a real error message survives to the agent's error toast.
  */
-const failed = (path: string, status: number): Error => new Error(`${path} failed: ${status}`)
+const failed = async (path: string, res: Response): Promise<Error> => {
+  const body = await res.text().catch(() => "")
+  return new Error(`${path} failed: ${res.status}${body ? ` - ${body}` : ""}`)
+}
 
 
 /**
@@ -59,7 +63,7 @@ export async function servicesPost<T>(
     headers: jsonHeaders(headers),
     body: JSON.stringify(body),
   })
-  if (!res.ok) throw failed(path, res.status)
+  if (!res.ok) throw await failed(path, res)
   const json = (await res.json()) as { data: T }
   return json.data
 }
@@ -79,6 +83,6 @@ export async function* servicesStream<T>(
     headers: jsonHeaders(headers),
     body: JSON.stringify(body),
   })
-  if (!res.ok) throw failed(path, res.status)
+  if (!res.ok) throw await failed(path, res)
   yield* handleStreamingResponse<T>(res)
 }

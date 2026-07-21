@@ -29,6 +29,7 @@ import { buildContextTextFromNodes } from "@/features/board/utils/context-text"
 import { useAiSparkActions } from "@/features/board/hooks/use-ai-spark-actions"
 import { useIsLocalBoard } from "@/features/board/lib/use-is-local-board"
 import { useLocalTransform, type LocalTransformKind } from "@/features/agent/local/use-local-transform"
+import { useHasUsableModel } from "@/features/agent/services/use-agent-availability"
 import { useBoardAppStore } from "../store/board-app-store"
 import { nodeToNote } from "../convert/node-to-note"
 import type { NoteNode } from "@/features/board/types/flow"
@@ -119,6 +120,11 @@ export function CanvasContextMenu({ wrapRef, store, rendererRef }: CanvasContext
   const boardId = useBoardAppStore((s) => s.boardId)
   // AI Spark / Translate are backend-only — hidden on local boards for now.
   const isLocal = useIsLocalBoard()
+  // Local transforms need an in-browser LLM; hide the AI section when no model
+  // key is usable (parity with the floating island) instead of offering actions
+  // that can only fail. Online boards use the backend, so they're unaffected.
+  const hasUsableModel = useHasUsableModel()
+  const showAiSection = !isLocal || hasUsableModel
   const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null)
   const [aiOpen, setAiOpen] = useState(false)
   const [translateOpen, setTranslateOpen] = useState(false)
@@ -373,7 +379,7 @@ export function CanvasContextMenu({ wrapRef, store, rendererRef }: CanvasContext
         onClick={handleExportSvg}
       />
 
-      <>
+      {showAiSection && (<>
       <Divider />
       <button
         type="button"
@@ -460,7 +466,7 @@ export function CanvasContextMenu({ wrapRef, store, rendererRef }: CanvasContext
           </>)}
         </div>
       )}
-      </>
+      </>)}
     </div>
   )
 }

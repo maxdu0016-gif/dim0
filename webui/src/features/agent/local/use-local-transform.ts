@@ -5,7 +5,7 @@ import { getCanvasStoreRef } from "@/features/board/harness/canvas-store-ref"
 import { arrangeCreatedNodes } from "@/features/board/harness/agent/arrange-created-nodes"
 import { getSearchIndexRef } from "@/features/board/search/search-index-ref"
 import { runAgent } from "@/features/agent/engine/agent-loop"
-import { agentBuildTools, writeNote } from "@/features/agent/engine/tools"
+import { linkNotes, writeNote } from "@/features/agent/engine/tools"
 import { resolveAgentLlm } from "@/features/agent/engine/services/local-llm"
 import type { AgentEvent } from "@/features/agent/engine/types"
 import { useByokStore } from "@/features/agent/byok/byok-store"
@@ -79,7 +79,9 @@ export function useLocalTransform() {
       for await (const ev of runAgent({
         system: transformSystemPrompt(kind),
         userMessage: sourceText,
-        tools: agentBuildTools,
+        // Build-only: create + connect notes. Deliberately no edit_note/get_note
+        // so a transform can't mutate the user's existing notes as a side effect.
+        tools: [writeNote, linkNotes],
         llm,
         ctx,
       })) {

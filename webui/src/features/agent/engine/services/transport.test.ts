@@ -22,7 +22,7 @@ const jsonResponse = <T,>(data: T): Response =>
 
 
 const errorResponse = (status: number): Response =>
-  ({ ok: false, status }) as unknown as Response
+  ({ ok: false, status, text: async () => "" }) as unknown as Response
 
 
 const streamResponse = (lines: unknown[]): Response => {
@@ -81,6 +81,17 @@ describe("servicesPost", () => {
     const err = await servicesPost("/ai/search", {}).catch((e) => e)
     expect(err).toBeInstanceOf(Error)
     expect(isOverQuotaError(err)).toBe(false)
+  })
+
+  it("folds the server's error body into the thrown message", async () => {
+    fetchWithAuthRaw.mockResolvedValue({
+      ok: false,
+      status: 400,
+      text: async () => "Unsupported search engine 'foo'",
+    } as unknown as Response)
+    const err = (await servicesPost("/ai/search", {}).catch((e) => e)) as Error
+    expect(err.message).toContain("400")
+    expect(err.message).toContain("Unsupported search engine")
   })
 
   it("routes through a swapped base URL (the desktop seam)", async () => {

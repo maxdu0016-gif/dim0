@@ -19,7 +19,7 @@ const jsonResponse = <T,>(data: T): Response =>
 
 
 const errorResponse = (status: number): Response =>
-  ({ ok: false, status }) as unknown as Response
+  ({ ok: false, status, text: async () => "" }) as unknown as Response
 
 
 const streamResponse = (lines: unknown[]): Response => {
