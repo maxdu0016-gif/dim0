@@ -25,7 +25,9 @@ export const chunkMarkdown = (
   const maxChars = Math.max(1, opts.maxChars ?? DEFAULT_MAX_CHARS)
   const overlap = Math.max(0, Math.min(opts.overlap ?? DEFAULT_OVERLAP, maxChars - 1))
 
-  const text = markdown.trim()
+  // Normalize CRLF/CR so paragraph splitting works on PDF exports that use
+  // Windows/old-Mac line endings (otherwise `\r\n\r\n` isn't a blank line).
+  const text = markdown.replace(/\r\n?/g, "\n").trim()
   if (!text) return []
 
   const blocks = text.split(/\n{2,}/).map((b) => b.trim()).filter(Boolean)
