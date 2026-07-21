@@ -1,17 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 
 
-// The managed factories' DEFAULT transports route through the shared api layer.
-// Mock it so we can assert the per-run X-Run-Id header is attached (metering).
-vi.mock("@/api", () => ({
-  apiFetch: vi.fn(),
-  fetchWithAuthRaw: vi.fn(),
-}))
-vi.mock("@/config/api", () => ({ API_URL: "https://api.test" }))
-vi.mock("../utils/stream/digest", () => ({ handleStreamingResponse: vi.fn() }))
+// The managed factories' DEFAULT transports route through the shared services
+// transport (→ fetchWithAuthRaw). Mock it so we can assert the per-run X-Run-Id
+// header is attached (metering) across every client + the streaming path.
+const fetchWithAuthRaw = vi.hoisted(() => vi.fn())
+vi.mock("@/api", () => ({ fetchWithAuthRaw }))
 
-import { apiFetch, fetchWithAuthRaw } from "@/api"
-import { handleStreamingResponse } from "../utils/stream/digest"
 import { managedLlmClient } from "./managed-client"
 import { managedSearchClient } from "./web-search"
 import { managedCodeClient } from "./code-interpreter"
@@ -19,70 +14,72 @@ import { managedFetchClient } from "./fetch-url"
 import type { LlmMessage } from "./types"
 
 
-const apiFetchMock = vi.mocked(apiFetch)
-const rawMock = vi.mocked(fetchWithAuthRaw)
-const streamMock = vi.mocked(handleStreamingResponse)
+const jsonResponse = <T,>(data: T): Response =>
+  ({ ok: true, status: 200, json: async () => ({ data }) }) as unknown as Response
 
 
-// Header value passed to the last apiFetch call, whatever HeadersInit shape it took.
-const lastRunIdHeader = (): string | undefined => {
-  const opts = apiFetchMock.mock.calls.at(-1)?.[0] as { headers?: Record<string, string> } | undefined
-  return opts?.headers?.["X-Run-Id"]
+// Run-id header on the last transport call (all clients send a Headers object).
+const lastRunIdHeader = (): string | null => {
+  const init = fetchWithAuthRaw.mock.calls.at(-1)?.[1] as { headers: Headers } | undefined
+  return init ? init.headers.get("X-Run-Id") : null
 }
 
 
-afterEach(() => {
-  vi.clearAllMocks()
-})
+afterEach(() => vi.clearAllMocks())
 
 
 describe("managed default transports attach X-Run-Id", () => {
   it("LLM /ai/llm sends the run id", async () => {
-    apiFetchMock.mockResolvedValue({ data: { choices: [{ message: { role: "assistant", content: "ok" } }] } })
+    fetchWithAuthRaw.mockResolvedValue(
+      jsonResponse({ choices: [{ message: { role: "assistant", content: "ok" } }] }),
+    )
     const messages: LlmMessage[] = [{ role: "user", content: "hi" }]
     await managedLlmClient("auto", { runId: "run-42" }).complete(messages, [])
     expect(lastRunIdHeader()).toBe("run-42")
   })
 
   it("search /ai/search sends the run id", async () => {
-    apiFetchMock.mockResolvedValue({ data: { answer: "", results: [] } })
+    fetchWithAuthRaw.mockResolvedValue(jsonResponse({ answer: "", results: [] }))
     await managedSearchClient({ runId: "run-42" }).search("cats")
     expect(lastRunIdHeader()).toBe("run-42")
   })
 
   it("code /ai/code sends the run id", async () => {
-    apiFetchMock.mockResolvedValue({ data: { status: "success", stdout: "", stderr: "", duration_ms: 1 } })
+    fetchWithAuthRaw.mockResolvedValue(jsonResponse({ status: "success", stdout: "", stderr: "", duration_ms: 1 }))
     await managedCodeClient({ runId: "run-42" }).run("1+1", "python")
     expect(lastRunIdHeader()).toBe("run-42")
   })
 
   it("fetch /ai/fetch sends the run id", async () => {
-    apiFetchMock.mockResolvedValue({ data: { url: "https://a.com", title: null, text: "" } })
+    fetchWithAuthRaw.mockResolvedValue(jsonResponse({ url: "https://a.com", title: null, text: "" }))
     await managedFetchClient({ runId: "run-42" }).fetch("https://a.com")
     expect(lastRunIdHeader()).toBe("run-42")
   })
 
-  it("omits the header entirely when no run id is given", async () => {
-    apiFetchMock.mockResolvedValue({ data: { answer: "", results: [] } })
+  it("omits the run-id header entirely when no run id is given", async () => {
+    fetchWithAuthRaw.mockResolvedValue(jsonResponse({ answer: "", results: [] }))
     await managedSearchClient({}).search("q")
-    const opts = apiFetchMock.mock.calls.at(-1)?.[0] as { headers?: Record<string, string> }
-    expect(opts.headers).toEqual({})
+    expect(lastRunIdHeader()).toBeNull()
   })
 
-  it("streaming /ai/llm/stream sets the run id header", async () => {
-    rawMock.mockResolvedValue({ ok: true } as Response)
-    streamMock.mockReturnValue((async function* () {
-      yield { type: "final", message: { role: "assistant", content: "done" } }
-    })() as ReturnType<typeof handleStreamingResponse>)
+  it("streaming /ai/llm/stream sets the run id + JSON content-type", async () => {
+    const ndjson = JSON.stringify({ type: "final", message: { role: "assistant", content: "done", refusal: null } }) + "\n"
+    fetchWithAuthRaw.mockResolvedValue({
+      ok: true,
+      status: 200,
+      body: new ReadableStream<Uint8Array>({
+        start(c) {
+          c.enqueue(new TextEncoder().encode(ndjson))
+          c.close()
+        },
+      }),
+    } as unknown as Response)
 
     const messages: LlmMessage[] = [{ role: "user", content: "hi" }]
-    const it = managedLlmClient("auto", { runId: "run-99" }).completeStream!(messages, [])
-    // drain the stream so the transport actually runs
-    for await (const _ev of it) void _ev
+    for await (const _ev of managedLlmClient("auto", { runId: "run-99" }).completeStream!(messages, [])) void _ev
 
-    const init = rawMock.mock.calls.at(-1)?.[1] as RequestInit
-    const headers = init.headers as Headers
-    expect(headers.get("X-Run-Id")).toBe("run-99")
-    expect(headers.get("Content-Type")).toBe("application/json")
+    const init = fetchWithAuthRaw.mock.calls.at(-1)?.[1] as { headers: Headers }
+    expect(init.headers.get("X-Run-Id")).toBe("run-99")
+    expect(init.headers.get("Content-Type")).toBe("application/json")
   })
 })
