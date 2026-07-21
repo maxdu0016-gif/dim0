@@ -42,6 +42,28 @@ export class DocRepo {
   }
 
 
+  /** The board's document with this exact title, if any (titles are unique per board). */
+  async findByTitle(boardId: string, title: string): Promise<DocumentRecord | undefined> {
+    const docs = await this.listDocuments(boardId)
+    return docs.find((d) => d.title === title)
+  }
+
+
+  /**
+   * Upsert a document and (re)place its chunks in one transaction — the write for
+   * both a fresh upload and a same-name override (reuse the existing `docId` so
+   * prior citations stay valid). Any previous chunks of `doc.id` are cleared first.
+   */
+  async replaceDocument(doc: DocumentRecord, chunks: ChunkRecord[]): Promise<void> {
+    await this.engine.tx(["documents", "chunks"], async (t) => {
+      const old = await t.list<ChunkRecord>("chunks", { index: "by-doc", range: eq(doc.id) })
+      for (const c of old) await t.delete("chunks", c.chunkId)
+      await t.put("documents", doc)
+      for (const c of chunks) await t.put("chunks", c)
+    })
+  }
+
+
   /** Persist a document's chunks (one transaction). */
   async addChunks(chunks: ChunkRecord[]): Promise<void> {
     if (chunks.length === 0) return

@@ -71,6 +71,36 @@ for (const { label, make } of engineCases) describe(`DocRepo (${label})`, () => 
   })
 
 
+  it("findByTitle returns the board's doc with that exact title, else undefined", async () => {
+    await repo.addDocument(doc("d1", "b1", "Report.pdf"))
+    await repo.addDocument(doc("d2", "b2", "Report.pdf")) // same title, different board
+    expect((await repo.findByTitle("b1", "Report.pdf"))?.id).toBe("d1")
+    expect((await repo.findByTitle("b2", "Report.pdf"))?.id).toBe("d2") // scoped per board
+    expect(await repo.findByTitle("b1", "Missing.pdf")).toBeUndefined()
+    expect(await repo.findByTitle("b1", "report.pdf")).toBeUndefined() // exact match, case-sensitive
+  })
+
+
+  it("replaceDocument upserts the doc and replaces exactly its chunks", async () => {
+    await repo.replaceDocument(doc("d1", "b1", "R"), [chunk("d1#0", "d1", "b1", 0), chunk("d1#1", "d1", "b1", 1)])
+    await repo.addChunks([chunk("d2#0", "d2", "b1")]) // an unrelated doc's chunk
+
+    // Re-ingest d1 with fewer chunks (override): old d1 chunks gone, d2 untouched.
+    await repo.replaceDocument({ ...doc("d1", "b1", "R"), pages: 9 }, [chunk("d1#0", "d1", "b1", 0)])
+
+    expect((await repo.getDocument("d1"))?.pages).toBe(9) // metadata updated in place
+    expect((await repo.chunksForDoc("d1")).map((c) => c.chunkId)).toEqual(["d1#0"]) // replaced, not appended
+    expect((await repo.chunksForDoc("d2")).map((c) => c.chunkId)).toEqual(["d2#0"]) // untouched
+  })
+
+
+  it("replaceDocument works as a fresh insert when the doc is new", async () => {
+    await repo.replaceDocument(doc("d9", "b1", "New"), [chunk("d9#0", "d9", "b1")])
+    expect((await repo.getDocument("d9"))?.title).toBe("New")
+    expect((await repo.chunksForDoc("d9")).length).toBe(1)
+  })
+
+
   it("deleteDocument removes the doc + its chunks, leaving other docs intact", async () => {
     await repo.addDocument(doc("d1", "b1"))
     await repo.addDocument(doc("d2", "b1"))
