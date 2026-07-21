@@ -6,6 +6,8 @@ import { ThinkingIndicator } from "@/components/animations/thinking-indicator"
 import { cn } from "@/lib/utils"
 import { SendMessageError } from "@/features/agent/api/send-message"
 import { useChatSubmit } from "@/features/agent/hooks/use-chat-submit"
+import { useChat } from "@/features/agent/hooks/chat-context"
+import { DocAttachButton } from "@/features/agent/components/chat/doc-attach"
 import { buildMessageContext, useHasMessageContext } from "@/features/agent/hooks/use-message-context"
 import { SettingsButton } from "@/features/agent/settings/settings-button"
 import { useHasUsableModel } from "@/features/agent/services/use-agent-availability"
@@ -29,6 +31,8 @@ export const FloatingIsland = ({ boardId, onOpenFullSheet }: FloatingIslandProps
   const latestAssistantMessage = useCurrentAssistantMessage()
   const isStreaming = latestAssistantMessage?.streaming === true
   const submit = useChatSubmit()
+  // Document Q&A lives on the local (in-browser) agent only.
+  const { local } = useChat()
   const hasMessageContext = useHasMessageContext()
   // Single boolean derivation — only re-renders when a surface opens or
   // closes, never when its content/title changes. Cheap.
@@ -125,6 +129,7 @@ export const FloatingIsland = ({ boardId, onOpenFullSheet }: FloatingIslandProps
             ⌘↵
           </span>
           </div>
+          {local && <DocAttachButton boardId={boardId} />}
           <SettingsButton emphasize={!hasModel} />
         </div>
       </div>
