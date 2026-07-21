@@ -70,6 +70,27 @@ export async function servicesPost<T>(
 
 
 /**
+ * POST a multipart form (file upload) to a service endpoint and return the
+ * `{ data }` envelope's payload. Unlike `servicesPost` it does NOT set
+ * Content-Type — the browser must set the multipart boundary itself.
+ */
+export async function servicesUpload<T>(
+  path: string,
+  form: FormData,
+  headers?: Record<string, string>,
+): Promise<T> {
+  const res = await fetchWithAuthRaw(buildUrl(path), {
+    method: "POST",
+    headers: new Headers(headers ?? {}),
+    body: form,
+  })
+  if (!res.ok) throw await failed(path, res)
+  const json = (await res.json()) as { data: T }
+  return json.data
+}
+
+
+/**
  * POST a JSON body and stream the NDJSON response as typed lines (the `/ai/llm/
  * stream` shape). Not wrapped in a `{ data }` envelope — each line is a frame.
  */
