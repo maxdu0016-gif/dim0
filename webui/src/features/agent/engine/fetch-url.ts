@@ -4,11 +4,11 @@
  * (browser CORS + no key relay), like the other non-LLM services.
  */
 import { z } from "zod"
-import { apiFetch } from "@/api"
 import { defineTool, type Tool } from "./types"
 import type { FetchClient, PageContent } from "./services/clients"
 import { resolveService } from "./services/resolve"
 import { runIdHeaders } from "./services/run"
+import { servicesPost } from "./services/transport"
 
 
 type FetchResponse = { url: string; title: string | null; text: string }
@@ -18,15 +18,8 @@ type FetchResponse = { url: string; title: string | null; text: string }
 export type FetchPost = (body: { url: string }) => Promise<FetchResponse>
 
 
-const makeDefaultFetchPost = (runId?: string): FetchPost => async (body) => {
-  const res = await apiFetch<{ data: FetchResponse }>({
-    path: "/ai/fetch",
-    method: "POST",
-    body,
-    headers: runIdHeaders(runId),
-  })
-  return res.data
-}
+const makeDefaultFetchPost = (runId?: string): FetchPost => async (body) =>
+  servicesPost<FetchResponse>("/ai/fetch", body, runIdHeaders(runId))
 
 
 /** Managed fetch client — reads a page via the `/ai/fetch` proxy. */

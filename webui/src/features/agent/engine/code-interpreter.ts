@@ -9,11 +9,11 @@
  * Signed-out has no authed proxy → off.
  */
 import { z } from "zod"
-import { apiFetch } from "@/api"
 import { defineTool, type Tool } from "./types"
 import type { CodeClient, CodeResult } from "./services/clients"
 import { resolveService } from "./services/resolve"
 import { isOverQuotaError, runIdHeaders } from "./services/run"
+import { servicesPost } from "./services/transport"
 
 
 type CodeResponse = {
@@ -30,19 +30,17 @@ export type CodePost = (body: { code: string; language: string }) => Promise<Cod
 
 const makeDefaultCodePost = (runId?: string, byokKey?: string, alwaysByok = false): CodePost => async (body) => {
   const call = (withKey: boolean) =>
-    apiFetch<{ data: CodeResponse }>({
-      path: "/ai/code",
-      method: "POST",
-      body,
-      headers: { ...runIdHeaders(runId), ...(withKey && byokKey ? { "X-Provider-Key": byokKey } : {}) },
+    servicesPost<CodeResponse>("/ai/code", body, {
+      ...runIdHeaders(runId),
+      ...(withKey && byokKey ? { "X-Provider-Key": byokKey } : {}),
     })
   // byok mode → run on the user's Daytona key directly; managed → ours first,
   // fall back to their key on a 429 (over quota).
-  if (alwaysByok && byokKey) return (await call(true)).data
+  if (alwaysByok && byokKey) return call(true)
   try {
-    return (await call(false)).data
+    return await call(false)
   } catch (e) {
-    if (byokKey && isOverQuotaError(e)) return (await call(true)).data
+    if (byokKey && isOverQuotaError(e)) return call(true)
     throw e
   }
 }

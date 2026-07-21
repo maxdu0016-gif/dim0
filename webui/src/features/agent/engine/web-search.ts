@@ -9,11 +9,11 @@
  * not stored). Signed-out has no authed proxy → off.
  */
 import { z } from "zod"
-import { apiFetch } from "@/api"
 import { defineTool, type AgentEvent, type Tool } from "./types"
 import type { SearchClient, SearchResult } from "./services/clients"
 import { resolveService } from "./services/resolve"
 import { isOverQuotaError, runIdHeaders } from "./services/run"
+import { servicesPost } from "./services/transport"
 
 
 type SearchResponse = { answer: string; results: SearchResult[] }
@@ -25,19 +25,17 @@ export type SearchPost = (body: { query: string; engine?: string }) => Promise<S
 
 const makeDefaultSearchPost = (runId?: string, byokKey?: string, alwaysByok = false): SearchPost => async (body) => {
   const call = (withKey: boolean) =>
-    apiFetch<{ data: SearchResponse }>({
-      path: "/ai/search",
-      method: "POST",
-      body,
-      headers: { ...runIdHeaders(runId), ...(withKey && byokKey ? { "X-Provider-Key": byokKey } : {}) },
+    servicesPost<SearchResponse>("/ai/search", body, {
+      ...runIdHeaders(runId),
+      ...(withKey && byokKey ? { "X-Provider-Key": byokKey } : {}),
     })
   // byok mode: the user's key IS the source → send it up front. managed mode:
   // our keys first, fall back to the user's key only if we're over quota (429).
-  if (alwaysByok && byokKey) return (await call(true)).data
+  if (alwaysByok && byokKey) return call(true)
   try {
-    return (await call(false)).data
+    return await call(false)
   } catch (e) {
-    if (byokKey && isOverQuotaError(e)) return (await call(true)).data
+    if (byokKey && isOverQuotaError(e)) return call(true)
     throw e
   }
 }

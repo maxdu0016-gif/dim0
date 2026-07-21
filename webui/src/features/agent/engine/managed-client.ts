@@ -8,11 +8,9 @@
  * BYOK client — only the transport differs. Metering (per run) lands in G4.
  */
 import type { ChatCompletionMessage } from "openai/resources/chat/completions"
-import { apiFetch, fetchWithAuthRaw } from "@/api"
-import { API_URL } from "@/config/api"
-import { handleStreamingResponse } from "../utils/stream/digest"
 import { fromOpenAiMessage, toOpenAiMessages, toOpenAiTools } from "./byok-client"
 import { runIdHeaders } from "./services/run"
+import { servicesPost, servicesStream } from "./services/transport"
 import type { LlmClient, LlmMessage, LlmStreamEvent, LlmToolDef, LlmTurn } from "./types"
 
 
@@ -37,27 +35,12 @@ export type ManagedStreamLine =
 export type LlmStreamPost = (body: ManagedRequest) => AsyncIterable<ManagedStreamLine>
 
 
-const makeDefaultPost = (runId?: string): LlmTurnPost => async (body) => {
-  const res = await apiFetch<{ data: { choices: { message: ChatCompletionMessage }[] } }>({
-    path: "/ai/llm",
-    method: "POST",
-    body,
-    headers: runIdHeaders(runId),
-  })
-  return res.data
-}
+const makeDefaultPost = (runId?: string): LlmTurnPost => (body) =>
+  servicesPost<{ choices: { message: ChatCompletionMessage }[] }>("/ai/llm", body, runIdHeaders(runId))
 
 
-const makeDefaultStreamPost = (runId?: string): LlmStreamPost => async function* (body) {
-  const headers = new Headers({ "Content-Type": "application/json", ...runIdHeaders(runId) })
-  const res = await fetchWithAuthRaw(new URL("/ai/llm/stream", API_URL).toString(), {
-    method: "POST",
-    headers,
-    body: JSON.stringify(body),
-  })
-  if (!res.ok) throw new Error(`/ai/llm/stream failed: ${res.status}`)
-  yield* handleStreamingResponse<ManagedStreamLine>(res)
-}
+const makeDefaultStreamPost = (runId?: string): LlmStreamPost => (body) =>
+  servicesStream<ManagedStreamLine>("/ai/llm/stream", body, runIdHeaders(runId))
 
 
 export class ManagedLlmClient implements LlmClient {
