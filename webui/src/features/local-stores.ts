@@ -11,6 +11,7 @@ import { BoardRegistry } from "@/features/board/persist/local/board-registry"
 import type { StorageEngine } from "@/features/board/persist/local/engine"
 import { ChatRepo } from "@/features/agent/store/chat-repo"
 import { MiniAppRepo } from "@/features/mini-app/mini-app-repo"
+import { DocRepo } from "@/features/board/persist/local/doc-repo"
 
 
 export type LocalStores = {
@@ -18,6 +19,7 @@ export type LocalStores = {
   boards: BoardRegistry
   chats: ChatRepo
   miniApps: MiniAppRepo
+  docs: DocRepo
 }
 
 
@@ -27,6 +29,7 @@ export const createLocalStores = (engine: StorageEngine): LocalStores => ({
   boards: new BoardRegistry({ engine }),
   chats: new ChatRepo(engine),
   miniApps: new MiniAppRepo(engine),
+  docs: new DocRepo(engine),
 })
 
 

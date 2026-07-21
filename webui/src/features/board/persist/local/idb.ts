@@ -37,6 +37,27 @@ export type OplogRecord = { boardId: string; seq: number; batch: OpBatch; server
 export type SyncMetaRecord = { boardId: string; syncedSeq: number }
 
 
+/** An uploaded document's metadata (per board). Its markdown lives in its chunks. */
+export type DocumentRecord = {
+  id: string
+  boardId: string
+  title: string
+  pages: number
+  createdAt: number
+}
+
+
+/** One retrieval chunk of a document. `chunkId` is stable + prefix-matchable for
+ *  citations; `index` is its position within the doc. */
+export type ChunkRecord = {
+  chunkId: string
+  docId: string
+  boardId: string
+  index: number
+  text: string
+}
+
+
 interface Dim0DB extends DBSchema {
   snapshots: { key: string; value: SnapshotRecord }
   oplog: { key: [string, number]; value: OplogRecord }
@@ -51,6 +72,9 @@ interface Dim0DB extends DBSchema {
   mini_app_state: { key: string; value: { noteId: string; state: unknown } }
   // Sync cursor per board (offline outbox — how far the relay has acked).
   sync_meta: { key: string; value: SyncMetaRecord }
+  // Per-board uploaded documents + their retrieval chunks (document Q&A).
+  documents: { key: string; value: DocumentRecord; indexes: { "by-board": string } }
+  chunks: { key: string; value: ChunkRecord; indexes: { "by-board": string; "by-doc": string } }
 }
 
 
@@ -58,7 +82,7 @@ export type Dim0Database = IDBPDatabase<Dim0DB>
 
 
 const DB_NAME = "dim0"
-const DB_VERSION = 5
+const DB_VERSION = 6
 
 
 // Minimal loose shapes for the upgrade loop (see the cast note in `upgrade`).
