@@ -18,6 +18,11 @@ import { resolveParseClient } from "@/features/agent/engine/doc-parse"
 import { ingestDocument } from "@/features/agent/local/ingest-doc"
 
 
+// Instant client-side reject (saves the upload); the /ai/parse endpoint enforces
+// the same limits authoritatively. Keep MAX_FILE_BYTES in sync with MAX_PDF_BYTES.
+const MAX_FILE_BYTES = 5 * 1024 * 1024
+
+
 /**
  * Attach a PDF to the current local board for document Q&A: OCR it to markdown
  * (via `/ai/parse`), chunk + persist it, and rebuild the board's search index so
@@ -68,6 +73,10 @@ export const DocAttachButton = ({ boardId }: { boardId: string }) => {
     const file = e.target.files?.[0]
     e.target.value = "" // allow re-picking the same file
     if (!file || busy || inFlight.current) return
+    if (file.size > MAX_FILE_BYTES) {
+      toast.error(`PDF must be under ${MAX_FILE_BYTES / (1024 * 1024)} MB.`)
+      return
+    }
     inFlight.current = true
     try {
       // Same-name on this board → confirm override (parse only AFTER the user

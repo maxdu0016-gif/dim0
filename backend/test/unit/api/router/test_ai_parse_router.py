@@ -16,6 +16,7 @@ class _FakeParser:
     """Stand-in for MistralParser: records the api key, returns fixed pages."""
 
     last_api_key: str | None = None
+    num_pages: int = 2  # what get_num_pages reports (drives the page-limit gate)
 
     def __init__(self, api_key: str | None = None):
         _FakeParser.last_api_key = api_key
@@ -24,6 +25,9 @@ class _FakeParser:
     def from_config(cls):
         return cls(api_key="server-key")
 
+    def get_num_pages(self, filepath) -> int:
+        return _FakeParser.num_pages
+
     async def parse(self, filepath, max_pages: int = 200):
         return [{"markdown": "# Page 1", "page": 0}, {"markdown": "body", "page": 1}]
 
@@ -31,6 +35,7 @@ class _FakeParser:
 def _client(monkeypatch) -> TestClient:
     monkeypatch.setattr(ai_module, "MistralParser", _FakeParser)
     _FakeParser.last_api_key = None
+    _FakeParser.num_pages = 2
     app = FastAPI()
     app.include_router(router)
 
@@ -72,3 +77,26 @@ def test_parse_rejects_non_pdf(monkeypatch):
         "/ai/parse", files={"file": ("notes.txt", b"hello", "text/plain")}
     )
     assert res.status_code == 400
+
+
+def test_parse_rejects_oversize_file(monkeypatch):
+    """A PDF over the 5 MB byte limit is rejected (413) before OCR."""
+    big = b"%PDF-1.4 " + b"x" * (5 * 1024 * 1024)
+    res = _client(monkeypatch).post("/ai/parse", files={"file": ("big.pdf", big, "application/pdf")})
+    assert res.status_code == 413
+
+
+def test_parse_rejects_too_many_pages(monkeypatch):
+    """A PDF over the 50-page limit is rejected (400) before OCR."""
+    client = _client(monkeypatch)  # resets num_pages, so set it after
+    _FakeParser.num_pages = 51
+    res = client.post("/ai/parse", files=_pdf_file())
+    assert res.status_code == 400
+
+
+def test_parse_accepts_a_pdf_at_the_page_limit(monkeypatch):
+    """Exactly 50 pages is allowed (boundary)."""
+    client = _client(monkeypatch)
+    _FakeParser.num_pages = 50
+    res = client.post("/ai/parse", files=_pdf_file())
+    assert res.status_code == 200

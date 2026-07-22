@@ -47,6 +47,9 @@ router = APIRouter(prefix="/ai", tags=["ai"])
 RUN_TTL_SECONDS = 3600
 # Light abuse guard for the unauthenticated BYOK relay (per client IP, per minute).
 BYOK_IP_PER_MINUTE = 120
+# Upload limits for /ai/parse (mirror the client's pre-checks in doc-attach.tsx).
+MAX_PDF_BYTES = 5 * 1024 * 1024
+MAX_PDF_PAGES = 50
 
 # Token is OPTIONAL here: a BYOK relay call (X-Provider-Key) may be tokenless.
 _oauth2_optional = OAuth2PasswordBearer(tokenUrl="/users/signin", auto_error=False)
@@ -433,13 +436,26 @@ async def ai_parse(
     if not (file.content_type == "application/pdf" or filename.lower().endswith(".pdf")):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Only PDF files are supported")
 
+    file_bytes = await file.read()
+    if len(file_bytes) > MAX_PDF_BYTES:
+        raise HTTPException(
+            status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            f"PDF must be under {MAX_PDF_BYTES // (1024 * 1024)} MB",
+        )
+
     parser = MistralParser(api_key=x_provider_key) if x_provider_key else MistralParser.from_config()
 
-    file_bytes = await file.read()
     tmp = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False)
     try:
         tmp.write(file_bytes)
         tmp.close()
+        # Page-count gate BEFORE OCR (get_num_pages reads pypdf locally, no spend).
+        # -1 = unreadable; let parse() surface the real error rather than gate on it.
+        page_count = parser.get_num_pages(tmp.name)
+        if page_count > MAX_PDF_PAGES:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST, f"PDF must be under {MAX_PDF_PAGES} pages"
+            )
         pages = await parser.parse(tmp.name)
     finally:
         os.unlink(tmp.name)
