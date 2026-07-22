@@ -30,6 +30,9 @@ import { ingestDocument } from "@/features/agent/local/ingest-doc"
 export const DocAttachButton = ({ boardId }: { boardId: string }) => {
   const signedIn = useIsSignedIn()
   const inputRef = useRef<HTMLInputElement>(null)
+  // Synchronous re-entrancy guard: `busy` state lags a render, so a rapid second
+  // file-select could slip through before it flips. A ref closes that window.
+  const inFlight = useRef(false)
   const [busy, setBusy] = useState(false)
   const [override, setOverride] = useState<File | null>(null)
   const canParse = resolveParseClient({ signedIn }) !== null
@@ -64,13 +67,18 @@ export const DocAttachButton = ({ boardId }: { boardId: string }) => {
   const onPick = async (e: React.ChangeEvent<HTMLInputElement>): Promise<void> => {
     const file = e.target.files?.[0]
     e.target.value = "" // allow re-picking the same file
-    if (!file || busy) return
-    // Same-name on this board → confirm override (parse only AFTER the user
-    // decides, so a cancelled override never spends an OCR call).
-    const { docs } = await getLocalStores()
-    const existing = await docs.findByTitle(boardId, file.name)
-    if (existing) setOverride(file)
-    else void ingest(file)
+    if (!file || busy || inFlight.current) return
+    inFlight.current = true
+    try {
+      // Same-name on this board → confirm override (parse only AFTER the user
+      // decides, so a cancelled override never spends an OCR call).
+      const { docs } = await getLocalStores()
+      const existing = await docs.findByTitle(boardId, file.name)
+      if (existing) setOverride(file)
+      else await ingest(file)
+    } finally {
+      inFlight.current = false
+    }
   }
 
   return (

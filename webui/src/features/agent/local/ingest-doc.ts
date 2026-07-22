@@ -13,7 +13,7 @@ import { refreshDocIndex } from "@/features/board/search/use-doc-index"
 import { chunkMarkdown } from "@/features/agent/engine/doc-chunk"
 
 
-export type IngestResult = { docId: string; chunks: number; replaced: boolean }
+export type IngestResult = { docId: string | null; chunks: number; replaced: boolean }
 
 
 /**
@@ -38,6 +38,13 @@ export const ingestDocument = async (opts: {
     index: c.index,
     text: c.text,
   }))
+
+  // An unreadable PDF (no OCR text → no chunks) must NOT persist: it would save
+  // an empty document and, on a same-name re-upload, replaceDocument would wipe
+  // the existing good version's chunks. Leave any existing doc untouched.
+  if (chunkRecords.length === 0) {
+    return { docId: null, chunks: 0, replaced: false }
+  }
 
   await docs.replaceDocument(
     { id: docId, boardId: opts.boardId, title: opts.title, pages: opts.pages, createdAt: Date.now() },
