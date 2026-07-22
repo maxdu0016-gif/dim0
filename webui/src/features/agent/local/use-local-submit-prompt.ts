@@ -168,15 +168,21 @@ export function useLocalSubmitPrompt(boardId: string) {
         const fetchUrl = resolveFetchClient({ signedIn, runId })
         // Offer doc_search only when the board actually has indexed document chunks.
         const docIndex = getDocIndexRef()
+        const hasDocs = !!docIndex && docIndex.count() > 0
         const tools = [
           ...AGENT_TOOLS,
           ...(webSearch ? [makeWebSearchTool(webSearch)] : []),
           ...(code ? [makeCodeInterpreterTool(code)] : []),
           ...(fetchUrl ? [makeFetchTool(fetchUrl)] : []),
-          ...(docIndex && docIndex.count() > 0 ? [makeDocSearchTool(docIndex)] : []),
+          ...(hasDocs && docIndex ? [makeDocSearchTool(docIndex)] : []),
         ]
+        // When documents are attached, steer grounding + citation-by-title (titles
+        // are unique per board, so a title names exactly one document).
+        const systemWithDocs = hasDocs
+          ? `${system}\n\nThis board has uploaded documents. For questions about them, call doc_search and ground your answer in the returned passages, referring to each document by its exact title.`
+          : system
         const userMessageForAgent = wrapWithMessageContext(prompt, messageContext)
-        for await (const ev of runAgent({ system, userMessage: userMessageForAgent, history, tools, llm, ctx: { store, rootId, search } })) {
+        for await (const ev of runAgent({ system: systemWithDocs, userMessage: userMessageForAgent, history, tools, llm, ctx: { store, rootId, search } })) {
           // Streaming yields a cumulative assistant_text per token — replace the
           // previous snapshot in place instead of appending one event per token.
           const prev = events[events.length - 1]

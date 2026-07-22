@@ -5,6 +5,7 @@ import {
   EditNoteIcon,
   ImageGenerationIcon,
   ImageSearchWidgetIcon,
+  DocumentFileIcon,
   LinkIcon,
   MemorySearchIcon,
   NoteIcon,
@@ -114,6 +115,7 @@ export type ToolName =
   | "web_collector"
   | "synthesizer"
   | "fetch"
+  | "doc_search"
   | "raw_message"
   | "image_description"
   | "topic_illustrator"
@@ -140,6 +142,7 @@ export const ToolNameDescription: Record<ToolName, string> = {
   web_collector: "Collect web content",
   synthesizer: "Synthesize response",
   fetch: "Fetch and analyze web page content",
+  doc_search: "Search uploaded documents",
   raw_message: "Reasoning",
   image_description: "Describe image",
   topic_illustrator: "Illustrate topic",
@@ -160,6 +163,7 @@ export const ToolNameIcon: Record<ToolName, AppIconComponent> = {
   answer_reformulate: NoteIcon,
   web_search: BrowserSearchIcon,
   memory_search: MemorySearchIcon,
+  doc_search: DocumentFileIcon,
   outline_generator: OutlineGeneratorIcon,
   web_collector: WebCollectorIcon,
   synthesizer: NoteIcon,

@@ -4,6 +4,7 @@ import { ResponseActions } from "./actions/response-actions"
 import { useMemo } from "react"
 import { isReasoningTextStep, type ReasoningStep, type ReasoningTextStep } from "../../types/stream"
 import { SourcesView } from "./sources-view"
+import { DocSourcesView } from "./doc-sources-view"
 
 
 const EMPTY_STEPS: ReasoningStep[] = []
@@ -32,6 +33,7 @@ export const AssistantMessage = ({
         isStreaming={message.streaming || false}
       />
       {!message.streaming && <SourcesView answer={resp} />}
+      {!message.streaming && <DocSourcesView answer={resp} />}
       {!message.streaming && responseMarkdown && (
         <ResponseActions
           message={responseMarkdown}
