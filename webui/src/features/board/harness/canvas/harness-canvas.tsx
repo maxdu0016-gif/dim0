@@ -65,6 +65,7 @@ import { resolveStoredEdgeColors, useStampNewEdges } from "./use-stamp-new-edges
 import { useStampNewNodes } from "./use-stamp-new-nodes"
 import { useLocalSearchIndex } from "@/features/board/search/use-search-index"
 import { useLocalDocIndex } from "@/features/board/search/use-doc-index"
+import { useDocNodeCascade } from "@/features/board/harness/agent/use-doc-node-cascade"
 import { useStyleMemory } from "./use-style-memory"
 import { CUSTOM_NODE_TYPES } from "./custom-node-types"
 import { useLocalPresence } from "./use-local-presence"
@@ -164,6 +165,7 @@ export function HarnessCanvas({ local = false }: { local?: boolean } = {}) {
   useStampNewNodes(store, boardId, rootId)
   useLocalSearchIndex(store, local)
   useLocalDocIndex(boardId ?? "", local)
+  useDocNodeCascade(store, boardId ?? "", local)
   useBlockFolderCopy(store)
   useHarnessApplyMindMap(store, boardId, rootId)
   useHydrateIconNodes(store, boardId, rootId, ready)

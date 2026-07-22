@@ -14,6 +14,9 @@ import {
 import { generateUuid } from "@/lib/common"
 import { useIsSignedIn } from "@/lib/auth"
 import { getLocalStores } from "@/features/local-stores"
+import { getCanvasStoreRef } from "@/features/board/harness/canvas-store-ref"
+import { useBoardAppStore } from "@/features/board/harness/store/board-app-store"
+import { addDocumentNode } from "@/features/board/harness/agent/doc-node"
 import { resolveParseClient } from "@/features/agent/engine/doc-parse"
 import { ingestDocument } from "@/features/agent/local/ingest-doc"
 
@@ -52,12 +55,16 @@ export const DocAttachButton = ({ boardId }: { boardId: string }) => {
     const id = toast(`Reading ${file.name}…`, { icon: <Spinner />, duration: Infinity })
     try {
       const { markdown, pages } = await client.parse(file)
-      const { chunks, replaced } = await ingestDocument({ boardId, title: file.name, markdown, pages })
+      const { docId, chunks, replaced } = await ingestDocument({ boardId, title: file.name, markdown, pages })
       toast.dismiss(id)
-      if (chunks === 0) {
+      if (chunks === 0 || !docId) {
         toast.error("No readable text found in that PDF.")
         return
       }
+      // Surface the document as a node on the canvas (id = docId). No-op on a
+      // same-name override (the node already exists).
+      const store = getCanvasStoreRef()
+      if (store) addDocumentNode(store, { docId, title: file.name, boardId, rootId: useBoardAppStore.getState().rootId })
       toast.success(
         `${replaced ? "Replaced" : "Added"} ${file.name} — ${chunks} passages ready to ask about.`,
       )

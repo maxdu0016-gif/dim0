@@ -1,4 +1,5 @@
-import { DocumentFileIcon } from "@/components/icons"
+import { useNavigate } from "@tanstack/react-router"
+import { DocumentFileIcon, MapPinIcon } from "@/components/icons"
 import type { AgentResponse } from "../../types/stream"
 import { extractDocSources } from "../../utils/doc-sources"
 
@@ -11,8 +12,14 @@ import { extractDocSources } from "../../utils/doc-sources"
  * answer can scroll straight to its source.
  */
 export const DocSourcesView = ({ answer }: { answer: AgentResponse }) => {
+  const navigate = useNavigate()
   const sources = extractDocSources(answer)
   if (sources.length === 0) return null
+
+  // The doc node's id IS the docId, so ?center=<docId> jumps to it (useCenterFromUrl).
+  const locate = (docId: string): void => {
+    void navigate({ to: ".", replace: true, search: (prev: Record<string, unknown>) => ({ ...prev, center: docId }) })
+  }
 
   return (
     <div className="mt-2 min-w-0 space-y-1">
@@ -32,6 +39,19 @@ export const DocSourcesView = ({ answer }: { answer: AgentResponse }) => {
             <span className="ml-auto shrink-0 text-muted-foreground">
               {s.passages.length} passage{s.passages.length === 1 ? "" : "s"}
             </span>
+            <button
+              type="button"
+              aria-label="Find on board"
+              title="Find on board"
+              className="shrink-0 rounded p-0.5 text-muted-foreground hover:text-secondary-foreground"
+              onClick={(e) => {
+                e.preventDefault() // don't toggle the <details>
+                e.stopPropagation()
+                locate(s.docId)
+              }}
+            >
+              <MapPinIcon className="size-3.5" strokeWidth={2} />
+            </button>
           </summary>
           {s.passages.length > 0 && (
             <div className="space-y-2 px-3 pb-2 pt-1">
