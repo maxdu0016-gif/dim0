@@ -18,6 +18,8 @@ import type { OpBatch } from "@canvas-harness/core"
 import type { DimNode } from "@/features/board/model"
 import { getBoardPersistenceRef } from "@/features/board/persist/local/board-persistence-ref"
 import { isDurableDelete } from "@/features/board/harness/node-types/durable-delete"
+import { cascadeRemovedDocs } from "@/features/board/harness/agent/use-doc-node-cascade"
+import { useBoardAppStore } from "@/features/board/harness/store/board-app-store"
 
 
 /**
@@ -61,15 +63,19 @@ const edgeEndId = (end: unknown): string | undefined => {
  * Remove descendants that live in deeper (unloaded) layers, straight from the
  * whole-board oplog. Best-effort: a failure leaves orphans (prior behaviour) but
  * never throws into the click handler.
+ *
+ * Returns the ids of removed `document` nodes: these are swept via the oplog, so
+ * the store never emits a 'change' for them and `useDocNodeCascade` can't see
+ * them — the caller cascades their DocRepo cleanup explicitly.
  */
 const sweepDeepDescendants = async (
   store: CanvasStore,
   roots: NodeId[],
   loaded: Set<NodeId>,
   origin: OpBatch["origin"],
-): Promise<void> => {
+): Promise<string[]> => {
   const persistence = getBoardPersistenceRef()
-  if (!persistence) return // backend board / nothing else loaded — server cascades
+  if (!persistence) return [] // backend board / nothing else loaded — server cascades
 
   try {
     await persistence.flush() // make the loaded-layer removal durable first
@@ -77,7 +83,7 @@ const sweepDeepDescendants = async (
     const all = collectSubtreeIds(content.nodes, roots)
     const deep = new Set<string>()
     for (const id of all) if (!loaded.has(id)) deep.add(id)
-    if (deep.size === 0) return
+    if (deep.size === 0) return []
 
     const removeNodes = content.nodes.filter((n) => deep.has(n.id))
     const removeEdges = content.edges.filter((e) => {
@@ -98,8 +104,10 @@ const sweepDeepDescendants = async (
       ops,
     })
     await persistence.flush()
+    return removeNodes.filter((n) => n.type === "document").map((n) => String(n.id))
   } catch (err) {
     console.warn("[harness] deep subtree cascade failed", err)
+    return []
   }
 }
 
@@ -129,11 +137,14 @@ const buildLoadedRemovalOps = (store: CanvasStore, ids: Set<NodeId>): Op[] => {
  */
 export const removeNodesSubtreeAsync = async (store: CanvasStore, roots: NodeId[]): Promise<void> => {
   if (roots.length === 0) return
-  // A durable type (see DURABLE_DELETE) owns state outside the store, so its
-  // delete must NOT be undoable — apply it as an explicit `history`-origin batch
-  // (which skips the undo stack) rather than the default undoable `store.batch`.
-  const durable = roots.some((r) => isDurableDelete(store.getNode(r)?.type))
   const loaded = collectSubtreeIds(store.getAllNodes() as DimNode[], roots)
+  // If ANY node in the removed set is a durable type (see DURABLE_DELETE) its
+  // state lives outside the store, so undo can't losslessly restore it — take
+  // the whole delete off the undo stack via an explicit `history`-origin batch
+  // rather than the default undoable `store.batch`. Keyed off the collected set,
+  // not just the roots, so a durable node nested under a plain container still
+  // deletes non-undoably.
+  const durable = [...loaded].some((id) => isDurableDelete(store.getNode(id)?.type))
   if (loaded.size > 0) {
     if (durable) {
       store.applyBatch({
@@ -149,7 +160,13 @@ export const removeNodesSubtreeAsync = async (store: CanvasStore, roots: NodeId[
       })
     }
   }
-  await sweepDeepDescendants(store, roots, loaded, durable ? "history" : "local")
+  // Deep-layer document removals never reach the store, so cascade their DocRepo
+  // cleanup here (the store-'change' listener in useDocNodeCascade can't see them).
+  const deepDocIds = await sweepDeepDescendants(store, roots, loaded, durable ? "history" : "local")
+  if (deepDocIds.length > 0) {
+    const boardId = useBoardAppStore.getState().boardId
+    if (boardId) await cascadeRemovedDocs(boardId, deepDocIds)
+  }
 }
 
 

@@ -27,21 +27,31 @@ export const removedDocNodeIds = (batch: OpBatch): string[] => {
 
 
 /**
+ * Delete the given documents from local storage and rebuild the board's doc
+ * index — so a removed document leaves no orphaned chunks the agent would still
+ * search. Shared by the store-change cascade (loaded removals) and the subtree
+ * deep-layer sweep (unloaded removals the store never emits a 'change' for).
+ */
+export const cascadeRemovedDocs = async (boardId: string, docIds: string[]): Promise<void> => {
+  if (docIds.length === 0) return
+  const { docs } = await getLocalStores()
+  for (const id of docIds) await docs.deleteDocument(id)
+  await refreshDocIndex(boardId)
+}
+
+
+/**
  * Cascade a document node's deletion to its stored doc + chunks, then reindex —
  * so removing the node from the canvas doesn't leave orphaned chunks the agent
- * would still search. Local boards only.
+ * would still search. Local boards only. Covers removals the store emits a
+ * 'change' for (the loaded layer); deep-layer removals are cascaded directly by
+ * `removeNodesSubtreeAsync` (they never reach the store).
  */
 export const useDocNodeCascade = (store: CanvasStore, boardId: string, enabled: boolean): void => {
   useEffect(() => {
     if (!enabled || !boardId) return
     return store.subscribe("change", (batch) => {
-      const ids = removedDocNodeIds(batch)
-      if (ids.length === 0) return
-      void (async () => {
-        const { docs } = await getLocalStores()
-        for (const id of ids) await docs.deleteDocument(id)
-        await refreshDocIndex(boardId)
-      })()
+      void cascadeRemovedDocs(boardId, removedDocNodeIds(batch))
     })
   }, [store, boardId, enabled])
 }

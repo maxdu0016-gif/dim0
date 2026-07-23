@@ -1,6 +1,8 @@
-import { describe, expect, it } from "vitest"
+import { beforeEach, describe, expect, it } from "vitest"
 import type { Node, Op, OpBatch } from "@canvas-harness/core"
-import { removedDocNodeIds } from "./use-doc-node-cascade"
+import { resetIdb } from "@/test/canvas"
+import { getLocalStores } from "@/features/local-stores"
+import { cascadeRemovedDocs, removedDocNodeIds } from "./use-doc-node-cascade"
 
 
 const node = (id: string, type: string): Node => ({ id, type } as unknown as Node)
@@ -42,5 +44,39 @@ describe("removedDocNodeIds", () => {
 
   it("ignores non-remove ops and non-document node removals", () => {
     expect(removedDocNodeIds(batch("local", [addOp("d1"), removeOp("n1", "rect"), removeOp("n2", "sheet")]))).toEqual([])
+  })
+})
+
+
+describe("cascadeRemovedDocs", () => {
+  beforeEach(() => resetIdb())
+
+  it("deletes each document and its chunks from local storage", async () => {
+    const { docs } = await getLocalStores()
+    await docs.addDocument({ id: "d1", boardId: "b", title: "A.pdf", pages: 1, createdAt: 0 })
+    await docs.addChunks([{ chunkId: "d1#0", docId: "d1", boardId: "b", index: 0, text: "hello" }])
+
+    await cascadeRemovedDocs("b", ["d1"])
+
+    expect(await docs.getDocument("d1")).toBeUndefined()
+    expect(await docs.chunksForDoc("d1")).toEqual([])
+  })
+
+  it("leaves other documents untouched", async () => {
+    const { docs } = await getLocalStores()
+    await docs.addDocument({ id: "d1", boardId: "b", title: "A.pdf", pages: 1, createdAt: 0 })
+    await docs.addDocument({ id: "d2", boardId: "b", title: "B.pdf", pages: 1, createdAt: 0 })
+
+    await cascadeRemovedDocs("b", ["d1"])
+
+    expect(await docs.getDocument("d1")).toBeUndefined()
+    expect(await docs.getDocument("d2")).toBeDefined()
+  })
+
+  it("is a no-op for an empty id list", async () => {
+    const { docs } = await getLocalStores()
+    await docs.addDocument({ id: "d1", boardId: "b", title: "A.pdf", pages: 1, createdAt: 0 })
+    await cascadeRemovedDocs("b", [])
+    expect(await docs.getDocument("d1")).toBeDefined()
   })
 })

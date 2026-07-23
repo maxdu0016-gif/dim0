@@ -1,16 +1,19 @@
 import { afterEach, describe, expect, it } from "vitest"
 import { asNodeId } from "@canvas-harness/core"
-import { addEdge, freshStore } from "@/test/canvas"
+import { addEdge, freshStore, resetIdb } from "@/test/canvas"
 import type { DimNode } from "@/features/board/model"
+import { getLocalStores } from "@/features/local-stores"
 import { BoardPersistence } from "@/features/board/persist/local/board-persistence"
 import { InMemoryEngine } from "@/features/board/persist/local/in-memory-engine"
 import { setBoardPersistenceRef } from "@/features/board/persist/local/board-persistence-ref"
+import { useBoardAppStore } from "@/features/board/harness/store/board-app-store"
 import { collectSubtreeIds, removeNodeSubtree, removeNodesSubtreeAsync } from "./subtree"
 
 
 afterEach(() => {
   // The persistence ref is a module singleton — isolate tests.
   setBoardPersistenceRef(null)
+  useBoardAppStore.setState({ boardId: null })
 })
 
 
@@ -125,6 +128,38 @@ describe("removeNodeSubtree", () => {
     addChild(store, "b")
     removeNodeSubtree(store, asNodeId("a"))
     expect(store.getAllNodes().map((n) => n.id)).toEqual(["b"])
+  })
+
+
+  it("cascades DocRepo cleanup for a document in a deeper (unloaded) layer", async () => {
+    // A PDF uploaded inside a folder lives in the folder's layer. Deleting the
+    // folder from its parent layer removes the doc node via the oplog sweep only
+    // (the store never sees it), so its DocRepo chunks must be cleaned here or
+    // doc_search would keep citing a deleted document.
+    resetIdb()
+    useBoardAppStore.setState({ boardId: "b" })
+    const { docs } = await getLocalStores()
+    await docs.addDocument({ id: "d1", boardId: "b", title: "A.pdf", pages: 1, createdAt: 0 })
+    await docs.addChunks([{ chunkId: "d1#0", docId: "d1", boardId: "b", index: 0, text: "hi" }])
+
+    const engine = new InMemoryEngine()
+    const persistence = new BoardPersistence("b", { engine })
+    const full = freshStore("seed")
+    const unsub = persistence.attach(full)
+    addTyped(full, "F", "folder")
+    addTyped(full, "d1", "document", "F") // doc in the folder's (deeper) layer
+    await persistence.flush()
+    unsub()
+
+    const live = freshStore("live")
+    addTyped(live, "F", "folder") // only the folder is loaded at the parent layer
+    persistence.attach(live)
+    setBoardPersistenceRef(persistence)
+
+    await removeNodesSubtreeAsync(live, [asNodeId("F")])
+
+    expect(await docs.getDocument("d1")).toBeUndefined()
+    expect(await docs.chunksForDoc("d1")).toEqual([])
   })
 
 
