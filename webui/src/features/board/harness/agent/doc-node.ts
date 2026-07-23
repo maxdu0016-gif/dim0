@@ -8,9 +8,10 @@
  * `convertNoteToNode`, so the harness node's data shape is exactly what
  * `DocumentView` renders (label + "completed" status) and round-trips cleanly.
  */
-import { asBatchId, asNodeId, type CanvasStore } from "@canvas-harness/core"
+import { asNodeId, type CanvasStore } from "@canvas-harness/core"
 import { createDefaultNote } from "@/features/board/types/note"
 import { noteToNode } from "@/features/board/harness/convert/note-to-node"
+import { makeBatch } from "@/features/board/harness/make-batch"
 import { beneathBorderOrigin } from "./beneath-border"
 
 
@@ -38,11 +39,5 @@ export const addDocumentNode = (
   // Non-undoable create (`history` origin): a document owns markdown + chunks in
   // DocRepo, so undoing the upload can't losslessly restore it — keep it off the
   // undo stack, mirroring the durable delete (see DURABLE_DELETE).
-  store.applyBatch({
-    id: asBatchId(store.generateId()),
-    clientId: store.clientId,
-    ts: Date.now(),
-    origin: "history",
-    ops: [{ type: "node.add", node: { ...node, id, x: at.x, y: at.y } }],
-  })
+  store.applyBatch(makeBatch(store, "history", [{ type: "node.add", node: { ...node, id, x: at.x, y: at.y } }]))
 }

@@ -12,11 +12,11 @@
  * On backend boards there's no local persistence ref, so only step 1 runs and the
  * server performs its own cascade (unchanged behaviour).
  */
-import { asBatchId } from "@canvas-harness/core"
 import type { CanvasStore, NodeId, Op } from "@canvas-harness/core"
 import type { OpBatch } from "@canvas-harness/core"
 import type { DimNode } from "@/features/board/model"
 import { getBoardPersistenceRef } from "@/features/board/persist/local/board-persistence-ref"
+import { makeBatch } from "@/features/board/harness/make-batch"
 import { isDurableDelete } from "@/features/board/harness/node-types/durable-delete"
 import { cascadeRemovedDocs } from "@/features/board/harness/agent/use-doc-node-cascade"
 import { useBoardAppStore } from "@/features/board/harness/store/board-app-store"
@@ -96,13 +96,7 @@ const sweepDeepDescendants = async (
       ...removeEdges.map((edge) => ({ type: "edge.remove", edge }) as Op),
       ...removeNodes.map((node) => ({ type: "node.remove", node }) as Op),
     ]
-    persistence.record({
-      id: asBatchId(store.generateId()),
-      clientId: store.clientId,
-      ts: Date.now(),
-      origin,
-      ops,
-    })
+    persistence.record(makeBatch(store, origin, ops))
     await persistence.flush()
     return removeNodes.filter((n) => n.type === "document").map((n) => String(n.id))
   } catch (err) {
@@ -147,13 +141,7 @@ export const removeNodesSubtreeAsync = async (store: CanvasStore, roots: NodeId[
   const durable = [...loaded].some((id) => isDurableDelete(store.getNode(id)?.type))
   if (loaded.size > 0) {
     if (durable) {
-      store.applyBatch({
-        id: asBatchId(store.generateId()),
-        clientId: store.clientId,
-        ts: Date.now(),
-        origin: "history",
-        ops: buildLoadedRemovalOps(store, loaded),
-      })
+      store.applyBatch(makeBatch(store, "history", buildLoadedRemovalOps(store, loaded)))
     } else {
       store.batch(() => {
         for (const id of loaded) store.removeNode(id)
