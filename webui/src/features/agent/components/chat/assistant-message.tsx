@@ -37,9 +37,10 @@ export const AssistantMessage = ({
         response={resp}
         isStreaming={message.streaming || false}
         docSources={docSources}
+        messageId={message.id}
       />
       {!message.streaming && <SourcesView answer={resp} />}
-      {!message.streaming && <DocSourcesView answer={resp} />}
+      {!message.streaming && <DocSourcesView sources={docSources} messageId={message.id} />}
       {!message.streaming && responseMarkdown && (
         <ResponseActions
           message={responseMarkdown}

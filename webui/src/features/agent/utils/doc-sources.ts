@@ -47,16 +47,30 @@ export const extractDocSources = (answer: AgentResponse): DocSource[] => {
 const escapeRegExp = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
 
 
+// Backslash-escape markdown-active chars so a filename like "a*b_.pdf" renders
+// as literal text inside the emitted `[label](…)` instead of turning into
+// emphasis / code. "[" and "]" are handled by skipping such titles entirely.
+const escapeMarkdownLabel = (s: string): string => s.replace(/[\\`*_]/g, "\\$&")
+
+
+/**
+ * The DOM id of a document's Sources card. Namespaced by the message so a
+ * multi-turn chat that cites the same document across messages doesn't produce
+ * duplicate ids (which would make an in-answer link jump to the wrong message).
+ */
+export const docAnchorId = (messageId: string, docId: string): string => `doc-${messageId}-${docId}`
+
+
 /**
  * Wrap exact occurrences of a cited document's title in the answer markdown with
- * a link to its Sources anchor (`#doc-<docId>`). Non-mutating in spirit: only
- * exact title strings are decorated, longest-first so a title that contains
- * another isn't half-matched, and occurrences already inside a markdown link
- * `](...)` are left alone. Unknown/misspelled references are simply not linked.
+ * a link to its Sources anchor (`#${docAnchorId(messageId, docId)}`). Non-mutating
+ * in spirit: only exact title strings are decorated, longest-first so a title
+ * that contains another isn't half-matched, and occurrences already inside a
+ * markdown link `](...)` are left alone. Unknown references are simply not linked.
  */
-export const linkifyDocTitles = (markdown: string, sources: DocSource[]): string => {
+export const linkifyDocTitles = (markdown: string, sources: DocSource[], messageId: string): string => {
   // Skip empty titles, and titles carrying a "[" or "]" (they'd break the
-  // emitted `[label](…)` markdown — the label isn't escapable).
+  // emitted `[label](…)` markdown — brackets aren't safely escapable in a label).
   const titled = sources.filter((s) => s.docTitle.trim().length > 0 && !/[[\]]/.test(s.docTitle))
   if (titled.length === 0) return markdown
   // Longest titles first so "Report v2.pdf" wins over "Report".
@@ -72,7 +86,8 @@ export const linkifyDocTitles = (markdown: string, sources: DocSource[]): string
     //    and not already inside a link ("[title]").
     //  - trailing `(?![\w]|\]\()` → not "Report.pdfx", and no double-wrap.
     const re = new RegExp(`(^|[^\\w[])(${title})(?![\\w]|\\]\\()`, "g")
-    out = out.replace(re, (_m, pre: string, match: string) => `${pre}[${match}](#doc-${s.docId})`)
+    const href = `#${docAnchorId(messageId, s.docId)}`
+    out = out.replace(re, (_m, pre: string, match: string) => `${pre}[${escapeMarkdownLabel(match)}](${href})`)
   }
   return out
 }

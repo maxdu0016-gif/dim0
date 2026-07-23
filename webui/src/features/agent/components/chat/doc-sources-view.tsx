@@ -1,19 +1,17 @@
 import { useNavigate } from "@tanstack/react-router"
 import { DocumentFileIcon, MapPinIcon } from "@/components/icons"
-import type { AgentResponse } from "../../types/stream"
-import { extractDocSources } from "../../utils/doc-sources"
+import { docAnchorId, type DocSource } from "../../utils/doc-sources"
 
 
 /**
  * Document Sources for an answer (F2 B7) — the documents `doc_search` actually
  * retrieved from this turn, keyed by the unique `docId`. Each entry expands to
- * the passages that grounded the answer (option a). Rendered inline (native
- * `<details>`) with an `id="doc-<docId>"` anchor, so a linkified title in the
- * answer can scroll straight to its source.
+ * the passages that grounded the answer. Rendered inline (native `<details>`)
+ * with a per-message `id` anchor (see `docAnchorId`), so a linkified title in
+ * the answer scrolls to THIS message's source (not an older one's).
  */
-export const DocSourcesView = ({ answer }: { answer: AgentResponse }) => {
+export const DocSourcesView = ({ sources, messageId }: { sources: DocSource[]; messageId: string }) => {
   const navigate = useNavigate()
-  const sources = extractDocSources(answer)
   if (sources.length === 0) return null
 
   // The doc node's id IS the docId, so ?center=<docId> jumps to it (useCenterFromUrl).
@@ -30,7 +28,7 @@ export const DocSourcesView = ({ answer }: { answer: AgentResponse }) => {
       {sources.map((s) => (
         <details
           key={s.docId}
-          id={`doc-${s.docId}`}
+          id={docAnchorId(messageId, s.docId)}
           className="scroll-mt-16 rounded-lg border border-border/60 bg-transparent"
         >
           <summary className="flex cursor-pointer list-none items-center gap-2 px-2 py-1.5 text-xs">

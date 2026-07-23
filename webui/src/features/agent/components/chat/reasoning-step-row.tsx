@@ -14,10 +14,12 @@ export const ReasoningStepRow = ({
   step,
   isStreaming,
   docSources,
+  messageId,
 }: {
   step: ReasoningTextStep
   isStreaming?: boolean
   docSources?: DocSource[]
+  messageId?: string
 }) => {
   const [viewMore, setViewMore] = useState(false)
   const hasReasoningDetails = !isStreaming && step.reasoning !== ""
@@ -25,13 +27,14 @@ export const ReasoningStepRow = ({
 
   // Once the answer is final, turn exact document-title mentions into links to
   // their Sources card. Skipped mid-stream (titles arrive partial; sources
-  // aren't final yet) and when the turn cited no documents.
+  // aren't final yet), when the turn cited no documents, or with no message id
+  // to namespace the anchor.
   const message = useMemo(
     () =>
-      !isStreaming && docSources && docSources.length > 0
-        ? linkifyDocTitles(step.message, docSources)
+      !isStreaming && messageId && docSources && docSources.length > 0
+        ? linkifyDocTitles(step.message, docSources, messageId)
         : step.message,
-    [isStreaming, docSources, step.message],
+    [isStreaming, messageId, docSources, step.message],
   )
 
   if (!isStreaming && step.message === "" && step.reasoning === "") {

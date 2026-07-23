@@ -110,13 +110,15 @@ export interface ReasoningStepsViewProps {
   estimatedDurationSeconds?: number
   /** Documents cited this turn — their titles are linkified in the answer text. */
   docSources?: DocSource[]
+  /** The owning message id — namespaces the cited-document anchors. */
+  messageId?: string
 }
 
 
 /**
  * Renders the assistant process as one ordered merged list.
  */
-export const ReasoningStepsView = ({ isStreaming, response, docSources }: ReasoningStepsViewProps) => {
+export const ReasoningStepsView = ({ isStreaming, response, docSources, messageId }: ReasoningStepsViewProps) => {
   const steps = response?.steps ?? EMPTY_STEPS
 
   const widgetAttachments = useMemo(
@@ -191,6 +193,7 @@ export const ReasoningStepsView = ({ isStreaming, response, docSources }: Reason
             step={item.step}
             isStreaming={isStreaming}
             docSources={docSources}
+            messageId={messageId}
           />
         ) : item.type === "tool_block" ? (
           <ToolStepBlock
