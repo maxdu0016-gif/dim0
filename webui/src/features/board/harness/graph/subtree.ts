@@ -14,8 +14,10 @@
  */
 import { asBatchId } from "@canvas-harness/core"
 import type { CanvasStore, NodeId, Op } from "@canvas-harness/core"
+import type { OpBatch } from "@canvas-harness/core"
 import type { DimNode } from "@/features/board/model"
 import { getBoardPersistenceRef } from "@/features/board/persist/local/board-persistence-ref"
+import { isDurableDelete } from "@/features/board/harness/node-types/durable-delete"
 
 
 /**
@@ -60,7 +62,12 @@ const edgeEndId = (end: unknown): string | undefined => {
  * whole-board oplog. Best-effort: a failure leaves orphans (prior behaviour) but
  * never throws into the click handler.
  */
-const sweepDeepDescendants = async (store: CanvasStore, roots: NodeId[], loaded: Set<NodeId>): Promise<void> => {
+const sweepDeepDescendants = async (
+  store: CanvasStore,
+  roots: NodeId[],
+  loaded: Set<NodeId>,
+  origin: OpBatch["origin"],
+): Promise<void> => {
   const persistence = getBoardPersistenceRef()
   if (!persistence) return // backend board / nothing else loaded — server cascades
 
@@ -87,7 +94,7 @@ const sweepDeepDescendants = async (store: CanvasStore, roots: NodeId[], loaded:
       id: asBatchId(store.generateId()),
       clientId: store.clientId,
       ts: Date.now(),
-      origin: "local",
+      origin,
       ops,
     })
     await persistence.flush()
@@ -98,18 +105,51 @@ const sweepDeepDescendants = async (store: CanvasStore, roots: NodeId[], loaded:
 
 
 /**
+ * Build `node.remove` + incident `edge.remove` ops for the loaded nodes in
+ * `ids`, so a durable delete can be applied as an explicit non-undoable batch
+ * (the imperative `store.removeNode` cascades edges but is always undoable).
+ */
+const buildLoadedRemovalOps = (store: CanvasStore, ids: Set<NodeId>): Op[] => {
+  const removeEdges = store.getAllEdges().filter((e) => {
+    const s = edgeEndId(e.source)
+    const t = edgeEndId(e.target)
+    return (s !== undefined && ids.has(s as NodeId)) || (t !== undefined && ids.has(t as NodeId))
+  })
+  const removeNodes = store.getAllNodes().filter((n) => ids.has(n.id as NodeId))
+  return [
+    ...removeEdges.map((edge) => ({ type: "edge.remove", edge }) as Op),
+    ...removeNodes.map((node) => ({ type: "node.remove", node }) as Op),
+  ]
+}
+
+
+/**
  * Remove nodes and all their descendants. Synchronously clears the loaded layer
  * (immediate UI + one undo), then sweeps deeper layers via persistence.
  */
 export const removeNodesSubtreeAsync = async (store: CanvasStore, roots: NodeId[]): Promise<void> => {
   if (roots.length === 0) return
+  // A durable type (see DURABLE_DELETE) owns state outside the store, so its
+  // delete must NOT be undoable — apply it as an explicit `history`-origin batch
+  // (which skips the undo stack) rather than the default undoable `store.batch`.
+  const durable = roots.some((r) => isDurableDelete(store.getNode(r)?.type))
   const loaded = collectSubtreeIds(store.getAllNodes() as DimNode[], roots)
   if (loaded.size > 0) {
-    store.batch(() => {
-      for (const id of loaded) store.removeNode(id)
-    })
+    if (durable) {
+      store.applyBatch({
+        id: asBatchId(store.generateId()),
+        clientId: store.clientId,
+        ts: Date.now(),
+        origin: "history",
+        ops: buildLoadedRemovalOps(store, loaded),
+      })
+    } else {
+      store.batch(() => {
+        for (const id of loaded) store.removeNode(id)
+      })
+    }
   }
-  await sweepDeepDescendants(store, roots, loaded)
+  await sweepDeepDescendants(store, roots, loaded, durable ? "history" : "local")
 }
 
 

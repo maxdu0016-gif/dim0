@@ -7,10 +7,14 @@ import { refreshDocIndex } from "@/features/board/search/use-doc-index"
 /**
  * Doc ids whose `document` node was removed by a GENUINE (non-remote) edit.
  *
+ * Admits both `local` and `history` origins: a durable document/folder delete is
+ * applied as a non-undoable `history` batch (see DURABLE_DELETE / removeNodeSubtree),
+ * and its DocRepo cleanup must still run — a folder delete even carries its child
+ * documents' `node.remove` in the same batch.
+ *
  * CRITICAL: ignores `origin: "remote"` batches. Hydrate / layer-switch clears the
  * scene as a `remote` batch (see applyContentToStore); without this guard a
- * reload would cascade-delete every document. Only a real user/local delete
- * should tear down the underlying doc + chunks.
+ * reload would cascade-delete every document.
  */
 export const removedDocNodeIds = (batch: OpBatch): string[] => {
   if (batch.origin === "remote") return []

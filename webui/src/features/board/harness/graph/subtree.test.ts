@@ -21,9 +21,20 @@ const node = (id: string, parentId?: string): DimNode =>
 
 // Add a rect node carrying a parentId (test/canvas addNode has no parentId).
 const addChild = (store: ReturnType<typeof freshStore>, id: string, parentId?: string): void => {
+  addTyped(store, id, "rect", parentId)
+}
+
+
+// Add a node of an explicit type (durable-delete keys off node type).
+const addTyped = (
+  store: ReturnType<typeof freshStore>,
+  id: string,
+  type: string,
+  parentId?: string,
+): void => {
   store.addNode({
     id: asNodeId(id),
-    type: "rect",
+    type,
     x: 0, y: 0, w: 100, h: 50, angle: 0, groups: [],
     data: { meta: { v: 1, createdAt: 0, updatedAt: 0 }, parentId },
   })
@@ -82,6 +93,29 @@ describe("removeNodeSubtree", () => {
     store.undo()
     expect(store.getAllNodes().map((n) => n.id).sort()).toEqual(["F", "c1", "c2", "s"])
     expect(store.getAllEdges().map((e) => e.id)).toEqual(["e1"])
+  })
+
+
+  it("deletes a durable-type node WITHOUT putting it on the undo stack", () => {
+    const store = freshStore("c")
+    addTyped(store, "d1", "document")
+    store.clearHistory() // isolate: only the delete could touch the undo stack
+    removeNodeSubtree(store, asNodeId("d1"))
+    expect(store.getNode(asNodeId("d1"))).toBeUndefined()
+    store.undo() // history-origin delete is off the stack — must not resurrect it
+    expect(store.getNode(asNodeId("d1"))).toBeUndefined()
+  })
+
+
+  it("still cascades incident edges when deleting a durable folder subtree", () => {
+    const store = freshStore("c")
+    addTyped(store, "F", "folder")
+    addChild(store, "c1", "F")
+    addChild(store, "s")
+    addEdge(store, "e1", "c1", "s") // edge crossing the subtree boundary
+    removeNodeSubtree(store, asNodeId("F"))
+    expect(store.getAllNodes().map((n) => n.id).sort()).toEqual(["s"])
+    expect(store.getAllEdges()).toHaveLength(0) // incident edge cascaded out
   })
 
 

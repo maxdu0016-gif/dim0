@@ -2,6 +2,7 @@ import { type NodeId } from "@canvas-harness/core"
 import { useCanvasStore, useNode } from "@canvas-harness/react"
 import { removeNodeSubtree } from "@/features/board/harness/graph/subtree"
 import { cn } from "@/lib/utils"
+import { DURABLE_DELETE } from "../durable-delete"
 import type { NoteNodeData } from "../../convert/note-to-node"
 import {
   NodeTitleCaption,
@@ -82,6 +83,7 @@ export function FolderView({ id }: FolderViewProps) {
       {embedded ? (
         <NodeTrafficLights
           onDelete={canEdit ? () => removeNodeSubtree(store, id) : undefined}
+          confirmDelete={DURABLE_DELETE.folder}
         />
       ) : null}
 

@@ -3,6 +3,7 @@ import { type NodeId } from "@canvas-harness/core"
 import { useCanvasStore, useNode } from "@canvas-harness/react"
 import { removeNodeSubtree } from "@/features/board/harness/graph/subtree"
 import { cn } from "@/lib/utils"
+import { DURABLE_DELETE } from "../durable-delete"
 import type { NoteNodeData } from "../../convert/note-to-node"
 import { NodeTitleCaption, NodeTrafficLights } from "../../shared-views"
 import { useBoardAppStore } from "../../store/board-app-store"
@@ -49,6 +50,7 @@ export function DocumentView({ id }: DocumentViewProps) {
     <div className="pointer-events-none relative h-full w-full select-none">
       <NodeTrafficLights
         onDelete={canEdit ? () => removeNodeSubtree(store, id) : undefined}
+        confirmDelete={DURABLE_DELETE.document}
       />
 
       <div

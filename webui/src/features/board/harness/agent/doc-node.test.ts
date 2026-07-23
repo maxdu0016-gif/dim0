@@ -37,6 +37,15 @@ describe("addDocumentNode", () => {
     expect(store.getNode(asNodeId("d1"))!.y).toBe(y0) // untouched
   })
 
+  it("creates the node WITHOUT putting it on the undo stack (non-undoable)", () => {
+    const store = freshStore("c")
+    store.clearHistory()
+    addDocumentNode(store, { docId: "d1", title: "A.pdf", boardId: "b1" })
+    expect(store.getNode(asNodeId("d1"))).toBeDefined()
+    store.undo() // history-origin create is off the stack — must not remove it
+    expect(store.getNode(asNodeId("d1"))).toBeDefined()
+  })
+
   it("stamps the current folder layer (parentId) when a rootId is given", () => {
     const store = freshStore("c")
     addDocumentNode(store, { docId: "d1", title: "A.pdf", boardId: "b1", rootId: "folder-1" })

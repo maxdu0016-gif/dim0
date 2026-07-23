@@ -25,6 +25,15 @@ describe("removedDocNodeIds", () => {
     ).toEqual(["d1", "d2"])
   })
 
+  it("cascades history-origin removals — durable doc/folder deletes are non-undoable (history)", () => {
+    // removeNodeSubtree applies a durable-type delete as a `history` batch; the
+    // DocRepo cleanup MUST still run, and a folder delete carries its child
+    // document's node.remove in the same batch.
+    expect(
+      removedDocNodeIds(batch("history", [removeOp("folder-1", "folder"), removeOp("d1", "document")])),
+    ).toEqual(["d1"])
+  })
+
   it("IGNORES remote-origin batches — a hydrate/clear must never cascade-delete docs", () => {
     // applyContentToStore clears the scene as a `remote` batch on reload / layer
     // switch; treating that as a delete would wipe every document.
