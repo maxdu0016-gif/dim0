@@ -436,7 +436,12 @@ async def ai_parse(
     if not (file.content_type == "application/pdf" or filename.lower().endswith(".pdf")):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Only PDF files are supported")
 
-    file_bytes = await file.read()
+    # Bounded read: pull at most MAX_PDF_BYTES + 1 so an oversized upload can't be
+    # buffered whole in memory — one extra byte is enough to know it's over. (The
+    # multipart body is already spooled to disk by Starlette before we get here;
+    # capping the in-memory copy is the part we control. A hard receive ceiling
+    # belongs at the ingress/ASGI layer.)
+    file_bytes = await file.read(MAX_PDF_BYTES + 1)
     if len(file_bytes) > MAX_PDF_BYTES:
         raise HTTPException(
             status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
@@ -460,5 +465,5 @@ async def ai_parse(
     finally:
         os.unlink(tmp.name)
 
-    markdown = "\n\n".join(str(page["markdown"]) for page in pages)
+    markdown = "\n\n".join(str(page.get("markdown", "")) for page in pages)
     return {"markdown": markdown, "pages": len(pages)}

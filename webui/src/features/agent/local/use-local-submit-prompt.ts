@@ -16,6 +16,8 @@ import { agentBuildTools, searchNotes } from "@/features/agent/engine/tools"
 import { skillTools } from "@/features/agent/engine/skills"
 import { getSearchIndexRef } from "@/features/board/search/search-index-ref"
 import { getDocIndexRef } from "@/features/board/search/doc-index-ref"
+import { rebuildDocIndex } from "@/features/board/search/use-doc-index"
+import { getLocalStores } from "@/features/local-stores"
 import { makeDocSearchTool } from "@/features/agent/engine/doc-search"
 import type { AgentEvent } from "@/features/agent/engine/types"
 import { planSystemPrompt } from "@/features/agent/prompts"
@@ -167,8 +169,18 @@ export function useLocalSubmitPrompt(boardId: string) {
         const code = resolveCodeClient({ signedIn, runId, byokKey: codeByok() })
         const fetchUrl = resolveFetchClient({ signedIn, runId })
         // Offer doc_search only when the board actually has indexed document chunks.
+        // The index rebuilds asynchronously on board load, so a question asked
+        // before that resolves would see count() === 0; fall back to the persisted
+        // chunks and build the index on the spot so grounding isn't silently lost.
         const docIndex = getDocIndexRef()
-        const hasDocs = !!docIndex && docIndex.count() > 0
+        let hasDocs = !!docIndex && docIndex.count() > 0
+        if (docIndex && !hasDocs) {
+          const { docs } = await getLocalStores()
+          if ((await docs.chunksForBoard(boardId)).length > 0) {
+            await rebuildDocIndex(docIndex, boardId)
+            hasDocs = docIndex.count() > 0
+          }
+        }
         const tools = [
           ...AGENT_TOOLS,
           ...(webSearch ? [makeWebSearchTool(webSearch)] : []),

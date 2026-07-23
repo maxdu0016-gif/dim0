@@ -71,6 +71,21 @@ def test_parse_relays_byok_provider_key(monkeypatch):
     assert _FakeParser.last_api_key == "user-mistral-key"
 
 
+def test_parse_tolerates_a_page_missing_the_markdown_key(monkeypatch):
+    """A page dict without a 'markdown' key contributes '' rather than 500-ing."""
+    client = _client(monkeypatch)
+
+    async def _parse_missing(self, filepath, max_pages: int = 200):
+        return [{"markdown": "ok", "page": 0}, {"page": 1}]  # 2nd page lacks 'markdown'
+
+    monkeypatch.setattr(_FakeParser, "parse", _parse_missing)
+    res = client.post("/ai/parse", files=_pdf_file())
+    assert res.status_code == 200
+    data = res.json()["data"]
+    assert data["markdown"] == "ok\n\n"  # the empty second page joins as ""
+    assert data["pages"] == 2
+
+
 def test_parse_rejects_non_pdf(monkeypatch):
     """A non-PDF upload is a 400 (only PDFs are supported at launch)."""
     res = _client(monkeypatch).post(
