@@ -5,6 +5,7 @@ import { useMemo } from "react"
 import { isReasoningTextStep, type ReasoningStep, type ReasoningTextStep } from "../../types/stream"
 import { SourcesView } from "./sources-view"
 import { DocSourcesView } from "./doc-sources-view"
+import { extractDocSources } from "../../utils/doc-sources"
 
 
 const EMPTY_STEPS: ReasoningStep[] = []
@@ -26,11 +27,16 @@ export const AssistantMessage = ({
     [steps]
   )
 
+  // Documents cited this turn — used to linkify their titles inline in the answer
+  // (their exact-title occurrences become links to the Sources card below).
+  const docSources = useMemo(() => extractDocSources({ steps }), [steps])
+
   return (
     <div className='w-full space-y-2'>
       <ReasoningStepsView
         response={resp}
         isStreaming={message.streaming || false}
+        docSources={docSources}
       />
       {!message.streaming && <SourcesView answer={resp} />}
       {!message.streaming && <DocSourcesView answer={resp} />}

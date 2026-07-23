@@ -6,6 +6,7 @@ import { PageRefChip } from "./page-ref-chip"
 
 const boardLinkRe = /^\/boards\/([^/]+)\/([^/]+)\/([^/]+)$/
 const PAGE_HREF_PREFIX = "page://"
+const DOC_HREF_PREFIX = "#doc-"
 
 type MarkdownLinkProps = React.AnchorHTMLAttributes<HTMLAnchorElement> & {
   children?: React.ReactNode
@@ -43,6 +44,29 @@ export function MarkdownLink({ children, href, ...rest }: MarkdownLinkProps) {
   if (href?.startsWith(PAGE_HREF_PREFIX)) {
     const title = textOf(children).trim() || "Untitled"
     return <PageRefChip title={title} />
+  }
+
+  // Document citation (`#doc-<docId>`, injected by linkifyDocTitles): render the
+  // title as an inline PROSE link (keep the label — the default internal-link
+  // branch below would replace it with a bare icon), and scroll to the matching
+  // Sources card, opening it if collapsed. Kept in-page (no URL hash churn).
+  if (href?.startsWith(DOC_HREF_PREFIX)) {
+    const onDocClick = (event: React.MouseEvent<HTMLAnchorElement>): void => {
+      event.preventDefault()
+      const el = document.getElementById(href.slice(1)) // "#doc-x" → "doc-x"
+      if (!el) return
+      if (el instanceof HTMLDetailsElement) el.open = true
+      el.scrollIntoView({ behavior: "smooth", block: "start" })
+    }
+    return (
+      <a
+        href={href}
+        onClick={onDocClick}
+        className="font-medium text-primary underline decoration-primary/40 underline-offset-2 hover:decoration-primary"
+      >
+        {children}
+      </a>
+    )
   }
 
   const content = Array.isArray(children) ? children[0] : children

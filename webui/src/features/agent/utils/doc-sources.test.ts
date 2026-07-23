@@ -111,6 +111,17 @@ describe("linkifyDocTitles", () => {
     )
   })
 
+  it("links a title at the very start of the text (leading boundary via ^)", () => {
+    expect(linkifyDocTitles("notes.pdf is the source", [src("A", "notes.pdf")])).toBe(
+      "[notes.pdf](#doc-A) is the source",
+    )
+  })
+
+  it("skips a title containing brackets (would break the emitted link label)", () => {
+    const title = "weird [draft].pdf"
+    expect(linkifyDocTitles(`see ${title} here`, [src("A", title)])).toBe(`see ${title} here`)
+  })
+
   it("returns the markdown unchanged when there are no titled sources", () => {
     expect(linkifyDocTitles("nothing to link", [])).toBe("nothing to link")
     expect(linkifyDocTitles("x", [src("A", "   ")])).toBe("x")

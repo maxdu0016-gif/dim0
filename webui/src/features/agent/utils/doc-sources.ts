@@ -55,7 +55,9 @@ const escapeRegExp = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, "\\
  * `](...)` are left alone. Unknown/misspelled references are simply not linked.
  */
 export const linkifyDocTitles = (markdown: string, sources: DocSource[]): string => {
-  const titled = sources.filter((s) => s.docTitle.trim().length > 0)
+  // Skip empty titles, and titles carrying a "[" or "]" (they'd break the
+  // emitted `[label](…)` markdown — the label isn't escapable).
+  const titled = sources.filter((s) => s.docTitle.trim().length > 0 && !/[[\]]/.test(s.docTitle))
   if (titled.length === 0) return markdown
   // Longest titles first so "Report v2.pdf" wins over "Report".
   const ordered = [...titled].sort((a, b) => b.docTitle.length - a.docTitle.length)
@@ -63,12 +65,14 @@ export const linkifyDocTitles = (markdown: string, sources: DocSource[]): string
   let out = markdown
   for (const s of ordered) {
     const title = escapeRegExp(s.docTitle)
-    // Boundaries: not preceded by a word char or "[" (avoids substring matches
-    // like "notes.pdf" inside "mynotes.pdf", and titles already inside a link),
-    // and not followed by a word char or "](" (avoids "Report.pdf" in
-    // "Report.pdfx", and double-wrapping an existing link).
-    const re = new RegExp(`(?<![\\w[])${title}(?![\\w]|\\]\\()`, "g")
-    out = out.replace(re, (match) => `[${match}](#doc-${s.docId})`)
+    // Boundaries. Leading edge WITHOUT a lookbehind (Safari <16.4 lacks it):
+    // capture start-of-string or a char that is neither a word char nor "[",
+    // and re-emit it. Trailing edge is a lookahead (supported everywhere).
+    //  - leading `(^|[^\w[])` → not a substring ("notes.pdf" in "mynotes.pdf")
+    //    and not already inside a link ("[title]").
+    //  - trailing `(?![\w]|\]\()` → not "Report.pdfx", and no double-wrap.
+    const re = new RegExp(`(^|[^\\w[])(${title})(?![\\w]|\\]\\()`, "g")
+    out = out.replace(re, (_m, pre: string, match: string) => `${pre}[${match}](#doc-${s.docId})`)
   }
   return out
 }
