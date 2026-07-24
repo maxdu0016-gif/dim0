@@ -31,6 +31,12 @@ describe("chunkMarkdown — invariants (hold for any input/options)", () => {
     { name: "ragged blank lines", md: "a\n\n\n\n\nb\n\n\n c ", maxChars: 100, overlap: 0 },
     { name: "block exactly maxChars", md: "q".repeat(100), maxChars: 100, overlap: 0 },
     { name: "block maxChars+1", md: "q".repeat(101), maxChars: 100, overlap: 0 },
+    { name: "spaced prose oversized", md: "one two three four five six seven eight nine ten", maxChars: 12, overlap: 0 },
+    { name: "multi-line block oversized", md: "aaaa\nbbbb\ncccc\ndddd", maxChars: 6, overlap: 0 },
+    { name: "sections with headings", md: `# A\n\n${"x".repeat(40)}\n\n# B\n\n${"y".repeat(40)}`, maxChars: 50, overlap: 0 },
+    { name: "heading glued to body", md: "# H\nbody\n## Sub\nmore\n\npara", maxChars: 40, overlap: 5 },
+    { name: "one long word", md: "x".repeat(37), maxChars: 10, overlap: 0 },
+    { name: "line longer than a word run", md: `short\n${"one two three four five"}`, maxChars: 10, overlap: 0 },
   ]
 
   for (const { name, md, maxChars, overlap } of cases) {
@@ -121,5 +127,90 @@ describe("chunkMarkdown — line endings", () => {
     )
     // and it actually produced >1 chunk (i.e. the blank lines were recognized)
     expect(chunkMarkdown(crlf, { maxChars: 20, overlap: 0 }).length).toBeGreaterThan(1)
+  })
+})
+
+
+describe("chunkMarkdown — heading-aware section breaks", () => {
+  it("ends a substantial chunk at the next heading so a section stays intact", () => {
+    const md = `## Alpha\n\n${"a".repeat(60)}\n\n## Beta\n\n${"b".repeat(60)}`
+    const out = chunkMarkdown(md, { maxChars: 200, overlap: 0 }) // minChars = 66
+    expect(out.map((c) => c.text)).toEqual([
+      `## Alpha\n\n${"a".repeat(60)}`,
+      `## Beta\n\n${"b".repeat(60)}`,
+    ])
+  })
+
+  it("does NOT break at a heading while the current chunk is still small (packs tiny sections)", () => {
+    // Six tiny sections, each well under minChars → all packed into one chunk
+    // instead of shattering into one-liners (mirrors legacy min_chunk_size).
+    const md = "# A\n\nx\n\n# B\n\ny\n\n# C\n\nz"
+    const out = chunkMarkdown(md, { maxChars: 200, overlap: 0 }) // minChars = 66
+    expect(out).toHaveLength(1)
+    expect(out[0].text).toBe(md)
+  })
+
+  it("minChars=1 forces a fresh chunk at every heading", () => {
+    const md = "# A\n\nx\n\n# B\n\ny\n\n# C\n\nz"
+    const out = chunkMarkdown(md, { maxChars: 200, overlap: 0, minChars: 1 })
+    expect(out.map((c) => c.text)).toEqual(["# A\n\nx", "# B\n\ny", "# C\n\nz"])
+  })
+
+  it("starts a block at a heading even with no blank line before it", () => {
+    const md = "# Title\nbody line one\n## Sub\nbody two"
+    const out = chunkMarkdown(md, { maxChars: 1000, overlap: 0, minChars: 1 })
+    expect(out.map((c) => c.text)).toEqual(["# Title\nbody line one", "## Sub\nbody two"])
+  })
+})
+
+
+describe("chunkMarkdown — heading detection (matches the legacy `^#{1,6}\\s` rule)", () => {
+  // With minChars=1 a real heading forces a break; a non-heading does not — so
+  // chunk count distinguishes what counts as a heading.
+  const chunks = (md: string) => chunkMarkdown(md, { maxChars: 1000, overlap: 0, minChars: 1 })
+
+  it("treats 1–6 leading # + space as a heading (breaks)", () => {
+    expect(chunks("para one\n\n###### six\n\npara two")).toHaveLength(2)
+  })
+
+  it("does not treat 7+ # as a heading (no break)", () => {
+    expect(chunks("para one\n\n####### seven\n\npara two")).toHaveLength(1)
+  })
+
+  it("does not treat a # without a following space as a heading (no break)", () => {
+    expect(chunks("para one\n\n#nospace\n\npara two")).toHaveLength(1)
+  })
+})
+
+
+describe("chunkMarkdown — separator cascade for oversized blocks", () => {
+  it("splits a multi-line block at line boundaries (no line cut mid-way)", () => {
+    const md = `${"a".repeat(60)}\n${"b".repeat(60)}\n${"c".repeat(60)}` // one block, 3 lines
+    const out = chunkMarkdown(md, { maxChars: 100, overlap: 0 })
+    expect(out.map((c) => c.text)).toEqual(["a".repeat(60), "b".repeat(60), "c".repeat(60)])
+  })
+
+  it("splits at word boundaries when there is no newline (no mid-word cut)", () => {
+    const out = chunkMarkdown("alpha beta gamma delta", { maxChars: 10, overlap: 0 })
+    expect(out.map((c) => c.text)).toEqual(["alpha beta", "gamma", "delta"])
+  })
+
+  it("falls back to characters only when a single word exceeds maxChars", () => {
+    const out = chunkMarkdown("supercalifragilistic", { maxChars: 5, overlap: 0 }) // 20 chars, no seams
+    expect(out.map((c) => c.text.length)).toEqual([5, 5, 5, 5])
+    expect(out.map((c) => c.text).join("")).toBe("supercalifragilistic")
+  })
+
+  it("recurses line → word when a single line still exceeds maxChars", () => {
+    const md = "short\none two three four five" // one block: a short line + a long line
+    const out = chunkMarkdown(md, { maxChars: 10, overlap: 0 })
+    expect(out.map((c) => c.text)).toEqual(["short", "one two", "three four", "five"])
+  })
+
+  it("never emits a chunk over maxChars from an oversized block", () => {
+    const md = `${"w".repeat(30)} ${"z".repeat(30)}\n${"q".repeat(45)}`
+    for (const c of chunkMarkdown(md, { maxChars: 20, overlap: 0 })) {
+      expect(c.text.length).toBeLessThanOrEqual(20)
+    }
   })
 })
