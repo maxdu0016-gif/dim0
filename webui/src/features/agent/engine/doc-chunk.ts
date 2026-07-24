@@ -33,21 +33,24 @@ const HEADING_RE = /^#{1,6}\s/
 const SEPARATORS = ["\n", " ", ""] as const
 
 
-const isHeading = (block: string): boolean => HEADING_RE.test(block)
+/** A paragraph/heading block plus whether it opens a section (its first line is a heading). */
+type Block = { text: string; heading: boolean }
 
 
 /**
  * Split `text` into paragraph blocks (blank-line separated), additionally
  * starting a new block at any heading line — so a heading with no blank line
- * before it (e.g. "# Title\nintro") still begins its own block.
+ * before it (e.g. "# Title\nintro") still begins its own block. Each block
+ * records whether it is a heading, decided ONCE here on the raw first line
+ * (matching the legacy rule), so the packer never re-tests a trimmed string.
  */
-const splitIntoBlocks = (text: string): string[] => {
-  const blocks: string[] = []
+const splitIntoBlocks = (text: string): Block[] => {
+  const blocks: Block[] = []
   for (const para of text.split(/\n{2,}/)) {
     let buf: string[] = []
     const flushBuf = (): void => {
       const t = buf.join("\n").trim()
-      if (t) blocks.push(t)
+      if (t) blocks.push({ text: t, heading: HEADING_RE.test(buf[0]) })
       buf = []
     }
     for (const line of para.split("\n")) {
@@ -110,30 +113,43 @@ export const chunkMarkdown = (
 
   const blocks = splitIntoBlocks(text)
   const packed: string[] = []
+  const startsSection: boolean[] = [] // chunk[i] opens a new heading section
   let cur = ""
+  let curHeading = false // does the block that started `cur` open a section?
   const flush = (): void => {
-    if (cur) packed.push(cur)
+    if (cur) {
+      packed.push(cur)
+      startsSection.push(curHeading)
+    }
     cur = ""
+    curHeading = false
   }
 
   for (const block of blocks) {
     // Keep a section intact: once the current chunk is substantial, let a heading
     // end it so the new section starts fresh rather than being glued on.
-    if (isHeading(block) && cur.length >= minChars) flush()
+    if (block.heading && cur.length >= minChars) flush()
 
-    if (block.length > maxChars) {
+    if (block.text.length > maxChars) {
       flush()
-      for (const piece of splitOversized(block, maxChars)) packed.push(piece)
+      // Only the first piece opens the section; the rest are continuations.
+      splitOversized(block.text, maxChars).forEach((piece, i) => {
+        packed.push(piece)
+        startsSection.push(block.heading && i === 0)
+      })
       continue
     }
-    if (cur && cur.length + 2 + block.length > maxChars) flush()
-    cur = cur ? `${cur}\n\n${block}` : block
+    if (cur && cur.length + 2 + block.text.length > maxChars) flush()
+    if (!cur) curHeading = block.heading // this block starts the chunk
+    cur = cur ? `${cur}\n\n${block.text}` : block.text
   }
   flush()
 
   // Prepend the tail of the previous chunk (context bridge across boundaries).
+  // Skipped for a chunk that opens a section: the heading break deliberately
+  // kept it standalone, so it shouldn't inherit the prior section's tail.
   return packed.map((chunk, index) => {
-    if (index === 0 || overlap === 0) return { index, text: chunk }
+    if (index === 0 || overlap === 0 || startsSection[index]) return { index, text: chunk }
     return { index, text: `${packed[index - 1].slice(-overlap)}\n\n${chunk}` }
   })
 }

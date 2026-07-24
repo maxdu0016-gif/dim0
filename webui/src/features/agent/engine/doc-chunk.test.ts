@@ -161,6 +161,31 @@ describe("chunkMarkdown — heading-aware section breaks", () => {
     const out = chunkMarkdown(md, { maxChars: 1000, overlap: 0, minChars: 1 })
     expect(out.map((c) => c.text)).toEqual(["# Title\nbody line one", "## Sub\nbody two"])
   })
+
+  it("does NOT prepend the previous section's overlap tail to a section-start chunk", () => {
+    // Two full sections; overlap is on. The second chunk opens a new section, so
+    // it must start with its heading — not the tail of the first section.
+    const md = `## Alpha\n\n${"a".repeat(60)}\n\n## Beta\n\n${"b".repeat(60)}`
+    const out = chunkMarkdown(md, { maxChars: 200, overlap: 10, minChars: 20 })
+    expect(out).toHaveLength(2)
+    expect(out[1].text).toBe(`## Beta\n\n${"b".repeat(60)}`) // clean section start, no "a…" prefix
+  })
+
+  it("still applies overlap to a continuation chunk that is NOT a section start", () => {
+    // No headings → the second chunk is a plain continuation and keeps its tail.
+    const md = `${"A".repeat(60)}\n\n${"B".repeat(60)}`
+    const out = chunkMarkdown(md, { maxChars: 70, overlap: 10 })
+    expect(out[1].text).toBe(`${"A".repeat(10)}\n\n${"B".repeat(60)}`)
+  })
+
+  it("treats an empty-title heading line ('## ') as a heading consistently", () => {
+    // Regression: the block trims to '##', but its heading-ness is decided on the
+    // raw line, so it still forces a section break (single source of truth).
+    const md = "para one\n\n## \n\npara two"
+    const out = chunkMarkdown(md, { maxChars: 1000, overlap: 0, minChars: 1 })
+    expect(out).toHaveLength(2)
+    expect(out[1].text).toBe("##\n\npara two")
+  })
 })
 
 
