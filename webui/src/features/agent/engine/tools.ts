@@ -296,18 +296,33 @@ export const editNote = defineTool({
 })
 
 
+// Cap per-hit body + hit count so the tool payload stays lean (mirrors the old
+// backend's 500-char / limit-5 shaping — here a touch higher on both).
+const SEARCH_SNIPPET_CHARS = 600
+const SEARCH_MAX_HITS = 8
+
+
+/** Coerce to a plain string; a node's label/content is typed string but the store types data generically. */
+const asText = (value: unknown): string => (typeof value === "string" ? value : "")
+
+
 export const searchNotes = defineTool({
   name: "search_notes",
-  description: "Full-text search notes on the board. Returns matching ids + titles.",
+  description:
+    "Full-text search the board's existing notes. Returns each match's id, title," +
+    " and a content snippet — usually enough to answer without a separate get_note.",
   parameters: z.object({
     query: z.string().describe("Full-text query matched against note titles and bodies."),
   }),
   run: async ({ query }, ctx) => {
     if (!ctx.search) return { results: [] }
-    const ids = await ctx.search.query(query)
+    const ids = (await ctx.search.query(query)).slice(0, SEARCH_MAX_HITS)
     const results = ids.map((id) => {
       const node = ctx.store.getNode(asNodeId(id))
-      return { id, title: (node?.data as DimNodeData | undefined)?.label ?? "" }
+      // Title is `data.label`; the body lives in the native `node.content`.
+      const title = asText((node?.data as DimNodeData | undefined)?.label)
+      const content = asText(node?.content).slice(0, SEARCH_SNIPPET_CHARS)
+      return { id, title, content }
     })
     return { results }
   },

@@ -191,7 +191,7 @@ export function useLocalSubmitPrompt(boardId: string) {
         // When documents are attached, steer grounding + citation-by-title (titles
         // are unique per board, so a title names exactly one document).
         const systemWithDocs = hasDocs
-          ? `${system}\n\nThis board has uploaded documents. For questions about them, call doc_search and ground your answer in the returned passages, referring to each document by its exact title.`
+          ? `${system}\n\nThis board has uploaded documents. Use \`doc_search(query)\` — full-text over their contents — and for anything they could answer, call it FIRST, before answering from your own knowledge; ground the answer in the returned passages and cite each document by its exact title. (\`search_notes\` covers the board's own notes.)`
           : system
         const userMessageForAgent = wrapWithMessageContext(prompt, messageContext)
         for await (const ev of runAgent({ system: systemWithDocs, userMessage: userMessageForAgent, history, tools, llm, ctx: { store, rootId, search } })) {

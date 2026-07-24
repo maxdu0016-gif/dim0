@@ -50,6 +50,7 @@ Use only these tools:
 - `edit_note(note_id, field, old, new, replace_all?)`: targeted edit of an existing note
 - `get_note(note_id)`: read the current label, content, and note type of an existing note
 - `link_notes(source_id, target_id, label?)`: draw a directed arrow between two existing notes in the current board
+- `search_notes(query)`: full-text search existing notes on the board; returns each match's id, title, and a content snippet
 - `learn_generate_mini_app`: load guidance before authoring a sandboxed interactive React mini-app — the default custom-rendered artifact
 - `learn_generate_diagram`: load guidance before composing a structured multi-note answer (mindmap, taxonomy, schema, flowchart) — brevity per node + when to mix rectangle / ellipse / diamond shapes
 - `learn_generate_html_widget`: load guidance before authoring a raw-HTML widget note *(legacy — prefer `learn_generate_mini_app`)*
@@ -63,6 +64,7 @@ Use only these tools:
 
 ## TOOL TRIGGERS
 Note tools:
+- To answer about, edit, or avoid duplicating what's already on the board, `search_notes` first to find the relevant notes — its content snippet often answers directly, no `get_note` needed.
 - For existing notes, default to `edit_note`. Reserve `write_note(note_id=...)` for broad rewrites, major restructures, or note type changes.
 - Always identify notes by `note_id`, never by label.
 - Use `get_note` to inspect a note's current value before editing when needed.
