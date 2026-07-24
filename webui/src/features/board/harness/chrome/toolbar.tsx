@@ -195,7 +195,7 @@ function FlaredTray({
 }
 
 
-export function HarnessToolbar() {
+export function HarnessToolbar({ local = false }: { local?: boolean } = {}) {
   const tool = useBoardAppStore((s) => s.tool)
   const setTool = useBoardAppStore((s) => s.setTool)
   const chromeDialog = useBoardAppStore((s) => s.chromeDialog)
@@ -448,7 +448,7 @@ export function HarnessToolbar() {
       </>
       )}
 
-      <HarnessToolbarMore />
+      <HarnessToolbarMore local={local} />
     </FlaredTray>
   )
 }

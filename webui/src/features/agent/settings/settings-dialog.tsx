@@ -17,7 +17,7 @@ import { useChatStore } from "@/features/agent/store/chat-store"
 import { useListAvailableServices } from "@/features/agent/api/list-available-services"
 import { useModelCatalog } from "@/features/agent/api/use-model-catalog"
 import { agentResolveContext } from "@/features/agent/engine/services/context"
-import { resolveAllServices } from "@/features/agent/engine/services/resolve"
+import { resolveAllServices, resolveService } from "@/features/agent/engine/services/resolve"
 import type { ServiceKind } from "@/features/agent/engine/services/kinds"
 
 
@@ -49,10 +49,36 @@ const fieldClass =
  * active model, and see each tool's usable/not marker with a shortcut into its
  * key section. The provider sections hold BYOK keys. "Our keys first."
  */
+/** Which service each nav section configures (General is a summary, no dot). */
+const NAV_KIND: Partial<Record<SectionId, ServiceKind>> = {
+  models: "llm",
+  search: "search",
+  code: "code",
+  documents: "parse",
+}
+
+
 export function SettingsDialog({ trigger }: { trigger: React.ReactNode }) {
   const [section, setSection] = useState<SectionId>("general")
   useModelCatalog() // public model list — populates the picker for everyone
   useListAvailableServices() // signed-in: search/code/tool availability
+
+  // Per-service usable/not status, so the left nav doubles as a status overview.
+  const signedIn = useIsSignedIn()
+  const configured = useByokStore((s) => s.configured)
+  const asConfig = useByokStore((s) => s.asConfig)
+  const searchByok = useByokStore((s) => s.searchByok)
+  const codeByok = useByokStore((s) => s.codeByok)
+  const parseByok = useByokStore((s) => s.parseByok)
+  const resolutions = resolveAllServices(
+    agentResolveContext({
+      signedIn,
+      llm: configured ? asConfig() : null,
+      search: searchByok(),
+      code: codeByok(),
+      parse: parseByok(),
+    }),
+  )
 
   return (
     <Dialog>
@@ -64,7 +90,9 @@ export function SettingsDialog({ trigger }: { trigger: React.ReactNode }) {
             <div className="px-2 pb-2 pt-1 text-[11px] font-mono uppercase tracking-wider text-muted-foreground">
               Settings
             </div>
-            {NAV.map(({ id, label, icon: Icon }) => (
+            {NAV.map(({ id, label, icon: Icon }) => {
+              const kind = NAV_KIND[id]
+              return (
               <button
                 key={id}
                 type="button"
@@ -78,8 +106,14 @@ export function SettingsDialog({ trigger }: { trigger: React.ReactNode }) {
               >
                 <Icon className="size-4 shrink-0" />
                 <span className="truncate">{label}</span>
+                {kind && (
+                  <span className="ml-auto shrink-0">
+                    <StatusDot usable={resolutions[kind].mode !== "off"} />
+                  </span>
+                )}
               </button>
-            ))}
+              )
+            })}
             <ForgetKeysButton />
           </nav>
           <div className="flex-1 overflow-y-auto p-5 scrollbar-thin">
@@ -326,14 +360,19 @@ function SearchPane() {
 
 
 function CodePane() {
+  const signedIn = useIsSignedIn()
   const savedKey = useByokStore((s) => s.codeKey)
   const setCode = useByokStore((s) => s.setCode)
   const [key, setKey] = useState(savedKey)
+  const usable = resolveService("code", agentResolveContext({ signedIn, code: savedKey.trim() || null })).mode !== "off"
 
   return (
     <div>
       <PaneTitle title="Code interpreter" hint="Runs in a Daytona sandbox. Add your Daytona key to run on your own account (relayed, never stored)." />
-      <div className="mb-2 text-xs font-medium">Daytona</div>
+      <div className="mb-2 flex items-center gap-2 text-xs font-medium">
+        <StatusDot usable={usable} />
+        Daytona
+      </div>
       <div className="flex gap-2">
         <input
           type="password"
@@ -350,14 +389,19 @@ function CodePane() {
 
 
 function DocumentsPane() {
+  const signedIn = useIsSignedIn()
   const savedKey = useByokStore((s) => s.parseKey)
   const setParse = useByokStore((s) => s.setParse)
   const [key, setKey] = useState(savedKey)
+  const usable = resolveService("parse", agentResolveContext({ signedIn, parse: savedKey.trim() || null })).mode !== "off"
 
   return (
     <div>
       <PaneTitle title="Documents" hint="PDFs are OCR'd to markdown by Mistral. Add your Mistral key to parse on your own account (relayed, never stored) — required to upload documents when signed out." />
-      <div className="mb-2 text-xs font-medium">Mistral</div>
+      <div className="mb-2 flex items-center gap-2 text-xs font-medium">
+        <StatusDot usable={usable} />
+        Mistral
+      </div>
       <div className="flex gap-2">
         <input
           type="password"

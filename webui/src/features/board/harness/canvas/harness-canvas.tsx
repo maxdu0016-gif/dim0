@@ -511,7 +511,7 @@ function HarnessCanvasInner({
         status badge, slide-related surfaces. NodeSurfaceHost stays
         mounted everywhere so the modal editor opens from any view.
       */}
-      {!presenting && <HarnessToolbar />}
+      {!presenting && <HarnessToolbar local={!canCollab} />}
       {/*
         Top-right chrome row: save status + share button live in one
         flex container so they never overlap (z-stack collisions cost
