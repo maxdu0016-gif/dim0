@@ -1,5 +1,5 @@
-import { CircleNotchIcon, DocumentFileIcon } from "@/components/icons"
-import { useLocalDocUpload } from "@/features/agent/local/use-local-doc-upload"
+import { DocumentFileIcon } from "@/components/icons"
+import { useLocalDocUpload, Spinner } from "@/features/agent/local/use-local-doc-upload"
 
 
 /**
@@ -12,7 +12,7 @@ import { useLocalDocUpload } from "@/features/agent/local/use-local-doc-upload"
  * unavailable (no managed access and no BYOK Mistral key).
  */
 export const DocAttachButton = ({ boardId }: { boardId: string }) => {
-  const { canParse, busy, pick, overrideDialog } = useLocalDocUpload(boardId)
+  const { canParse, busy, pick, elements } = useLocalDocUpload(boardId)
 
   return (
     <>
@@ -26,12 +26,7 @@ export const DocAttachButton = ({ boardId }: { boardId: string }) => {
       >
         {busy ? <Spinner /> : <DocumentFileIcon className="size-4" strokeWidth={2} />}
       </button>
-      {overrideDialog}
+      {elements}
     </>
   )
 }
-
-
-const Spinner = () => (
-  <CircleNotchIcon className="size-4 animate-spin [animation-duration:750ms]" strokeWidth={2} />
-)

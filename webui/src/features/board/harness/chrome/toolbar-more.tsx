@@ -165,7 +165,7 @@ export function HarnessToolbarMore({ local = false }: { local?: boolean } = {}) 
         </DropdownMenuContent>
       </DropdownMenu>
 
-      {localUpload && upload.overrideDialog}
+      {localUpload && upload.elements}
 
       <ImageSearchDialog
         open={openImageSearch}

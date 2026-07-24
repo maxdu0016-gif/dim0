@@ -32,10 +32,14 @@ export type LocalDocUpload = {
   /** False when parsing is unavailable (no managed access and no BYOK key) → grey out. */
   canParse: boolean
   busy: boolean
-  /** Open a native file picker and ingest the chosen PDF (guards double-pick). */
+  /** Open the native file picker and ingest the chosen PDF (guards double-pick). */
   pick: () => void
-  /** The same-name override confirm dialog — render it once at the call site. */
-  overrideDialog: ReactNode
+  /**
+   * Mount ONCE at the call site: the hidden file input `pick()` clicks (kept in
+   * the DOM so the picker opens on every browser) plus the same-name override
+   * confirm dialog.
+   */
+  elements: ReactNode
 }
 
 
@@ -52,6 +56,7 @@ export const useLocalDocUpload = (boardId: string): LocalDocUpload => {
   const signedIn = useIsSignedIn()
   // Raw so the button re-enables the moment a signed-out user saves a key.
   const byokKey = useByokStore((s) => s.parseKey).trim() || null
+  const inputRef = useRef<HTMLInputElement>(null)
   // Synchronous re-entrancy guard: `busy` state lags a render, so a rapid second
   // pick could slip through before it flips. A ref closes that window.
   const inFlight = useRef(false)
@@ -115,45 +120,52 @@ export const useLocalDocUpload = (boardId: string): LocalDocUpload => {
 
   const pick = useCallback((): void => {
     if (!canParse || busy || inFlight.current) return
-    const input = document.createElement("input")
-    input.type = "file"
-    input.accept = "application/pdf,.pdf"
-    input.onchange = () => {
-      const file = input.files?.[0]
-      if (file) void onPickFile(file)
-    }
-    input.click()
-  }, [canParse, busy, onPickFile])
+    inputRef.current?.click()
+  }, [canParse, busy])
 
-  const overrideDialog = (
-    <AlertDialog open={override !== null} onOpenChange={(o) => !o && setOverride(null)}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Replace “{override?.name}”?</AlertDialogTitle>
-          <AlertDialogDescription>
-            A document with this name is already on this board. Uploading will replace its contents.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel onClick={() => setOverride(null)}>Cancel</AlertDialogCancel>
-          <AlertDialogAction
-            onClick={() => {
-              const file = override
-              setOverride(null)
-              if (file) void ingest(file)
-            }}
-          >
-            Replace
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+  const elements = (
+    <>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="application/pdf,.pdf"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0]
+          e.target.value = "" // allow re-picking the same file
+          if (file) void onPickFile(file)
+        }}
+      />
+      <AlertDialog open={override !== null} onOpenChange={(o) => !o && setOverride(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Replace “{override?.name}”?</AlertDialogTitle>
+            <AlertDialogDescription>
+              A document with this name is already on this board. Uploading will replace its contents.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setOverride(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                const file = override
+                setOverride(null)
+                if (file) void ingest(file)
+              }}
+            >
+              Replace
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   )
 
-  return { canParse, busy, pick, overrideDialog }
+  return { canParse, busy, pick, elements }
 }
 
 
-const Spinner = () => (
+/** Shared 16px spinning loader (composer button busy-state + upload toast). */
+export const Spinner = () => (
   <CircleNotchIcon className="size-4 animate-spin [animation-duration:750ms]" strokeWidth={2} />
 )

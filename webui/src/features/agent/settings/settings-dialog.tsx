@@ -43,12 +43,6 @@ const fieldClass =
   "transition focus:border-secondary-foreground/50 focus:ring-4 focus:ring-secondary-foreground/15"
 
 
-/**
- * Unified agent settings — a dialog with a left nav (General / Model providers /
- * Web search / Code) and a right pane. General is the everyday surface: pick the
- * active model, and see each tool's usable/not marker with a shortcut into its
- * key section. The provider sections hold BYOK keys. "Our keys first."
- */
 /** Which service each nav section configures (General is a summary, no dot). */
 const NAV_KIND: Partial<Record<SectionId, ServiceKind>> = {
   models: "llm",
@@ -58,6 +52,12 @@ const NAV_KIND: Partial<Record<SectionId, ServiceKind>> = {
 }
 
 
+/**
+ * Unified agent settings — a dialog with a left nav (General / Model providers /
+ * Web search / Code) and a right pane. General is the everyday surface: pick the
+ * active model, and see each tool's usable/not marker with a shortcut into its
+ * key section. The provider sections hold BYOK keys. "Our keys first."
+ */
 export function SettingsDialog({ trigger }: { trigger: React.ReactNode }) {
   const [section, setSection] = useState<SectionId>("general")
   useModelCatalog() // public model list — populates the picker for everyone
