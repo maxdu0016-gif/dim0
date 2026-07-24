@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { generateUuid } from "@/lib/common"
 import { useIsSignedIn } from "@/lib/auth"
+import { useByokStore } from "@/features/agent/byok/byok-store"
 import { getLocalStores } from "@/features/local-stores"
 import { getCanvasStoreRef } from "@/features/board/harness/canvas-store-ref"
 import { useBoardAppStore } from "@/features/board/harness/store/board-app-store"
@@ -37,16 +38,19 @@ const MAX_FILE_BYTES = 5 * 1024 * 1024
  */
 export const DocAttachButton = ({ boardId }: { boardId: string }) => {
   const signedIn = useIsSignedIn()
+  // The user's Mistral key (if any). Selected raw so the button re-enables the
+  // moment a signed-out user saves one in Settings → Documents.
+  const byokKey = useByokStore((s) => s.parseKey).trim() || null
   const inputRef = useRef<HTMLInputElement>(null)
   // Synchronous re-entrancy guard: `busy` state lags a render, so a rapid second
   // file-select could slip through before it flips. A ref closes that window.
   const inFlight = useRef(false)
   const [busy, setBusy] = useState(false)
   const [override, setOverride] = useState<File | null>(null)
-  const canParse = resolveParseClient({ signedIn }) !== null
+  const canParse = resolveParseClient({ signedIn, byokKey }) !== null
 
   const ingest = async (file: File): Promise<void> => {
-    const client = resolveParseClient({ signedIn, runId: generateUuid() })
+    const client = resolveParseClient({ signedIn, runId: generateUuid(), byokKey })
     if (!client) {
       toast.error("Sign in or add a Mistral key to upload documents.")
       return

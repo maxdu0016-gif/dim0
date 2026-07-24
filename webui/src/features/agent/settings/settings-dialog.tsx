@@ -2,6 +2,7 @@ import { useState, type ComponentType } from "react"
 import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import {
   CodeInterpreterIcon,
+  DocumentFileIcon,
   GlobeIcon,
   LinkIcon,
   ToolsMenuIcon,
@@ -20,13 +21,14 @@ import { resolveAllServices } from "@/features/agent/engine/services/resolve"
 import type { ServiceKind } from "@/features/agent/engine/services/kinds"
 
 
-type SectionId = "general" | "models" | "search" | "code"
+type SectionId = "general" | "models" | "search" | "code" | "documents"
 
 const NAV: { id: SectionId; label: string; icon: ComponentType<{ className?: string }> }[] = [
   { id: "general", label: "General", icon: ToolsMenuIcon },
   { id: "models", label: "Model providers", icon: SparklesIcon },
   { id: "search", label: "Web search", icon: GlobeIcon },
   { id: "code", label: "Code interpreter", icon: CodeInterpreterIcon },
+  { id: "documents", label: "Documents", icon: DocumentFileIcon },
 ]
 
 const SEARCH_ENGINES: { id: SearchEngine; label: string; placeholder: string }[] = [
@@ -85,6 +87,7 @@ export function SettingsDialog({ trigger }: { trigger: React.ReactNode }) {
             {section === "models" && <ProvidersPane />}
             {section === "search" && <SearchPane />}
             {section === "code" && <CodePane />}
+            {section === "documents" && <DocumentsPane />}
           </div>
         </div>
       </DialogContent>
@@ -97,7 +100,11 @@ export function SettingsDialog({ trigger }: { trigger: React.ReactNode }) {
 function ForgetKeysButton() {
   const clear = useByokStore((s) => s.clear)
   const hasKeys = useByokStore(
-    (s) => Object.values(s.llm).some((c) => c?.apiKey) || Object.values(s.search).some(Boolean) || !!s.codeKey,
+    (s) =>
+      Object.values(s.llm).some((c) => c?.apiKey) ||
+      Object.values(s.search).some(Boolean) ||
+      !!s.codeKey ||
+      !!s.parseKey,
   )
   return (
     <button
@@ -140,18 +147,21 @@ function GeneralPane({ onNavigate }: { onNavigate: (s: SectionId) => void }) {
   const asConfig = useByokStore((s) => s.asConfig)
   const searchByok = useByokStore((s) => s.searchByok)
   const codeByok = useByokStore((s) => s.codeByok)
+  const parseByok = useByokStore((s) => s.parseByok)
   const resolutions = resolveAllServices(
     agentResolveContext({
       signedIn,
       llm: configured ? asConfig() : null,
       search: searchByok(),
       code: codeByok(),
+      parse: parseByok(),
     }),
   )
 
   const tools: { kind: ServiceKind; label: string; icon: ComponentType<{ className?: string }>; section?: SectionId }[] = [
     { kind: "search", label: "Web search", icon: GlobeIcon, section: "search" },
     { kind: "code", label: "Code interpreter", icon: CodeInterpreterIcon, section: "code" },
+    { kind: "parse", label: "Documents", icon: DocumentFileIcon, section: "documents" },
     { kind: "fetch", label: "Fetch", icon: LinkIcon },
   ]
 
@@ -333,6 +343,30 @@ function CodePane() {
           className={fieldClass}
         />
         <SaveButton disabled={key === savedKey} onClick={() => setCode({ apiKey: key.trim() })} />
+      </div>
+    </div>
+  )
+}
+
+
+function DocumentsPane() {
+  const savedKey = useByokStore((s) => s.parseKey)
+  const setParse = useByokStore((s) => s.setParse)
+  const [key, setKey] = useState(savedKey)
+
+  return (
+    <div>
+      <PaneTitle title="Documents" hint="PDFs are OCR'd to markdown by Mistral. Add your Mistral key to parse on your own account (relayed, never stored) — required to upload documents when signed out." />
+      <div className="mb-2 text-xs font-medium">Mistral</div>
+      <div className="flex gap-2">
+        <input
+          type="password"
+          value={key}
+          onChange={(ev) => setKey(ev.target.value)}
+          placeholder="mis-…"
+          className={fieldClass}
+        />
+        <SaveButton disabled={key === savedKey} onClick={() => setParse({ apiKey: key.trim() })} />
       </div>
     </div>
   )

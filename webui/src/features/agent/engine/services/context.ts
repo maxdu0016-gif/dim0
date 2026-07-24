@@ -16,6 +16,7 @@ export const agentResolveContext = (opts: {
   llm?: ByokConfig | null
   search?: { engine: string; apiKey: string } | null
   code?: string | null
+  parse?: string | null
 }): ResolveContext => {
   const byok: PerKindByok = {}
   if (opts.llm) {
@@ -26,6 +27,9 @@ export const agentResolveContext = (opts: {
   }
   if (opts.code) {
     byok.code = { provider: "daytona", apiKey: opts.code }
+  }
+  if (opts.parse) {
+    byok.parse = { provider: "mistral", apiKey: opts.parse }
   }
   return { signedIn: opts.signedIn, preferManaged: opts.signedIn, byok }
 }

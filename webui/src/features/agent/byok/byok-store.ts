@@ -21,6 +21,8 @@ type Stored = {
   /** Per-engine search keys — set one without clearing the others. */
   search: Partial<Record<SearchEngine, string>>
   codeKey: string
+  /** Document parsing (Mistral OCR) — relayed through our proxy. */
+  parseKey: string
 }
 
 
@@ -43,6 +45,7 @@ const load = (): Stored | null => {
       searchEngine,
       search: p.search ?? (p.searchKey ? { [searchEngine]: p.searchKey } : {}),
       codeKey: p.codeKey ?? "",
+      parseKey: p.parseKey ?? "",
     }
   } catch {
     return null
@@ -65,6 +68,8 @@ type ByokState = {
   search: Partial<Record<SearchEngine, string>>
   // Code interpreter (Daytona) — relayed through our proxy.
   codeKey: string
+  // Document parsing (Mistral OCR) — relayed through our proxy.
+  parseKey: string
   /** Save a provider's model key + model, and make it the active provider. */
   setLlm: (cfg: { provider: ByokProvider; apiKey: string; model: string }) => void
   /** Switch the active model provider (keys are preserved per provider). */
@@ -74,6 +79,7 @@ type ByokState = {
   /** Save one engine's key without touching the others. */
   setSearchKey: (engine: SearchEngine, apiKey: string) => void
   setCode: (cfg: { apiKey: string }) => void
+  setParse: (cfg: { apiKey: string }) => void
   clear: () => void
   /** The active provider's config (key + model), or null when it has no key. */
   asConfig: () => ByokConfig | null
@@ -81,6 +87,8 @@ type ByokState = {
   searchByok: () => { engine: SearchEngine; apiKey: string } | null
   /** The code (Daytona) BYOK key, or null when unset. */
   codeByok: () => string | null
+  /** The document-parsing (Mistral) BYOK key, or null when unset. */
+  parseByok: () => string | null
 }
 
 
@@ -105,6 +113,7 @@ export const useByokStore = create<ByokState>((set, get) => ({
   searchEngine: initial?.searchEngine ?? "perplexity",
   search: initial?.search ?? {},
   codeKey: initial?.codeKey ?? "",
+  parseKey: initial?.parseKey ?? "",
 
   setLlm: ({ provider, apiKey, model }) => {
     const llm = { ...get().llm, [provider]: { apiKey, model } }
@@ -132,8 +141,13 @@ export const useByokStore = create<ByokState>((set, get) => ({
     persist(get)
   },
 
+  setParse: ({ apiKey }) => {
+    set({ parseKey: apiKey })
+    persist(get)
+  },
+
   clear: () => {
-    set({ llm: {}, configured: false, search: {}, codeKey: "" })
+    set({ llm: {}, configured: false, search: {}, codeKey: "", parseKey: "" })
     try {
       localStorage.removeItem(STORAGE_KEY)
     } catch {
@@ -155,19 +169,24 @@ export const useByokStore = create<ByokState>((set, get) => ({
   },
 
   codeByok: () => get().codeKey.trim() || null,
+
+  parseByok: () => get().parseKey.trim() || null,
 }))
 
 
 const hasAnyKey = (s: ByokState): boolean =>
-  Object.values(s.llm).some((c) => c?.apiKey) || Object.values(s.search).some(Boolean) || Boolean(s.codeKey)
+  Object.values(s.llm).some((c) => c?.apiKey) ||
+  Object.values(s.search).some(Boolean) ||
+  Boolean(s.codeKey) ||
+  Boolean(s.parseKey)
 
 
 /** Persist the config to localStorage on this device (until `clear()`). */
 function persist(get: () => ByokState): void {
-  const { provider, llm, searchEngine, search, codeKey } = get()
+  const { provider, llm, searchEngine, search, codeKey, parseKey } = get()
   try {
     if (hasAnyKey(get())) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ provider, llm, searchEngine, search, codeKey }))
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ provider, llm, searchEngine, search, codeKey, parseKey }))
     } else {
       localStorage.removeItem(STORAGE_KEY)
     }
