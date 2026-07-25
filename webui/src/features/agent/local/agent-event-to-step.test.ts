@@ -163,6 +163,35 @@ describe("stepsFromEvents", () => {
   })
 
 
+  it("maps a doc_search result to a structured doc_search output (docId-keyed refs)", () => {
+    const [step] = stepsFromEvents(
+      [
+        { type: "tool_start", toolName: "doc_search", args: { query: "revenue" } },
+        {
+          type: "tool_result",
+          toolName: "doc_search",
+          result: {
+            results: [
+              { chunkId: "A#0", docId: "A", docTitle: "Report.pdf", text: "revenue grew" },
+              { chunkId: "x", docId: "", docTitle: "No.pdf", text: "dropped (no docId)" },
+            ],
+          },
+        },
+      ],
+      "b",
+    )
+    expect(step.type === "tool_call" && step.name).toBe("doc_search")
+    if (step.type === "tool_call" && typeof step.output !== "string") {
+      expect(step.output).toEqual({
+        type: "doc_search",
+        references: [{ chunkId: "A#0", docId: "A", docTitle: "Report.pdf", text: "revenue grew" }],
+      })
+    } else {
+      throw new Error("expected a structured doc_search output")
+    }
+  })
+
+
   it("coalesces a run of cumulative streaming deltas into ONE reasoning step", () => {
     const events: AgentEvent[] = [
       { type: "assistant_text", text: "Nap" },

@@ -27,6 +27,7 @@ const toToolName = (name: string): ToolName => {
   if (name === "code_interpreter") return "code_interpreter"
   if (name === "search_notes") return "memory_search"
   if (name === "fetch") return "fetch"
+  if (name === "doc_search") return "doc_search"
   return name as ToolName
 }
 
@@ -80,6 +81,20 @@ const toOutput = (name: string, args: unknown, result: unknown, boardId: string)
     // output so a fetched link surfaces alongside search sources.
     const ann = toUrlAnnotation(result)
     return ann ? { type: "web_search", answer: "", searchResults: [ann] } : JSON.stringify(result)
+  }
+  if (name === "doc_search") {
+    // Result: { results: [{ chunkId, docId, docTitle, text }] } → structured
+    // references the answer's document Sources view reads (keyed by docId).
+    const raw = field(result, "results")
+    const references = (Array.isArray(raw) ? raw : [])
+      .map((r) => ({
+        chunkId: asStr(field(r, "chunkId")) ?? "",
+        docId: asStr(field(r, "docId")) ?? "",
+        docTitle: asStr(field(r, "docTitle")) ?? "",
+        text: asStr(field(r, "text")) ?? "",
+      }))
+      .filter((r) => r.docId !== "")
+    return { type: "doc_search", references }
   }
   if (name.startsWith("learn_generate")) {
     return `Loaded ${name.replace("learn_generate_", "").replace(/_/g, " ")} guidance`

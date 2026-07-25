@@ -12,12 +12,14 @@ so a managed turn reuses the exact BYOK mapping — only the transport differs.
 """
 
 import json
+import os
+import tempfile
 
 from typing import Annotated, Any, Literal
 
 import litellm
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, File, Header, HTTPException, Request, Response, UploadFile, status
 from fastapi.responses import StreamingResponse
 from fastapi.security import OAuth2PasswordBearer
 from pydantic import BaseModel
@@ -37,6 +39,7 @@ from topix.api.utils.rate_limit.policy import resolve_allowed_model_tiers
 from topix.api.utils.rate_limit.service import enforce_rate_limit
 from topix.api.utils.security import decode_and_validate_token, get_current_user_uid
 from topix.config import catalog
+from topix.nlp.parser import MistralParser
 
 router = APIRouter(prefix="/ai", tags=["ai"])
 
@@ -44,6 +47,9 @@ router = APIRouter(prefix="/ai", tags=["ai"])
 RUN_TTL_SECONDS = 3600
 # Light abuse guard for the unauthenticated BYOK relay (per client IP, per minute).
 BYOK_IP_PER_MINUTE = 120
+# Upload limits for /ai/parse (mirror the client's pre-checks in doc-attach.tsx).
+MAX_PDF_BYTES = 5 * 1024 * 1024
+MAX_PDF_PAGES = 50
 
 # Token is OPTIONAL here: a BYOK relay call (X-Provider-Key) may be tokenless.
 _oauth2_optional = OAuth2PasswordBearer(tokenUrl="/users/signin", auto_error=False)
@@ -406,3 +412,53 @@ async def ai_fetch(
         "title": first.title if first else None,
         "text": (first.content if first else "") or output.answer or "",
     }
+
+
+@router.post("/parse/", include_in_schema=False)
+@router.post("/parse")
+@with_standard_response
+async def ai_parse(
+    response: Response,
+    request: Request,
+    user_id: Annotated[str | None, Depends(optional_user_uid)],
+    _meter: Annotated[None, Depends(meter_run)],
+    file: UploadFile = File(..., description="PDF to OCR into markdown"),
+    x_provider_key: Annotated[str | None, Header()] = None,
+):
+    """OCR an uploaded PDF into markdown via Mistral; returns `{markdown, pages}`.
+
+    Uses our Mistral key by default, or relays the user's `X-Provider-Key` (a
+    Mistral key) for this call only — never stored. Only PDFs are supported; the
+    bytes are OCR'd from a short-lived temp file and never persisted server-side
+    (the client owns the resulting markdown, offline-first).
+    """
+    filename = file.filename or ""
+    if not (file.content_type == "application/pdf" or filename.lower().endswith(".pdf")):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Only PDF files are supported")
+
+    file_bytes = await file.read()
+    if len(file_bytes) > MAX_PDF_BYTES:
+        raise HTTPException(
+            status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            f"PDF must be under {MAX_PDF_BYTES // (1024 * 1024)} MB",
+        )
+
+    parser = MistralParser(api_key=x_provider_key) if x_provider_key else MistralParser.from_config()
+
+    tmp = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False)
+    try:
+        tmp.write(file_bytes)
+        tmp.close()
+        # Page-count gate BEFORE OCR (get_num_pages reads pypdf locally, no spend).
+        # -1 = unreadable; let parse() surface the real error rather than gate on it.
+        page_count = parser.get_num_pages(tmp.name)
+        if page_count > MAX_PDF_PAGES:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST, f"PDF must be under {MAX_PDF_PAGES} pages"
+            )
+        pages = await parser.parse(tmp.name)
+    finally:
+        os.unlink(tmp.name)
+
+    markdown = "\n\n".join(str(page["markdown"]) for page in pages)
+    return {"markdown": markdown, "pages": len(pages)}

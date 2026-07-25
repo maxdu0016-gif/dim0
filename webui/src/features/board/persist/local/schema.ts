@@ -25,4 +25,7 @@ export const COLLECTIONS: Record<Collection, CollectionSchema> = {
   chat_messages: { keyPath: ["chatUid", "id"] },
   mini_app_state: { keyPath: "noteId" },
   sync_meta: { keyPath: "boardId" },
+  // Document Q&A (per-board): an uploaded doc's metadata + its retrieval chunks.
+  documents: { keyPath: "id", indexes: { "by-board": "boardId" } },
+  chunks: { keyPath: "chunkId", indexes: { "by-board": "boardId", "by-doc": "docId" } },
 }

@@ -13,6 +13,7 @@ import {
   getServicesBaseUrl,
   servicesPost,
   servicesStream,
+  servicesUpload,
   setServicesBaseUrl,
 } from "./transport"
 
@@ -100,6 +101,27 @@ describe("servicesPost", () => {
     await servicesPost("/ai/fetch", { url: "https://x.com" })
     const [url] = lastCall()
     expect(url).toBe("http://localhost:9999/ai/fetch")
+  })
+})
+
+
+describe("servicesUpload", () => {
+  it("sends the FormData as-is and does NOT set Content-Type (browser owns the boundary)", async () => {
+    fetchWithAuthRaw.mockResolvedValue(jsonResponse({ markdown: "# x", pages: 1 }))
+    const form = new FormData()
+    form.append("file", new Blob(["%PDF"], { type: "application/pdf" }), "doc.pdf")
+    const out = await servicesUpload<{ markdown: string; pages: number }>("/ai/parse", form, { "X-Run-Id": "r1" })
+    expect(out).toEqual({ markdown: "# x", pages: 1 })
+    const [, init] = lastCall()
+    expect(init.body).toBe(form)
+    expect(init.headers.get("Content-Type")).toBeNull()
+    expect(init.headers.get("X-Run-Id")).toBe("r1")
+  })
+
+  it("throws a 429-detectable error on over-quota", async () => {
+    fetchWithAuthRaw.mockResolvedValue(errorResponse(429))
+    const err = await servicesUpload("/ai/parse", new FormData()).catch((e) => e)
+    expect(isOverQuotaError(err)).toBe(true)
   })
 })
 

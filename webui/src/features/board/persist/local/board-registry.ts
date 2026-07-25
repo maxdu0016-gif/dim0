@@ -22,7 +22,7 @@ export type BoardRegistryOptions = { engine?: StorageEngine; dbName?: string }
 
 // Every store a board's data spans — the cascade-delete transaction covers all.
 const BOARD_COLLECTIONS: Collection[] = [
-  "boards", "views", "snapshots", "oplog", "chats", "chat_messages",
+  "boards", "views", "snapshots", "oplog", "chats", "chat_messages", "documents", "chunks",
 ]
 
 
@@ -145,6 +145,11 @@ export class BoardRegistry {
         await t.delete("chat_messages", { lower: [chat.id, ""], upper: [chat.id, "￿"] })
         await t.delete("chats", chat.id)
       }
+      // Cascade the board's uploaded documents + their retrieval chunks.
+      const docs = await t.list<{ id: string }>("documents", { index: "by-board", range: { lower: id, upper: id } })
+      for (const doc of docs) await t.delete("documents", doc.id)
+      const chunks = await t.list<{ chunkId: string }>("chunks", { index: "by-board", range: { lower: id, upper: id } })
+      for (const chunk of chunks) await t.delete("chunks", chunk.chunkId)
     })
   }
 

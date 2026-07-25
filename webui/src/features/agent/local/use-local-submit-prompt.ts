@@ -15,6 +15,8 @@ import { useIsSignedIn } from "@/lib/auth"
 import { agentBuildTools, searchNotes } from "@/features/agent/engine/tools"
 import { skillTools } from "@/features/agent/engine/skills"
 import { getSearchIndexRef } from "@/features/board/search/search-index-ref"
+import { getDocIndexRef } from "@/features/board/search/doc-index-ref"
+import { makeDocSearchTool } from "@/features/agent/engine/doc-search"
 import type { AgentEvent } from "@/features/agent/engine/types"
 import { planSystemPrompt } from "@/features/agent/prompts"
 import { useByokStore } from "@/features/agent/byok/byok-store"
@@ -164,14 +166,23 @@ export function useLocalSubmitPrompt(boardId: string) {
         const webSearch = resolveSearchClient({ signedIn, runId, engine: searchEngine, byok: searchByok() })
         const code = resolveCodeClient({ signedIn, runId, byokKey: codeByok() })
         const fetchUrl = resolveFetchClient({ signedIn, runId })
+        // Offer doc_search only when the board actually has indexed document chunks.
+        const docIndex = getDocIndexRef()
+        const hasDocs = !!docIndex && docIndex.count() > 0
         const tools = [
           ...AGENT_TOOLS,
           ...(webSearch ? [makeWebSearchTool(webSearch)] : []),
           ...(code ? [makeCodeInterpreterTool(code)] : []),
           ...(fetchUrl ? [makeFetchTool(fetchUrl)] : []),
+          ...(hasDocs && docIndex ? [makeDocSearchTool(docIndex)] : []),
         ]
+        // When documents are attached, steer grounding + citation-by-title (titles
+        // are unique per board, so a title names exactly one document).
+        const systemWithDocs = hasDocs
+          ? `${system}\n\nThis board has uploaded documents. For questions about them, call doc_search and ground your answer in the returned passages, referring to each document by its exact title.`
+          : system
         const userMessageForAgent = wrapWithMessageContext(prompt, messageContext)
-        for await (const ev of runAgent({ system, userMessage: userMessageForAgent, history, tools, llm, ctx: { store, rootId, search } })) {
+        for await (const ev of runAgent({ system: systemWithDocs, userMessage: userMessageForAgent, history, tools, llm, ctx: { store, rootId, search } })) {
           // Streaming yields a cumulative assistant_text per token — replace the
           // previous snapshot in place instead of appending one event per token.
           const prev = events[events.length - 1]
