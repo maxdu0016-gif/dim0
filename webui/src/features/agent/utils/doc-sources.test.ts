@@ -125,6 +125,21 @@ describe("linkifyDocTitles", () => {
     )
   })
 
+  it("neutralizes HTML metacharacters in the emitted label (no raw HTML injection)", () => {
+    // A malicious file name carrying raw HTML must render as literal text, not
+    // reach the markdown renderer as active markup.
+    const title = "<img src=x onerror=alert(1)>.pdf"
+    const out = linkifyDocTitles(`cite ${title} now`, [src("A", title)], MID)
+    expect(out).toBe("cite [&lt;img src=x onerror=alert(1)&gt;.pdf](#doc-m1-A) now")
+    expect(out).not.toContain("<img")
+  })
+
+  it("leaves a plain title's label untouched (no spurious entity encoding)", () => {
+    expect(linkifyDocTitles("see Q3 Report.pdf here", [src("A", "Q3 Report.pdf")], MID)).toBe(
+      "see [Q3 Report.pdf](#doc-m1-A) here",
+    )
+  })
+
   it("links a title at the very start of the text (leading boundary via ^)", () => {
     expect(linkifyDocTitles("notes.pdf is the source", [src("A", "notes.pdf")], MID)).toBe(
       "[notes.pdf](#doc-m1-A) is the source",

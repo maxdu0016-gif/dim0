@@ -8,6 +8,30 @@ const boardLinkRe = /^\/boards\/([^/]+)\/([^/]+)\/([^/]+)$/
 const PAGE_HREF_PREFIX = "page://"
 const DOC_HREF_PREFIX = "#doc-"
 
+// Schemes we allow on a rendered <a href>. Everything else (javascript:,
+// data:, vbscript:, blob:, file:, …) is treated as unsafe and neutralized.
+// page:// and #doc- are handled by dedicated branches before this gate.
+// Kept in sync with sanitize-schema's href protocols. tel/sms are legitimate
+// contact links; xmpp/irc(s) are in the sanitizer's default href allowlist.
+const SAFE_SCHEMES = new Set(["http:", "https:", "mailto:", "tel:", "sms:", "xmpp:", "irc:", "ircs:"])
+
+/**
+ * Decide whether a markdown href is safe to assign to an anchor.
+ * Schemeless hrefs — relative paths, `#hash`, `?query`, and
+ * protocol-relative `//host` — inherit the current origin and are safe.
+ * A href with an explicit scheme is safe only when that scheme is in the
+ * allowlist. Robust to obfuscation: leading/trailing whitespace, control
+ * chars, mixed case, and whitespace embedded in the scheme (browsers strip
+ * tabs/newlines, so "java\tscript:" resolves to javascript:).
+ */
+const isSafeHref = (href: string): boolean => {
+  // eslint-disable-next-line no-control-regex -- deliberately strips control/whitespace chars a browser ignores inside a scheme (defeats "java\tscript:" obfuscation)
+  const cleaned = href.replace(/[\u0000-\u0020\u007f-\u009f]/g, "")
+  const scheme = cleaned.match(/^([a-z][a-z0-9+.-]*):/i)
+  if (!scheme) return true
+  return SAFE_SCHEMES.has(`${scheme[1].toLowerCase()}:`)
+}
+
 type MarkdownLinkProps = React.AnchorHTMLAttributes<HTMLAnchorElement> & {
   children?: React.ReactNode
 }
@@ -86,7 +110,11 @@ export function MarkdownLink({ children, href, ...rest }: MarkdownLinkProps) {
     })
   }
 
-  const isExternal = !!href && /^(https?:)?\/\//.test(href)
+  // Scheme allowlist gate (defense at the sink): only assign the href when
+  // its scheme is safe, so javascript:/data:/vbscript:/… never reach the DOM.
+  const safeHref = href && isSafeHref(href) ? href : undefined
+
+  const isExternal = !!safeHref && /^(https?:)?\/\//.test(safeHref)
   const target = isExternal ? "_blank" : rest.target
   const rel = isExternal ? "noreferrer" : rest.rel
 
@@ -97,7 +125,7 @@ export function MarkdownLink({ children, href, ...rest }: MarkdownLinkProps) {
 
   return (
     <a
-      href={href}
+      href={safeHref}
       target={target}
       rel={rel}
       className={clName}

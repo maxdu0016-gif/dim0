@@ -47,10 +47,19 @@ export const extractDocSources = (answer: AgentResponse): DocSource[] => {
 const escapeRegExp = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
 
 
-// Backslash-escape markdown-active chars so a filename like "a*b_.pdf" renders
-// as literal text inside the emitted `[label](…)` instead of turning into
-// emphasis / code. "[" and "]" are handled by skipping such titles entirely.
-const escapeMarkdownLabel = (s: string): string => s.replace(/[\\`*_]/g, "\\$&")
+// Neutralize a title before it becomes the label of an emitted `[label](…)`.
+// Two passes: (1) backslash-escape markdown-active chars so "a*b_.pdf" renders
+// as literal text instead of emphasis / code; (2) HTML-entity-encode & < >
+// so a title carrying raw HTML (e.g. "<img src=x onerror=…>.pdf" from an
+// attacker-controlled file name) renders as literal text rather than reaching
+// MarkdownView's raw-HTML pipeline as active markup. "[" and "]" are handled by
+// skipping such titles entirely. `&` is encoded first so `<`/`>` don't double-encode.
+const escapeMarkdownLabel = (s: string): string =>
+  s
+    .replace(/[\\`*_]/g, "\\$&")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
 
 
 /**
