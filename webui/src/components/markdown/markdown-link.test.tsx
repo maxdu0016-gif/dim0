@@ -99,6 +99,8 @@ describe("MarkdownLink — href scheme allowlist", () => {
     "http://example.com/",
     "//example.com/",
     "mailto:hi@example.com",
+    "tel:+15551234567",
+    "sms:+15551234567",
     "/boards/b1/n/n1",
     "#section",
     "?q=1",

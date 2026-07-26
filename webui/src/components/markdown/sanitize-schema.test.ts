@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest"
 import { fromHtml } from "hast-util-from-html"
 import { toHtml } from "hast-util-to-html"
 import { sanitize } from "hast-util-sanitize"
-import { SANITIZE_SCHEMA } from "./sanitize-schema"
+import { SANITIZE_SCHEMA, cleanStyle, rehypeSafeStyle } from "./sanitize-schema"
 
 
 // Exercise the schema the way rehype-sanitize applies it (see markdown-view.tsx):
@@ -40,8 +40,65 @@ describe("SANITIZE_SCHEMA — strips XSS vectors", () => {
     expect(out).toContain("click")
   })
 
-  it("strips a data: URI on an image", () => {
-    expect(clean('<img src="data:text/html,<script>alert(1)</script>">')).not.toContain("data:")
+})
+
+
+describe("SANITIZE_SCHEMA — no over-stripping of legitimate content", () => {
+  it("keeps a data:image URI on an <img> (inert — an image cannot execute)", () => {
+    expect(clean('<img src="data:image/png;base64,iVBORw0KGgo=">')).toContain("data:image/png")
+  })
+
+  it("does not rewrite in-document anchor ids (clobberPrefix empty)", () => {
+    const out = clean('<h2 id="summary">Summary</h2>')
+    expect(out).toContain('id="summary"')
+    expect(out).not.toContain("user-content")
+  })
+
+  it("keeps tel:/sms: hrefs (contact links)", () => {
+    expect(clean('<a href="tel:+15551234567">call</a>')).toContain("tel:+15551234567")
+    expect(clean('<a href="sms:+15551234567">text</a>')).toContain("sms:+15551234567")
+  })
+})
+
+
+describe("cleanStyle — scrubs CSS-injection vectors, keeps layout", () => {
+  it("drops fixed/absolute/sticky positioning and z-index (clickjacking overlay)", () => {
+    expect(cleanStyle("position:fixed;inset:0;z-index:9999;background:#000")).not.toMatch(/fixed|z-index/)
+    expect(cleanStyle("position:absolute;z-index:5")).toBe("")
+    expect(cleanStyle("position:sticky")).toBe("")
+  })
+
+  it("drops url() and expression() values (off-site beacons)", () => {
+    expect(cleanStyle("background:url(https://evil/x)")).toBe("")
+    expect(cleanStyle("width:1px;background:url(x)")).toBe("width:1px")
+  })
+
+  it("keeps KaTeX/highlight layout styles (incl. position:relative)", () => {
+    const out = cleanStyle("height:0.8em;vertical-align:-0.19em")
+    expect(out).toContain("height:0.8em")
+    expect(out).toContain("vertical-align:-0.19em")
+    expect(cleanStyle("position:relative;top:2px")).toContain("position:relative")
+    expect(cleanStyle("color:#ff0000")).toBe("color:#ff0000")
+  })
+})
+
+
+describe("rehypeSafeStyle — plugin scrubs style attributes in the tree", () => {
+  const run = (html: string): string => {
+    const tree = fromHtml(html, { fragment: true })
+    rehypeSafeStyle()(tree)
+    return toHtml(tree)
+  }
+
+  it("neutralizes a full-viewport overlay span but keeps the element + text", () => {
+    const out = run('<span style="position:fixed;inset:0;z-index:9999;background:#000">Sign in</span>')
+    expect(out).not.toContain("fixed")
+    expect(out).not.toContain("z-index")
+    expect(out).toContain("Sign in")
+  })
+
+  it("leaves a KaTeX-style span's inline layout intact", () => {
+    expect(run('<span style="height:0.8em">x</span>')).toContain("height:0.8em")
   })
 })
 

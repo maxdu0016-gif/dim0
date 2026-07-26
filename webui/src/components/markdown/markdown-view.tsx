@@ -23,7 +23,7 @@ import remarkMath from "remark-math"
 import rehypeKatex from "rehype-katex"
 import rehypeRaw from "rehype-raw"
 import rehypeSanitize from "rehype-sanitize"
-import { SANITIZE_SCHEMA } from "./sanitize-schema"
+import { SANITIZE_SCHEMA, rehypeSafeStyle } from "./sanitize-schema"
 
 
 const DISPLAY_MATH_RE = /\\\[([\s\S]+?)\\\]/g
@@ -253,6 +253,10 @@ const REHYPE_PLUGINS = [
   // tag chips, toggles and page-ref links. Without it, raw HTML would reach
   // the DOM unsanitized (stored/DOM XSS).
   [rehypeSanitize, SANITIZE_SCHEMA],
+  // rehype-sanitize allowlists `style` but can't inspect CSS values; this
+  // scrubs inline styles (drops fixed/absolute positioning, z-index, url())
+  // so untrusted CSS can't paint clickjacking overlays or beacon out.
+  rehypeSafeStyle,
 ] as const
 
 const STREAMDOWN_PLUGINS_STATIC = { code: codePlugin } as const

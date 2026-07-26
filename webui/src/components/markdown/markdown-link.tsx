@@ -11,7 +11,9 @@ const DOC_HREF_PREFIX = "#doc-"
 // Schemes we allow on a rendered <a href>. Everything else (javascript:,
 // data:, vbscript:, blob:, file:, …) is treated as unsafe and neutralized.
 // page:// and #doc- are handled by dedicated branches before this gate.
-const SAFE_SCHEMES = new Set(["http:", "https:", "mailto:"])
+// Kept in sync with sanitize-schema's href protocols. tel/sms are legitimate
+// contact links; xmpp/irc(s) are in the sanitizer's default href allowlist.
+const SAFE_SCHEMES = new Set(["http:", "https:", "mailto:", "tel:", "sms:", "xmpp:", "irc:", "ircs:"])
 
 /**
  * Decide whether a markdown href is safe to assign to an anchor.
