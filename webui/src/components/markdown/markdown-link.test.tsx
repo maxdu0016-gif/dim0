@@ -54,3 +54,57 @@ describe("MarkdownLink — #doc- citation", () => {
     expect(Element.prototype.scrollIntoView).toHaveBeenCalled()
   })
 })
+
+
+describe("MarkdownLink — href scheme allowlist", () => {
+  let container: HTMLDivElement
+  let root: Root
+
+
+  beforeEach(() => {
+    container = document.createElement("div")
+    document.body.appendChild(container)
+    root = createRoot(container)
+  })
+
+
+  afterEach(() => {
+    act(() => root.unmount())
+    container.remove()
+  })
+
+
+  const render = (href: string) =>
+    act(() => root.render(<MarkdownLink href={href}>link</MarkdownLink>))
+
+  const hrefOf = () => container.querySelector("a")?.getAttribute("href") ?? null
+
+  it.each([
+    "javascript:alert(1)",
+    "JavaScript:alert(1)",
+    " javascript:alert(1)",
+    "java\tscript:alert(1)",
+    "java\nscript:alert(1)",
+    "data:text/html,<script>alert(1)</script>",
+    "vbscript:msgbox(1)",
+    "blob:https://example.com/abc",
+    "file:///etc/passwd",
+  ])("neutralizes the dangerous href %j (no href attribute emitted)", (href) => {
+    render(href)
+    expect(hrefOf()).toBeNull()
+  })
+
+  it.each([
+    "https://example.com/",
+    "http://example.com/",
+    "//example.com/",
+    "mailto:hi@example.com",
+    "/boards/b1/n/n1",
+    "#section",
+    "?q=1",
+    "relative/path",
+  ])("preserves the legitimate href %j", (href) => {
+    render(href)
+    expect(hrefOf()).toBe(href)
+  })
+})
