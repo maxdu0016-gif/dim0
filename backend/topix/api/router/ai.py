@@ -128,8 +128,12 @@ async def _meter_run(
         except Exception:
             # Rejected (e.g. over quota): release the dedup slot so this run isn't
             # marked metered — otherwise a retry with the same id would skip the
-            # charge and ride free until the key's TTL expires.
-            await redis.delete(key)
+            # charge and ride free until the key's TTL expires. Best-effort, so a
+            # delete failure never masks the original rejection (the 429).
+            try:
+                await redis.delete(key)
+            except Exception:
+                pass
             raise
     else:
         await enforce_rate_limit(request, user_id)
