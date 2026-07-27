@@ -97,7 +97,19 @@ export async function* runAgent(opts: RunAgentOptions): AsyncGenerator<AgentEven
       const args = parseArgs(call.arguments)
       yield { type: "tool_start", toolName: call.name, args }
       const tool = opts.tools.find((t) => t.name === call.name)
-      const output = tool ? await tool.run(args, opts.ctx) : { error: `unknown tool: ${call.name}` }
+      // A tool that throws (e.g. a managed service returning 500) must not abort
+      // the whole run: feed the error back as the tool result so the model can
+      // recover or answer without it, matching the unknown-tool path.
+      let output: unknown
+      if (!tool) {
+        output = { error: `unknown tool: ${call.name}` }
+      } else {
+        try {
+          output = await tool.run(args, opts.ctx)
+        } catch (err) {
+          output = { error: err instanceof Error ? err.message : String(err) }
+        }
+      }
       agentLog.tool(call.name, args, output)
       yield { type: "tool_result", toolName: call.name, result: output }
       messages.push({ role: "tool", toolCallId: call.id, content: JSON.stringify(output) })
