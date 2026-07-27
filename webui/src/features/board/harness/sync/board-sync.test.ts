@@ -695,3 +695,124 @@ describe("relay idempotency", () => {
     expect(acks).toEqual([1, 1]) // both acked at the same seq
   })
 })
+
+
+describe("reconnect re-sends un-acked ops (supervised path, no disconnect)", () => {
+  // A hand-driven connection that records outbound `op` sends. reconnect() reuses
+  // the same conn (like the real WS supervisor reopening), so both sends land here.
+  const recordingClient = (id: string) => {
+    const engine = new InMemoryEngine()
+    const persistence = new BoardPersistence(BOARD, { engine })
+    const store = freshStore(id)
+    persistence.attach(store)
+    const sent: { client_seq: number; batch: OpBatch }[] = []
+    let deliver: ((m: InboundMessage) => void) | null = null
+    const conn: RelayConnection = {
+      send: (m) => {
+        if (m.kind === "op") sent.push({ client_seq: m.client_seq, batch: m.batch })
+      },
+      onMessage: (cb) => {
+        deliver = cb
+        return () => {
+          deliver = null
+        }
+      },
+      close: () => {},
+    }
+    const sync = attachBoardSync({
+      store,
+      persistence,
+      engine,
+      boardId: BOARD,
+      clientId: asClientId(id),
+      connect: (sinceSeq) => {
+        void sinceSeq
+        return conn
+      },
+      coalesceMs: 0,
+    })
+    return { engine, store, sync, sent, push: (m: InboundMessage) => deliver?.(m) }
+  }
+
+
+  it("re-pumps an un-acked op after a reconnect (was stranded until reload)", async () => {
+    const c = recordingClient("A")
+    addNode(c.store, "n1")
+    await c.sync.settle()
+    expect(c.sent).toHaveLength(1) // sent once, now in-flight; ack never arrives
+
+    // Real reconnect path — openConnection, NOT the test-only disconnect() that
+    // used to be the only thing clearing in-flight.
+    c.sync.reconnect()
+    await c.sync.settle()
+    expect(c.sent).toHaveLength(2) // the stranded op re-pumps (previously stuck at 1)
+
+    // A fresh ack on the re-send drains the outbox — proving it got through.
+    c.push({ kind: "op-applied", client_seq: c.sent[1].client_seq, seq: 1 })
+    await c.sync.settle()
+    expect(await new BoardOutbox(c.engine, BOARD).pending()).toHaveLength(0)
+    c.sync.detach()
+  })
+
+
+  it("re-sends a coalesced batch under its original id so the relay dedups it (no re-apply)", async () => {
+    // A dedup-aware fake relay: it applies a batch's ops only the first time it
+    // sees that envelope batch id (exactly what the real relay does — dedup by
+    // batch_id, collab.py), and its ack can be withheld to simulate a lost one.
+    const engine = new InMemoryEngine()
+    const persistence = new BoardPersistence(BOARD, { engine })
+    const store = freshStore("A")
+    persistence.attach(store)
+    const seen = new Set<string>()
+    let appliedOps = 0
+    let serverSeq = 0
+    let autoAck = true
+    let deliver: ((m: InboundMessage) => void) | null = null
+    const conn: RelayConnection = {
+      send: (m) => {
+        if (m.kind !== "op") return
+        serverSeq += 1
+        const id = String(m.batch.id)
+        if (!seen.has(id)) {
+          seen.add(id)
+          appliedOps += m.batch.ops.length // first sight → applied + broadcast
+        }
+        if (autoAck) deliver?.({ kind: "op-applied", client_seq: m.client_seq, seq: serverSeq })
+      },
+      onMessage: (cb) => {
+        deliver = cb
+        return () => {
+          deliver = null
+        }
+      },
+      close: () => {},
+    }
+    const sync = attachBoardSync({
+      store,
+      persistence,
+      engine,
+      boardId: BOARD,
+      clientId: asClientId("A"),
+      connect: () => conn,
+      coalesceMs: 75,
+    })
+    await sync.settle() // drain the initial connect pump (nothing pending yet)
+
+    // A coalesced burst reaches the relay (2 ops applied) but its ack is lost.
+    autoAck = false
+    addNode(store, "n1")
+    addNode(store, "n2")
+    await sync.settle()
+    expect(appliedOps).toBe(2) // both ops applied under one coalesced batch id
+
+    // Supervised reconnect re-sends the still-un-acked batch. Because it re-sends
+    // the SAME coalesced grouping (same envelope id), the relay dedups it — the
+    // earlier records are NOT re-applied (the bug this replaces asserted the
+    // opposite via an uncoalesced replay under ids the relay never recorded).
+    autoAck = true
+    sync.reconnect()
+    await sync.settle()
+    expect(appliedOps).toBe(2) // still 2 — nothing re-applied
+    sync.detach()
+  })
+})
