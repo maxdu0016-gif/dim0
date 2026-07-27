@@ -14,7 +14,7 @@ from fastapi.testclient import TestClient
 
 import topix.api.router.ai as ai_module
 
-from topix.api.router.ai import meter_run, router
+from topix.api.router.ai import meter_run_managed, router
 from topix.api.utils.security import get_current_user_uid
 
 
@@ -30,7 +30,7 @@ def _client() -> TestClient:
         return "user-1"
 
     app.dependency_overrides[get_current_user_uid] = _uid
-    app.dependency_overrides[meter_run] = _no_meter
+    app.dependency_overrides[meter_run_managed] = _no_meter
     return TestClient(app)
 
 
