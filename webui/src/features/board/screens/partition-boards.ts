@@ -1,5 +1,6 @@
 import type { BoardMeta } from "@/features/board/model"
 import type { BoardListItem } from "@/features/board/api/list-boards"
+import { isSignedIn } from "@/lib/auth"
 
 
 export type PartitionedBoards = {
@@ -9,31 +10,51 @@ export type PartitionedBoards = {
 
 
 /**
- * Split the two board sources into the dashboard's groups, newest first.
+ * The local boards that belong under "On this device", newest first.
  *
- * A promoted board lives in BOTH the local registry (its replica, now flagged
- * `kind: "synced"` and owned by a user) and the backend list; it must render
- * once, under "Synced". "On this device" is therefore local-only boards whose
- * id is NOT in the synced list — two independent guards:
- *  - `kind === "local-only"` keeps a promoted replica out even when the synced
- *    list is empty (signed out, or a different account) — otherwise a board that
- *    belongs to a user account leaks into the logged-out local view.
- *  - the id/uid exclusion covers the window where the backend already adopted the
- *    board but the local `kind` flip hasn't landed yet (avoids a transient double).
+ * A board is dropped if its id is already in the backend `synced` list — it
+ * renders once, under "Synced" (this also covers the window right after promotion
+ * where the backend has adopted the board but the local `kind` flip hasn't landed,
+ * so it never shows twice). Of the rest:
+ *  - `local-only` boards always belong here (truly device-local, no account).
+ *  - a `synced` replica belongs here ONLY for its signed-in owner — the offline /
+ *    pre-refetch fallback that keeps a promoted board reachable without a
+ *    connection. It is hidden when signed out or under a different account, so a
+ *    board that belongs to a user account never leaks into another session.
+ *
+ * `synced` may be undefined (signed out / not yet loaded). `userId` is the auth
+ * sentinel — `"root"` when signed out (see `isSignedIn`).
+ */
+export const selectOnDeviceBoards = (
+  local: BoardMeta[],
+  synced: BoardListItem[] | undefined,
+  userId: string,
+): BoardMeta[] => {
+  const syncedIds = new Set((synced ?? []).map((b) => b.uid))
+  const signedIn = isSignedIn(userId)
+  return local
+    .filter((b) => {
+      if (syncedIds.has(b.id)) return false
+      if (b.kind === "local-only") return true
+      return signedIn && b.ownerId === userId
+    })
+    .sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0))
+}
+
+
+/**
+ * Split the two board sources into the dashboard's groups, newest first.
+ * See `selectOnDeviceBoards` for the on-device membership rule.
  */
 export const partitionBoards = (
   local: BoardMeta[],
   synced: BoardListItem[] | undefined,
+  userId: string,
 ): PartitionedBoards => {
-  const syncedList = synced ?? []
-  const syncedIds = new Set(syncedList.map((b) => b.uid))
-  const onDevice = local
-    .filter((b) => b.kind === "local-only" && !syncedIds.has(b.id))
-    .sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0))
-  const sortedSynced = [...syncedList].sort(
+  const sortedSynced = [...(synced ?? [])].sort(
     (a, b) => syncedTime(b) - syncedTime(a),
   )
-  return { onDevice, synced: sortedSynced }
+  return { onDevice: selectOnDeviceBoards(local, synced, userId), synced: sortedSynced }
 }
 
 
