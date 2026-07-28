@@ -42,6 +42,7 @@ export function LocalBoardCard({
   }
 
   return (
+    <>
     <div
       className="group relative w-64 h-60 flex flex-col justify-between gap-1 p-1 overflow-hidden rounded-xl bg-accent hover:bg-muted text-card-foreground border border-transparent hover:border-secondary-foreground hover:ring-2 hover:ring-secondary-foreground/50 shadow-md hover:shadow-lg transition-all cursor-pointer"
       onClick={() => !editing && onOpen()}
@@ -58,17 +59,6 @@ export function LocalBoardCard({
       >
         <CancelPlainIcon className="size-3.5" strokeWidth={2} />
       </button>
-
-      {/* A local board lives only in IndexedDB — deletion is irreversible with no
-          server copy, so confirm first (parity with the sidebar's local delete). */}
-      <ConfirmDeleteBoardAlert
-        open={confirmingDelete}
-        onOpenChange={setConfirmingDelete}
-        onConfirm={() => {
-          onDelete()
-          setConfirmingDelete(false)
-        }}
-      />
 
       {onEnableSync && (
         <button
@@ -134,6 +124,21 @@ export function LocalBoardCard({
         </div>
       </div>
     </div>
+
+    {/* Rendered OUTSIDE the clickable card: the dialog is Radix-portaled, but
+        React replays synthetic events along the component tree, so a Cancel/Delete
+        click inside a dialog nested in the card would bubble to onClick={onOpen}
+        (opening the board on Cancel; navigating into the deleted route on Delete).
+        A local board lives only in IndexedDB — deletion is irreversible, so confirm. */}
+    <ConfirmDeleteBoardAlert
+      open={confirmingDelete}
+      onOpenChange={setConfirmingDelete}
+      onConfirm={() => {
+        onDelete()
+        setConfirmingDelete(false)
+      }}
+    />
+    </>
   )
 }
 

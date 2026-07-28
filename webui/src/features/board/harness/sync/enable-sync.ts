@@ -22,6 +22,7 @@ export type EnableSyncResult =
   | { ok: true; boardId: string }
   | { ok: false; reason: "signed-out" }
   | { ok: false; reason: "limited" }
+  | { ok: false; reason: "in-flight" }
   | { ok: false; reason: "error"; error: unknown }
 
 

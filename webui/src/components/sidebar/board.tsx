@@ -196,16 +196,21 @@ export function LocalBoardItem({
           Local rows have no chat action, so this is the single trailing icon —
           the menu-button's built-in pr-8 reserves its space, keeping the title
           truncation correct. */}
+      {/* Not `disabled` while syncing: a disabled button fires no hover/title, so
+          the "Enabling sync…" tooltip would never show. Re-entry is instead guarded
+          at the source (useEnableSync), so a click mid-sync is a safe no-op. */}
       <SidebarMenuAction
         showOnHover
-        disabled={syncing}
         onClick={(e) => {
           e.stopPropagation()
           onEnableSync()
         }}
         title={syncing ? "Enabling sync…" : "Enable sync — back up + share this board"}
         aria-label="Enable sync"
-        className="text-muted-foreground/50 hover:text-secondary-foreground disabled:opacity-50"
+        className={cn(
+          "text-muted-foreground/50 hover:text-secondary-foreground",
+          syncing && "opacity-50",
+        )}
       >
         <CloudSyncIcon className={cn("size-4", syncing && "animate-pulse")} strokeWidth={2} />
       </SidebarMenuAction>

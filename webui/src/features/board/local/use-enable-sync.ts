@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react"
+import { useCallback, useRef, useState } from "react"
 import { useNavigate } from "@tanstack/react-router"
 import { useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
@@ -32,6 +32,11 @@ export function useEnableSync() {
   const queryClient = useQueryClient()
   const { data: syncedBoards = [] } = useListBoards(userId)
   const [pendingId, setPendingId] = useState<string | null>(null)
+  // Synchronous re-entry guard: `pendingId` is React state (updates next render),
+  // so two rapid clicks (e.g. the sidebar cloud icon + the context-menu item)
+  // could both pass the `syncing` gate and promote the same board twice. A ref
+  // flips immediately, before the first `await`, closing that window.
+  const inFlight = useRef<Set<string>>(new Set())
 
   const run = useCallback(
     async (boardId: string, label?: string): Promise<EnableSyncResult> => {
@@ -51,6 +56,8 @@ export function useEnableSync() {
         )
         return { ok: false, reason: "limited" }
       }
+      if (inFlight.current.has(boardId)) return { ok: false, reason: "in-flight" }
+      inFlight.current.add(boardId)
       setPendingId(boardId)
       const stores = await getLocalStores()
       const persistence = new BoardPersistence(boardId, { engine: stores.engine })
@@ -72,6 +79,7 @@ export function useEnableSync() {
         }
         return result
       } finally {
+        inFlight.current.delete(boardId)
         persistence.close()
         setPendingId(null)
       }
