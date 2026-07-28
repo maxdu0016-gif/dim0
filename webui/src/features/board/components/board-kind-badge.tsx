@@ -1,4 +1,4 @@
-import { CloudSyncIcon, MonitorIcon } from "@/components/icons"
+import { CloudCheckIcon, MonitorIcon } from "@/components/icons"
 import type { BoardKind } from "@/features/board/model"
 
 
@@ -20,7 +20,7 @@ export function BoardKindBadge({ kind }: { kind: BoardKind }) {
       title={synced ? "Synced — backed up and shareable" : "On this device only"}
     >
       {synced ? (
-        <CloudSyncIcon className="size-3 shrink-0" strokeWidth={2} />
+        <CloudCheckIcon className="size-3 shrink-0" strokeWidth={2} />
       ) : (
         <MonitorIcon className="size-3 shrink-0" strokeWidth={2} />
       )}

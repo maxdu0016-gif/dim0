@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { AddIcon, CancelPlainIcon, CloudSyncIcon } from "@/components/icons"
+import { AddIcon, CancelPlainIcon, CloudArrowUpIcon } from "@/components/icons"
 import { UNTITLED_LABEL } from "@/features/board/const"
 import type { BoardMeta } from "@/features/board/model"
 import { formatDateForUI } from "@/features/board/utils/datetime"
@@ -72,7 +72,7 @@ export function LocalBoardCard({
             onEnableSync()
           }}
         >
-          <CloudSyncIcon className="size-3.5" strokeWidth={2} />
+          <CloudArrowUpIcon className="size-3.5" strokeWidth={2} />
           {syncing ? "Syncing…" : "Enable sync"}
         </button>
       )}
