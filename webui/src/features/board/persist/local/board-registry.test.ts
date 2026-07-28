@@ -80,6 +80,22 @@ for (const { label, make } of engineCases) describe(`BoardRegistry (${label})`, 
   })
 
 
+  it("deleteBoard cascades the sync cursor (sync_meta), sparing other boards", async () => {
+    // A stale sync_meta left behind is a silent data-loss trap: re-hydrating the
+    // same board id later would treat fresh edits as already-acked.
+    const reg = new BoardRegistry({ engine })
+    const board = newLocalBoard("Doomed", 1000)
+    await reg.createBoard(board)
+    await engine.put("sync_meta", { boardId: board.id, syncedSeq: 42 })
+    await engine.put("sync_meta", { boardId: "other-board", syncedSeq: 7 })
+
+    await reg.deleteBoard(board.id)
+
+    expect(await engine.get("sync_meta", board.id)).toBeUndefined()
+    expect(await engine.get("sync_meta", "other-board")).toBeDefined() // spared
+  })
+
+
   it("setSyncEngine flips the stored engine and bumps updatedAt; no-op if absent", async () => {
     const reg = new BoardRegistry({ engine })
     const board = newLocalBoard("Promotable", 1000)

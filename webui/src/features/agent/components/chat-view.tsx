@@ -5,6 +5,7 @@ import { ChatProvider, useChat } from "../hooks/chat-context"
 import { useActiveChatId } from "../hooks/use-chat-messages"
 import { useLocalMessagesStore } from "../store/local-messages-store"
 import { cn } from "@/lib/utils"
+import { toast } from "sonner"
 import { useMemo } from "react"
 import type { Chat as ChatEntity } from "../types/chat"
 import { Button } from "@/components/ui/button"
@@ -174,6 +175,22 @@ const ChatBody = ({
   const selectLocalChat = useLocalMessagesStore(s => s.selectChat)
   const newLocalChat = useLocalMessagesStore(s => s.newChat)
   const localChats = useLocalMessagesStore(s => s.chats)
+  const localMessages = useLocalMessagesStore(s => s.messages)
+  // A local turn streams into the in-memory store and only `persist`s when done.
+  // Switching/starting a chat mid-stream clears those messages, so the turn is
+  // never written (and any nodes it created are orphaned) — block it while live.
+  // `streaming` clears in runAgent's `finally`; a turn that never settles would
+  // keep this true (bounded by the turn-cancellation follow-up).
+  const localStreaming = local && localMessages.some(m => m.streaming)
+
+
+  // Guard the local chat-switch handlers while a turn streams; surface why so the
+  // blocked click isn't a silent no-op.
+  const blockedByStream = (): boolean => {
+    if (!localStreaming) return false
+    toast.info("Wait for the response to finish before switching chats.")
+    return true
+  }
   // Backend chat list is disabled in local mode (empty userId → no fetch).
   const { data: backendChats = [] } = useListChats({ graphUid: initialBoardId, userId: local ? "" : userId })
   const navigate = useNavigate()
@@ -223,6 +240,7 @@ const ChatBody = ({
 
   const handleNewChat = () => {
     if (local) {
+      if (blockedByStream()) return // don't discard the in-flight turn
       newLocalChat()
       return
     }
@@ -241,6 +259,7 @@ const ChatBody = ({
 
   const handleSelectChat = (id: string) => {
     if (local) {
+      if (blockedByStream()) return // don't discard the in-flight turn
       void selectLocalChat(id)
       return
     }

@@ -4,8 +4,11 @@
  * Stores `BoardMeta` (the local board index, incl. local-only boards) and
  * `BoardView` (camera/selection, per device) via the `StorageEngine` port. Board
  * *content* lives in the snapshot/oplog stores driven by `BoardPersistence`;
- * `deleteBoard` cascades across metadata, view, content AND the board's chats +
- * messages in one transaction, so a removed board leaves no orphans.
+ * `deleteBoard` cascades those in one transaction — metadata, view, snapshot +
+ * oplog, chats + messages, uploaded documents + chunks, and the sync cursor
+ * (`sync_meta`). One known gap: per-widget `mini_app_state` (keyed by noteId, no
+ * by-board index) is not yet cascaded — a storage leak tracked as a follow-up,
+ * not data loss.
  *
  * Engine ownership: if no engine is injected the registry opens and owns one
  * (self-contained lifecycle via `init`/`close`); when the composition root
@@ -22,7 +25,7 @@ export type BoardRegistryOptions = { engine?: StorageEngine; dbName?: string }
 
 // Every store a board's data spans — the cascade-delete transaction covers all.
 const BOARD_COLLECTIONS: Collection[] = [
-  "boards", "views", "snapshots", "oplog", "chats", "chat_messages", "documents", "chunks",
+  "boards", "views", "snapshots", "oplog", "chats", "chat_messages", "documents", "chunks", "sync_meta",
 ]
 
 
@@ -139,6 +142,11 @@ export class BoardRegistry {
       await t.delete("views", id)
       await t.delete("snapshots", id)
       await t.delete("oplog", { lower: [id, 0], upper: [id, Number.MAX_SAFE_INTEGER] })
+      // Cascade the sync cursor. Leaving it behind is a silent data-loss trap: if
+      // the same board id is later re-hydrated (a synced board deleted locally then
+      // re-opened), a stale `syncedSeq` makes fresh low-seq edits look already-acked
+      // (`outbox.pending()` skips seq <= cursor) → they're never sent to the relay.
+      await t.delete("sync_meta", id)
       // Cascade the board's chats and their message transcripts.
       const chats = await t.list<{ id: string }>("chats", { index: "by-board", range: { lower: id, upper: id } })
       for (const chat of chats) {

@@ -17,6 +17,7 @@ import { ErrorBoundary } from "./error-boundary"
 import { CompileErrorCard, RuntimeErrorCard } from "./error-display"
 import { handleHostMessage, setHostInitialState } from "./rpc"
 import { MINI_APP_SCOPE_NAMES, MINI_APP_SCOPE_VALUES } from "./scope"
+import { isSingleFrontend } from "./single-frontend"
 import "./runtime.css"
 // Tailwind v4's browser build JIT-compiles utility classes at runtime
 // by scanning the live DOM. Critical for mini-apps: the agent's JSX is
@@ -45,11 +46,15 @@ const HOST_ORIGIN =
   (typeof window !== "undefined" ? window.__APP_CONFIG__?.hostOrigin : undefined) ||
   import.meta.env.VITE_HOST_ORIGIN
 
-// Single-frontend: no configured host origin → the runtime is served same-origin
-// and loaded into an opaque-origin sandbox. We trust the parent by SOURCE
-// (origin-independent; a sandboxed iframe can only be embedded by its parent)
-// and reply with "*". Cross-origin mode keeps the strict origin check.
-const SINGLE_FRONTEND = !HOST_ORIGIN
+// Single-frontend: served same-origin and loaded into an opaque-origin sandbox.
+// Detected from the opaque origin ("null") rather than a possibly-mismatched
+// injected host origin (see single-frontend.ts). We trust the parent by SOURCE
+// (origin-independent; a sandboxed iframe can only be embedded by its parent) and
+// reply with "*". Cross-origin mode keeps the strict origin check.
+const SINGLE_FRONTEND = isSingleFrontend(
+  HOST_ORIGIN,
+  typeof window !== "undefined" ? window.origin : undefined,
+)
 const REPLY_TARGET = SINGLE_FRONTEND ? "*" : (HOST_ORIGIN as string)
 
 
