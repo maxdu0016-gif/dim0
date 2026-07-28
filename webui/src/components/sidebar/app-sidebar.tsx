@@ -15,6 +15,7 @@ import { isSignedIn } from '@/lib/auth'
 import { useListBoards } from '@/features/board/api/list-boards'
 import { useLocalBoards } from '@/features/board/local/use-local-boards'
 import { useEnableSync } from '@/features/board/local/use-enable-sync'
+import { selectOnDeviceBoards } from '@/features/board/screens/partition-boards'
 import { ChatMenuItem, NewChatItem } from './chat'
 import { BoardItem, DashboardMenuItem, LocalBoardItem, NewLocalBoardItem } from './board'
 import { ChatsDialog } from './chats-dialog'
@@ -93,14 +94,14 @@ export function AppSidebar({ onLogout }: AppSidebarProps) {
     if (meta) openLocal(meta.id)
   }
 
-  // Only truly-local boards belong here; a promoted board flips to kind=synced
-  // and appears in the SYNCED group (from the backend list) instead.
+  // Only truly-local boards belong here; a promoted board appears in the SYNCED
+  // group (from the backend list) instead. Share the dashboard's on-device rule
+  // so both surfaces dedupe identically (see selectOnDeviceBoards): dropped once
+  // present in the backend list, and a synced replica shows only for its
+  // signed-in owner (never leaks to another session).
   const localOnly = useMemo(
-    () =>
-      localBoards
-        .filter((b) => b.kind === "local-only")
-        .sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0)),
-    [localBoards],
+    () => selectOnDeviceBoards(localBoards, boards, userId),
+    [localBoards, boards, userId],
   )
 
   const localBoardItems = useMemo(

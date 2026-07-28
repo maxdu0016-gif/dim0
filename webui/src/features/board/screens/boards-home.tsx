@@ -34,8 +34,8 @@ export function BoardsHome({
   const { enableSync, pendingId } = useEnableSync()
 
   const { onDevice, synced } = useMemo(
-    () => partitionBoards(localBoards, syncedBoards),
-    [localBoards, syncedBoards],
+    () => partitionBoards(localBoards, syncedBoards, userId),
+    [localBoards, syncedBoards, userId],
   )
 
   const openLocal = (id: string): void => {

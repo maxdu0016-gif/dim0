@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react"
+import { create } from "zustand"
 import type { BoardMeta } from "@/features/board/model"
 import { newLocalBoard } from "@/features/board/persist/local/board-registry"
 import type { BoardRegistry } from "@/features/board/persist/local/board-registry"
@@ -6,11 +7,26 @@ import { requestPersistentStorage } from "@/features/board/persist/local/persist
 import { getLocalStores } from "@/features/local-stores"
 
 
-/** List/create/delete local-only boards via the shared BoardRegistry — offline, no account. */
+/**
+ * Shared revision counter, bumped on every local-board mutation. Each
+ * `useLocalBoards` instance subscribes and re-reads on change, so a create /
+ * delete / rename from one mount (e.g. the top-left header) is reflected in the
+ * others (sidebar LOCAL list, dashboard cards) without a remount — the registry
+ * itself has no change notification, and the instances hold independent state.
+ */
+const useLocalBoardsRevision = create<{ rev: number; bump: () => void }>((set) => ({
+  rev: 0,
+  bump: () => set((s) => ({ rev: s.rev + 1 })),
+}))
+
+
+/** List/create/delete/rename local-only boards via the shared BoardRegistry — offline, no account. */
 export function useLocalBoards() {
   const [boards, setBoards] = useState<BoardMeta[]>([])
   const [ready, setReady] = useState(false)
   const registryRef = useRef<BoardRegistry | null>(null)
+  const rev = useLocalBoardsRevision((s) => s.rev)
+  const bump = useLocalBoardsRevision((s) => s.bump)
 
   useEffect(() => {
     void requestPersistentStorage()
@@ -32,6 +48,13 @@ export function useLocalBoards() {
     }
   }, [])
 
+  // Re-read whenever any instance mutates (shared revision bump). No-op on the
+  // first render (rev 0) — the registry isn't open yet; the mount effect loads.
+  useEffect(() => {
+    const registry = registryRef.current
+    if (registry) void registry.listBoards().then(setBoards)
+  }, [rev])
+
   const refresh = useCallback(async () => {
     const registry = registryRef.current
     if (registry) setBoards(await registry.listBoards())
@@ -43,10 +66,10 @@ export function useLocalBoards() {
       if (!registry) return null
       const meta = newLocalBoard(title.trim() || "Untitled board", Date.now())
       await registry.createBoard(meta)
-      await refresh()
+      bump()
       return meta
     },
-    [refresh],
+    [bump],
   )
 
   const deleteBoard = useCallback(
@@ -54,9 +77,9 @@ export function useLocalBoards() {
       const registry = registryRef.current
       if (!registry) return
       await registry.deleteBoard(id)
-      await refresh()
+      bump()
     },
-    [refresh],
+    [bump],
   )
 
   const renameBoard = useCallback(
@@ -64,9 +87,9 @@ export function useLocalBoards() {
       const registry = registryRef.current
       if (!registry) return
       await registry.renameBoard(id, title.trim() || "Untitled board")
-      await refresh()
+      bump()
     },
-    [refresh],
+    [bump],
   )
 
   return { boards, ready, createBoard, deleteBoard, renameBoard, refresh }
