@@ -190,6 +190,20 @@ describe("runAgent — off-board tool confirmation gate", () => {
     expect(ran.value).toBe(false)
   })
 
+  it("gates web_search too", async () => {
+    const ran = { value: false }
+    const llm = new ScriptedLlm([toolTurn("web_search", { query: "secrets on the board" }), { kind: "text", text: "d" }])
+    await drain(
+      runAgent({
+        userMessage: "go",
+        tools: [spyTool("web_search", ran)],
+        llm,
+        ctx: { store: freshStore("c"), confirmTool: async () => false },
+      }),
+    )
+    expect(ran.value).toBe(false)
+  })
+
   it("runs a gated tool unprompted when no confirmTool is wired (headless/tests)", async () => {
     const ran = { value: false }
     const llm = new ScriptedLlm([toolTurn("fetch", { url: "https://x" }), { kind: "text", text: "d" }])

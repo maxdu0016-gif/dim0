@@ -1,4 +1,4 @@
-import { GlobeIcon, CodeInterpreterIcon } from "@/components/icons"
+import { GlobeIcon, CodeInterpreterIcon, BrowserSearchIcon } from "@/components/icons"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,6 +25,14 @@ const describe = (req: ToolConfirmRequest): { title: string; hint: string; previ
       Icon: GlobeIcon,
     }
   }
+  if (req.name === "web_search") {
+    return {
+      title: "Allow the assistant to search the web?",
+      hint: "It will send this query to a search provider. Content on your board could try to steer the query — check it says what you expect.",
+      preview: asString(req.args.query),
+      Icon: BrowserSearchIcon,
+    }
+  }
   return {
     title: "Allow the assistant to run this code?",
     hint: "It runs in a sandbox, but only allow code you understand — content on your board could try to make it exfiltrate data.",
@@ -35,8 +43,8 @@ const describe = (req: ToolConfirmRequest): { title: string; hint: string; previ
 
 
 /**
- * Confirmation for off-board agent tools (`fetch` / `code_interpreter`). Mounted
- * once on a local board; shows the exact URL/code and pauses the run until the
+ * Confirmation for off-board agent tools (`fetch` / `web_search` / `code_interpreter`).
+ * Mounted once on a local board; shows the exact URL/query/code and pauses the run until the
  * user allows or declines (see `useToolConfirm` + the agent loop's CONFIRM_TOOLS).
  * The preview is rendered as plain text — never HTML — so it can't inject markup.
  */
