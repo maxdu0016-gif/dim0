@@ -43,6 +43,26 @@ describe("partitionBoards", () => {
     expect(syncedOut.map((b) => b.uid)).toEqual(["shared"])
   })
 
+  it("keeps a promoted (kind=synced) replica off-device even when signed out", () => {
+    // Logout clears the remote list; the leftover synced replica must NOT
+    // resurface under "on device" — it belongs to a user account.
+    const { onDevice } = partitionBoards(
+      [local("a", 1), local("promoted", 2, "synced")],
+      undefined,
+    )
+    expect(onDevice.map((b) => b.id)).toEqual(["a"])
+  })
+
+  it("drops a local-only board already in the synced list (kind flip not yet landed)", () => {
+    // Backend adopted the board but the local kind flip hasn't committed;
+    // the id/uid match must still keep it out of on-device (no transient double).
+    const { onDevice } = partitionBoards(
+      [local("pending", 1, "local-only")],
+      [synced("pending", "2024-01-01T00:00:00Z")],
+    )
+    expect(onDevice).toEqual([])
+  })
+
   it("sorts each group newest first (local by epoch ms, synced by ISO date)", () => {
     const { onDevice, synced: syncedOut } = partitionBoards(
       [local("old", 100), local("new", 200)],

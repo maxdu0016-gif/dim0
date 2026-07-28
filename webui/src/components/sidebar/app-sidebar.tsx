@@ -15,6 +15,7 @@ import { isSignedIn } from '@/lib/auth'
 import { useListBoards } from '@/features/board/api/list-boards'
 import { useLocalBoards } from '@/features/board/local/use-local-boards'
 import { useEnableSync } from '@/features/board/local/use-enable-sync'
+import { partitionBoards } from '@/features/board/screens/partition-boards'
 import { ChatMenuItem, NewChatItem } from './chat'
 import { BoardItem, DashboardMenuItem, LocalBoardItem, NewLocalBoardItem } from './board'
 import { ChatsDialog } from './chats-dialog'
@@ -93,14 +94,14 @@ export function AppSidebar({ onLogout }: AppSidebarProps) {
     if (meta) openLocal(meta.id)
   }
 
-  // Only truly-local boards belong here; a promoted board flips to kind=synced
-  // and appears in the SYNCED group (from the backend list) instead.
+  // Only truly-local boards belong here; a promoted board appears in the SYNCED
+  // group (from the backend list) instead. Reuse the dashboard's partition so
+  // both surfaces dedupe identically: a board is dropped from LOCAL once it is
+  // either flagged kind=synced OR already present in the backend list (covers
+  // the window before the local kind flip lands — otherwise it shows twice).
   const localOnly = useMemo(
-    () =>
-      localBoards
-        .filter((b) => b.kind === "local-only")
-        .sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0)),
-    [localBoards],
+    () => partitionBoards(localBoards, boards).onDevice,
+    [localBoards, boards],
   )
 
   const localBoardItems = useMemo(
