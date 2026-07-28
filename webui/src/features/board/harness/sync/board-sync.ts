@@ -284,10 +284,24 @@ export const attachBoardSync = (opts: BoardSyncOptions): BoardSyncHandle => {
   }
 
   const openConnection = (): void => {
+    // Close any prior socket first: a direct reconnect() while one is still open
+    // would otherwise leak it and leave a second `handle` registered on it.
+    connection?.close()
+    // A fresh socket: anything sent on the previous connection but not yet acked
+    // is lost with it, so drop the in-flight tracking — those oplog records are
+    // still unacked and must become eligible to re-send, or they're stranded
+    // until a reload. This is the supervised-reconnect path, which (unlike the
+    // test-only `disconnect()`) never cleared in-flight before.
+    inFlight.clear()
     // `sinceSeq` at connect time lets the relay pick the welcome mode; no separate
     // hello-with-since_seq message (the real WS carries it as a query param).
     connection = opts.connect(lastServerSeq)
     connection.onMessage(handle)
+    // Replay coalesced (same grouping as the live send): a coalesced message's
+    // relay id is its LAST record's id, so re-sending the same set keeps that id
+    // and the relay dedups it. Re-sending records individually would give earlier
+    // records ids the relay never recorded → re-apply. (A superset re-send, if a
+    // new edit landed during the drop, still changes the id — see PR notes.)
     enqueue(pump)
   }
 
