@@ -27,6 +27,11 @@ class _AdoptStore:
         self.add_links_calls: list = []
         # Number of boards the caller already OWNS (for the synced-board cap).
         self._owned_count = owned_count
+        # When True, the atomic create reports the cap hit (simulates losing the race).
+        self.block_create = False
+        # When True, the atomic create reports a concurrent create already made the
+        # UID (the create-under-lock "exists" branch, invisible to the top-level check).
+        self.race_exists = False
 
     async def get_graph_metadata(self, graph_uid: str) -> Graph | None:
         return self.metadata.get(graph_uid)
@@ -38,6 +43,21 @@ class _AdoptStore:
         self.added_graphs.append((graph, user_uid))
         self.metadata[graph.uid] = graph
         self.roles[(graph.uid, user_uid)] = "owner"
+
+    async def create_graph_within_cap(self, graph: Graph, user_uid: str, cap: int | None) -> str:
+        # Mirrors the real atomic method's outcomes.
+        if self.race_exists:
+            # A concurrent adopter created the UID under the lock (owner = caller).
+            self.metadata[graph.uid] = graph
+            self.roles[(graph.uid, user_uid)] = "owner"
+            return "exists"
+        if self.block_create or (cap is not None and self._owned_count >= cap):
+            return "at_cap"
+        self.added_graphs.append((graph, user_uid))
+        self.metadata[graph.uid] = graph
+        self.roles[(graph.uid, user_uid)] = "owner"
+        self._owned_count += 1
+        return "created"
 
     async def list_graphs(self, user_uid: str):
         # (graph, role, owner_email) tuples; `_owned_count` owned rows.
@@ -176,3 +196,71 @@ def test_adopt_allows_paid_plan_over_free_limit(monkeypatch):
 
     assert res.status_code == 200
     assert res.json()["data"]["adopted"] is True
+
+
+def test_adopt_losing_the_cap_race_is_402_and_writes_nothing(monkeypatch):
+    """The atomic cap check is authoritative (not a pre-check), and create-first.
+
+    When `create_graph_within_cap` reports the cap hit (a concurrent adopt took the
+    last slot), adopt 402s, creates NO graph row, and — because content is rebuilt
+    only after a successful create — applies NO content either. So there's neither a
+    half-adopted empty board nor orphaned Qdrant content, and a retry heals cleanly.
+    """
+    monkeypatch.setattr(boards_module, "is_billing_active", lambda: True)
+    store = _AdoptStore(owned_count=0)
+    store.block_create = True  # atomic create reports the cap hit (lost the race)
+    client = _client(store, user_uid="owner-1", plan="free")
+
+    res = client.post("/boards/b:adopt", json={"ops": [_node_add("n1")]})
+    assert res.status_code == 402
+    assert store.added_graphs == []  # no board row created
+    assert store.add_notes_calls == []  # create-first: content never applied → no orphan
+
+    # Retry once the slot frees: no graph row exists → re-creates + applies cleanly.
+    store.block_create = False
+    res2 = client.post("/boards/b:adopt", json={"ops": [_node_add("n1")]})
+    assert res2.status_code == 200
+    assert res2.json()["data"]["adopted"] is True
+    assert len(store.added_graphs) == 1
+
+
+def test_adopt_concurrent_same_id_is_idempotent_not_500():
+    """A concurrent adopt of the same UID (create-under-lock 'exists') is a no-op.
+
+    The top-level metadata check sees nothing (the concurrent create hasn't been
+    observed yet), so adopt reaches create_graph_within_cap, which reports the UID
+    already exists. That must return an idempotent no-op — not blow up on the unique
+    constraint (the old behavior on a double-click).
+    """
+    store = _AdoptStore()
+    store.race_exists = True  # a concurrent adopter created the UID under the lock
+    client = _client(store, user_uid="owner-1")
+
+    res = client.post("/boards/b:adopt", json={"ops": [_node_add("n1")]})
+    assert res.status_code == 200
+    assert res.json()["data"] == {"graph_id": "b", "adopted": False, "applied": 0}
+    assert store.add_notes_calls == []  # the loser doesn't re-apply content
+
+
+def test_create_board_rejects_when_free_synced_limit_reached(monkeypatch):
+    """Creating a board via PUT /boards enforces the same cap as adopt (no bypass)."""
+    monkeypatch.setattr(boards_module, "is_billing_active", lambda: True)
+    store = _AdoptStore(owned_count=boards_module.FREE_SYNCED_BOARD_LIMIT)
+    client = _client(store, user_uid="owner-1", plan="free")
+
+    res = client.put("/boards")
+
+    assert res.status_code == 402
+    assert store.added_graphs == []  # never created
+
+
+def test_create_board_succeeds_under_cap():
+    """PUT /boards creates a board when under the cap (billing off → unlimited)."""
+    store = _AdoptStore(owned_count=0)
+    client = _client(store, user_uid="owner-1")
+
+    res = client.put("/boards")
+
+    assert res.status_code == 200
+    assert "graph_id" in res.json()["data"]
+    assert len(store.added_graphs) == 1

@@ -53,34 +53,40 @@ async def create_graph(
     request: Request,
     user_id: Annotated[str, Depends(get_current_user_uid)]
 ):
-    """Create a new graph for the user."""
+    """Create a new synced board for the user, enforcing the plan's board cap.
+
+    Shares the atomic, race-free cap primitive with adopt so the free-tier limit
+    can't be bypassed by creating boards directly instead of promoting local ones.
+    """
     store: GraphStore = request.app.graph_store
 
+    cap = await _synced_board_cap(request, user_id)
     new_graph = Graph(user_uid=user_id)
-    await store.add_graph(graph=new_graph, user_uid=user_id)
+    outcome = await store.create_graph_within_cap(graph=new_graph, user_uid=user_id, cap=cap)
+    if outcome == "at_cap":
+        raise HTTPException(status_code=402, detail=_CAP_DETAIL)
+    # A fresh server-generated UID can't collide, so "created" is the only other
+    # outcome.
     return {"graph_id": new_graph.uid}
 
 
-async def _enforce_synced_board_limit(
-    request: Request, store: GraphStore, user_id: str
-) -> None:
-    """Raise 402 if the free plan's synced-board cap is already reached.
+_CAP_DETAIL = "Synced-board limit reached for your plan. Upgrade, or delete a synced board."
 
-    No-op in OSS mode (billing off) and for paid plans (unlimited). Counts only
-    boards the user OWNS — shared-with-me boards don't count against their cap.
+
+async def _synced_board_cap(request: Request, user_id: str) -> int | None:
+    """Resolve the caller's synced-board cap, or None when unlimited.
+
+    None in OSS mode (billing off) and for paid plans; the free plan's fixed cap
+    otherwise. The count of owned boards is done atomically at create time (see
+    `create_graph_within_cap`) — this only resolves the limit.
     """
     if not is_billing_active():
-        return
+        return None
     billing = await request.app.user_billing_store.get_user_billing(user_id)
     plan = effective_plan(billing.plan, billing.status) if billing else "free"
     if plan != "free":
-        return
-    owned = sum(1 for (_g, role, _e) in await store.list_graphs(user_id) if role == "owner")
-    if owned >= FREE_SYNCED_BOARD_LIMIT:
-        raise HTTPException(
-            status_code=402,
-            detail="Synced-board limit reached for your plan. Upgrade, or delete a synced board.",
-        )
+        return None
+    return FREE_SYNCED_BOARD_LIMIT
 
 
 @router.post("/{graph_id}:adopt/", include_in_schema=False)
@@ -114,12 +120,27 @@ async def adopt_graph(
             raise HTTPException(status_code=409, detail="board id already in use")
         return {"graph_id": graph_id, "adopted": False, "applied": 0}
 
-    # Enforce the synced-board cap at promotion (boards are one-way: no un-sync,
-    # so the cap can't be bypassed by demoting). Local boards stay unlimited.
-    await _enforce_synced_board_limit(request, store, user_id)
-
+    # Create the graph row FIRST, atomically enforcing the synced-board cap: a
+    # per-user advisory lock inside create_graph_within_cap makes the count+insert
+    # race-free (no two concurrent adopts can both slip past the cap) and detects a
+    # concurrent duplicate UID instead of hitting the unique constraint. Content is
+    # rebuilt only AFTER a successful create, so a rejected/duplicate adopt writes
+    # nothing to Qdrant that would need cleaning up.
+    cap = await _synced_board_cap(request, user_id)
     graph = Graph(uid=graph_id, label=body.label)
-    await store.add_graph(graph=graph, user_uid=user_id)
+    outcome = await store.create_graph_within_cap(graph=graph, user_uid=user_id, cap=cap)
+    if outcome == "at_cap":
+        raise HTTPException(status_code=402, detail=_CAP_DETAIL)
+    if outcome == "exists":
+        # A concurrent adopt of this UID won the race and owns the content rebuild;
+        # this call is an idempotent no-op. Confirm ownership though — a UID owned
+        # by someone else is a conflict, not a silent success.
+        role = await store.get_graph_role(graph_uid=graph_id, user_uid=user_id)
+        if role != "owner":
+            raise HTTPException(status_code=409, detail="board id already in use")
+        return {"graph_id": graph_id, "adopted": False, "applied": 0}
+
+    # Rebuild content on the freshly-created graph (idempotent Qdrant upserts).
     results = await apply_batch(
         graph_store=store,
         board_id=graph_id,
