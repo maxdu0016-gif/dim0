@@ -80,22 +80,29 @@ def _client_ip(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 
 
-async def meter_run(
+async def _meter_run(
     request: Request,
-    user_id: Annotated[str | None, Depends(optional_user_uid)] = None,
-    x_run_id: Annotated[str | None, Header()] = None,
-    x_provider_key: Annotated[str | None, Header()] = None,
+    user_id: str | None,
+    x_run_id: str | None,
+    x_provider_key: str | None,
+    *,
+    allow_byok_relay: bool,
 ) -> None:
     """Meter one whole agent run against the plan's AI quota.
 
-    - A BYOK call (`X-Provider-Key`) runs on the user's own provider key: it's
-      never charged against our quota. It may be tokenless (local user), so it's
-      only guarded by a light per-IP cap.
+    - When `allow_byok_relay` is set (the external-tool endpoints that relay the
+      caller's key to the provider), a call carrying `X-Provider-Key` runs on the
+      user's own key: never charged against our quota, only guarded by a light
+      per-IP cap (it may be tokenless for a local user). The managed LLM proxy
+      passes `allow_byok_relay=False` — it always runs on OUR keys, so a stray
+      provider-key header must NOT skip metering.
     - A managed call requires auth. The FIRST managed call of a run (deduped by
       `X-Run-Id`) enforces the quota (429 when over); later calls in the run are
       free; a call with no run id is metered on its own ("one run = one unit").
+      The dedup slot is released if enforcement rejects, so a rejected first call
+      isn't recorded as already-metered (which would let a retry ride free).
     """
-    if x_provider_key:
+    if allow_byok_relay and x_provider_key:
         redis = getattr(request.app, "redis_store", None)
         if redis is not None:
             ok, _ = await redis.check_fixed_window_quota(
@@ -112,10 +119,50 @@ async def meter_run(
         )
     if x_run_id:
         redis = request.app.redis_store
-        first = await redis.set_if_absent(f"airun:{user_id}:{x_run_id}", RUN_TTL_SECONDS)
+        key = f"airun:{user_id}:{x_run_id}"
+        first = await redis.set_if_absent(key, RUN_TTL_SECONDS)
         if not first:
             return
-    await enforce_rate_limit(request, user_id)
+        try:
+            await enforce_rate_limit(request, user_id)
+        except Exception:
+            # Rejected (e.g. over quota): release the dedup slot so this run isn't
+            # marked metered — otherwise a retry with the same id would skip the
+            # charge and ride free until the key's TTL expires. Best-effort, so a
+            # delete failure never masks the original rejection (the 429).
+            try:
+                await redis.delete(key)
+            except Exception:
+                pass
+            raise
+    else:
+        await enforce_rate_limit(request, user_id)
+
+
+async def meter_run(
+    request: Request,
+    user_id: Annotated[str | None, Depends(optional_user_uid)] = None,
+    x_run_id: Annotated[str | None, Header()] = None,
+    x_provider_key: Annotated[str | None, Header()] = None,
+) -> None:
+    """Meter a managed-or-BYOK-relay call (`/ai/search|code|fetch|parse`).
+
+    A relayed `X-Provider-Key` runs on the user's own key and skips our quota.
+    """
+    await _meter_run(request, user_id, x_run_id, x_provider_key, allow_byok_relay=True)
+
+
+async def meter_run_managed(
+    request: Request,
+    user_id: Annotated[str | None, Depends(optional_user_uid)] = None,
+    x_run_id: Annotated[str | None, Header()] = None,
+) -> None:
+    """Meter a managed-only call (`/ai/llm[/stream]`, which runs on OUR keys).
+
+    Unlike `meter_run` there is no `X-Provider-Key` escape hatch: these endpoints
+    never relay a caller key, so the run is always charged.
+    """
+    await _meter_run(request, user_id, x_run_id, None, allow_byok_relay=False)
 
 
 class AiLlmRequest(BaseModel):
@@ -200,7 +247,7 @@ async def ai_llm(
     request: Request,
     body: AiLlmRequest,
     user_id: Annotated[str, Depends(get_current_user_uid)],
-    _meter: Annotated[None, Depends(meter_run)],
+    _meter: Annotated[None, Depends(meter_run_managed)],
 ):
     """Forward one model turn with our keys. Returns `{choices:[{message}]}`."""
     entitlement = await resolve_entitlement_context(request, user_id)
@@ -236,7 +283,7 @@ async def ai_llm_stream(
     request: Request,
     body: AiLlmRequest,
     user_id: Annotated[str, Depends(get_current_user_uid)],
-    _meter: Annotated[None, Depends(meter_run)],
+    _meter: Annotated[None, Depends(meter_run_managed)],
 ):
     """Stream one model turn as NDJSON lines.
 

@@ -48,6 +48,10 @@ class RedisStore:
         result = await self.redis.set(key, "1", nx=True, ex=ttl_seconds)
         return bool(result)
 
+    async def delete(self, key: str) -> None:
+        """Delete a key (used to release a run's dedup slot when metering is rejected)."""
+        await self.redis.delete(key)
+
     async def check_rate_limit(
         self,
         user_id: str,

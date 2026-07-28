@@ -6,7 +6,9 @@ import { BoardRegistry, newLocalBoard } from "@/features/board/persist/local/boa
 import { LocalSearchIndex } from "@/features/board/search/local-index"
 import { addNode, freshStore, resetIdb } from "@/test/canvas"
 import { ScriptedLlm, toolTurn } from "@/test/llm"
+import { z } from "zod"
 import { runAgent } from "./agent-loop"
+import { defineTool } from "./types"
 import type { AgentEvent, LlmClient, LlmMessage } from "./types"
 import { createNote, editNote, getNote, linkNotes, listBoards, localTools, searchNotes, updateNote, writeNote } from "./tools"
 import { learnGenerateMiniApp, skillTools } from "./skills"
@@ -49,6 +51,33 @@ describe("runAgent (scripted LLM)", () => {
     expect(pairs).toEqual(["n1->n2", "n2->n3"])
     expect(events.at(-1)).toEqual({ type: "done" })
     expect(events.some((e) => e.type === "assistant_text")).toBe(true)
+  })
+
+
+  it("reports a throwing tool as a tool error and keeps the run going", async () => {
+    const store = freshStore("c")
+    const exploding = defineTool({
+      name: "explode",
+      description: "always throws",
+      parameters: z.object({}),
+      run: async () => {
+        throw new Error("boom")
+      },
+    })
+    const llm = new ScriptedLlm([
+      toolTurn("explode", {}),
+      { kind: "text", text: "recovered without the tool" },
+    ])
+
+    const events = await drain(runAgent({ userMessage: "go", tools: [exploding], llm, ctx: { store } }))
+
+    expect(events.find((e) => e.type === "tool_result")).toMatchObject({
+      type: "tool_result",
+      toolName: "explode",
+      result: { error: "boom" },
+    })
+    expect(events.some((e) => e.type === "assistant_text" && e.text === "recovered without the tool")).toBe(true)
+    expect(events.at(-1)).toEqual({ type: "done" })
   })
 
 

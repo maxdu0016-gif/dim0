@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 
 import topix.api.router.ai as ai_module
 
-from topix.api.router.ai import meter_run, optional_user_uid
+from topix.api.router.ai import meter_run, meter_run_managed, optional_user_uid
 
 
 class _FakeRedis:
@@ -26,12 +26,21 @@ class _FakeRedis:
         self.seen.add(key)
         return True
 
+    async def delete(self, key: str) -> None:
+        self.seen.discard(key)
+
     async def check_fixed_window_quota(self, key, limit, period, scope="tier_usage"):
         return (not self.ip_over, 60)
 
 
-def _app(monkeypatch, enforce, uid: str | None = "u1", redis: _FakeRedis | None = None) -> TestClient:
-    """App exposing a probe route guarded by meter_run, with enforce + auth stubbed."""
+def _app(
+    monkeypatch,
+    enforce,
+    uid: str | None = "u1",
+    redis: _FakeRedis | None = None,
+    dep=meter_run,
+) -> TestClient:
+    """App exposing a probe route guarded by `dep`, with enforce + auth stubbed."""
     app = FastAPI()
     app.redis_store = redis or _FakeRedis()
     monkeypatch.setattr(ai_module, "enforce_rate_limit", enforce)
@@ -42,7 +51,7 @@ def _app(monkeypatch, enforce, uid: str | None = "u1", redis: _FakeRedis | None 
     app.dependency_overrides[optional_user_uid] = _uid
 
     @app.post("/_probe")
-    async def _probe(_: None = Depends(meter_run)):
+    async def _probe(_: None = Depends(dep)):
         return {"ok": True}
 
     return TestClient(app)
@@ -133,4 +142,48 @@ def test_over_quota_first_call_returns_429(monkeypatch):
         raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "slow down")
 
     res = _app(monkeypatch, enforce).post("/_probe", headers={"X-Run-Id": "run-x"})
+    assert res.status_code == 429
+
+
+def test_over_quota_retry_with_same_run_id_still_charges(monkeypatch):
+    """A rejected first call releases its dedup slot, so a retry re-enforces.
+
+    Regression: previously the slot was claimed before enforcement and never
+    released, so re-sending the same X-Run-Id after a 429 skipped the charge and
+    rode free for the key's TTL.
+    """
+    calls: list[str] = []
+
+    async def enforce(_request, uid):
+        calls.append(uid)
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "slow down")
+
+    client = _app(monkeypatch, enforce)
+    first = client.post("/_probe", headers={"X-Run-Id": "run-x"})
+    retry = client.post("/_probe", headers={"X-Run-Id": "run-x"})
+    assert first.status_code == 429
+    assert retry.status_code == 429  # not a free 200
+    assert calls == ["u1", "u1"]  # re-enforced, not skipped
+
+
+def test_managed_only_ignores_provider_key_and_still_meters(monkeypatch):
+    """`meter_run_managed` (the LLM proxy) never honors X-Provider-Key.
+
+    Regression: a stray provider-key header used to take the BYOK skip branch and
+    bypass the quota — but the LLM endpoints run on our keys, so it must charge.
+    """
+    calls, enforce = _recorder()
+    client = _app(monkeypatch, enforce, dep=meter_run_managed)
+    res = client.post("/_probe", headers={"X-Run-Id": "run-1", "X-Provider-Key": "sk-user"})
+    assert res.status_code == 200
+    assert calls == ["u1"]  # metered despite the provider key
+
+
+def test_managed_only_over_quota_cannot_be_bypassed_by_provider_key(monkeypatch):
+    """An over-quota managed call is 429 even with an X-Provider-Key header."""
+    async def enforce(_request, _uid):
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "slow down")
+
+    client = _app(monkeypatch, enforce, dep=meter_run_managed)
+    res = client.post("/_probe", headers={"X-Run-Id": "r", "X-Provider-Key": "sk-user"})
     assert res.status_code == 429
