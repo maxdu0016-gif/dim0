@@ -19,6 +19,7 @@ import { getDocIndexRef } from "@/features/board/search/doc-index-ref"
 import { rebuildDocIndex } from "@/features/board/search/use-doc-index"
 import { getLocalStores } from "@/features/local-stores"
 import { makeDocSearchTool } from "@/features/agent/engine/doc-search"
+import { useToolConfirm } from "@/features/agent/engine/tool-confirm-store"
 import type { AgentEvent } from "@/features/agent/engine/types"
 import { planSystemPrompt } from "@/features/agent/prompts"
 import { useByokStore } from "@/features/agent/byok/byok-store"
@@ -194,7 +195,11 @@ export function useLocalSubmitPrompt(boardId: string) {
           ? `${system}\n\nThis board has uploaded documents. Use \`doc_search(query)\` — full-text over their contents — and for anything they could answer, call it FIRST, before answering from your own knowledge; ground the answer in the returned passages and cite each document by its exact title. (\`search_notes\` covers the board's own notes.)`
           : system
         const userMessageForAgent = wrapWithMessageContext(prompt, messageContext)
-        for await (const ev of runAgent({ system: systemWithDocs, userMessage: userMessageForAgent, history, tools, llm, ctx: { store, rootId, search } })) {
+        // Gate off-board tools (network/code) behind a user confirmation, so a
+        // prompt-injected tool call can't silently exfiltrate or run code.
+        const confirmTool = (req: { name: string; args: Record<string, unknown> }) =>
+          useToolConfirm.getState().request(req)
+        for await (const ev of runAgent({ system: systemWithDocs, userMessage: userMessageForAgent, history, tools, llm, ctx: { store, rootId, search, confirmTool } })) {
           // Streaming yields a cumulative assistant_text per token — replace the
           // previous snapshot in place instead of appending one event per token.
           const prev = events[events.length - 1]

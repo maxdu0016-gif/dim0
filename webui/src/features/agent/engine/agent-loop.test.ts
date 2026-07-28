@@ -129,6 +129,127 @@ describe("runAgent (scripted LLM)", () => {
 })
 
 
+describe("runAgent — off-board tool confirmation gate", () => {
+  const spyTool = (name: string, ran: { value: boolean }) =>
+    defineTool({
+      name,
+      description: name,
+      parameters: z.object({ url: z.string().optional(), code: z.string().optional() }),
+      run: async () => {
+        ran.value = true
+        return { ok: true }
+      },
+    })
+
+  const resultOf = (events: AgentEvent[]) => events.find((e) => e.type === "tool_result")
+
+  it("runs a gated tool when the user allows", async () => {
+    const ran = { value: false }
+    const seen: { name: string; args: Record<string, unknown> }[] = []
+    const llm = new ScriptedLlm([toolTurn("fetch", { url: "https://x" }), { kind: "text", text: "done" }])
+    const events = await drain(
+      runAgent({
+        userMessage: "go",
+        tools: [spyTool("fetch", ran)],
+        llm,
+        ctx: { store: freshStore("c"), confirmTool: async (r) => (seen.push(r), true) },
+      }),
+    )
+    expect(seen).toEqual([{ name: "fetch", args: { url: "https://x" } }])
+    expect(ran.value).toBe(true)
+    expect(resultOf(events)).toMatchObject({ result: { ok: true } })
+  })
+
+  it("declines a gated tool and feeds an error back to the model (tool not run)", async () => {
+    const ran = { value: false }
+    const llm = new ScriptedLlm([toolTurn("fetch", { url: "https://evil/x" }), { kind: "text", text: "ok without it" }])
+    const events = await drain(
+      runAgent({
+        userMessage: "go",
+        tools: [spyTool("fetch", ran)],
+        llm,
+        ctx: { store: freshStore("c"), confirmTool: async () => false },
+      }),
+    )
+    expect(ran.value).toBe(false)
+    expect(resultOf(events)).toMatchObject({ toolName: "fetch", result: { error: "declined by user" } })
+    expect(events.some((e) => e.type === "assistant_text" && e.text === "ok without it")).toBe(true)
+  })
+
+  it("gates code_interpreter too", async () => {
+    const ran = { value: false }
+    const llm = new ScriptedLlm([toolTurn("code_interpreter", { code: "fetch('x')" }), { kind: "text", text: "d" }])
+    await drain(
+      runAgent({
+        userMessage: "go",
+        tools: [spyTool("code_interpreter", ran)],
+        llm,
+        ctx: { store: freshStore("c"), confirmTool: async () => false },
+      }),
+    )
+    expect(ran.value).toBe(false)
+  })
+
+  it("gates web_search too", async () => {
+    const ran = { value: false }
+    const llm = new ScriptedLlm([toolTurn("web_search", { query: "secrets on the board" }), { kind: "text", text: "d" }])
+    await drain(
+      runAgent({
+        userMessage: "go",
+        tools: [spyTool("web_search", ran)],
+        llm,
+        ctx: { store: freshStore("c"), confirmTool: async () => false },
+      }),
+    )
+    expect(ran.value).toBe(false)
+  })
+
+  it("runs a gated tool unprompted when no confirmTool is wired (headless/tests)", async () => {
+    const ran = { value: false }
+    const llm = new ScriptedLlm([toolTurn("fetch", { url: "https://x" }), { kind: "text", text: "d" }])
+    await drain(runAgent({ userMessage: "go", tools: [spyTool("fetch", ran)], llm, ctx: { store: freshStore("c") } }))
+    expect(ran.value).toBe(true)
+  })
+
+  it("a throwing confirmer becomes a tool error, not a run abort", async () => {
+    const ran = { value: false }
+    const llm = new ScriptedLlm([toolTurn("fetch", { url: "https://x" }), { kind: "text", text: "recovered" }])
+    const events = await drain(
+      runAgent({
+        userMessage: "go",
+        tools: [spyTool("fetch", ran)],
+        llm,
+        ctx: {
+          store: freshStore("c"),
+          confirmTool: async () => {
+            throw new Error("boom")
+          },
+        },
+      }),
+    )
+    expect(ran.value).toBe(false)
+    expect(resultOf(events)).toMatchObject({ toolName: "fetch", result: { error: "boom" } })
+    expect(events.some((e) => e.type === "assistant_text" && e.text === "recovered")).toBe(true)
+  })
+
+  it("does NOT prompt for non-gated tools (note tools auto-run)", async () => {
+    const ran = { value: false }
+    let prompted = false
+    const llm = new ScriptedLlm([toolTurn("noop", {}), { kind: "text", text: "d" }])
+    await drain(
+      runAgent({
+        userMessage: "go",
+        tools: [spyTool("noop", ran)],
+        llm,
+        ctx: { store: freshStore("c"), confirmTool: async () => ((prompted = true), true) },
+      }),
+    )
+    expect(prompted).toBe(false)
+    expect(ran.value).toBe(true)
+  })
+})
+
+
 describe("tools", () => {
   it("create_note then update_note changes title and body", async () => {
     const store = freshStore("c")

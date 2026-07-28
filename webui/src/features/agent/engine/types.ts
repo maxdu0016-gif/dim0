@@ -68,6 +68,14 @@ export type ToolContext = {
   rootId?: string | null
   search?: LocalSearchIndex
   registry?: BoardRegistry
+  /**
+   * Optional gate for side-effecting / off-board tools (network egress, code
+   * execution). The loop calls it before running such a tool; resolve `true` to
+   * run, `false` to decline (the model gets a "declined" result and adapts).
+   * When absent (tests / headless), gated tools run unprompted — the gate is a
+   * UI concern wired only by the local submit path.
+   */
+  confirmTool?: (req: { name: string; args: Record<string, unknown> }) => Promise<boolean>
 }
 
 
