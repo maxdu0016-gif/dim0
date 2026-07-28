@@ -16,6 +16,17 @@ import { agentLog } from "./debug"
 export const DEFAULT_MAX_TURNS = 30
 
 
+/**
+ * Tools that reach OFF the board — network egress (`fetch`) and code execution
+ * (`code_interpreter`). When a confirmer is wired (see `ToolContext.confirmTool`)
+ * these require an explicit user OK before running, so a prompt-injected tool
+ * call (from a selected note / uploaded doc) can't silently exfiltrate board
+ * data or run attacker code. Note tools stay auto — they act on the user's own
+ * board and gating them would wreck the normal build flow.
+ */
+const CONFIRM_TOOLS = new Set(["fetch", "code_interpreter"])
+
+
 /** Convert a tool's Zod schema to a plain JSON Schema (dropping the `$schema` tag). */
 const toJsonSchema = (schema: z.ZodType): Record<string, unknown> => {
   const json = z.toJSONSchema(schema) as Record<string, unknown>
@@ -103,6 +114,14 @@ export async function* runAgent(opts: RunAgentOptions): AsyncGenerator<AgentEven
       let output: unknown
       if (!tool) {
         output = { error: `unknown tool: ${call.name}` }
+      } else if (
+        CONFIRM_TOOLS.has(tool.name) &&
+        opts.ctx.confirmTool &&
+        !(await opts.ctx.confirmTool({ name: tool.name, args }))
+      ) {
+        // User declined this off-board action; feed a result back so the model
+        // can adapt (answer without it) rather than silently running it.
+        output = { error: "declined by user" }
       } else {
         try {
           output = await tool.run(args, opts.ctx)
