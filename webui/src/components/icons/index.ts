@@ -27,6 +27,8 @@ export {
   ClaudeBrandIcon,
   CloseIcon,
   ClockIcon,
+  CloudArrowUpIcon,
+  CloudCheckIcon,
   CloudSyncIcon,
   CodeBlockIcon,
   CodeFileIcon,

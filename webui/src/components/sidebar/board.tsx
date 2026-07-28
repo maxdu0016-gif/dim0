@@ -7,7 +7,7 @@ import { UNTITLED_LABEL } from "@/features/board/const"
 import { useNavigate, useRouterState } from "@tanstack/react-router"
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "../ui/context-menu"
 import { Collapsible, CollapsibleContent } from "../ui/collapsible"
-import { BoardContextIcon, ChatHistoryIcon, ChevronRightIcon, CloudSyncIcon, DashboardAddIcon, DeleteIcon, EditIcon } from "@/components/icons"
+import { BoardContextIcon, ChatHistoryIcon, ChevronRightIcon, CloudArrowUpIcon, DashboardAddIcon, DeleteIcon, EditIcon } from "@/components/icons"
 import { ChatsDialog } from "./chats-dialog"
 import { ConfirmDeleteBoardAlert } from "./confirm-delete-board"
 import { BoardTreeNode } from "./board-tree-node"
@@ -176,7 +176,7 @@ export function LocalBoardItem({
             disabled={syncing}
             className="text-xs flex flex-row items-center"
           >
-            <CloudSyncIcon className="mr-2 size-4" strokeWidth={2} />
+            <CloudArrowUpIcon className="mr-2 size-4" strokeWidth={2} />
             <span>{syncing ? "Enabling sync…" : "Enable sync"}</span>
           </ContextMenuItem>
           <ContextMenuItem
@@ -212,7 +212,7 @@ export function LocalBoardItem({
           syncing && "opacity-50",
         )}
       >
-        <CloudSyncIcon className={cn("size-4", syncing && "animate-pulse")} strokeWidth={2} />
+        <CloudArrowUpIcon className={cn("size-4", syncing && "animate-pulse")} strokeWidth={2} />
       </SidebarMenuAction>
 
       <ConfirmDeleteBoardAlert
