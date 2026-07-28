@@ -5,7 +5,7 @@ import { create } from "zustand"
 export type ToolConfirmRequest = { name: string; args: Record<string, unknown> }
 
 
-type Pending = (ToolConfirmRequest & { id: number; resolve: (ok: boolean) => void }) | null
+type Pending = (ToolConfirmRequest & { resolve: (ok: boolean) => void }) | null
 
 
 type ToolConfirmState = {
@@ -17,9 +17,6 @@ type ToolConfirmState = {
 }
 
 
-let seq = 0
-
-
 /**
  * Bridges the agent loop's `confirmTool` gate (see agent-loop `CONFIRM_TOOLS`)
  * to a React confirm dialog: `request` parks a promise + the pending request so
@@ -28,15 +25,13 @@ let seq = 0
  */
 export const useToolConfirm = create<ToolConfirmState>((set, get) => ({
   pending: null,
-  request: (req) =>
-    new Promise<boolean>((resolve) => {
-      // Only one prompt at a time (the loop awaits each). If one is somehow
-      // already open, decline it before replacing so its promise never leaks.
-      const prev = get().pending
-      if (prev) prev.resolve(false)
-      seq += 1
-      set({ pending: { ...req, id: seq, resolve } })
-    }),
+  request: (req) => {
+    // One prompt at a time. If one is already open (a second/concurrent run),
+    // decline the NEW request rather than clobbering the prompt the user is
+    // deciding on — fail closed without disturbing the in-flight decision.
+    if (get().pending) return Promise.resolve(false)
+    return new Promise<boolean>((resolve) => set({ pending: { ...req, resolve } }))
+  },
   resolve: (ok) => {
     const p = get().pending
     if (!p) return

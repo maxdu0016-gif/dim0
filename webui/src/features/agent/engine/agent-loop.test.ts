@@ -197,6 +197,27 @@ describe("runAgent — off-board tool confirmation gate", () => {
     expect(ran.value).toBe(true)
   })
 
+  it("a throwing confirmer becomes a tool error, not a run abort", async () => {
+    const ran = { value: false }
+    const llm = new ScriptedLlm([toolTurn("fetch", { url: "https://x" }), { kind: "text", text: "recovered" }])
+    const events = await drain(
+      runAgent({
+        userMessage: "go",
+        tools: [spyTool("fetch", ran)],
+        llm,
+        ctx: {
+          store: freshStore("c"),
+          confirmTool: async () => {
+            throw new Error("boom")
+          },
+        },
+      }),
+    )
+    expect(ran.value).toBe(false)
+    expect(resultOf(events)).toMatchObject({ toolName: "fetch", result: { error: "boom" } })
+    expect(events.some((e) => e.type === "assistant_text" && e.text === "recovered")).toBe(true)
+  })
+
   it("does NOT prompt for non-gated tools (note tools auto-run)", async () => {
     const ran = { value: false }
     let prompted = false

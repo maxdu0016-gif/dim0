@@ -114,17 +114,16 @@ export async function* runAgent(opts: RunAgentOptions): AsyncGenerator<AgentEven
       let output: unknown
       if (!tool) {
         output = { error: `unknown tool: ${call.name}` }
-      } else if (
-        CONFIRM_TOOLS.has(tool.name) &&
-        opts.ctx.confirmTool &&
-        !(await opts.ctx.confirmTool({ name: tool.name, args }))
-      ) {
-        // User declined this off-board action; feed a result back so the model
-        // can adapt (answer without it) rather than silently running it.
-        output = { error: "declined by user" }
       } else {
+        // Confirm + run share one try/catch so neither a declined confirm nor a
+        // throwing confirmer/tool aborts the whole run — the error is fed back.
         try {
-          output = await tool.run(args, opts.ctx)
+          if (CONFIRM_TOOLS.has(tool.name) && opts.ctx.confirmTool && !(await opts.ctx.confirmTool({ name: tool.name, args }))) {
+            // Declined off-board action: feed a result back so the model adapts.
+            output = { error: "declined by user" }
+          } else {
+            output = await tool.run(args, opts.ctx)
+          }
         } catch (err) {
           output = { error: err instanceof Error ? err.message : String(err) }
         }

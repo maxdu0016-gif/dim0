@@ -1,5 +1,4 @@
 import { ChatProvider } from "@/features/agent/hooks/chat-context"
-import { ToolConfirmDialog } from "@/features/agent/components/chat/tool-confirm-dialog"
 import { AnswerCard } from "./answer-card"
 import { FloatingIsland } from "./floating-island"
 
@@ -30,8 +29,6 @@ export const FloatingAssistant = ({
     <ChatProvider initialChatId={local ? boardId : currentChatId} local={local}>
       <FloatingIsland boardId={boardId} onOpenFullSheet={onOpenFullSheet} />
       <AnswerCard onOpenFullSheet={onOpenFullSheet} />
-      {/* Off-board tool (fetch/code) confirmation — only the local agent gates. */}
-      {local && <ToolConfirmDialog />}
     </ChatProvider>
   )
 }

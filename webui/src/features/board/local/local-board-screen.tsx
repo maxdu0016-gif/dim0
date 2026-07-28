@@ -4,6 +4,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Button } from "@/components/ui/button"
 import { ArrowExpandIcon, SparklesIcon } from "@/components/icons"
 import { Chat } from "@/features/agent/components/chat-view"
+import { ToolConfirmDialog } from "@/features/agent/components/chat/tool-confirm-dialog"
 import { useLocalMessagesStore } from "@/features/agent/store/local-messages-store"
 import { HarnessCanvas } from "@/features/board/harness/canvas"
 import { LocalFolderBreadcrumb } from "@/features/board/local/local-folder-breadcrumb"
@@ -46,6 +47,11 @@ export function LocalBoardScreen() {
     <div className="absolute inset-0 h-full w-full overflow-hidden bg-background">
       <div className="relative h-full w-full">
         <HarnessCanvas local />
+
+        {/* Off-board tool (fetch/code) confirmation. Mounted at screen level
+            (not inside FloatingAssistant) so it stays present when the full
+            sheet is open — otherwise a gated call from the sheet hangs the run. */}
+        <ToolConfirmDialog />
 
         <LocalFolderBreadcrumb boardId={boardId} rootId={rootId ?? null} />
 
