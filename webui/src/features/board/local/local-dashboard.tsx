@@ -4,6 +4,7 @@ import { UNTITLED_LABEL } from "@/features/board/const"
 import type { BoardMeta } from "@/features/board/model"
 import { formatDateForUI } from "@/features/board/utils/datetime"
 import { BoardKindBadge } from "@/features/board/components/board-kind-badge"
+import { ConfirmDeleteBoardAlert } from "@/components/sidebar/confirm-delete-board"
 
 
 // Local-board card + "new" tile, rendered by the unified BoardsHome dashboard's
@@ -29,6 +30,7 @@ export function LocalBoardCard({
 }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(board.title)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
   const date = board.updatedAt ?? board.createdAt
   const dateString = date ? formatDateForUI(new Date(date).toISOString()) : null
 
@@ -40,6 +42,7 @@ export function LocalBoardCard({
   }
 
   return (
+    <>
     <div
       className="group relative w-64 h-60 flex flex-col justify-between gap-1 p-1 overflow-hidden rounded-xl bg-accent hover:bg-muted text-card-foreground border border-transparent hover:border-secondary-foreground hover:ring-2 hover:ring-secondary-foreground/50 shadow-md hover:shadow-lg transition-all cursor-pointer"
       onClick={() => !editing && onOpen()}
@@ -51,7 +54,7 @@ export function LocalBoardCard({
         className="absolute right-2 top-2 z-10 hidden rounded-md bg-background/80 p-1 text-muted-foreground shadow-sm hover:text-destructive group-hover:block"
         onClick={(e) => {
           e.stopPropagation()
-          onDelete()
+          setConfirmingDelete(true)
         }}
       >
         <CancelPlainIcon className="size-3.5" strokeWidth={2} />
@@ -121,6 +124,21 @@ export function LocalBoardCard({
         </div>
       </div>
     </div>
+
+    {/* Rendered OUTSIDE the clickable card: the dialog is Radix-portaled, but
+        React replays synthetic events along the component tree, so a Cancel/Delete
+        click inside a dialog nested in the card would bubble to onClick={onOpen}
+        (opening the board on Cancel; navigating into the deleted route on Delete).
+        A local board lives only in IndexedDB — deletion is irreversible, so confirm. */}
+    <ConfirmDeleteBoardAlert
+      open={confirmingDelete}
+      onOpenChange={setConfirmingDelete}
+      onConfirm={() => {
+        onDelete()
+        setConfirmingDelete(false)
+      }}
+    />
+    </>
   )
 }
 
