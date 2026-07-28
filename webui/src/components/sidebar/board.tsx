@@ -192,6 +192,24 @@ export function LocalBoardItem({
         </ContextMenuContent>
       </ContextMenu>
 
+      {/* Visible one-click promote-to-sync (also in the context menu above).
+          Local rows have no chat action, so this is the single trailing icon —
+          the menu-button's built-in pr-8 reserves its space, keeping the title
+          truncation correct. */}
+      <SidebarMenuAction
+        showOnHover
+        disabled={syncing}
+        onClick={(e) => {
+          e.stopPropagation()
+          onEnableSync()
+        }}
+        title={syncing ? "Enabling sync…" : "Enable sync — back up + share this board"}
+        aria-label="Enable sync"
+        className="text-muted-foreground/50 hover:text-secondary-foreground disabled:opacity-50"
+      >
+        <CloudSyncIcon className={cn("size-4", syncing && "animate-pulse")} strokeWidth={2} />
+      </SidebarMenuAction>
+
       <ConfirmDeleteBoardAlert
         open={isConfirmOpen}
         onOpenChange={setIsConfirmOpen}

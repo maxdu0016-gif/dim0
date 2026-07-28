@@ -4,6 +4,7 @@ import { UNTITLED_LABEL } from "@/features/board/const"
 import type { BoardMeta } from "@/features/board/model"
 import { formatDateForUI } from "@/features/board/utils/datetime"
 import { BoardKindBadge } from "@/features/board/components/board-kind-badge"
+import { ConfirmDeleteBoardAlert } from "@/components/sidebar/confirm-delete-board"
 
 
 // Local-board card + "new" tile, rendered by the unified BoardsHome dashboard's
@@ -29,6 +30,7 @@ export function LocalBoardCard({
 }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(board.title)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
   const date = board.updatedAt ?? board.createdAt
   const dateString = date ? formatDateForUI(new Date(date).toISOString()) : null
 
@@ -51,11 +53,22 @@ export function LocalBoardCard({
         className="absolute right-2 top-2 z-10 hidden rounded-md bg-background/80 p-1 text-muted-foreground shadow-sm hover:text-destructive group-hover:block"
         onClick={(e) => {
           e.stopPropagation()
-          onDelete()
+          setConfirmingDelete(true)
         }}
       >
         <CancelPlainIcon className="size-3.5" strokeWidth={2} />
       </button>
+
+      {/* A local board lives only in IndexedDB — deletion is irreversible with no
+          server copy, so confirm first (parity with the sidebar's local delete). */}
+      <ConfirmDeleteBoardAlert
+        open={confirmingDelete}
+        onOpenChange={setConfirmingDelete}
+        onConfirm={() => {
+          onDelete()
+          setConfirmingDelete(false)
+        }}
+      />
 
       {onEnableSync && (
         <button
