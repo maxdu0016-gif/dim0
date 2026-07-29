@@ -1,8 +1,5 @@
-import { useEffect } from "react"
 import { ChatProvider } from "@/features/agent/hooks/chat-context"
-import { useLocalMessagesStore } from "@/features/agent/store/local-messages-store"
 import { isLocalAgentOnSynced } from "@/features/agent/local/local-agent-flag"
-import { seedTranscriptsFromServer } from "@/features/agent/local/seed-transcripts"
 import { AnswerCard } from "./answer-card"
 import { FloatingIsland } from "./floating-island"
 
@@ -37,22 +34,9 @@ export const FloatingAssistant = ({
   // server (cross-device). A local-only board (`local`) has nothing to sync to.
   const syncTranscript = browserAgent && !local
 
-  // The local chat store is normally initialized by LocalBoardScreen; a synced
-  // board in browser-agent mode must init it too. On a synced board, first seed
-  // any server-side transcripts into IndexedDB (cross-device) so `openBoard`
-  // picks them up; seeding is best-effort and never clobbers a local copy.
-  const openBoard = useLocalMessagesStore((s) => s.openBoard)
-  useEffect(() => {
-    if (!(browserAgent && !local && boardId)) return
-    let cancelled = false
-    void (async () => {
-      if (syncTranscript) await seedTranscriptsFromServer(boardId)
-      if (!cancelled) await openBoard(boardId)
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [browserAgent, local, syncTranscript, boardId, openBoard])
+  // The local store is initialized at the screen level (BoardView for synced
+  // boards, LocalBoardScreen for local ones) so the pill and drawer — which
+  // never mount together — share one conversation. This surface just consumes it.
 
   return (
     <ChatProvider

@@ -1,4 +1,8 @@
+import { useEffect } from "react"
 import { useNavigate, useSearch } from "@tanstack/react-router"
+import { isLocalAgentOnSynced } from "@/features/agent/local/local-agent-flag"
+import { seedTranscriptsFromServer } from "@/features/agent/local/seed-transcripts"
+import { useLocalMessagesStore } from "@/features/agent/store/local-messages-store"
 import { HarnessCanvas } from "../harness/canvas"
 import { useBoardAppStore } from "../harness/store/board-app-store"
 import { FloatingAssistant } from "./flow/floating-assistant/floating-assistant"
@@ -17,6 +21,29 @@ export const BoardView: React.FC = () => {
   const chatSheetOpen = useBoardAppStore((s) => s.chatSheetOpen)
   const setChatSheetOpen = useBoardAppStore((s) => s.setChatSheetOpen)
   const presentationMode = useBoardAppStore((s) => s.presentationMode)
+
+  // Phase 3 (flag-gated): a synced board runs the browser engine. Computed once
+  // here and passed to BOTH chat surfaces so the pill and the drawer stay on the
+  // same engine and share one conversation (the pill is hidden while the drawer
+  // is open, so they must agree). Phase 2: back finished turns up to the server.
+  const browserAgent = isLocalAgentOnSynced()
+  const syncTranscript = browserAgent
+
+  // Own the local-store init at the screen level (mirrors LocalBoardScreen), so
+  // the store is populated regardless of which chat surface is currently mounted
+  // — otherwise opening the drawer (which unmounts the pill) would show nothing.
+  const openBoard = useLocalMessagesStore((s) => s.openBoard)
+  useEffect(() => {
+    if (!(browserAgent && boardId)) return
+    let cancelled = false
+    void (async () => {
+      await seedTranscriptsFromServer(boardId)
+      if (!cancelled) await openBoard(boardId)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [browserAgent, boardId, openBoard])
 
   // current_chat_id from the URL — shared between the floating island
   // and the full chat sheet so opening one continues the same chat.
@@ -42,6 +69,8 @@ export const BoardView: React.FC = () => {
           onOpenChange={setChatSheetOpen}
           boardId={boardId ?? undefined}
           currentChatId={currentChatId}
+          local={browserAgent}
+          syncTranscript={syncTranscript}
           onOpenFullChat={(chatId) => {
             setChatSheetOpen(false)
             if (chatId) {
