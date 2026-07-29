@@ -184,11 +184,18 @@ export function HarnessCanvas({ local = false }: { local?: boolean } = {}) {
   // A synced board runs EITHER the legacy WS adapter OR the offline-first
   // coordinator (v2), gated per-board by `BoardMeta.syncEngine` (dev flag as an
   // override). `null` while resolving — hydration below waits on it, so we never
-  // mount the wrong client first. Default is legacy: untouched boards are unchanged.
+  // mount the wrong client first. Default is v2 (Phase 1 of the backend-agent
+  // retirement); a board can be pinned to legacy via `syncEngine: "legacy"`.
   const syncEngine = useSyncEngine(boardId, local)
   const v2 = syncEngine === "v2"
   useWsCollab(store, boardId, ready && !local && !v2, rootId)
-  useBoardSyncV2(store, boardId, ready && v2, rootId ?? null)
+  useBoardSyncV2(store, boardId, ready && v2, rootId ?? null, (role) => {
+    // v2 skips the REST hydrate, so this is where the real role lands (from the
+    // collab ticket). Upgrade edit rights only for owner/member; viewers stay
+    // read-only (matches the server's edit gate).
+    setBoardRole(role)
+    setCanEdit(role !== "viewer")
+  })
   useLocalPresence(store, wrapRef, ready)
 
   const { handleCreateDrag, handleClick } = useCreateHandlers(store, boardId, rootId, styleMemory)
@@ -312,12 +319,14 @@ export function HarnessCanvas({ local = false }: { local?: boolean } = {}) {
     }
 
     // v2 synced board: the coordinator (useBoardSyncV2) hydrates via the welcome
-    // snapshot, so skip the REST hydrate here (running both would double-apply).
-    // Just mark ready + editable so its gate activates. (canEdit/role refinement
-    // from the ticket lands with presence in a later slice.)
+    // snapshot, so skip the REST content hydrate here (running both would
+    // double-apply). Role/canEdit are NOT known yet — the coordinator resolves
+    // them from the collab ticket and reports back via `onRole` below. Default to
+    // read-only (fail-closed) so a viewer of a shared board never gets edit
+    // affordances (edit tools, Share button) before the role is confirmed.
     if (v2) {
-      setCanEdit(true)
-      setBoardRole("owner")
+      setCanEdit(false)
+      setBoardRole("viewer")
       setIsLoading(false)
       setReady(true)
       return () => {

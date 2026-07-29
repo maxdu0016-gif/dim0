@@ -19,14 +19,9 @@ describe("resolveSyncEngine", () => {
     expect(resolveSyncEngine(undefined, false)).toBe("v2")
   })
 
-  it("reads the stored engine from meta", () => {
+  it("reads the stored engine from meta (incl. the legacy-pin escape hatch)", () => {
     expect(resolveSyncEngine(meta("v2"), false)).toBe("v2")
-    expect(resolveSyncEngine(meta("legacy"), false)).toBe("legacy")
-  })
-
-  it("respects an explicit legacy pin (rollout escape hatch)", () => {
-    // A board can still be held on the legacy client by storing syncEngine:"legacy".
-    expect(resolveSyncEngine(meta("legacy"), false)).toBe("legacy")
+    expect(resolveSyncEngine(meta("legacy"), false)).toBe("legacy") // pin holds a board on legacy
   })
 
   it("treats meta without syncEngine as v2 (the default)", () => {
