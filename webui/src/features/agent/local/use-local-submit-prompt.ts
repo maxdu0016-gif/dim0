@@ -27,6 +27,7 @@ import { useChatStore } from "@/features/agent/store/chat-store"
 import { byokModelForId } from "@/features/agent/types/model-catalog"
 import { useBoardAppStore } from "@/features/board/harness/store/board-app-store"
 import { useLocalMessagesStore } from "@/features/agent/store/local-messages-store"
+import { putChatTranscript } from "@/features/agent/api/chat-transcript"
 import type { ChatMessage } from "@/features/agent/types/chat"
 import { agentLog } from "@/features/agent/engine/debug"
 import { latestAssistantText, stepsFromEvents } from "./agent-event-to-step"
@@ -56,8 +57,12 @@ const mintId = (): string => `local-${Date.now()}-${counter++}`
  * with `ReasoningStep[]` — so the existing rich chat UI renders it unchanged.
  * Mints a chat on the first turn (mirrors the backend creating a chat) and
  * labels it from the opening prompt.
+ *
+ * When `syncTranscript` is set (a synced board in browser-agent mode), the
+ * finished transcript is also backed up to the server for cross-device access —
+ * a fire-and-forget mirror of the local persist, never part of the turn's path.
  */
-export function useLocalSubmitPrompt(boardId: string) {
+export function useLocalSubmitPrompt(boardId: string, syncTranscript = false) {
   // Source of truth for the client agent: byok-store (keys + search engine) plus
   // service availability. Deliberately NOT chat-store's webSearchEngine /
   // enabledTools / useDeepResearch — those feed only the retiring backend path.
@@ -265,10 +270,18 @@ export function useLocalSubmitPrompt(boardId: string) {
         await persist(label)
         const { chatUid: savedUid, messages } = useLocalMessagesStore.getState()
         agentLog.turnDone(savedUid, messages.length)
+        // Back up the finished transcript to the server (Phase 2 cross-device),
+        // mirroring the local persist. Fire-and-forget and gated on sign-in: a
+        // failed or unauthenticated backup must never surface as a turn error.
+        if (syncTranscript && signedIn && savedUid) {
+          void putChatTranscript(savedUid, boardId, messages, label).catch((e) =>
+            agentLog.error("putChatTranscript", e),
+          )
+        }
         // Auto-label a still-"Untitled" board from its first turn (fire-and-forget).
         void maybeAutoLabelBoard(boardId, messages, resolveAgentLlm(config, { signedIn, runId, model: llmModel, byokModel }))
       }
     },
-    [asConfig, searchByok, searchEngine, codeByok, llmModel, llmCatalog, signedIn, setMessages, setChatUid, persist, boardId, navigate],
+    [asConfig, searchByok, searchEngine, codeByok, llmModel, llmCatalog, signedIn, syncTranscript, setMessages, setChatUid, persist, boardId, navigate],
   )
 }
