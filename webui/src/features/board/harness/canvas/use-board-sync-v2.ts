@@ -93,7 +93,10 @@ export const useBoardSyncV2 = (
                 rootId: rootId ?? undefined,
                 mintTicket: async (id) => {
                   const { ticket, role } = await mintCollabTicket(id)
-                  onRoleRef.current?.(role) // authoritative role → canEdit/board role
+                  // Ignore a mint that resolved after this board's effect was torn
+                  // down (rapid board switch) — else a stale role would clobber the
+                  // now-current board's state on the singleton store.
+                  if (!cancelled) onRoleRef.current?.(role)
                   return ticket
                 },
                 wsUrl: (path) => `${wsBaseFromApiUrl(API_URL)}${path}`,

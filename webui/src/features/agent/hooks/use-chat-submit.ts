@@ -24,16 +24,18 @@ type SubmitOptions = {
 export const useChatSubmit = () => {
   const { local } = useChat()
   const boardId = useBoardAppStore((s) => s.boardId) ?? ""
-  const canEdit = useBoardAppStore((s) => s.canEdit)
+  const boardRole = useBoardAppStore((s) => s.boardRole)
   const backendSubmit = useSubmitPrompt()
   const localSubmit = useLocalSubmitPrompt(boardId)
 
   return useCallback(
     async (text: string, options: SubmitOptions = {}): Promise<void> => {
       // The assistant edits the board, so it's edit-gated: a viewer (read-only
-      // access to a shared board) can't run it. Local boards are always editable,
-      // so this only ever blocks genuine viewers.
-      if (!canEdit) {
+      // access to a shared board) can't run it. Gate on a CONFIRMED viewer role
+      // (not canEdit, which is transiently false while a v2 board resolves its
+      // role) so an owner is never wrongly blocked mid-resolve. Local boards are
+      // role "owner", so this only ever blocks genuine viewers.
+      if (boardRole === "viewer") {
         toast.error("You have view-only access to this board — ask an editor to run the assistant.")
         return
       }
@@ -46,6 +48,6 @@ export const useChatSubmit = () => {
       }
       await backendSubmit(text, options)
     },
-    [local, canEdit, localSubmit, backendSubmit],
+    [local, boardRole, localSubmit, backendSubmit],
   )
 }

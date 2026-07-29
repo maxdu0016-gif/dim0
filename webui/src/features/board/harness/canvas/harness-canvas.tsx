@@ -189,12 +189,21 @@ export function HarnessCanvas({ local = false }: { local?: boolean } = {}) {
   const syncEngine = useSyncEngine(boardId, local)
   const v2 = syncEngine === "v2"
   useWsCollab(store, boardId, ready && !local && !v2, rootId)
+  // Fail-closed until the coordinator resolves the role from the ticket: unknown
+  // role (null) → no edit affordances / no owner-only Share. Keyed on the board
+  // (not rootId), so folder navigation within a board never resets a resolved role.
+  useEffect(() => {
+    if (v2) {
+      setCanEdit(false)
+      setBoardRole(null)
+    }
+  }, [boardId, v2, setCanEdit, setBoardRole])
   useBoardSyncV2(store, boardId, ready && v2, rootId ?? null, (role) => {
     // v2 skips the REST hydrate, so this is where the real role lands (from the
-    // collab ticket). Upgrade edit rights only for owner/member; viewers stay
-    // read-only (matches the server's edit gate).
+    // collab ticket). Grant edit rights only to owner/member (positive check →
+    // fail-closed for null / any future non-editor role); viewers stay read-only.
     setBoardRole(role)
-    setCanEdit(role !== "viewer")
+    setCanEdit(role === "owner" || role === "member")
   })
   useLocalPresence(store, wrapRef, ready)
 
@@ -320,13 +329,11 @@ export function HarnessCanvas({ local = false }: { local?: boolean } = {}) {
 
     // v2 synced board: the coordinator (useBoardSyncV2) hydrates via the welcome
     // snapshot, so skip the REST content hydrate here (running both would
-    // double-apply). Role/canEdit are NOT known yet — the coordinator resolves
-    // them from the collab ticket and reports back via `onRole` below. Default to
-    // read-only (fail-closed) so a viewer of a shared board never gets edit
-    // affordances (edit tools, Share button) before the role is confirmed.
+    // double-apply). Role/canEdit are resolved from the collab ticket by the
+    // coordinator's `onRole` and reset fail-closed per-board in a separate effect
+    // (below) — NOT here, so folder navigation (a rootId change re-runs this
+    // effect) doesn't flicker an editor back to read-only.
     if (v2) {
-      setCanEdit(false)
-      setBoardRole("viewer")
       setIsLoading(false)
       setReady(true)
       return () => {
