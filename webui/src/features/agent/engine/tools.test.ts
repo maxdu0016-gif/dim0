@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it } from "vitest"
 import { asNodeId } from "@canvas-harness/core"
 import type { CanvasStore } from "@canvas-harness/core"
 import { freshStore, resetIdb } from "@/test/canvas"
-import type { DimNodeData } from "@/features/board/model"
+import type { DimEdgeData, DimNodeData } from "@/features/board/model"
+import { setBoardThemeMode } from "@/features/board/harness/theme/theme-mode-ref"
 import { LocalSearchIndex } from "@/features/board/search/local-index"
 import type { BoardRegistry } from "@/features/board/persist/local/board-registry"
 import type { ToolContext } from "./types"
@@ -196,6 +197,32 @@ describe("linkNotes", () => {
     const edge = store.getAllEdges()[0]
     expect(edge.style?.targetArrowhead).toBe("arrow-filled")
     expect(edge.pathStyle).toBe("bezier")
+  })
+
+  it("stores canonical (theme-independent) edge colors so save round-trips across themes", async () => {
+    // Regression: without _storedColors, a dark-mode edge persisted the
+    // dark-adapted display hex as canonical and rendered wrong for a light peer.
+    seed(store, "a")
+    seed(store, "b")
+    seed(store, "c")
+    seed(store, "d")
+    try {
+      setBoardThemeMode("light")
+      const r1 = (await linkNotes.run({ sourceId: "a", targetId: "b" }, ctx)) as { id: string }
+      setBoardThemeMode("dark")
+      const r2 = (await linkNotes.run({ sourceId: "c", targetId: "d" }, ctx)) as { id: string }
+      const edges = store.getAllEdges()
+      const light = edges.find((e) => String(e.id) === r1.id)!
+      const dark = edges.find((e) => String(e.id) === r2.id)!
+      const lightStored = (light.data as DimEdgeData)._storedColors?.strokeColor
+      const darkStored = (dark.data as DimEdgeData)._storedColors?.strokeColor
+      // Stored colors are the canonical source of truth — identical in both modes.
+      expect(darkStored).toBe(lightStored)
+      // But the dark edge's DISPLAY style is adapted away from the canonical value.
+      expect(dark.style?.strokeColor).not.toBe(darkStored)
+    } finally {
+      setBoardThemeMode("light")
+    }
   })
 })
 

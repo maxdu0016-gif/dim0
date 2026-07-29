@@ -22,6 +22,7 @@ import {
   applyColorsToStyle,
   pickStoredEdgeColors,
   type StoredColors,
+  type StoredEdgeColors,
 } from "@/features/board/harness/theme/color-adapter"
 import { getBoardThemeMode } from "@/features/board/harness/theme/theme-mode-ref"
 import { createDefaultLinkStyle, createDefaultStyle } from "@/features/board/types/style"
@@ -90,12 +91,19 @@ const canonicalNodeStyle = (colors: StoredColors) => {
 }
 
 
-const canonicalEdgeStyle = () => {
+/**
+ * Canonical edge `style` (theme-adapted for display) plus the canonical
+ * light-space `_storedColors` that must ride on `data` — mirrors `linkToEdge`.
+ * The stored colors are the source of truth on save; without them `edgeToLink`
+ * would persist the dark-adapted display hex as canonical and corrupt the color
+ * for a light-mode peer / on reload.
+ */
+const canonicalEdge = (): { style: ReturnType<typeof dim0LinkStyleToCanvas>; storedColors: StoredEdgeColors } => {
   const base = dim0LinkStyleToCanvas(createDefaultLinkStyle())
+  const storedColors = pickStoredEdgeColors(base)
   const mode = getBoardThemeMode()
-  return mode === "light"
-    ? base
-    : applyColorsToEdgeStyle(base, adaptEdgeColors(pickStoredEdgeColors(base), mode))
+  const style = mode === "light" ? base : applyColorsToEdgeStyle(base, adaptEdgeColors(storedColors, mode))
+  return { style, storedColors }
 }
 
 
@@ -193,6 +201,10 @@ export const linkNotes = defineTool({
       const node = ctx.store.getNode(nodeId)
       return node ? { x: node.w / 2, y: node.h / 2 } : { x: 0, y: 0 }
     }
+    // Canonical edge style (arrowhead, stroke, roughness) so the live edge
+    // matches its reloaded form — the lib default is otherwise rougher — plus the
+    // canonical stored colors so a dark-mode edge saves the right (light) color.
+    const { style, storedColors } = canonicalEdge()
     ctx.store.batch(() => {
       ctx.store.addEdge({
         id,
@@ -200,10 +212,13 @@ export const linkNotes = defineTool({
         target: { nodeId: tgt, localOffset: center(tgt) },
         pathStyle: "bezier",
         groups: [],
-        // Canonical edge style (arrowhead, stroke, roughness) so the live edge
-        // matches its reloaded form — the lib default is otherwise rougher.
-        style: canonicalEdgeStyle(),
-        data: { label: label || undefined, parentId: ctx.rootId ?? undefined, meta: meta() } satisfies DimEdgeData,
+        style,
+        data: {
+          label: label || undefined,
+          parentId: ctx.rootId ?? undefined,
+          meta: meta(),
+          _storedColors: storedColors,
+        } satisfies DimEdgeData,
       })
     })
     return { id: String(id) }
