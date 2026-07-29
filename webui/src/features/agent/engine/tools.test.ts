@@ -99,6 +99,17 @@ describe("createNote", () => {
     expect(stored?.backgroundColor).toBeTruthy()
   })
 
+  it("stamps a canonical style so the live render matches the reloaded one", async () => {
+    // Regression: a live rect with no `style` fell back to the lib's rounded
+    // defaults, then snapped square on reload. The convert layer sets roundness 0.
+    const res = (await createNote.run({ title: "T" }, ctx)) as { id: string }
+    const style = store.getNode(asNodeId(res.id))?.style
+    expect(style?.roundness).toBe(0)
+    // Fill mirrors the stored color the note was born with.
+    const stored = (store.getNode(asNodeId(res.id))?.data as DimNodeData)._storedColors
+    expect(style?.backgroundColor).toBe(stored?.backgroundColor)
+  })
+
   it("is a single undoable batch (INV-8)", async () => {
     const res = (await createNote.run({ title: "T" }, ctx)) as { id: string }
     expect(store.getNode(asNodeId(res.id))).toBeDefined()
@@ -174,6 +185,17 @@ describe("linkNotes", () => {
     ctx = { store, rootId: "folder-1" }
     await linkNotes.run({ sourceId: "a", targetId: "b" }, ctx)
     expect((store.getAllEdges()[0].data as { parentId?: string }).parentId).toBe("folder-1")
+  })
+
+  it("stamps a canonical edge style so the live edge matches the reloaded one", async () => {
+    // Regression: a live edge with no `style` fell back to the lib defaults and
+    // looked rougher until reload. The convert layer sets a filled arrowhead.
+    seed(store, "a")
+    seed(store, "b")
+    await linkNotes.run({ sourceId: "a", targetId: "b" }, ctx)
+    const edge = store.getAllEdges()[0]
+    expect(edge.style?.targetArrowhead).toBe("arrow-filled")
+    expect(edge.pathStyle).toBe("bezier")
   })
 })
 
