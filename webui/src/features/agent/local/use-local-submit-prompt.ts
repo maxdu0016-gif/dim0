@@ -19,7 +19,8 @@ import { getDocIndexRef } from "@/features/board/search/doc-index-ref"
 import { rebuildDocIndex } from "@/features/board/search/use-doc-index"
 import { getLocalStores } from "@/features/local-stores"
 import { makeDocSearchTool } from "@/features/agent/engine/doc-search"
-import { useToolConfirm } from "@/features/agent/engine/tool-confirm-store"
+import { resolveConfirmDecision, useToolConfirm, type ToolConfirmDecision } from "@/features/agent/engine/tool-confirm-store"
+import { useToolTrustStore } from "@/features/agent/settings/tool-trust-store"
 import type { AgentEvent } from "@/features/agent/engine/types"
 import { planSystemPrompt } from "@/features/agent/prompts"
 import { useByokStore } from "@/features/agent/byok/byok-store"
@@ -201,9 +202,16 @@ export function useLocalSubmitPrompt(boardId: string, syncTranscript = false) {
           : system
         const userMessageForAgent = wrapWithMessageContext(prompt, messageContext)
         // Gate off-board tools (network/code) behind a user confirmation, so a
-        // prompt-injected tool call can't silently exfiltrate or run code.
-        const confirmTool = (req: { name: string; args: Record<string, unknown> }) =>
-          useToolConfirm.getState().request(req)
+        // prompt-injected tool call can't silently exfiltrate or run code. A
+        // standing per-tool "always allow" grant (Settings) skips the prompt for
+        // that tool. Both ports are read via getState() per call, so a mid-run
+        // toggle (on OR off) applies to the next call.
+        const confirmTool = (req: { name: string; args: Record<string, unknown> }): Promise<ToolConfirmDecision> =>
+          resolveConfirmDecision(
+            req.name,
+            useToolTrustStore.getState().isAutoAllowed,
+            () => useToolConfirm.getState().request(req),
+          )
         for await (const ev of runAgent({ system: systemWithDocs, userMessage: userMessageForAgent, history, tools, llm, ctx: { store, rootId, search, confirmTool } })) {
           // Streaming yields a cumulative assistant_text per token — replace the
           // previous snapshot in place instead of appending one event per token.
