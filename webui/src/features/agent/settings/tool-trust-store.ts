@@ -28,7 +28,12 @@ const ALL_OFF = (): Record<ConfirmToolName, boolean> => ({
 })
 
 
-const load = (): Record<ConfirmToolName, boolean> => {
+/**
+ * Read the persisted grant map from localStorage, tolerant of a missing,
+ * corrupt, or partial payload (each missing/garbage field defaults to off).
+ * Exported for testing the rehydration path. Never throws.
+ */
+export const loadToolTrust = (): Record<ConfirmToolName, boolean> => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return ALL_OFF()
@@ -54,7 +59,7 @@ type ToolTrustState = {
 
 
 export const useToolTrustStore = create<ToolTrustState>((set, get) => ({
-  autoAllow: load(),
+  autoAllow: loadToolTrust(),
   isAutoAllowed: (tool) => Boolean((get().autoAllow as Record<string, boolean>)[tool]),
   setAutoAllow: (tool, on) => {
     const autoAllow = { ...get().autoAllow, [tool]: on }

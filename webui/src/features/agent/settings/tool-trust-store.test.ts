@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest"
-import { useToolTrustStore } from "./tool-trust-store"
+import { loadToolTrust, useToolTrustStore } from "./tool-trust-store"
 
 
 const KEY = "dim0.tool_trust"
@@ -50,5 +50,29 @@ describe("useToolTrustStore", () => {
     useToolTrustStore.getState().setAutoAllow("web_search", true)
     expect(localStorage.getItem(KEY)).toBeTruthy()
     expect(localStorage.getItem("dim0.byok")).toBeNull()
+  })
+})
+
+
+describe("loadToolTrust (rehydration)", () => {
+  it("returns all-off when nothing is stored", () => {
+    localStorage.clear()
+    expect(loadToolTrust()).toEqual({ web_search: false, fetch: false, code_interpreter: false })
+  })
+
+  it("rehydrates a stored grant map", () => {
+    localStorage.setItem(KEY, JSON.stringify({ web_search: true, code_interpreter: true }))
+    expect(loadToolTrust()).toEqual({ web_search: true, fetch: false, code_interpreter: true })
+  })
+
+  it("coerces a partial payload — missing keys default to off", () => {
+    localStorage.setItem(KEY, JSON.stringify({ fetch: true }))
+    expect(loadToolTrust()).toEqual({ web_search: false, fetch: true, code_interpreter: false })
+  })
+
+  it("falls back to all-off on corrupt (non-JSON) storage — never throws", () => {
+    localStorage.setItem(KEY, "{not json")
+    expect(() => loadToolTrust()).not.toThrow()
+    expect(loadToolTrust()).toEqual({ web_search: false, fetch: false, code_interpreter: false })
   })
 })

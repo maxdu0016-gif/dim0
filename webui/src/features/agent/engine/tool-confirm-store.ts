@@ -49,3 +49,19 @@ export const useToolConfirm = create<ToolConfirmState>((set, get) => ({
     set({ pending: null })
   },
 }))
+
+
+/**
+ * Decide a confirm outcome without touching the UI. A standing per-tool grant
+ * (`isAutoAllowed`) short-circuits to `once` — run this call but do NOT record it
+ * in the run's approved set, so the grant is re-checked on every call and
+ * toggling it off mid-run takes effect on the very next call. Otherwise defer to
+ * the dialog. Kept as a pure function (ports injected) so it's unit-testable
+ * away from the submit hook.
+ */
+export const resolveConfirmDecision = (
+  toolName: string,
+  isAutoAllowed: (tool: string) => boolean,
+  askDialog: () => Promise<ToolConfirmDecision>,
+): Promise<ToolConfirmDecision> =>
+  isAutoAllowed(toolName) ? Promise.resolve("once") : askDialog()
