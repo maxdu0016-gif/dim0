@@ -14,7 +14,7 @@
  */
 
 
-export type ToolErrorCode = "user_declined" | "unknown_tool" | "tool_error"
+export type ToolErrorCode = "user_declined" | "unknown_tool" | "tool_error" | "tool_rejected"
 
 
 /** A structured tool-call failure fed back to the model as the tool result. */
@@ -32,6 +32,30 @@ export const isToolFailure = (result: unknown): result is ToolFailure =>
   result !== null &&
   (result as { ok?: unknown }).ok === false &&
   typeof (result as { message?: unknown }).message === "string"
+
+
+/**
+ * The failure convention for tool authors: a tool signals a rejection (bad
+ * args, not found, validation) by returning `{ error: string }`. Detected here
+ * so `executeToolCall` can normalize it into a `ToolFailure` — keeping tools
+ * simple while the runtime/UI get one uniform failure shape. Not matched once a
+ * result is already a `ToolFailure` (has `ok`).
+ */
+export const isToolSoftError = (result: unknown): result is { error: string } =>
+  typeof result === "object" &&
+  result !== null &&
+  !("ok" in result) &&
+  typeof (result as { error?: unknown }).error === "string" &&
+  (result as { error: string }).error.length > 0
+
+
+/** Normalize a tool's own `{ error }` rejection into the shared failure shape. */
+export const toolRejected = (tool: string, message: string): ToolFailure => ({
+  ok: false,
+  error: "tool_rejected",
+  tool,
+  message,
+})
 
 
 /**

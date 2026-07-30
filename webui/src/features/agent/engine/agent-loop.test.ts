@@ -8,6 +8,7 @@ import { addNode, freshStore, resetIdb } from "@/test/canvas"
 import { ScriptedLlm, toolTurn } from "@/test/llm"
 import { z } from "zod"
 import { executeToolCall, newConfirmGate, runAgent } from "./agent-loop"
+import { isToolFailure } from "./tool-result"
 import { defineTool } from "./types"
 import type { AgentEvent, LlmClient, LlmMessage, Tool, ToolContext } from "./types"
 import { createNote, editNote, getNote, linkNotes, listBoards, localTools, searchNotes, updateNote, writeNote } from "./tools"
@@ -487,6 +488,22 @@ describe("executeToolCall (tool execution choke point)", () => {
     )
     expect(out).toMatchObject({ ok: false, error: "tool_error", tool: "fetch" })
     expect((out as { message: string }).message).toContain("kaboom")
+  })
+
+  it("normalizes a tool's own {error} rejection into a tool_rejected failure", async () => {
+    const out = await executeToolCall(
+      "create_note", {}, [stubTool("create_note", async () => ({ error: "note not found" }))], ctxWith(), newConfirmGate(),
+    )
+    expect(out).toMatchObject({ ok: false, error: "tool_rejected", tool: "create_note", message: "note not found" })
+    expect(isToolFailure(out)).toBe(true) // uniform failure signal, not a bare {error}
+  })
+
+  it("passes a tool's success output through unchanged", async () => {
+    const out = await executeToolCall(
+      "create_note", {}, [stubTool("create_note", async () => ({ id: "n1", created: true }))], ctxWith(), newConfirmGate(),
+    )
+    expect(out).toEqual({ id: "n1", created: true })
+    expect(isToolFailure(out)).toBe(false)
   })
 
   it("gates run without a confirmer wired (headless): the tool runs", async () => {

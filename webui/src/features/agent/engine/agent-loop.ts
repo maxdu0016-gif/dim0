@@ -5,7 +5,7 @@
  */
 import { z } from "zod"
 import type { AgentEvent, LlmClient, LlmMessage, LlmToolDef, LlmTurn, Tool, ToolContext } from "./types"
-import { toolThrew, unknownTool, userDeclined } from "./tool-result"
+import { isToolSoftError, toolRejected, toolThrew, unknownTool, userDeclined } from "./tool-result"
 import { agentLog } from "./debug"
 
 
@@ -124,7 +124,11 @@ export async function executeToolCall(
         if (decision === "always") gate.approved.add(tool.name)
       }
     }
-    return await tool.run(args, ctx)
+    const result = await tool.run(args, ctx)
+    // Normalize a tool's own `{ error }` rejection into the shared ToolFailure
+    // shape, so every failure origin — unknown / declined / thrown / rejected —
+    // answers `isToolFailure` uniformly.
+    return isToolSoftError(result) ? toolRejected(tool.name, result.error) : result
   } catch (err) {
     return toolThrew(tool.name, err)
   }

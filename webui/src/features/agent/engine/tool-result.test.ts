@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { isToolFailure, toolThrew, unknownTool, userDeclined } from "./tool-result"
+import { isToolFailure, isToolSoftError, toolRejected, toolThrew, unknownTool, userDeclined } from "./tool-result"
 
 
 describe("tool-result contract", () => {
@@ -32,8 +32,22 @@ describe("tool-result contract", () => {
   it("isToolFailure discriminates failures from a tool's own output", () => {
     expect(isToolFailure(userDeclined("x"))).toBe(true)
     expect(isToolFailure({ id: "n1", created: true })).toBe(false) // a tool's success output
-    expect(isToolFailure({ error: "note not found" })).toBe(false) // a tool's soft error (no `ok`)
+    expect(isToolFailure({ error: "note not found" })).toBe(false) // a RAW soft error (not yet normalized)
     expect(isToolFailure(null)).toBe(false)
     expect(isToolFailure("declined")).toBe(false)
+  })
+
+  it("isToolSoftError recognizes the tool `{ error }` convention only", () => {
+    expect(isToolSoftError({ error: "note not found" })).toBe(true)
+    expect(isToolSoftError({ error: "" })).toBe(false) // empty isn't a failure signal
+    expect(isToolSoftError({ id: "n1", created: true })).toBe(false) // a success output
+    expect(isToolSoftError(toolRejected("create_note", "x"))).toBe(false) // already a ToolFailure (has `ok`)
+    expect(isToolSoftError(null)).toBe(false)
+  })
+
+  it("toolRejected normalizes a tool error into the shared failure shape", () => {
+    const r = toolRejected("create_note", "note not found")
+    expect(r).toEqual({ ok: false, error: "tool_rejected", tool: "create_note", message: "note not found" })
+    expect(isToolFailure(r)).toBe(true) // one uniform "did it fail?" check across all origins
   })
 })
