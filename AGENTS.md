@@ -13,8 +13,8 @@
 
 ## Domain conventions
 Conventions live with the code they govern (loaded on demand when you work in that tree):
-- Frontend code style + FE orientation → `webui/CLAUDE.md`
-- Python conventions + backend orientation → `backend/CLAUDE.md`
+- Frontend code style + FE orientation → `webui/AGENTS.md`
+- Python conventions + backend orientation → `backend/AGENTS.md`
 
 ## Docs map (read on demand)
 - Code structure & key invariants → `docs/architecture.md`
