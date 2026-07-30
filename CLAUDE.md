@@ -20,6 +20,7 @@ Conventions live with the code they govern (loaded on demand when you work in th
 - Code structure & key invariants → `docs/architecture.md`
 - What the product does, feature by feature → `docs/features.md`
 - In-flight work & known follow-ups → `docs/roadmap.md`
+- Durable decisions (MUST/why, one per file) → `docs/adr/` (index in `docs/adr/README.md`)
 
 ## Core Features
 - `webui` has two core domains:

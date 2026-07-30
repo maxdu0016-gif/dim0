@@ -18,6 +18,7 @@ React 19, Vite 7, Tailwind v4, TanStack Router + Query, Zustand, Phosphor icons.
 ## Orientation (detail in `docs/architecture.md`)
 
 - Two agent runtimes behind one chat UI, chosen by `local`: the browser engine (`features/agent/engine/`) and the legacy server path (`features/agent/api/send-message.ts`, retires in G5).
+- Working in `features/agent/engine/`? Off-board tools + the tool-failure contract are load-bearing — see `docs/adr/ADR-AGENT-002`. Browser-agent transcript storage → `docs/adr/ADR-AGENT-001`.
 - Board = the canvas-harness mount at `features/board/harness/canvas/harness-canvas.tsx`; Dim0 `Note`/`Link` ↔ harness `Node`/`Edge` in `harness/convert/`; offline-first persistence in `features/board/persist/local/`.
 - `_storedColors` (not `node.style`) is the color source of truth.
 - Signed-out sentinel is `userId === "root"` (non-empty) — gate on `isSignedIn()`, never `!!userId`.
