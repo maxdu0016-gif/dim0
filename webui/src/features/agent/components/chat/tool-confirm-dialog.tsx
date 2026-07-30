@@ -1,7 +1,7 @@
 import { GlobeIcon, CodeInterpreterIcon, BrowserSearchIcon } from "@/components/icons"
+import { Button } from "@/components/ui/button"
 import {
   AlertDialog,
-  AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
@@ -56,7 +56,7 @@ export const ToolConfirmDialog = () => {
   const { title, hint, preview, Icon } = describe(pending)
 
   return (
-    <AlertDialog open onOpenChange={(open) => !open && resolve(false)}>
+    <AlertDialog open onOpenChange={(open) => !open && resolve("deny")}>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle className="flex items-center gap-2">
@@ -71,8 +71,11 @@ export const ToolConfirmDialog = () => {
           </pre>
         )}
         <AlertDialogFooter>
-          <AlertDialogCancel onClick={() => resolve(false)}>Don't allow</AlertDialogCancel>
-          <AlertDialogAction onClick={() => resolve(true)}>Allow</AlertDialogAction>
+          <AlertDialogCancel onClick={() => resolve("deny")}>Don't allow</AlertDialogCancel>
+          {/* "Allow once" gates the next call again; "Allow for this request"
+              auto-approves further calls to this tool for the rest of the run. */}
+          <Button variant="outline" onClick={() => resolve("once")}>Allow once</Button>
+          <Button onClick={() => resolve("always")}>Allow for this request</Button>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

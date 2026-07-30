@@ -53,22 +53,36 @@ const parseArgs = (raw: string): Record<string, unknown> => {
 
 
 /**
+ * Per-run memory for the off-board confirm gate, so a tool is prompted at most
+ * once per outcome across the whole run:
+ *  - `declined` — the user said no; further calls fail closed WITHOUT reopening
+ *    the dialog (a retrying model can't nag).
+ *  - `approved` — the user chose "allow for this request"; further calls to the
+ *    same tool run without prompting.
+ */
+export type ConfirmGate = { declined: Set<string>; approved: Set<string> }
+
+
+/** A fresh gate for one run. */
+export const newConfirmGate = (): ConfirmGate => ({ declined: new Set(), approved: new Set() })
+
+
+/**
  * Execute one tool call under the loop's policy and return the model-facing
  * result: the tool's own output on success, or a structured `ToolFailure`
  * (unknown tool / user-declined / thrown error) the model can act on. The
  * single choke point for tool execution — the frontend analog of the backend's
  * tool decorator, so every failure origin yields one consistent shape.
  *
- * The off-board confirm gate de-dupes per run via `declinedTools`: once the user
- * declines a tool, a later call to the same tool fails closed WITHOUT reopening
- * the dialog, so a retrying model can't nag the user with repeat prompts.
+ * The off-board confirm gate is consulted only when the tool is neither already
+ * declined nor already approved this run (see {@link ConfirmGate}).
  */
 export async function executeToolCall(
   name: string,
   args: Record<string, unknown>,
   tools: Tool[],
   ctx: ToolContext,
-  declinedTools: Set<string>,
+  gate: ConfirmGate,
 ): Promise<unknown> {
   const tool = tools.find((t) => t.name === name)
   if (!tool) return unknownTool(name)
@@ -77,11 +91,15 @@ export async function executeToolCall(
   // a throwing tool aborts the whole run — both surface as a `tool_error`.
   try {
     if (CONFIRM_TOOLS.has(tool.name) && ctx.confirmTool) {
-      if (declinedTools.has(tool.name)) return userDeclined(tool.name)
-      const approved = await ctx.confirmTool({ name: tool.name, args })
-      if (!approved) {
-        declinedTools.add(tool.name)
-        return userDeclined(tool.name)
+      if (gate.declined.has(tool.name)) return userDeclined(tool.name)
+      if (!gate.approved.has(tool.name)) {
+        const decision = await ctx.confirmTool({ name: tool.name, args })
+        if (decision === "deny") {
+          gate.declined.add(tool.name)
+          return userDeclined(tool.name)
+        }
+        // "always" broadens consent to the rest of the run; "once" does not.
+        if (decision === "always") gate.approved.add(tool.name)
       }
     }
     return await tool.run(args, ctx)
@@ -112,9 +130,9 @@ export async function* runAgent(opts: RunAgentOptions): AsyncGenerator<AgentEven
   if (opts.history) messages.push(...opts.history)
   messages.push({ role: "user", content: opts.userMessage })
 
-  // Off-board tools the user declined this run — never re-prompted (see
-  // executeToolCall). Spans all turns, so a retry in a later round is caught.
-  const declinedTools = new Set<string>()
+  // Per-run confirm memory (declined + approved). Spans all turns, so a retry
+  // or a follow-up call in a later round respects the earlier decision.
+  const gate = newConfirmGate()
 
   for (let turn = 0; turn < maxTurns; turn += 1) {
     // Prefer streaming: emit cumulative `assistant_text` per delta so the UI
@@ -155,7 +173,7 @@ export async function* runAgent(opts: RunAgentOptions): AsyncGenerator<AgentEven
       // error normalization all live in executeToolCall, so every outcome —
       // declined, unknown, or thrown — feeds back one consistent structured
       // result and no failure origin aborts the run.
-      const output = await executeToolCall(call.name, args, opts.tools, opts.ctx, declinedTools)
+      const output = await executeToolCall(call.name, args, opts.tools, opts.ctx, gate)
       agentLog.tool(call.name, args, output)
       yield { type: "tool_result", toolName: call.name, result: output }
       messages.push({ role: "tool", toolCallId: call.id, content: JSON.stringify(output) })

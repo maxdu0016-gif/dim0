@@ -10,6 +10,7 @@ import { z } from "zod"
 import type { CanvasStore } from "@canvas-harness/core"
 import type { BoardRegistry } from "@/features/board/persist/local/board-registry"
 import type { LocalSearchIndex } from "@/features/board/search/local-index"
+import type { ToolConfirmDecision } from "./tool-confirm-store"
 
 
 export type LlmToolCall = { id: string; name: string; arguments: string }
@@ -70,12 +71,13 @@ export type ToolContext = {
   registry?: BoardRegistry
   /**
    * Optional gate for side-effecting / off-board tools (network egress, code
-   * execution). The loop calls it before running such a tool; resolve `true` to
-   * run, `false` to decline (the model gets a "declined" result and adapts).
+   * execution). The loop calls it before running such a tool; the decision is
+   * `deny` (model gets a "declined" result and adapts), `once` (run this call),
+   * or `always` (run + auto-approve further calls to the same tool this run).
    * When absent (tests / headless), gated tools run unprompted — the gate is a
    * UI concern wired only by the local submit path.
    */
-  confirmTool?: (req: { name: string; args: Record<string, unknown> }) => Promise<boolean>
+  confirmTool?: (req: { name: string; args: Record<string, unknown> }) => Promise<ToolConfirmDecision>
 }
 
 

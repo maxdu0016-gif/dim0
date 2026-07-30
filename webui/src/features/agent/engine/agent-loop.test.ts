@@ -7,7 +7,7 @@ import { LocalSearchIndex } from "@/features/board/search/local-index"
 import { addNode, freshStore, resetIdb } from "@/test/canvas"
 import { ScriptedLlm, toolTurn } from "@/test/llm"
 import { z } from "zod"
-import { executeToolCall, runAgent } from "./agent-loop"
+import { executeToolCall, newConfirmGate, runAgent } from "./agent-loop"
 import { defineTool } from "./types"
 import type { AgentEvent, LlmClient, LlmMessage, Tool, ToolContext } from "./types"
 import { createNote, editNote, getNote, linkNotes, listBoards, localTools, searchNotes, updateNote, writeNote } from "./tools"
@@ -152,7 +152,7 @@ describe("runAgent — off-board tool confirmation gate", () => {
         userMessage: "go",
         tools: [spyTool("fetch", ran)],
         llm,
-        ctx: { store: freshStore("c"), confirmTool: async (r) => (seen.push(r), true) },
+        ctx: { store: freshStore("c"), confirmTool: async (r) => (seen.push(r), "once") },
       }),
     )
     expect(seen).toEqual([{ name: "fetch", args: { url: "https://x" } }])
@@ -168,7 +168,7 @@ describe("runAgent — off-board tool confirmation gate", () => {
         userMessage: "go",
         tools: [spyTool("fetch", ran)],
         llm,
-        ctx: { store: freshStore("c"), confirmTool: async () => false },
+        ctx: { store: freshStore("c"), confirmTool: async () => "deny" },
       }),
     )
     expect(ran.value).toBe(false)
@@ -187,7 +187,7 @@ describe("runAgent — off-board tool confirmation gate", () => {
         userMessage: "go",
         tools: [spyTool("code_interpreter", ran)],
         llm,
-        ctx: { store: freshStore("c"), confirmTool: async () => false },
+        ctx: { store: freshStore("c"), confirmTool: async () => "deny" },
       }),
     )
     expect(ran.value).toBe(false)
@@ -201,7 +201,7 @@ describe("runAgent — off-board tool confirmation gate", () => {
         userMessage: "go",
         tools: [spyTool("web_search", ran)],
         llm,
-        ctx: { store: freshStore("c"), confirmTool: async () => false },
+        ctx: { store: freshStore("c"), confirmTool: async () => "deny" },
       }),
     )
     expect(ran.value).toBe(false)
@@ -247,7 +247,7 @@ describe("runAgent — off-board tool confirmation gate", () => {
         userMessage: "go",
         tools: [spyTool("noop", ran)],
         llm,
-        ctx: { store: freshStore("c"), confirmTool: async () => ((prompted = true), true) },
+        ctx: { store: freshStore("c"), confirmTool: async () => ((prompted = true), "once") },
       }),
     )
     expect(prompted).toBe(false)
@@ -406,7 +406,7 @@ describe("executeToolCall (tool execution choke point)", () => {
     ({ store: freshStore("c"), rootId: null, confirmTool })
 
   it("returns an unknown_tool failure when the tool isn't in the set", async () => {
-    const out = await executeToolCall("nope", {}, [stubTool("fetch")], ctxWith(), new Set())
+    const out = await executeToolCall("nope", {}, [stubTool("fetch")], ctxWith(), newConfirmGate())
     expect(out).toMatchObject({ ok: false, error: "unknown_tool", tool: "nope" })
   })
 
@@ -414,37 +414,54 @@ describe("executeToolCall (tool execution choke point)", () => {
     let asked = false
     const out = await executeToolCall(
       "create_note", {}, [stubTool("create_note", async () => ({ id: "n1" }))],
-      ctxWith(async () => ((asked = true), true)), new Set(),
+      ctxWith(async () => ((asked = true), "once")), newConfirmGate(),
     )
     expect(asked).toBe(false)
     expect(out).toEqual({ id: "n1" })
   })
 
-  it("runs a gated tool when approved", async () => {
-    const out = await executeToolCall("fetch", { url: "x" }, [stubTool("fetch")], ctxWith(async () => true), new Set())
+  it("runs a gated tool on allow-once but does NOT auto-approve the next call", async () => {
+    const gate = newConfirmGate()
+    const out = await executeToolCall("fetch", { url: "x" }, [stubTool("fetch")], ctxWith(async () => "once"), gate)
     expect(out).toEqual({ ok: true })
+    expect(gate.approved.has("fetch")).toBe(false) // "once" is not remembered
   })
 
   it("returns user_declined and records the tool when refused", async () => {
-    const declined = new Set<string>()
-    const out = await executeToolCall("fetch", {}, [stubTool("fetch")], ctxWith(async () => false), declined)
+    const gate = newConfirmGate()
+    const out = await executeToolCall("fetch", {}, [stubTool("fetch")], ctxWith(async () => "deny"), gate)
     expect(out).toMatchObject({ ok: false, error: "user_declined", tool: "fetch" })
-    expect(declined.has("fetch")).toBe(true)
+    expect(gate.declined.has("fetch")).toBe(true)
   })
 
   it("does NOT re-prompt a tool already declined this run (fail closed, no dialog spam)", async () => {
-    const declined = new Set<string>(["fetch"])
+    const gate = { declined: new Set(["fetch"]), approved: new Set<string>() }
     let asked = false
     const out = await executeToolCall(
-      "fetch", {}, [stubTool("fetch")], ctxWith(async () => ((asked = true), true)), declined,
+      "fetch", {}, [stubTool("fetch")], ctxWith(async () => ((asked = true), "once")), gate,
     )
     expect(asked).toBe(false) // the confirmer was never consulted the second time
     expect(out).toMatchObject({ ok: false, error: "user_declined", tool: "fetch" })
   })
 
+  it("'allow for this request' records approval and skips the prompt on the next call", async () => {
+    const gate = newConfirmGate()
+    let prompts = 0
+    const tool = [stubTool("web_search")]
+    const ctx = ctxWith(async () => (prompts += 1, "always"))
+
+    const first = await executeToolCall("web_search", { query: "a" }, tool, ctx, gate)
+    expect(first).toEqual({ ok: true })
+    expect(gate.approved.has("web_search")).toBe(true)
+
+    const second = await executeToolCall("web_search", { query: "b" }, tool, ctx, gate)
+    expect(second).toEqual({ ok: true })
+    expect(prompts).toBe(1) // approved for the run — the second call didn't prompt
+  })
+
   it("normalizes a thrown tool into a tool_error (never propagates)", async () => {
     const out = await executeToolCall(
-      "fetch", {}, [stubTool("fetch", async () => { throw new Error("kaboom") })], ctxWith(async () => true), new Set(),
+      "fetch", {}, [stubTool("fetch", async () => { throw new Error("kaboom") })], ctxWith(async () => "once"), newConfirmGate(),
     )
     expect(out).toMatchObject({ ok: false, error: "tool_error", tool: "fetch" })
     expect((out as { message: string }).message).toContain("kaboom")
@@ -452,7 +469,7 @@ describe("executeToolCall (tool execution choke point)", () => {
 
   it("gates run without a confirmer wired (headless): the tool runs", async () => {
     let ran = false
-    await executeToolCall("fetch", {}, [stubTool("fetch", async () => ((ran = true), { ok: true }))], ctxWith(), new Set())
+    await executeToolCall("fetch", {}, [stubTool("fetch", async () => ((ran = true), { ok: true }))], ctxWith(), newConfirmGate())
     expect(ran).toBe(true)
   })
 })
@@ -479,7 +496,7 @@ describe("runAgent — declined off-board tool is not re-prompted across turns",
         userMessage: "go",
         tools: [spy],
         llm,
-        ctx: { store: freshStore("c"), rootId: null, confirmTool: async () => (prompts += 1, false) },
+        ctx: { store: freshStore("c"), rootId: null, confirmTool: async () => (prompts += 1, "deny") },
       }),
     )
     expect(prompts).toBe(1) // dialog shown once, not on the retry
@@ -488,5 +505,31 @@ describe("runAgent — declined off-board tool is not re-prompted across turns",
       (e) => e.type === "tool_result" && (e.result as { error?: string }).error === "user_declined",
     )
     expect(declines).toHaveLength(2) // both attempts get a clean declined result
+  })
+
+  it("prompts once on 'allow for this request', then runs later calls unprompted", async () => {
+    let prompts = 0
+    const ran = { value: 0 }
+    const spy = defineTool({
+      name: "web_search",
+      description: "web_search",
+      parameters: z.object({ query: z.string().optional() }),
+      run: async () => ((ran.value += 1), { ok: true }),
+    })
+    const llm = new ScriptedLlm([
+      toolTurn("web_search", { query: "a" }),
+      toolTurn("web_search", { query: "b" }),
+      { kind: "text", text: "done" },
+    ])
+    await drain(
+      runAgent({
+        userMessage: "go",
+        tools: [spy],
+        llm,
+        ctx: { store: freshStore("c"), rootId: null, confirmTool: async () => (prompts += 1, "always") },
+      }),
+    )
+    expect(prompts).toBe(1) // approved for the request — only the first call prompted
+    expect(ran.value).toBe(2) // both searches ran
   })
 })

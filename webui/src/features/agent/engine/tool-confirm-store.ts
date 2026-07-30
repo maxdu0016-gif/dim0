@@ -5,15 +5,25 @@ import { create } from "zustand"
 export type ToolConfirmRequest = { name: string; args: Record<string, unknown> }
 
 
-type Pending = (ToolConfirmRequest & { resolve: (ok: boolean) => void }) | null
+/**
+ * The user's answer to a confirm prompt:
+ *  - `deny`   — don't run it (the loop also won't re-prompt this tool this run).
+ *  - `once`   — run this call only; the next call to the tool prompts again.
+ *  - `always` — run it, and auto-approve further calls to the SAME tool for the
+ *    rest of this run (no more prompts). A deliberate broadening of consent.
+ */
+export type ToolConfirmDecision = "deny" | "once" | "always"
+
+
+type Pending = (ToolConfirmRequest & { resolve: (decision: ToolConfirmDecision) => void }) | null
 
 
 type ToolConfirmState = {
   pending: Pending
-  /** Ask the user to approve a tool run; resolves true (run) / false (decline). */
-  request: (req: ToolConfirmRequest) => Promise<boolean>
+  /** Ask the user to approve a tool run; resolves with their decision. */
+  request: (req: ToolConfirmRequest) => Promise<ToolConfirmDecision>
   /** Settle the pending request (from the confirm UI). No-op if nothing pending. */
-  resolve: (ok: boolean) => void
+  resolve: (decision: ToolConfirmDecision) => void
 }
 
 
@@ -29,13 +39,13 @@ export const useToolConfirm = create<ToolConfirmState>((set, get) => ({
     // One prompt at a time. If one is already open (a second/concurrent run),
     // decline the NEW request rather than clobbering the prompt the user is
     // deciding on — fail closed without disturbing the in-flight decision.
-    if (get().pending) return Promise.resolve(false)
-    return new Promise<boolean>((resolve) => set({ pending: { ...req, resolve } }))
+    if (get().pending) return Promise.resolve("deny")
+    return new Promise<ToolConfirmDecision>((resolve) => set({ pending: { ...req, resolve } }))
   },
-  resolve: (ok) => {
+  resolve: (decision) => {
     const p = get().pending
     if (!p) return
-    p.resolve(ok)
+    p.resolve(decision)
     set({ pending: null })
   },
 }))
