@@ -1,6 +1,6 @@
 # backend — Python conventions
 
-Applies to `backend/**` (package `topix`). Repo-wide rules (commits) are in the root `CLAUDE.md`; architecture is in `docs/architecture.md`.
+Applies to `backend/**` (package `topix`). Repo-wide rules (commits) are in the root `AGENTS.md`; architecture is in `docs/architecture.md`.
 
 ## Conventions
 

@@ -1,6 +1,6 @@
 # webui — Frontend conventions
 
-Applies to `webui/**`. Repo-wide rules (commits, docstrings) are in the root `CLAUDE.md`; architecture is in `docs/architecture.md`.
+Applies to `webui/**`. Repo-wide rules (commits, docstrings) are in the root `AGENTS.md`; architecture is in `docs/architecture.md`.
 
 ## Code style
 
