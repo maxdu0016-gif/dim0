@@ -3,6 +3,7 @@ import { useNavigate, useSearch } from "@tanstack/react-router"
 import { isLocalAgentOnSynced } from "@/features/agent/local/local-agent-flag"
 import { seedTranscriptsFromServer } from "@/features/agent/local/seed-transcripts"
 import { useLocalMessagesStore } from "@/features/agent/store/local-messages-store"
+import { ToolConfirmDialog } from "@/features/agent/components/chat/tool-confirm-dialog"
 import { HarnessCanvas } from "../harness/canvas"
 import { useBoardAppStore } from "../harness/store/board-app-store"
 import { FloatingAssistant } from "./flow/floating-assistant/floating-assistant"
@@ -85,6 +86,11 @@ export const BoardView: React.FC = () => {
             }
           }}
         />
+        {/* Off-board tool gate (web search / fetch / code). Mounted at the board
+            level — like LocalBoardScreen does — so it survives the pill↔drawer
+            swap; without it a browser-agent turn would await a confirm that can
+            never be answered and hang forever. Only the browser engine gates. */}
+        {browserAgent && <ToolConfirmDialog />}
       </div>
     </div>
   )
