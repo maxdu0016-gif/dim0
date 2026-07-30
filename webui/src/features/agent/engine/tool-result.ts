@@ -14,6 +14,12 @@
  */
 
 
+/**
+ * Failure codes, by origin: `user_declined` (confirm gate), `unknown_tool` (no
+ * such tool), `tool_error` (the tool THREW — a crash, may be transient), and
+ * `tool_rejected` (the tool RAN and returned `{error}` — a deliberate rejection
+ * like bad args / not found).
+ */
 export type ToolErrorCode = "user_declined" | "unknown_tool" | "tool_error" | "tool_rejected"
 
 

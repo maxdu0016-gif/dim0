@@ -1,18 +1,13 @@
 import { create } from "zustand"
+import type { ToolConfirmDecision } from "./types"
+
+
+// Re-exported so existing importers keep their path; canonical home is types.ts.
+export type { ToolConfirmDecision } from "./types"
 
 
 /** A pending request to run an off-board tool, awaiting the user's decision. */
 export type ToolConfirmRequest = { name: string; args: Record<string, unknown> }
-
-
-/**
- * The user's answer to a confirm prompt:
- *  - `deny`   — don't run it (the loop also won't re-prompt this tool this run).
- *  - `once`   — run this call only; the next call to the tool prompts again.
- *  - `always` — run it, and auto-approve further calls to the SAME tool for the
- *    rest of this run (no more prompts). A deliberate broadening of consent.
- */
-export type ToolConfirmDecision = "deny" | "once" | "always"
 
 
 type Pending = (ToolConfirmRequest & { resolve: (decision: ToolConfirmDecision) => void }) | null

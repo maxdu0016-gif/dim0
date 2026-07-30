@@ -29,8 +29,14 @@ describe("tool-result contract", () => {
     expect(toolThrew("fetch", "raw string").message).toContain("raw string")
   })
 
-  it("isToolFailure discriminates failures from a tool's own output", () => {
+  it("isToolFailure is uniform across every failure origin", () => {
     expect(isToolFailure(userDeclined("x"))).toBe(true)
+    expect(isToolFailure(unknownTool("x"))).toBe(true)
+    expect(isToolFailure(toolThrew("x", new Error("e")))).toBe(true)
+    expect(isToolFailure(toolRejected("x", "e"))).toBe(true)
+  })
+
+  it("isToolFailure discriminates failures from a tool's own output", () => {
     expect(isToolFailure({ id: "n1", created: true })).toBe(false) // a tool's success output
     expect(isToolFailure({ error: "note not found" })).toBe(false) // a RAW soft error (not yet normalized)
     expect(isToolFailure(null)).toBe(false)

@@ -4,6 +4,7 @@
  * construction — the LLM is injected, so tests use a scripted mock.
  */
 import { z } from "zod"
+import { CONFIRM_TOOL_NAMES } from "./types"
 import type { AgentEvent, LlmClient, LlmMessage, LlmToolDef, LlmTurn, Tool, ToolContext } from "./types"
 import { isToolSoftError, toolRejected, toolThrew, unknownTool, userDeclined } from "./tool-result"
 import { agentLog } from "./debug"
@@ -25,7 +26,7 @@ export const DEFAULT_MAX_TURNS = 30
  * data or run attacker code. Note tools stay auto — they act on the user's own
  * board and gating them would wreck the normal build flow.
  */
-const CONFIRM_TOOLS = new Set(["fetch", "code_interpreter", "web_search"])
+const CONFIRM_TOOLS = new Set<string>(CONFIRM_TOOL_NAMES)
 
 
 /** Convert a tool's Zod schema to a plain JSON Schema (dropping the `$schema` tag). */

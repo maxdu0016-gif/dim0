@@ -10,7 +10,26 @@ import { z } from "zod"
 import type { CanvasStore } from "@canvas-harness/core"
 import type { BoardRegistry } from "@/features/board/persist/local/board-registry"
 import type { LocalSearchIndex } from "@/features/board/search/local-index"
-import type { ToolConfirmDecision } from "./tool-confirm-store"
+
+
+/**
+ * Off-board tools gated by the confirm dialog — network egress + code execution.
+ * The single source of truth: the loop's gate (`CONFIRM_TOOLS`) and the settings
+ * trust store both derive from this, so a new gated tool is added in one place.
+ */
+export const CONFIRM_TOOL_NAMES = ["web_search", "fetch", "code_interpreter"] as const
+
+
+/** A gated off-board tool name. */
+export type ConfirmToolName = (typeof CONFIRM_TOOL_NAMES)[number]
+
+
+/**
+ * The user's answer to a confirm prompt: `deny` (don't run — the exact call is
+ * remembered and won't re-prompt), `once` (run this call only), `always` (run +
+ * auto-approve further calls to the same tool this run).
+ */
+export type ToolConfirmDecision = "deny" | "once" | "always"
 
 
 export type LlmToolCall = { id: string; name: string; arguments: string }

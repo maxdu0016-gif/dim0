@@ -9,6 +9,7 @@ import { ScriptedLlm, toolTurn } from "@/test/llm"
 import { z } from "zod"
 import { executeToolCall, newConfirmGate, runAgent } from "./agent-loop"
 import { isToolFailure } from "./tool-result"
+import { resolveConfirmDecision } from "./tool-confirm-store"
 import { defineTool } from "./types"
 import type { AgentEvent, LlmClient, LlmMessage, Tool, ToolContext } from "./types"
 import { createNote, editNote, getNote, linkNotes, listBoards, localTools, searchNotes, updateNote, writeNote } from "./tools"
@@ -510,6 +511,45 @@ describe("executeToolCall (tool execution choke point)", () => {
     let ran = false
     await executeToolCall("fetch", {}, [stubTool("fetch", async () => ((ran = true), { ok: true }))], ctxWith(), newConfirmGate())
     expect(ran).toBe(true)
+  })
+
+  it("'allow for this request' is per-tool — approving one gated tool doesn't approve another", async () => {
+    const gate = newConfirmGate()
+    const tools = [stubTool("web_search"), stubTool("fetch")]
+    let fetchPrompts = 0
+    const ctx = ctxWith(async (r) => (r.name === "fetch" ? (fetchPrompts += 1) : 0, "always"))
+
+    await executeToolCall("web_search", { query: "a" }, tools, ctx, gate)
+    expect(gate.approved.has("web_search")).toBe(true)
+
+    // A different gated tool still prompts despite web_search being approved.
+    await executeToolCall("fetch", { url: "u" }, tools, ctx, gate)
+    expect(fetchPrompts).toBe(1)
+    expect(gate.approved.has("fetch")).toBe(true)
+  })
+
+  it("a persistent grant revoked mid-run re-prompts on the next call (real wiring)", async () => {
+    // Exercises the confirmTool wiring use-local-submit-prompt uses: the grant
+    // (isAutoAllowed) and dialog are both read per call, so a revoke applies next.
+    const gate = newConfirmGate()
+    const tools = [stubTool("web_search")]
+    let granted = true
+    let dialogPrompts = 0
+    const ctx = ctxWith(() =>
+      resolveConfirmDecision("web_search", () => granted, async () => (dialogPrompts += 1, "deny")),
+    )
+
+    // Granted → runs via "once", never opens the dialog, never sticks in approved.
+    const first = await executeToolCall("web_search", { query: "a" }, tools, ctx, gate)
+    expect(first).toEqual({ ok: true })
+    expect(dialogPrompts).toBe(0)
+    expect(gate.approved.has("web_search")).toBe(false)
+
+    // Revoke mid-run → next call defers to the dialog and is declined.
+    granted = false
+    const second = await executeToolCall("web_search", { query: "b" }, tools, ctx, gate)
+    expect(dialogPrompts).toBe(1)
+    expect(second).toMatchObject({ ok: false, error: "user_declined" })
   })
 })
 

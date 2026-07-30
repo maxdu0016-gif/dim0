@@ -1,4 +1,9 @@
 import { create } from "zustand"
+import { CONFIRM_TOOL_NAMES, type ConfirmToolName } from "@/features/agent/engine/types"
+
+
+// Re-exported so settings-dialog keeps importing it from here; canonical in types.ts.
+export type { ConfirmToolName } from "@/features/agent/engine/types"
 
 
 /**
@@ -16,33 +21,24 @@ import { create } from "zustand"
 const STORAGE_KEY = "dim0.tool_trust"
 
 
-/** The off-board tools gated by the confirm dialog — keep in sync with
- *  `CONFIRM_TOOLS` in agent-loop.ts. */
-export type ConfirmToolName = "web_search" | "fetch" | "code_interpreter"
-
-
-const ALL_OFF = (): Record<ConfirmToolName, boolean> => ({
-  web_search: false,
-  fetch: false,
-  code_interpreter: false,
-})
+const ALL_OFF = (): Record<ConfirmToolName, boolean> =>
+  Object.fromEntries(CONFIRM_TOOL_NAMES.map((n) => [n, false])) as Record<ConfirmToolName, boolean>
 
 
 /**
  * Read the persisted grant map from localStorage, tolerant of a missing,
  * corrupt, or partial payload (each missing/garbage field defaults to off).
- * Exported for testing the rehydration path. Never throws.
+ * Derives the tool set from `CONFIRM_TOOL_NAMES`, so a new gated tool is covered
+ * automatically. Exported for testing the rehydration path. Never throws.
  */
 export const loadToolTrust = (): Record<ConfirmToolName, boolean> => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return ALL_OFF()
     const parsed = JSON.parse(raw) as Partial<Record<ConfirmToolName, boolean>>
-    return {
-      web_search: Boolean(parsed.web_search),
-      fetch: Boolean(parsed.fetch),
-      code_interpreter: Boolean(parsed.code_interpreter),
-    }
+    return Object.fromEntries(
+      CONFIRM_TOOL_NAMES.map((n) => [n, Boolean(parsed[n])]),
+    ) as Record<ConfirmToolName, boolean>
   } catch {
     return ALL_OFF()
   }

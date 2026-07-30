@@ -44,9 +44,11 @@ const describe = (req: ToolConfirmRequest): { title: string; hint: string; previ
 
 /**
  * Confirmation for off-board agent tools (`fetch` / `web_search` / `code_interpreter`).
- * Mounted once on a local board; shows the exact URL/query/code and pauses the run until the
- * user allows or declines (see `useToolConfirm` + the agent loop's CONFIRM_TOOLS).
- * The preview is rendered as plain text — never HTML — so it can't inject markup.
+ * Mounted at the board level whenever the browser engine runs (LocalBoardScreen
+ * for local boards, BoardView for synced ones); shows the exact URL/query/code
+ * and pauses the run until the user decides (see `useToolConfirm` + the agent
+ * loop's CONFIRM_TOOLS). The preview is plain text — never HTML — so it can't
+ * inject markup.
  */
 export const ToolConfirmDialog = () => {
   const pending = useToolConfirm((s) => s.pending)
