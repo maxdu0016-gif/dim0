@@ -5,6 +5,7 @@
  */
 import { z } from "zod"
 import type { AgentEvent, LlmClient, LlmMessage, LlmToolDef, LlmTurn, Tool, ToolContext } from "./types"
+import { toolThrew, unknownTool, userDeclined } from "./tool-result"
 import { agentLog } from "./debug"
 
 
@@ -51,6 +52,45 @@ const parseArgs = (raw: string): Record<string, unknown> => {
 }
 
 
+/**
+ * Execute one tool call under the loop's policy and return the model-facing
+ * result: the tool's own output on success, or a structured `ToolFailure`
+ * (unknown tool / user-declined / thrown error) the model can act on. The
+ * single choke point for tool execution — the frontend analog of the backend's
+ * tool decorator, so every failure origin yields one consistent shape.
+ *
+ * The off-board confirm gate de-dupes per run via `declinedTools`: once the user
+ * declines a tool, a later call to the same tool fails closed WITHOUT reopening
+ * the dialog, so a retrying model can't nag the user with repeat prompts.
+ */
+export async function executeToolCall(
+  name: string,
+  args: Record<string, unknown>,
+  tools: Tool[],
+  ctx: ToolContext,
+  declinedTools: Set<string>,
+): Promise<unknown> {
+  const tool = tools.find((t) => t.name === name)
+  if (!tool) return unknownTool(name)
+
+  // Confirm gate + run share one try/catch, so neither a throwing confirmer nor
+  // a throwing tool aborts the whole run — both surface as a `tool_error`.
+  try {
+    if (CONFIRM_TOOLS.has(tool.name) && ctx.confirmTool) {
+      if (declinedTools.has(tool.name)) return userDeclined(tool.name)
+      const approved = await ctx.confirmTool({ name: tool.name, args })
+      if (!approved) {
+        declinedTools.add(tool.name)
+        return userDeclined(tool.name)
+      }
+    }
+    return await tool.run(args, ctx)
+  } catch (err) {
+    return toolThrew(tool.name, err)
+  }
+}
+
+
 export type RunAgentOptions = {
   userMessage: string
   tools: Tool[]
@@ -71,6 +111,10 @@ export async function* runAgent(opts: RunAgentOptions): AsyncGenerator<AgentEven
   if (opts.system) messages.push({ role: "system", content: opts.system })
   if (opts.history) messages.push(...opts.history)
   messages.push({ role: "user", content: opts.userMessage })
+
+  // Off-board tools the user declined this run — never re-prompted (see
+  // executeToolCall). Spans all turns, so a retry in a later round is caught.
+  const declinedTools = new Set<string>()
 
   for (let turn = 0; turn < maxTurns; turn += 1) {
     // Prefer streaming: emit cumulative `assistant_text` per delta so the UI
@@ -107,27 +151,11 @@ export async function* runAgent(opts: RunAgentOptions): AsyncGenerator<AgentEven
     for (const call of result.calls) {
       const args = parseArgs(call.arguments)
       yield { type: "tool_start", toolName: call.name, args }
-      const tool = opts.tools.find((t) => t.name === call.name)
-      // A tool that throws (e.g. a managed service returning 500) must not abort
-      // the whole run: feed the error back as the tool result so the model can
-      // recover or answer without it, matching the unknown-tool path.
-      let output: unknown
-      if (!tool) {
-        output = { error: `unknown tool: ${call.name}` }
-      } else {
-        // Confirm + run share one try/catch so neither a declined confirm nor a
-        // throwing confirmer/tool aborts the whole run — the error is fed back.
-        try {
-          if (CONFIRM_TOOLS.has(tool.name) && opts.ctx.confirmTool && !(await opts.ctx.confirmTool({ name: tool.name, args }))) {
-            // Declined off-board action: feed a result back so the model adapts.
-            output = { error: "declined by user" }
-          } else {
-            output = await tool.run(args, opts.ctx)
-          }
-        } catch (err) {
-          output = { error: err instanceof Error ? err.message : String(err) }
-        }
-      }
+      // One choke point: unknown-tool guard, the off-board confirm gate, and
+      // error normalization all live in executeToolCall, so every outcome —
+      // declined, unknown, or thrown — feeds back one consistent structured
+      // result and no failure origin aborts the run.
+      const output = await executeToolCall(call.name, args, opts.tools, opts.ctx, declinedTools)
       agentLog.tool(call.name, args, output)
       yield { type: "tool_result", toolName: call.name, result: output }
       messages.push({ role: "tool", toolCallId: call.id, content: JSON.stringify(output) })

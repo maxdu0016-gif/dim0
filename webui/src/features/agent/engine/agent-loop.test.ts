@@ -7,9 +7,9 @@ import { LocalSearchIndex } from "@/features/board/search/local-index"
 import { addNode, freshStore, resetIdb } from "@/test/canvas"
 import { ScriptedLlm, toolTurn } from "@/test/llm"
 import { z } from "zod"
-import { runAgent } from "./agent-loop"
+import { executeToolCall, runAgent } from "./agent-loop"
 import { defineTool } from "./types"
-import type { AgentEvent, LlmClient, LlmMessage } from "./types"
+import type { AgentEvent, LlmClient, LlmMessage, Tool, ToolContext } from "./types"
 import { createNote, editNote, getNote, linkNotes, listBoards, localTools, searchNotes, updateNote, writeNote } from "./tools"
 import { learnGenerateMiniApp, skillTools } from "./skills"
 
@@ -74,7 +74,7 @@ describe("runAgent (scripted LLM)", () => {
     expect(events.find((e) => e.type === "tool_result")).toMatchObject({
       type: "tool_result",
       toolName: "explode",
-      result: { error: "boom" },
+      result: { ok: false, error: "tool_error", tool: "explode", message: expect.stringContaining("boom") },
     })
     expect(events.some((e) => e.type === "assistant_text" && e.text === "recovered without the tool")).toBe(true)
     expect(events.at(-1)).toEqual({ type: "done" })
@@ -124,7 +124,7 @@ describe("runAgent (scripted LLM)", () => {
     const llm = new ScriptedLlm([toolTurn("nope", {}), { kind: "text", text: "done" }])
     const events = await drain(runAgent({ userMessage: "x", tools: localTools, llm, ctx: { store } }))
     const result = events.find((e) => e.type === "tool_result")
-    expect(result).toMatchObject({ result: { error: "unknown tool: nope" } })
+    expect(result).toMatchObject({ result: { ok: false, error: "unknown_tool", tool: "nope" } })
   })
 })
 
@@ -172,7 +172,10 @@ describe("runAgent — off-board tool confirmation gate", () => {
       }),
     )
     expect(ran.value).toBe(false)
-    expect(resultOf(events)).toMatchObject({ toolName: "fetch", result: { error: "declined by user" } })
+    expect(resultOf(events)).toMatchObject({
+      toolName: "fetch",
+      result: { ok: false, error: "user_declined", tool: "fetch", message: expect.stringContaining("declined") },
+    })
     expect(events.some((e) => e.type === "assistant_text" && e.text === "ok without it")).toBe(true)
   })
 
@@ -228,7 +231,10 @@ describe("runAgent — off-board tool confirmation gate", () => {
       }),
     )
     expect(ran.value).toBe(false)
-    expect(resultOf(events)).toMatchObject({ toolName: "fetch", result: { error: "boom" } })
+    expect(resultOf(events)).toMatchObject({
+      toolName: "fetch",
+      result: { ok: false, error: "tool_error", tool: "fetch", message: expect.stringContaining("boom") },
+    })
     expect(events.some((e) => e.type === "assistant_text" && e.text === "recovered")).toBe(true)
   })
 
@@ -388,5 +394,99 @@ describe("skills", () => {
       "learn_generate_html_widget",
       "learn_generate_mini_app",
     ])
+  })
+})
+
+
+describe("executeToolCall (tool execution choke point)", () => {
+  const stubTool = (name: string, run: Tool["run"] = async () => ({ ok: true })): Tool =>
+    defineTool({ name, description: name, parameters: z.object({ url: z.string().optional() }), run })
+
+  const ctxWith = (confirmTool?: ToolContext["confirmTool"]): ToolContext =>
+    ({ store: freshStore("c"), rootId: null, confirmTool })
+
+  it("returns an unknown_tool failure when the tool isn't in the set", async () => {
+    const out = await executeToolCall("nope", {}, [stubTool("fetch")], ctxWith(), new Set())
+    expect(out).toMatchObject({ ok: false, error: "unknown_tool", tool: "nope" })
+  })
+
+  it("runs a non-gated tool without consulting the confirmer", async () => {
+    let asked = false
+    const out = await executeToolCall(
+      "create_note", {}, [stubTool("create_note", async () => ({ id: "n1" }))],
+      ctxWith(async () => ((asked = true), true)), new Set(),
+    )
+    expect(asked).toBe(false)
+    expect(out).toEqual({ id: "n1" })
+  })
+
+  it("runs a gated tool when approved", async () => {
+    const out = await executeToolCall("fetch", { url: "x" }, [stubTool("fetch")], ctxWith(async () => true), new Set())
+    expect(out).toEqual({ ok: true })
+  })
+
+  it("returns user_declined and records the tool when refused", async () => {
+    const declined = new Set<string>()
+    const out = await executeToolCall("fetch", {}, [stubTool("fetch")], ctxWith(async () => false), declined)
+    expect(out).toMatchObject({ ok: false, error: "user_declined", tool: "fetch" })
+    expect(declined.has("fetch")).toBe(true)
+  })
+
+  it("does NOT re-prompt a tool already declined this run (fail closed, no dialog spam)", async () => {
+    const declined = new Set<string>(["fetch"])
+    let asked = false
+    const out = await executeToolCall(
+      "fetch", {}, [stubTool("fetch")], ctxWith(async () => ((asked = true), true)), declined,
+    )
+    expect(asked).toBe(false) // the confirmer was never consulted the second time
+    expect(out).toMatchObject({ ok: false, error: "user_declined", tool: "fetch" })
+  })
+
+  it("normalizes a thrown tool into a tool_error (never propagates)", async () => {
+    const out = await executeToolCall(
+      "fetch", {}, [stubTool("fetch", async () => { throw new Error("kaboom") })], ctxWith(async () => true), new Set(),
+    )
+    expect(out).toMatchObject({ ok: false, error: "tool_error", tool: "fetch" })
+    expect((out as { message: string }).message).toContain("kaboom")
+  })
+
+  it("gates run without a confirmer wired (headless): the tool runs", async () => {
+    let ran = false
+    await executeToolCall("fetch", {}, [stubTool("fetch", async () => ((ran = true), { ok: true }))], ctxWith(), new Set())
+    expect(ran).toBe(true)
+  })
+})
+
+
+describe("runAgent — declined off-board tool is not re-prompted across turns", () => {
+  it("prompts once, then auto-declines a retry of the same tool in the same run", async () => {
+    let prompts = 0
+    const ran = { value: false }
+    const spy = defineTool({
+      name: "web_search",
+      description: "web_search",
+      parameters: z.object({ query: z.string().optional() }),
+      run: async () => ((ran.value = true), { ok: true }),
+    })
+    // The model tries web_search, is declined, then stubbornly tries it again.
+    const llm = new ScriptedLlm([
+      toolTurn("web_search", { query: "a" }),
+      toolTurn("web_search", { query: "b" }),
+      { kind: "text", text: "fine, answering without it" },
+    ])
+    const events = await drain(
+      runAgent({
+        userMessage: "go",
+        tools: [spy],
+        llm,
+        ctx: { store: freshStore("c"), rootId: null, confirmTool: async () => (prompts += 1, false) },
+      }),
+    )
+    expect(prompts).toBe(1) // dialog shown once, not on the retry
+    expect(ran.value).toBe(false)
+    const declines = events.filter(
+      (e) => e.type === "tool_result" && (e.result as { error?: string }).error === "user_declined",
+    )
+    expect(declines).toHaveLength(2) // both attempts get a clean declined result
   })
 })
