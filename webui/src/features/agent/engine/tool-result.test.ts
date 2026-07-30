@@ -3,12 +3,12 @@ import { isToolFailure, toolThrew, unknownTool, userDeclined } from "./tool-resu
 
 
 describe("tool-result contract", () => {
-  it("userDeclined names the tool, frames it as a permission choice, and says don't retry", () => {
+  it("userDeclined names the tool, frames it as a permission choice, scoped to this call", () => {
     const r = userDeclined("web_search")
     expect(r).toMatchObject({ ok: false, error: "user_declined", tool: "web_search" })
     expect(r.message).toContain("web_search")
     expect(r.message.toLowerCase()).toContain("declined")
-    expect(r.message.toLowerCase()).toContain("do not call")
+    expect(r.message.toLowerCase()).toContain("exact call") // per-call, not a tool-wide ban
   })
 
   it("unknownTool names the missing tool and steers back to valid ones", () => {

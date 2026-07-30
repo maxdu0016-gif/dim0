@@ -35,20 +35,21 @@ export const isToolFailure = (result: unknown): result is ToolFailure =>
 
 
 /**
- * The user declined an off-board tool at the confirm gate. Framed as a
- * permission choice (not a failure) with an explicit do-not-retry, so the model
- * neither loops nor causes the dialog to reopen.
+ * The user declined THIS specific off-board tool call at the confirm gate.
+ * Framed as a permission choice (not a failure), scoped to this call: a
+ * different call of the same tool may still be allowed, but repeating this exact
+ * call is pointless (it's remembered and auto-declined).
  */
 export const userDeclined = (tool: string): ToolFailure => ({
   ok: false,
   error: "user_declined",
   tool,
   message:
-    `The user declined to approve the "${tool}" tool for this request. This is a ` +
-    `permission choice, not a failure or a transient error. Do not call "${tool}" ` +
-    `again for this request. Continue using what you already know; if the task ` +
-    `genuinely requires it, briefly tell the user you could not use "${tool}" ` +
-    `because the request was not approved.`,
+    `The user declined this "${tool}" request — a permission choice, not a failure ` +
+    `or a transient error. Don't repeat this exact call. A genuinely different ` +
+    `"${tool}" request may still be allowed if the task needs it; otherwise ` +
+    `continue with what you already have and, if it matters, tell the user this ` +
+    `request wasn't approved.`,
 })
 
 

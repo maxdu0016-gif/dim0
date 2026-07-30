@@ -431,17 +431,39 @@ describe("executeToolCall (tool execution choke point)", () => {
     const gate = newConfirmGate()
     const out = await executeToolCall("fetch", {}, [stubTool("fetch")], ctxWith(async () => "deny"), gate)
     expect(out).toMatchObject({ ok: false, error: "user_declined", tool: "fetch" })
-    expect(gate.declined.has("fetch")).toBe(true)
+    // Recorded by CALL key (name + args), not the bare tool name.
+    expect(gate.declined.has("fetch:{}")).toBe(true)
+    expect(gate.declined.has("fetch")).toBe(false)
   })
 
-  it("does NOT re-prompt a tool already declined this run (fail closed, no dialog spam)", async () => {
-    const gate = { declined: new Set(["fetch"]), approved: new Set<string>() }
-    let asked = false
-    const out = await executeToolCall(
-      "fetch", {}, [stubTool("fetch")], ctxWith(async () => ((asked = true), "once")), gate,
-    )
-    expect(asked).toBe(false) // the confirmer was never consulted the second time
-    expect(out).toMatchObject({ ok: false, error: "user_declined", tool: "fetch" })
+  it("re-declines the SAME call without re-prompting, but a DIFFERENT call still prompts", async () => {
+    const gate = newConfirmGate()
+    let prompts = 0
+    const tools = [stubTool("web_search")]
+    const ctx = ctxWith(async () => (prompts += 1, "deny"))
+
+    // Deny query "a".
+    await executeToolCall("web_search", { query: "a" }, tools, ctx, gate)
+    expect(prompts).toBe(1)
+
+    // Same call again → auto-declined, no new prompt.
+    const repeat = await executeToolCall("web_search", { query: "a" }, tools, ctx, gate)
+    expect(prompts).toBe(1)
+    expect(repeat).toMatchObject({ ok: false, error: "user_declined", tool: "web_search" })
+
+    // A DIFFERENT query is a different call → prompts again (the bug fix).
+    await executeToolCall("web_search", { query: "b" }, tools, ctx, gate)
+    expect(prompts).toBe(2)
+  })
+
+  it("keys the decline by args order-independently (same args, different key order)", async () => {
+    const gate = newConfirmGate()
+    let prompts = 0
+    const tools = [stubTool("fetch")]
+    const ctx = ctxWith(async () => (prompts += 1, "deny"))
+    await executeToolCall("fetch", { url: "x", note: "n" }, tools, ctx, gate)
+    await executeToolCall("fetch", { note: "n", url: "x" }, tools, ctx, gate) // reordered
+    expect(prompts).toBe(1) // recognized as the same call
   })
 
   it("'allow for this request' records approval and skips the prompt on the next call", async () => {
@@ -476,35 +498,68 @@ describe("executeToolCall (tool execution choke point)", () => {
 
 
 describe("runAgent — declined off-board tool is not re-prompted across turns", () => {
-  it("prompts once, then auto-declines a retry of the same tool in the same run", async () => {
-    let prompts = 0
-    const ran = { value: false }
-    const spy = defineTool({
+  const searchSpy = (ran: { value: number }) =>
+    defineTool({
       name: "web_search",
       description: "web_search",
       parameters: z.object({ query: z.string().optional() }),
-      run: async () => ((ran.value = true), { ok: true }),
+      run: async () => ((ran.value += 1), { ok: true }),
     })
-    // The model tries web_search, is declined, then stubbornly tries it again.
+
+  it("prompts once then auto-declines a retry of the IDENTICAL call (nag protection)", async () => {
+    let prompts = 0
+    const ran = { value: 0 }
     const llm = new ScriptedLlm([
       toolTurn("web_search", { query: "a" }),
-      toolTurn("web_search", { query: "b" }),
+      toolTurn("web_search", { query: "a" }), // same query — stubborn retry
       { kind: "text", text: "fine, answering without it" },
     ])
     const events = await drain(
       runAgent({
         userMessage: "go",
-        tools: [spy],
+        tools: [searchSpy(ran)],
         llm,
         ctx: { store: freshStore("c"), rootId: null, confirmTool: async () => (prompts += 1, "deny") },
       }),
     )
-    expect(prompts).toBe(1) // dialog shown once, not on the retry
-    expect(ran.value).toBe(false)
+    expect(prompts).toBe(1) // identical retry didn't re-prompt
+    expect(ran.value).toBe(0)
     const declines = events.filter(
       (e) => e.type === "tool_result" && (e.result as { error?: string }).error === "user_declined",
     )
-    expect(declines).toHaveLength(2) // both attempts get a clean declined result
+    expect(declines).toHaveLength(2)
+  })
+
+  it("prompts again for a DIFFERENT query — declining one search doesn't ban the next", async () => {
+    // The reported bug: allow #1, deny #2, and #3 (a distinct query) was
+    // auto-declined. Each distinct search must get its own prompt.
+    const prompts: string[] = []
+    const ran = { value: 0 }
+    const llm = new ScriptedLlm([
+      toolTurn("web_search", { query: "a" }),
+      toolTurn("web_search", { query: "b" }),
+      toolTurn("web_search", { query: "c" }),
+      { kind: "text", text: "done" },
+    ])
+    await drain(
+      runAgent({
+        userMessage: "go",
+        tools: [searchSpy(ran)],
+        llm,
+        ctx: {
+          store: freshStore("c"),
+          rootId: null,
+          // allow "a", deny "b", allow "c"
+          confirmTool: async (r) => {
+            const q = String((r.args as { query?: string }).query)
+            prompts.push(q)
+            return q === "b" ? "deny" : "once"
+          },
+        },
+      }),
+    )
+    expect(prompts).toEqual(["a", "b", "c"]) // every distinct query prompted
+    expect(ran.value).toBe(2) // "a" and "c" ran; "b" was declined
   })
 
   it("prompts once on 'allow for this request', then runs later calls unprompted", async () => {

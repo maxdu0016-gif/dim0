@@ -52,13 +52,31 @@ const parseArgs = (raw: string): Record<string, unknown> => {
 }
 
 
+/** Order-independent JSON of a value, so equal args produce the same string. */
+const stableStringify = (v: unknown): string => {
+  if (v === null || typeof v !== "object") return JSON.stringify(v) ?? "null"
+  if (Array.isArray(v)) return `[${v.map(stableStringify).join(",")}]`
+  const obj = v as Record<string, unknown>
+  return `{${Object.keys(obj)
+    .sort()
+    .map((k) => `${JSON.stringify(k)}:${stableStringify(obj[k])}`)
+    .join(",")}}`
+}
+
+
+/** Identity of a specific tool call (name + args) — the decline gate's key, so a
+ *  refusal is scoped to THAT call, not the whole tool. */
+const callKey = (name: string, args: Record<string, unknown>): string => `${name}:${stableStringify(args)}`
+
+
 /**
- * Per-run memory for the off-board confirm gate, so a tool is prompted at most
- * once per outcome across the whole run:
- *  - `declined` — the user said no; further calls fail closed WITHOUT reopening
- *    the dialog (a retrying model can't nag).
- *  - `approved` — the user chose "allow for this request"; further calls to the
- *    same tool run without prompting.
+ * Per-run memory for the off-board confirm gate:
+ *  - `declined` — SPECIFIC calls (tool + args, see `callKey`) the user refused.
+ *    An identical later call fails closed WITHOUT reopening the dialog (a
+ *    retrying model can't nag), but a DIFFERENT call of the same tool still
+ *    prompts — declining one web search doesn't ban the next.
+ *  - `approved` — TOOLS the user chose "allow for this request" for; every later
+ *    call to that tool runs without prompting (a deliberate broad grant).
  */
 export type ConfirmGate = { declined: Set<string>; approved: Set<string> }
 
@@ -91,11 +109,15 @@ export async function executeToolCall(
   // a throwing tool aborts the whole run — both surface as a `tool_error`.
   try {
     if (CONFIRM_TOOLS.has(tool.name) && ctx.confirmTool) {
-      if (gate.declined.has(tool.name)) return userDeclined(tool.name)
+      // Decline is per specific call; approval is per tool (broad). Check the
+      // exact-call decline first so an explicitly refused call stays refused
+      // even if the tool was later broadly approved.
+      const key = callKey(tool.name, args)
+      if (gate.declined.has(key)) return userDeclined(tool.name)
       if (!gate.approved.has(tool.name)) {
         const decision = await ctx.confirmTool({ name: tool.name, args })
         if (decision === "deny") {
-          gate.declined.add(tool.name)
+          gate.declined.add(key)
           return userDeclined(tool.name)
         }
         // "always" broadens consent to the rest of the run; "once" does not.
