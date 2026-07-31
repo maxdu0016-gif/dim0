@@ -37,15 +37,18 @@ export function RootLayout() {
 
   // Billing is "active" only if the backend has the flag AND the Stripe keys —
   // a fact the web container can't compute. Consume the backend's answer so a
-  // flag-set-but-keyless deploy correctly reads as OSS (no tiers/limits).
-  // Unauthenticated + cached; the build-flag seed avoids a flash meanwhile.
+  // flag-set-but-keyless deploy correctly reads as OSS (no tiers/limits). Only
+  // signed-in users: billing UI/limits never apply signed-out, and the
+  // local-first front door makes zero backend calls when signed out. The
+  // build-flag seed covers the pre-fetch window.
   useEffect(() => {
+    if (!isSignedIn(userId)) return
     let cancelled = false
     getBillingPublicConfig()
       .then((cfg) => { if (!cancelled) setBillingActive(cfg.billing_enabled) })
       .catch(() => { /* keep the seeded default on error */ })
     return () => { cancelled = true }
-  }, [setBillingActive])
+  }, [userId, setBillingActive])
 
   const onLogout = useCallback(() => {
     clearTokens()

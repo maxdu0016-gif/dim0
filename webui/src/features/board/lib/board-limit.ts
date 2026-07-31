@@ -3,9 +3,12 @@ import { useAppStore } from "@/store"
 import { useListBoards } from "../api/list-boards"
 
 
-// Backend-authoritative billing gate (flag AND Stripe keys). Non-reactive read
-// for the pure limit helpers; the reactive hooks below use a selector. Never the
-// raw VITE flag — see docs/adr/ADR-BILLING-001.
+// Backend-authoritative billing gate (flag AND Stripe keys, never the raw VITE
+// flag — see docs/adr/ADR-BILLING-001). This is a NON-reactive read: the pure
+// helpers use it for correctness at call time (create paths read fresh here),
+// but a component that must RE-RENDER when billingActive flips (e.g. after boot
+// hydration) MUST also select `s.billingActive` itself — see
+// useIsBoardCreationLimited / NewBoardItem.
 const billingActive = (): boolean => useAppStore.getState().billingActive
 
 
@@ -42,8 +45,11 @@ export function isBoardCreationLimited(plan: BillingPlan, boardCount: number): b
 export function useIsBoardCreationLimited(): boolean {
   const userId = useAppStore((s) => s.userId)
   const userPlan = useAppStore((s) => s.userPlan)
+  // Subscribe to billingActive so the gate re-renders when the boot fetch flips
+  // it (e.g. flag-on-but-keyless self-host: seeded true → hydrated false).
+  const billingActive = useAppStore((s) => s.billingActive)
   const { data: boards = [] } = useListBoards(userId)
-  return isBoardCreationLimited(userPlan, boards.length)
+  return billingActive && isBoardCreationLimited(userPlan, boards.length)
 }
 
 
