@@ -1,27 +1,30 @@
 import { describe, expect, it } from "vitest"
-import { isPromotedBoardCurrentlyOpen } from "./use-enable-sync"
+import { promoteNavTarget } from "./use-enable-sync"
 
 
-describe("isPromotedBoardCurrentlyOpen", () => {
-  it("is true when the promoted board is the one open at /local/$id", () => {
-    expect(isPromotedBoardCurrentlyOpen("/local/board-1", "board-1")).toBe(true)
+describe("promoteNavTarget", () => {
+  it("targets the synced route when the promoted board is open at /local/$id", () => {
+    expect(promoteNavTarget("/local/board-1", "board-1")).toEqual({
+      to: "/boards/$id",
+      params: { id: "board-1" },
+    })
   })
 
-  it("is false when viewing a different local board (promoted from the sidebar)", () => {
-    expect(isPromotedBoardCurrentlyOpen("/local/board-2", "board-1")).toBe(false)
+  it("returns null when viewing a different local board (promoted from the sidebar)", () => {
+    expect(promoteNavTarget("/local/board-2", "board-1")).toBeNull()
   })
 
-  it("is false when not on a board route (e.g. the dashboard)", () => {
-    expect(isPromotedBoardCurrentlyOpen("/", "board-1")).toBe(false)
-    expect(isPromotedBoardCurrentlyOpen("/local", "board-1")).toBe(false)
+  it("returns null when not on a board route (e.g. the dashboard)", () => {
+    expect(promoteNavTarget("/", "board-1")).toBeNull()
+    expect(promoteNavTarget("/local", "board-1")).toBeNull()
   })
 
-  it("is false when the board is already open on the synced route", () => {
+  it("returns null when the board is already open on the synced route", () => {
     // Already synced → the local route no longer matches, so no re-navigate.
-    expect(isPromotedBoardCurrentlyOpen("/boards/board-1", "board-1")).toBe(false)
+    expect(promoteNavTarget("/boards/board-1", "board-1")).toBeNull()
   })
 
   it("does not match a board id that is only a path prefix", () => {
-    expect(isPromotedBoardCurrentlyOpen("/local/board-1/extra", "board-1")).toBe(false)
+    expect(promoteNavTarget("/local/board-1/extra", "board-1")).toBeNull()
   })
 })

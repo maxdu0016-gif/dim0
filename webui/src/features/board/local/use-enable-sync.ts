@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from "react"
-import { useNavigate, useRouterState } from "@tanstack/react-router"
+import { useNavigate, useRouter } from "@tanstack/react-router"
 import { useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { useAppStore } from "@/store"
@@ -16,13 +16,19 @@ import { enableSync } from "@/features/board/harness/sync/enable-sync"
 import type { EnableSyncResult } from "@/features/board/harness/sync/enable-sync"
 
 
+/** Where to send the view after a promote, or `null` to leave it put. */
+export type PromoteNavTarget = { to: "/boards/$id"; params: { id: string } } | null
+
+
 /**
- * True when a just-promoted board is the one currently open at `/local/$id`, so
- * the view must move to the synced route. Promoting a board you're NOT viewing
- * (from the dashboard/sidebar) returns false — your current view stays put.
+ * Decide where the view goes after a successful promote. When the promoted board
+ * is the one currently open at `/local/$id`, return the synced-route target so it
+ * re-mounts in collab mode; otherwise `null` (promoting a board you're NOT
+ * viewing, from the dashboard/sidebar, leaves your current view put). Pure so the
+ * navigate decision + target shape are unit-testable without a router.
  */
-export function isPromotedBoardCurrentlyOpen(pathname: string, boardId: string): boolean {
-  return pathname === `/local/${boardId}`
+export function promoteNavTarget(pathname: string, boardId: string): PromoteNavTarget {
+  return pathname === `/local/${boardId}` ? { to: "/boards/$id", params: { id: boardId } } : null
 }
 
 
@@ -43,7 +49,7 @@ export function useEnableSync() {
   const userId = useAppStore((s) => s.userId)
   const userPlan = useAppStore((s) => s.userPlan)
   const navigate = useNavigate()
-  const location = useRouterState({ select: (s) => s.location })
+  const router = useRouter()
   const queryClient = useQueryClient()
   const { data: syncedBoards = [] } = useListBoards(userId)
   const [pendingId, setPendingId] = useState<string | null>(null)
@@ -96,10 +102,13 @@ export function useEnableSync() {
           // editing the local-only copy and edits never reach the backend. Only
           // the currently-viewed board navigates; promoting another from the
           // dashboard/sidebar leaves your view put. Preserve the folder layer.
-          if (isPromotedBoardCurrentlyOpen(location.pathname, boardId)) {
+          // Read the LIVE pathname (not one captured at promote-start): the
+          // promote spans several awaits, and if the user navigated away
+          // meanwhile we must not yank them to the synced route.
+          const navTarget = promoteNavTarget(router.state.location.pathname, boardId)
+          if (navTarget) {
             void navigate({
-              to: "/boards/$id",
-              params: { id: boardId },
+              ...navTarget,
               // Carry the current search (incl. the folder-layer `root_id`) across
               // the route change so promotion doesn't jump back to the root layer.
               search: (prev: Record<string, unknown>) => ({ ...prev }),
@@ -115,7 +124,7 @@ export function useEnableSync() {
         setPendingId(null)
       }
     },
-    [userId, userPlan, syncedBoards, navigate, location, queryClient],
+    [userId, userPlan, syncedBoards, navigate, router, queryClient],
   )
 
   return { enableSync: run, pendingId }
