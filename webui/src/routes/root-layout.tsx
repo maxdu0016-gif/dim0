@@ -13,6 +13,7 @@ import { clearTokens } from '@/features/signin/auth-storage'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useBoardAppStore } from '@/features/board/harness/store/board-app-store'
 import { useAuth } from '@/features/signin/hooks/auth'
+import { getBillingPublicConfig } from '@/features/user-settings/api/billing'
 import { initConnectionState } from '@/features/connection/connection-state'
 import { OfflineOverlay } from '@/features/connection/offline-overlay'
 import { AuthGraphTexture } from '@/features/signin/components/auth-graph-texture'
@@ -32,6 +33,19 @@ export function RootLayout() {
   const setUserPlan = useAppStore(s => s.setUserPlan)
   const setEmailVerificationEnabled = useAppStore(s => s.setEmailVerificationEnabled)
   const setEmailVerified = useAppStore(s => s.setEmailVerified)
+  const setBillingActive = useAppStore(s => s.setBillingActive)
+
+  // Billing is "active" only if the backend has the flag AND the Stripe keys —
+  // a fact the web container can't compute. Consume the backend's answer so a
+  // flag-set-but-keyless deploy correctly reads as OSS (no tiers/limits).
+  // Unauthenticated + cached; the build-flag seed avoids a flash meanwhile.
+  useEffect(() => {
+    let cancelled = false
+    getBillingPublicConfig()
+      .then((cfg) => { if (!cancelled) setBillingActive(cfg.billing_enabled) })
+      .catch(() => { /* keep the seeded default on error */ })
+    return () => { cancelled = true }
+  }, [setBillingActive])
 
   const onLogout = useCallback(() => {
     clearTokens()

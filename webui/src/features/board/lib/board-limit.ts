@@ -1,7 +1,12 @@
-import { BILLING_ENABLED } from "@/config/billing"
 import type { BillingPlan } from "@/lib/decode-jwt"
 import { useAppStore } from "@/store"
 import { useListBoards } from "../api/list-boards"
+
+
+// Backend-authoritative billing gate (flag AND Stripe keys). Non-reactive read
+// for the pure limit helpers; the reactive hooks below use a selector. Never the
+// raw VITE flag — see docs/adr/ADR-BILLING-001.
+const billingActive = (): boolean => useAppStore.getState().billingActive
 
 
 // ----------------------------------------------------------------------------
@@ -26,7 +31,7 @@ export function boardLimitForPlan(plan: BillingPlan): number {
 
 
 export function isBoardCreationLimited(plan: BillingPlan, boardCount: number): boolean {
-  return BILLING_ENABLED && boardCount >= BOARD_LIMITS[plan]
+  return billingActive() && boardCount >= BOARD_LIMITS[plan]
 }
 
 
@@ -67,7 +72,7 @@ export function nodeLimitFor(type: string, plan: BillingPlan): number | null {
   const entry = NODE_LIMITS[type]
   if (entry === undefined) return null
   if (typeof entry === "number") return entry
-  if (!BILLING_ENABLED) return null
+  if (!billingActive()) return null
   return entry[plan]
 }
 
