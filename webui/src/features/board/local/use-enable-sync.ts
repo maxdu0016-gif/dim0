@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from "react"
-import { useNavigate } from "@tanstack/react-router"
+import { useNavigate, useRouterState } from "@tanstack/react-router"
 import { useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { useAppStore } from "@/store"
@@ -17,18 +17,33 @@ import type { EnableSyncResult } from "@/features/board/harness/sync/enable-sync
 
 
 /**
- * Promote a local board to synced (local → synced) from the dashboard.
+ * True when a just-promoted board is the one currently open at `/local/$id`, so
+ * the view must move to the synced route. Promoting a board you're NOT viewing
+ * (from the dashboard/sidebar) returns false — your current view stays put.
+ */
+export function isPromotedBoardCurrentlyOpen(pathname: string, boardId: string): boolean {
+  return pathname === `/local/${boardId}`
+}
+
+
+/**
+ * Promote a local board to synced (local → synced), from the dashboard or the
+ * sidebar.
  *
  * Wires the real deps to the `enableSync` orchestrator: a fresh BoardPersistence
  * for the snapshot + compaction, the adopt API, and the registry flip. Signed-out
  * users are routed to sign-in (a synced board needs an owner). On success it
- * invalidates the synced-board list so the card moves into the "Synced" group.
- * `pendingId` is the board mid-promotion (for a spinner / disabled state).
+ * invalidates the synced-board list so the card moves into the "Synced" group,
+ * and — if the promoted board is the one currently open — navigates it to the
+ * synced route so the live view re-mounts in collab mode instead of continuing
+ * to edit the now-superseded local copy. `pendingId` is the board mid-promotion
+ * (for a spinner / disabled state).
  */
 export function useEnableSync() {
   const userId = useAppStore((s) => s.userId)
   const userPlan = useAppStore((s) => s.userPlan)
   const navigate = useNavigate()
+  const location = useRouterState({ select: (s) => s.location })
   const queryClient = useQueryClient()
   const { data: syncedBoards = [] } = useListBoards(userId)
   const [pendingId, setPendingId] = useState<string | null>(null)
@@ -74,6 +89,22 @@ export function useEnableSync() {
         if (result.ok) {
           await queryClient.invalidateQueries({ queryKey: ["listBoards", userId] })
           toast.success("Sync enabled — this board is now backed up and shareable.")
+          // If the promoted board is the one currently open at `/local/$id`, move
+          // the view to the synced route so it re-mounts in collab mode. Promotion
+          // is in-place (same id) but LocalBoardScreen renders `<HarnessCanvas
+          // local />` and never re-binds, so without this the live view keeps
+          // editing the local-only copy and edits never reach the backend. Only
+          // the currently-viewed board navigates; promoting another from the
+          // dashboard/sidebar leaves your view put. Preserve the folder layer.
+          if (isPromotedBoardCurrentlyOpen(location.pathname, boardId)) {
+            void navigate({
+              to: "/boards/$id",
+              params: { id: boardId },
+              // Carry the current search (incl. the folder-layer `root_id`) across
+              // the route change so promotion doesn't jump back to the root layer.
+              search: (prev: Record<string, unknown>) => ({ ...prev }),
+            })
+          }
         } else {
           toast.error("Couldn't enable sync. Please try again.")
         }
@@ -84,7 +115,7 @@ export function useEnableSync() {
         setPendingId(null)
       }
     },
-    [userId, userPlan, syncedBoards, navigate, queryClient],
+    [userId, userPlan, syncedBoards, navigate, location, queryClient],
   )
 
   return { enableSync: run, pendingId }
