@@ -17,8 +17,10 @@ from topix.api.utils.rate_limit.policy import (
 
 
 def _set_billing_active(monkeypatch, active: bool):
-    """Patch the billing-active gate in BOTH namespaces that consult it —
-    `policy` (limit resolution) and `entitlements` (plan resolution)."""
+    """Patch the billing-active gate in both namespaces that consult it.
+
+    `policy` resolves the limits; `entitlements` resolves the plan.
+    """
     monkeypatch.setattr(policy, "is_billing_active", lambda: active)
     monkeypatch.setattr(entitlements, "is_billing_active", lambda: active)
 
