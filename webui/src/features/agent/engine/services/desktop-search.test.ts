@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { desktopLinkupSearch, desktopSearchPost } from "./desktop-search"
+import { desktopExaSearch, desktopLinkupSearch, desktopSearchPost } from "./desktop-search"
 
 
 describe("desktopLinkupSearch", () => {
@@ -40,10 +40,32 @@ describe("desktopLinkupSearch", () => {
 })
 
 
+describe("desktopExaSearch", () => {
+  it("uses the x-api-key header and maps text/summary to content", async () => {
+    const calls: { url: string; init?: RequestInit }[] = []
+    const fakeFetch = (async (url: string | URL | Request, init?: RequestInit) => {
+      calls.push({ url: url as string, init })
+      return new Response(
+        JSON.stringify({ results: [{ url: "https://a.com", title: "A", text: "alpha" }] }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      )
+    }) as typeof fetch
+
+    const res = await desktopExaSearch("exa-key", fakeFetch)({ query: "q" })
+
+    expect(res.results).toEqual([{ url: "https://a.com", title: "A", content: "alpha" }])
+    expect(calls[0].url).toBe("https://api.exa.ai/search")
+    expect(new Headers(calls[0].init?.headers).get("x-api-key")).toBe("exa-key")
+  })
+})
+
+
 describe("desktopSearchPost", () => {
-  it("returns a client for a ported engine (linkup) and null otherwise", () => {
-    expect(desktopSearchPost("linkup", "k")).toBeTypeOf("function")
-    expect(desktopSearchPost("tavily", "k")).toBeNull()
+  it("returns a client for every ported engine, null for unported/undefined", () => {
+    for (const engine of ["linkup", "tavily", "perplexity", "exa"]) {
+      expect(desktopSearchPost(engine, "k")).toBeTypeOf("function")
+    }
+    expect(desktopSearchPost("bing", "k")).toBeNull()
     expect(desktopSearchPost(undefined, "k")).toBeNull()
   })
 })
