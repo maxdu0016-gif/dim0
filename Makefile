@@ -168,8 +168,12 @@ setup-mini-app-compiler: ## Install mini-app compiler node deps (sucrase) for th
 test-backend: setup-mini-app-compiler ## Backend unit tests (integration deferred — they need DBs)
 	cd backend && uv run pytest test/unit
 
+.PHONY: test-tauri
+test-tauri: ## Desktop (Tauri) Rust unit tests — the rusqlite storage layer
+	cd webui/src-tauri && cargo test
+
 .PHONY: test-ci
-test-ci: lint-ui test-ui lint-backend test-backend ## Full CI suite: lint+test for webui then backend
+test-ci: lint-ui test-ui lint-backend test-backend test-tauri ## Full CI suite: lint+test for webui, backend, and the Tauri Rust layer
 
 .PHONY: check
 check: test-ci ## Alias for test-ci — run every lint + test locally
