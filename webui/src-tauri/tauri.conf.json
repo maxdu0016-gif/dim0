@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "topix",
-  "version": "0.1.0",
+  "productName": "Dim0",
+  "version": "0.3.59",
   "identifier": "com.topix.app",
   "build": {
     "frontendDist": "../dist",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "topix",
+        "title": "Dim0",
         "width": 1920,
         "height": 1080,
         "resizable": true,

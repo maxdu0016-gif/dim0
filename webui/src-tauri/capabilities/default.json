@@ -6,6 +6,14 @@
     "main"
   ],
   "permissions": [
-    "core:default"
+    "core:default",
+    {
+      "identifier": "http:default",
+      "allow": [
+        { "url": "https://api.openai.com/*" },
+        { "url": "https://openrouter.ai/*" },
+        { "url": "https://api.linkup.so/*" }
+      ]
+    }
   ]
 }

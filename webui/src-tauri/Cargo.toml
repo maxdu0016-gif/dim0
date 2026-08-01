@@ -23,3 +23,9 @@ serde = { version = "1.0", features = ["derive"] }
 log = "0.4"
 tauri = { version = "2.7.0", features = [] }
 tauri-plugin-log = "2"
+# BYOK relay: CORS-free HTTP from the webview straight to the user's provider.
+tauri-plugin-http = "2"
+# Local backend: SQLite via rusqlite (bundled) — one connection, real
+# transactions. Chosen over the pooled sql plugin so multi-statement writes are
+# genuinely atomic (see storage.rs).
+rusqlite = { version = "0.32", features = ["bundled"] }
