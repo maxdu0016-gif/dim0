@@ -169,11 +169,14 @@ test-backend: setup-mini-app-compiler ## Backend unit tests (integration deferre
 	cd backend && uv run pytest test/unit
 
 .PHONY: test-tauri
-test-tauri: ## Desktop (Tauri) Rust unit tests — the rusqlite storage layer
+test-tauri: ## Desktop (Tauri) Rust unit tests — the rusqlite storage layer (needs Rust + WebKit/GTK)
 	cd webui/src-tauri && cargo test
 
+# `test-tauri` is intentionally NOT in `test-ci`: CI runs it as its own job, but a
+# dev laptop may lack the Rust + libwebkit2gtk/gtk toolchain, and `make check`
+# shouldn't fail there. Run `make test-tauri` explicitly when working on src-tauri.
 .PHONY: test-ci
-test-ci: lint-ui test-ui lint-backend test-backend test-tauri ## Full CI suite: lint+test for webui, backend, and the Tauri Rust layer
+test-ci: lint-ui test-ui lint-backend test-backend ## Full CI suite: lint+test for webui then backend
 
 .PHONY: check
 check: test-ci ## Alias for test-ci — run every lint + test locally

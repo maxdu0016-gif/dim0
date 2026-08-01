@@ -130,7 +130,52 @@ export class SqliteEngine implements StorageEngine {
   }
 
 
-  async get<T>(c: Collection, key: Key): Promise<T | undefined> {
+  // Serialize every operation through one async queue so reads, writes, and whole
+  // transactions run one-at-a-time. This gives a `tx`'s read-modify-write the same
+  // isolation IndexedDB's readwrite transaction does — another op can't interleave
+  // between a tx's reads and its buffered flush and cause a lost update. Global
+  // serialization is free here: SQLite serializes writes anyway and this is a
+  // single-user local DB. The public methods queue; the `_`-prefixed impls don't,
+  // so a tx's internal reads (which run inside the queued slot) never self-deadlock.
+  private tail: Promise<unknown> = Promise.resolve()
+
+
+  private serialize<R>(op: () => Promise<R>): Promise<R> {
+    const run = this.tail.then(op, op)
+    this.tail = run.then(
+      () => undefined,
+      () => undefined,
+    )
+    return run
+  }
+
+
+  get<T>(c: Collection, key: Key): Promise<T | undefined> {
+    return this.serialize(() => this._get<T>(c, key))
+  }
+
+
+  list<T>(c: Collection, q: Query = {}): Promise<T[]> {
+    return this.serialize(() => this._list<T>(c, q))
+  }
+
+
+  put<T>(c: Collection, value: T, key?: Key): Promise<void> {
+    return this.serialize(() => this._put(c, value, key))
+  }
+
+
+  delete(c: Collection, key: Key | KeyRange): Promise<void> {
+    return this.serialize(() => this._delete(c, key))
+  }
+
+
+  tx<R>(collections: Collection[], fn: (t: Txn) => Promise<R>): Promise<R> {
+    return this.serialize(() => this._tx(collections, fn))
+  }
+
+
+  private async _get<T>(c: Collection, key: Key): Promise<T | undefined> {
     const p = this.plan(c)
     const rows = await this.db.select<{ data: string }>(
       `SELECT "data" FROM "${c}" WHERE ${eqClause(p.pk)} LIMIT 1`,
@@ -140,7 +185,7 @@ export class SqliteEngine implements StorageEngine {
   }
 
 
-  async list<T>(c: Collection, q: Query = {}): Promise<T[]> {
+  private async _list<T>(c: Collection, q: Query = {}): Promise<T[]> {
     const p = this.plan(c)
     let cols = p.pk
     const filters: string[] = []
@@ -190,13 +235,13 @@ export class SqliteEngine implements StorageEngine {
   }
 
 
-  async put<T>(c: Collection, value: T, key?: Key): Promise<void> {
+  private async _put<T>(c: Collection, value: T, key?: Key): Promise<void> {
     const { sql, params } = this.putStatement(this.plan(c), value, key)
     await this.db.execute(sql, params)
   }
 
 
-  async delete(c: Collection, key: Key | KeyRange): Promise<void> {
+  private async _delete(c: Collection, key: Key | KeyRange): Promise<void> {
     const { sql, params } = this.deleteStatement(this.plan(c), key)
     await this.db.execute(sql, params)
   }
@@ -204,13 +249,19 @@ export class SqliteEngine implements StorageEngine {
 
   /**
    * Run `fn` atomically. Writes made through the `Txn` handle are BUFFERED and
-   * flushed as one transaction (`SqlDb.batch`) only if `fn` resolves; if it
-   * throws, the buffer is discarded and nothing is written. Reads see committed
-   * state plus this tx's own buffered writes (a `get` overlay), so read-your-writes
-   * holds. This buffering is what makes `tx` truly atomic — issuing BEGIN/COMMIT
-   * as separate calls is not, since the driver may spread them across connections.
+   * flushed as one transaction (`SqlDb.batch`) only if `fn` resolves; if it throws,
+   * the buffer is discarded and nothing is written. That buffering is what makes
+   * `tx` truly atomic — issuing BEGIN/COMMIT as separate driver calls is not.
+   *
+   * Isolation: the whole tx runs inside one `serialize` slot, so no other engine
+   * op interleaves between its reads and its flush (no lost updates).
+   *
+   * Read-your-writes: `get` overlays this tx's buffered single-key puts/deletes.
+   * NOT overlaid (committed reads only): `list` results, and `get` of a key covered
+   * by a buffered RANGE delete. No caller reads its own uncommitted writes that way,
+   * and the contract doesn't require it; revisit if that changes.
    */
-  async tx<R>(_collections: Collection[], fn: (t: Txn) => Promise<R>): Promise<R> {
+  private async _tx<R>(_collections: Collection[], fn: (t: Txn) => Promise<R>): Promise<R> {
     const writes: SqlStatement[] = []
     const overlay = new Map<string, { value?: unknown; deleted?: boolean }>()
     const okey = (c: Collection, key: Key): string => `${c}:${JSON.stringify(keyToArray(key))}`
@@ -219,11 +270,9 @@ export class SqliteEngine implements StorageEngine {
       get: async <T>(c: Collection, key: Key): Promise<T | undefined> => {
         const o = overlay.get(okey(c, key))
         if (o) return o.deleted ? undefined : (o.value as T)
-        return this.get<T>(c, key)
+        return this._get<T>(c, key)
       },
-      // Reads a range/index from committed state. No current caller lists rows it
-      // wrote earlier in the same tx, so a committed read is correct here.
-      list: (c, q) => this.list(c, q),
+      list: (c, q) => this._list(c, q),
       put: async (c, value, key) => {
         const p = this.plan(c)
         const st = this.putStatement(p, value, key)

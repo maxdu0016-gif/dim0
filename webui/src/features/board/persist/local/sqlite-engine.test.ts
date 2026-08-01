@@ -5,6 +5,7 @@
 // sql.js loads its wasm via fs. This is the parity check that makes the desktop
 // SQLite backend a safe swap for IndexedDB.
 import { createRequire } from "node:module"
+import { describe, expect, it } from "vitest"
 import initSqlJs from "sql.js"
 import { runEngineContract } from "./engine-contract"
 import { SqliteEngine } from "./sqlite-engine"
@@ -50,3 +51,23 @@ const makeEngine = async (): Promise<SqliteEngine> => {
 
 
 runEngineContract("SqliteEngine (sql.js)", makeEngine)
+
+
+describe("SqliteEngine transaction isolation", () => {
+  it("serializes concurrent read-modify-write transactions (no lost update)", async () => {
+    const e = await makeEngine()
+    await e.put("boards", { id: "b", title: "0" })
+    // Each tx reads the counter, then writes +1. Run three at once: without
+    // serialization all three would read "0" and the result would be "1" (lost
+    // updates); serialized, they apply in turn → "3".
+    const bump = () =>
+      e.tx(["boards"], async (t) => {
+        const cur = await t.get<{ id: string; title: string }>("boards", "b")
+        await t.put("boards", { id: "b", title: String(Number(cur?.title ?? "0") + 1) })
+      })
+    await Promise.all([bump(), bump(), bump()])
+    const final = await e.get<{ title: string }>("boards", "b")
+    expect(final?.title).toBe("3")
+    e.close()
+  })
+})
