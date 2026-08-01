@@ -11,21 +11,13 @@ declare global {
   }
 }
 
-import { isTauri } from "@/platform"
+import { getDesktopApiBase } from "@/features/desktop/desktop-config"
 
-/**
- * localStorage key holding the remote server URL on desktop. There is no
- * docker-entrypoint injecting `__APP_CONFIG__` in the Tauri build, so the
- * signed-in managed + synced path reads its base from this user setting
- * (written by desktop Settings). Synchronous, so it's available at this
- * module's load; unset ⇒ falls through, and offline BYOK never needs it.
- */
-export const DESKTOP_API_BASE_KEY = "dim0.desktop.apiBase"
-
-const desktopApiBase =
-  isTauri() && typeof localStorage !== "undefined"
-    ? localStorage.getItem(DESKTOP_API_BASE_KEY) || undefined
-    : undefined
+// On the Tauri build there's no docker-entrypoint injecting `__APP_CONFIG__`, so
+// the remote server base is a user setting read from localStorage (canonical
+// reader in desktop-config). Synchronous, so it's available at module load; unset
+// ⇒ falls through, and offline BYOK never needs it.
+const desktopApiBase = getDesktopApiBase()
 
 const runtime =
   typeof window !== "undefined" ? window.__APP_CONFIG__?.apiBase : undefined

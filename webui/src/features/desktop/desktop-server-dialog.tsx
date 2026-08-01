@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label"
 import {
   clearDesktopApiBase,
   getDesktopApiBase,
+  isInsecureRemote,
   normalizeApiBase,
   setDesktopApiBase,
 } from "./desktop-config"
@@ -52,16 +53,31 @@ export function DesktopServerDialog({ open, onOpenChange }: DesktopServerDialogP
       return
     }
     setTesting(true)
+    const ctrl = new AbortController()
+    const timer = setTimeout(() => ctrl.abort(), 8000)
     try {
-      const res = await fetch(`${base}/billing/public-config`, { method: "GET" })
+      const res = await fetch(`${base}/billing/public-config`, {
+        method: "GET",
+        signal: ctrl.signal,
+      })
       if (res.ok) toast.success("Server reachable")
       else toast.error(`Server responded ${res.status}`)
     } catch {
-      toast.error("Couldn't reach the server")
+      toast.error("Couldn't reach the server (network, CORS, or wrong URL)")
     } finally {
+      clearTimeout(timer)
       setTesting(false)
     }
   }
+
+  // Warn when the entered URL would send credentials/data over plaintext http.
+  const insecure = (() => {
+    try {
+      return isInsecureRemote(normalizeApiBase(url))
+    } catch {
+      return false
+    }
+  })()
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -84,6 +100,12 @@ export function DesktopServerDialog({ open, onOpenChange }: DesktopServerDialogP
             autoComplete="off"
             spellCheck={false}
           />
+          {insecure ? (
+            <p className="text-xs text-destructive">
+              This server uses plain http — your sign-in and board data would be sent
+              unencrypted. Use https unless it&apos;s a trusted local network.
+            </p>
+          ) : null}
         </div>
 
         <DialogFooter className="gap-2 sm:justify-between">

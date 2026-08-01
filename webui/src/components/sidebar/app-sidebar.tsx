@@ -12,7 +12,9 @@ import {
 import { useInfiniteChats } from '@/features/agent/api/list-chats'
 import { useAppStore } from '@/store'
 import { isSignedIn } from '@/lib/auth'
+import { isTauri } from '@/platform'
 import { SignInCta } from '@/features/desktop/sign-in-cta'
+import { DesktopServerDialog } from '@/features/desktop/desktop-server-dialog'
 import { useListBoards } from '@/features/board/api/list-boards'
 import { useLocalBoards } from '@/features/board/local/use-local-boards'
 import { useEnableSync } from '@/features/board/local/use-enable-sync'
@@ -23,7 +25,7 @@ import { ChatsDialog } from './chats-dialog'
 import { useMemo, useState } from 'react'
 import { useRouterState } from '@tanstack/react-router'
 import type { Chat } from '@/features/agent/types/chat'
-import { AwardIcon, ChatHistoryIcon, InstallAppIcon, LogoutIcon, UserProfileIcon } from '@/components/icons'
+import { AwardIcon, ChatHistoryIcon, GlobeIcon, InstallAppIcon, LogoutIcon, UserProfileIcon } from '@/components/icons'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
   DropdownMenu,
@@ -70,6 +72,7 @@ export function AppSidebar({ onLogout }: AppSidebarProps) {
   }, [userEmail])
 
   const [chatsDialogOpen, setChatsDialogOpen] = useState(false)
+  const [serverDialogOpen, setServerDialogOpen] = useState(false)
 
   const { data: chatPagesData } = useInfiniteChats({
     pageSize: CHAT_HISTORY_PAGE_SIZE,
@@ -270,6 +273,10 @@ export function AppSidebar({ onLogout }: AppSidebarProps) {
 
         <ChatsDialog open={chatsDialogOpen} onOpenChange={setChatsDialogOpen} />
 
+        {isTauri() ? (
+          <DesktopServerDialog open={serverDialogOpen} onOpenChange={setServerDialogOpen} />
+        ) : null}
+
         <SidebarGroup className="shrink-0 border-t border-sidebar-border/50 pt-2">
           <SidebarGroupContent>
             <SidebarMenu>
@@ -313,6 +320,15 @@ export function AppSidebar({ onLogout }: AppSidebarProps) {
                           >
                             <AwardIcon className="mr-2 h-4 w-4 text-secondary-foreground" strokeWidth={2} />
                             <span>Upgrade Plan</span>
+                          </DropdownMenuItem>
+                        ) : null}
+                        {isTauri() ? (
+                          <DropdownMenuItem
+                            className='text-xs'
+                            onClick={() => setServerDialogOpen(true)}
+                          >
+                            <GlobeIcon className="mr-2 h-4 w-4" strokeWidth={2} />
+                            <span>Server</span>
                           </DropdownMenuItem>
                         ) : null}
                         <DropdownMenuSeparator />
