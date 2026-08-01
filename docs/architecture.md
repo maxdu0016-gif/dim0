@@ -65,6 +65,8 @@ Don't conflate them.
 
 1. Web bundle + PWA (`webui/vite.config.ts` — icon code-splitting, offline SPA fallback).
 2. Standalone mini-app runtime inlined to one HTML (`webui/vite.mini-app.config.ts`, `webui/mini-app-runtime/`) — sucrase-compiled agent JSX in a sandboxed iframe (single-frontend opaque-origin by default; cross-origin via `VITE_MINI_APP_ORIGIN`).
-3. Tauri desktop (`webui/src-tauri/`, early — version pinned `0.1.0`).
+3. **Tauri desktop** (`webui/src-tauri/`) — a standalone app: local-first + offline on the user's own keys, and (optionally) managed AI + synced boards when pointed at a server. Reuses the SPA + the #154 seams. Two load-bearing decisions:
+   - Local storage swaps IndexedDB → **rusqlite** behind the same `StorageEngine` port (`getLocalStores` on `isTauri()`), with real transactions via a `sql_tx` command. Why (and why not the pooled SQL plugin) → **[ADR-DESKTOP-001](./adr/ADR-DESKTOP-001-rusqlite-local-storage.md)**.
+   - BYOK provider calls go **direct** (CORS-free) via `@tauri-apps/plugin-http`; managed + synced ride the one `API_URL`, driven by an optional localStorage server URL (`features/desktop/`). Contract → **[ADR-DESKTOP-002](./adr/ADR-DESKTOP-002-byok-relay-and-remote-path.md)**.
 
 Self-host via Docker Compose: `make up` (from source) or `make pull && make run` (published images `winlp4ever/dim0-{backend,webui}`). Needs at least one LLM provider key (`OPENAI_API_KEY` or `OPENROUTER_API_KEY`); `LINKUP_API_KEY` powers web search (see `.env.sample`).
