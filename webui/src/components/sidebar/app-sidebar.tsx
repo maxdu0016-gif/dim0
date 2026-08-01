@@ -273,7 +273,9 @@ export function AppSidebar({ onLogout }: AppSidebarProps) {
 
         <ChatsDialog open={chatsDialogOpen} onOpenChange={setChatsDialogOpen} />
 
-        {isTauri() ? (
+        {/* Server dialog for the signed-in account menu. Signed-out desktop users
+            reach the same dialog through SignInCta, which owns its own instance. */}
+        {isTauri() && signedIn ? (
           <DesktopServerDialog open={serverDialogOpen} onOpenChange={setServerDialogOpen} />
         ) : null}
 

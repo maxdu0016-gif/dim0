@@ -10,8 +10,8 @@
  * Unset ⇒ the desktop app stays purely local/offline (BYOK) — no server contact.
  *
  * Note: the app addresses the backend with absolute paths (`new URL("/x", base)`),
- * so the server must be hosted at an origin root; a base path is preserved in the
- * stored value but not currently honored by the REST layer.
+ * so the server must be hosted at an origin root. A URL with a path is rejected
+ * (rather than silently mangled) — see `normalizeApiBase`.
  */
 import { clearTokens } from "@/features/signin/auth-storage"
 
@@ -40,16 +40,21 @@ const defaultScheme = (input: string): "http" | "https" => {
 
 
 /**
- * Normalize a user-entered server URL: trims, adds a scheme when missing (http for
- * local hosts, https otherwise), and drops a trailing slash while preserving any
- * base path. Throws on invalid input so the UI can show a message.
+ * Normalize a user-entered server URL to a bare origin: trims, adds a scheme when
+ * missing (http for local hosts, https otherwise). Throws on invalid input, or on
+ * a URL that carries a path — the app addresses the backend at an origin root, so
+ * a path would be dropped by the REST layer (and Test, which keeps it, would
+ * misleadingly pass). Better to reject it up front than route silently to 404s.
  */
 export const normalizeApiBase = (raw: string): string => {
   const trimmed = raw.trim()
   if (!trimmed) throw new Error("Enter a server URL")
   const withScheme = /^https?:\/\//i.test(trimmed) ? trimmed : `${defaultScheme(trimmed)}://${trimmed}`
   const url = new URL(withScheme) // throws on malformed input
-  return (url.origin + url.pathname).replace(/\/$/, "")
+  if (url.pathname !== "/" && url.pathname !== "") {
+    throw new Error("Use the server's root URL, without a path (e.g. https://dim0.example)")
+  }
+  return url.origin
 }
 
 
@@ -58,7 +63,8 @@ export const isInsecureRemote = (base: string): boolean => {
   try {
     const u = new URL(base)
     if (u.protocol !== "http:") return false
-    const h = u.hostname.toLowerCase()
+    // `hostname` brackets IPv6 literals (e.g. "[::1]"); strip them before matching.
+    const h = u.hostname.toLowerCase().replace(/^\[|\]$/g, "")
     return !(h === "localhost" || h === "127.0.0.1" || h === "::1")
   } catch {
     return false

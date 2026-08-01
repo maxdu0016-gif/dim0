@@ -20,9 +20,14 @@ describe("normalizeApiBase", () => {
     expect(normalizeApiBase("192.168.1.10:8888")).toBe("http://192.168.1.10:8888")
   })
 
-  it("keeps an explicit scheme, preserves any base path, drops a trailing slash", () => {
+  it("keeps an explicit scheme and drops a trailing slash", () => {
     expect(normalizeApiBase("http://localhost:8888/")).toBe("http://localhost:8888")
-    expect(normalizeApiBase("https://host/dim0/")).toBe("https://host/dim0")
+    expect(normalizeApiBase("https://api.dim0.net/")).toBe("https://api.dim0.net")
+  })
+
+  it("rejects a URL with a base path (the app addresses the server at root)", () => {
+    expect(() => normalizeApiBase("https://host/dim0")).toThrow()
+    expect(() => normalizeApiBase("https://host/dim0/")).toThrow()
   })
 
   it("trims surrounding whitespace", () => {
@@ -42,10 +47,11 @@ describe("isInsecureRemote", () => {
     expect(isInsecureRemote("http://example.com")).toBe(true)
   })
 
-  it("does not flag https, or http to localhost/loopback", () => {
+  it("does not flag https, or http to localhost/loopback (incl. IPv6)", () => {
     expect(isInsecureRemote("https://example.com")).toBe(false)
     expect(isInsecureRemote("http://localhost:8888")).toBe(false)
     expect(isInsecureRemote("http://127.0.0.1:8888")).toBe(false)
+    expect(isInsecureRemote("http://[::1]:8888")).toBe(false)
   })
 })
 
