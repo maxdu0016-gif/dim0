@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from "vitest"
 import {
   DESKTOP_API_BASE_KEY,
   getDesktopApiBase,
+  hasDesktopServer,
   isInsecureRemote,
   normalizeApiBase,
 } from "./desktop-config"
@@ -61,5 +62,13 @@ describe("getDesktopApiBase", () => {
     expect(getDesktopApiBase()).toBeUndefined()
     localStorage.setItem(DESKTOP_API_BASE_KEY, "https://api.dim0.net")
     expect(getDesktopApiBase()).toBe("https://api.dim0.net")
+  })
+})
+
+
+describe("hasDesktopServer", () => {
+  it("is true when the user has set a server override", () => {
+    localStorage.setItem(DESKTOP_API_BASE_KEY, "https://api.dim0.net")
+    expect(hasDesktopServer()).toBe(true)
   })
 })

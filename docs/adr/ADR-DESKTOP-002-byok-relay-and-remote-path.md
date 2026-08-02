@@ -13,10 +13,13 @@ unchanged — only the transport branches on `isTauri()`):
   `desktop-search.ts` / `desktop-parse.ts` returning the `/ai/*` reply shapes. Every
   provider host MUST be listed in the `http` capability allow-list.
 - **Managed → remote.** `managed` calls stay on the remote server, driven by
-  `API_URL`. The remote path (sign-in → managed AI + synced boards) is **optional**:
-  `API_URL` reads a localStorage server URL via `getDesktopApiBase`. Setting/clearing
-  it MUST reload the webview (the module-load `API_URL` re-resolves everywhere) and
-  MUST clear auth tokens; the URL MUST be an **origin root** (no path).
+  `API_URL`. The server MAY be **baked in at build** via `VITE_API_URL` (the same
+  env var the web frontend uses — so a distributor ships pointing at their server
+  and users just sign in), and a **user override** MAY be set in localStorage
+  (`getDesktopApiBase`), which wins. Sign-in is offered whenever either exists
+  (`hasDesktopServer`); a build with neither prompts to connect one. Setting/clearing
+  the override MUST reload the webview (the module-load `API_URL` re-resolves
+  everywhere) and MUST clear auth tokens; the URL MUST be an **origin root** (no path).
 - **Unset server ⇒ pure local/offline** (BYOK only), zero server contact.
 
 ## Why

@@ -19,11 +19,22 @@ import { clearTokens } from "@/features/signin/auth-storage"
 export const DESKTOP_API_BASE_KEY = "dim0.desktop.apiBase"
 
 
-/** The configured remote server base URL, or `undefined` when unset (local-only). */
+/** The user's server-URL override, or `undefined` when unset (localStorage only). */
 export const getDesktopApiBase = (): string | undefined => {
   if (typeof localStorage === "undefined") return undefined
   return localStorage.getItem(DESKTOP_API_BASE_KEY) || undefined
 }
+
+
+/**
+ * Whether a server is available at all — either baked in at build time via
+ * `VITE_API_URL` (the same env var the web frontend uses, so a distributor can
+ * ship pointing at their server) or set by the user (localStorage override). When
+ * true the app offers sign-in directly; when false it asks the user to connect
+ * one. The user override always wins over the baked default (see `config/api.ts`).
+ */
+export const hasDesktopServer = (): boolean =>
+  getDesktopApiBase() !== undefined || Boolean(import.meta.env.VITE_API_URL)
 
 
 /** Schemeless input defaults to `http` for localhost / IP literals (LAN self-host

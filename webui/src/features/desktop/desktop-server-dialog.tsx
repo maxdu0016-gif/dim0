@@ -33,7 +33,10 @@ type DesktopServerDialogProps = {
  */
 export function DesktopServerDialog({ open, onOpenChange }: DesktopServerDialogProps) {
   const current = getDesktopApiBase()
-  const [url, setUrl] = useState(current ?? "")
+  // Prefill with the effective server: the user's override if set, else the
+  // baked-in default (VITE_API_URL), so this "change server" screen shows what's
+  // in use. Disconnect below is gated on `current` — it only clears an override.
+  const [url, setUrl] = useState(current ?? import.meta.env.VITE_API_URL ?? "")
   const [testing, setTesting] = useState(false)
 
   const save = (): void => {

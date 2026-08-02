@@ -3,7 +3,7 @@ import { useNavigate } from "@tanstack/react-router"
 import { SidebarMenuButton } from "@/components/ui/sidebar"
 import { GlobeIcon, UserProfileIcon } from "@/components/icons"
 import { isTauri } from "@/platform"
-import { getDesktopApiBase } from "./desktop-config"
+import { hasDesktopServer } from "./desktop-config"
 import { DesktopServerDialog } from "./desktop-server-dialog"
 
 
@@ -20,7 +20,9 @@ export function SignInCta() {
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
   const desktop = isTauri()
-  const server = desktop ? getDesktopApiBase() : undefined
+  // A baked-in VITE_API_URL (or a user override) counts as "has a server" → offer
+  // sign-in directly. Only a build with no server at all prompts to connect one.
+  const server = desktop && hasDesktopServer()
 
   if (desktop && !server) {
     return (
