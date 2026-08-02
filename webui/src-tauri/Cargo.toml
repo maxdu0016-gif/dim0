@@ -29,3 +29,8 @@ tauri-plugin-http = "2"
 # transactions. Chosen over the pooled sql plugin so multi-statement writes are
 # genuinely atomic (see storage.rs).
 rusqlite = { version = "0.32", features = ["bundled"] }
+# System-browser Google OAuth (loopback + PKCE): a one-shot local server catches
+# the redirect, `open` launches the default browser. See oauth.rs.
+tiny_http = "0.12"
+open = "5"
+urlencoding = "2"
