@@ -43,6 +43,13 @@ root-URL rule exists because the app addresses the backend with absolute paths.
 - `fetch` + `code_interpreter` are managed-only by existing design → auto-`off`
   offline (no BYOK key slot / no local sandbox).
 - Adding a BYOK provider = a thin client + its host in the capability allow-list.
+- The server override read is **desktop-scoped** — `getDesktopApiBase` is gated on
+  `isTauri()`, so a stray `dim0.desktop.apiBase` value on a web origin can't repoint
+  `API_URL` (REST / collab / AI).
+- Baking `VITE_API_URL` into the desktop bundle requires the **final `vite build` to
+  be dotenv-wrapped** (`webui/package.json` `build`); the web build doesn't need it
+  (runtime `__APP_CONFIG__` injection wins), so it's easy to regress — the desktop
+  app would then silently fall back to `localhost:8888`.
 - Per-capability resolution + metering are unchanged — see [ADR-AGENT-003](./ADR-AGENT-003-service-resolution-and-metering.md).
 
 ## Rejected alternatives
