@@ -15,6 +15,10 @@ import { isTauri } from './platform'
  */
 if (!isTauri()) {
   registerSW({ immediate: true })
+} else {
+  // Desktop shell uses an overlay title bar (traffic lights float over content).
+  // This class lets the layout reserve the top-left corner for the traffic lights.
+  document.documentElement.classList.add("tauri")
 }
 
 createRoot(document.getElementById('root')!).render(
