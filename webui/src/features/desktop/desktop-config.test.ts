@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
+import { isTauri } from "@/platform"
 import {
   DESKTOP_API_BASE_KEY,
   getDesktopApiBase,
@@ -9,9 +10,16 @@ import {
 } from "./desktop-config"
 
 
+// The server override is desktop-only; default the platform to Tauri so the
+// localStorage-backed helpers are exercised, and flip it off per-test for the
+// web-safety case.
+vi.mock("@/platform", () => ({ isTauri: vi.fn(() => true) }))
+
+
 afterEach(() => {
   localStorage.clear()
   vi.unstubAllEnvs()
+  vi.mocked(isTauri).mockReturnValue(true)
 })
 
 
@@ -23,6 +31,7 @@ describe("normalizeApiBase", () => {
   it("defaults localhost / IP hosts to http (LAN self-host rarely has TLS)", () => {
     expect(normalizeApiBase("localhost:8888")).toBe("http://localhost:8888")
     expect(normalizeApiBase("192.168.1.10:8888")).toBe("http://192.168.1.10:8888")
+    expect(normalizeApiBase("[::1]:8888")).toBe("http://[::1]:8888")
   })
 
   it("keeps an explicit scheme and drops a trailing slash", () => {
@@ -62,10 +71,16 @@ describe("isInsecureRemote", () => {
 
 
 describe("getDesktopApiBase", () => {
-  it("returns undefined when unset, and the stored value when set", () => {
+  it("returns undefined when unset, and the stored value when set (desktop)", () => {
     expect(getDesktopApiBase()).toBeUndefined()
     localStorage.setItem(DESKTOP_API_BASE_KEY, "https://api.dim0.net")
     expect(getDesktopApiBase()).toBe("https://api.dim0.net")
+  })
+
+  it("ignores a stray localStorage value on the web build (isTauri false)", () => {
+    vi.mocked(isTauri).mockReturnValue(false)
+    localStorage.setItem(DESKTOP_API_BASE_KEY, "https://evil.example")
+    expect(getDesktopApiBase()).toBeUndefined()
   })
 })
 

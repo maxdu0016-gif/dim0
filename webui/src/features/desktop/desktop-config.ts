@@ -14,14 +14,19 @@
  * (rather than silently mangled) — see `normalizeApiBase`.
  */
 import { clearTokens } from "@/features/signin/auth-storage"
+import { isTauri } from "@/platform"
 
 /** localStorage key for the desktop remote-server URL. Also read by `config/api.ts`. */
 export const DESKTOP_API_BASE_KEY = "dim0.desktop.apiBase"
 
 
-/** The user's server-URL override, or `undefined` when unset (localStorage only). */
+/**
+ * The user's server-URL override, or `undefined` when unset. Desktop-only: a stray
+ * value under this key on a web origin must never repoint `API_URL` (REST / collab
+ * / AI), so the read is gated on `isTauri()`.
+ */
 export const getDesktopApiBase = (): string | undefined => {
-  if (typeof localStorage === "undefined") return undefined
+  if (!isTauri() || typeof localStorage === "undefined") return undefined
   return localStorage.getItem(DESKTOP_API_BASE_KEY) || undefined
 }
 
@@ -53,9 +58,15 @@ export const hasDesktopServer = (): boolean => getEffectiveApiBase() !== undefin
 /** Schemeless input defaults to `http` for localhost / IP literals (LAN self-host
  *  rarely has TLS) and `https` otherwise. */
 const defaultScheme = (input: string): "http" | "https" => {
-  const host = input.split("/")[0].split(":")[0].toLowerCase()
+  const authority = input.split("/")[0].toLowerCase()
+  // A bracketed IPv6 literal (`[::1]:8888`) must be unwrapped before stripping the
+  // port, or `split(":")` mangles it.
+  const host = authority.startsWith("[")
+    ? authority.slice(1, authority.indexOf("]"))
+    : authority.split(":")[0]
   const isLocal =
     host === "localhost" ||
+    host === "127.0.0.1" ||
     host === "::1" ||
     host.endsWith(".local") ||
     /^\d{1,3}(\.\d{1,3}){3}$/.test(host)
