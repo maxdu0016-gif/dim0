@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "dotenv -e ../${npm_config_envfile:-.env} -- vite",
     "dev:mini-app": "dotenv -e ../${npm_config_envfile:-.env} -- vite --config vite.mini-app.config.ts",
+    "dev:tauri": "dotenv -e ../${npm_config_envfile:-.env} -- vite --port 1420 --strictPort",
     "build": "dotenv -e ../${npm_config_envfile:-.env} -- vite build --config vite.mini-app.config.ts && dotenv -e ../${npm_config_envfile:-.env} -- tsc -b && dotenv -e ../${npm_config_envfile:-.env} -- vite build",
     "build:mini-app": "dotenv -e ../${npm_config_envfile:-.env} -- vite build --config vite.mini-app.config.ts",
     "lint": "eslint .",
