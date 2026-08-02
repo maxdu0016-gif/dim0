@@ -8,9 +8,9 @@ name: Desktop Release
 # (`desktop-build.yml` is the workflow_dispatch "does it compile on every OS" check;
 # this one is the tag-driven publish.)
 #
-# The public server URL is baked in from the `DESKTOP_API_URL` repo variable — the
-# same VITE_API_URL the web frontend uses. Unset ⇒ a local-only build that asks the
-# user to connect a server.
+# The public server URL is baked in from the `API_ORIGIN` repo variable — the same
+# server-origin var `.env` uses — into VITE_API_URL. Unset ⇒ a local-only build that
+# asks the user to connect a server.
 on:
   push:
     tags: ["v*"]
@@ -63,19 +63,19 @@ jobs:
         run: npm ci
         working-directory: webui
 
-      # Bake VITE_API_URL (the server users sign in to) from the DESKTOP_API_URL repo
-      # variable; unset ⇒ drop it entirely → a local-only build. bash so it runs the
-      # same on the Windows runner (git-bash).
+      # Bake VITE_API_URL (the server users sign in to) from the API_ORIGIN repo
+      # variable — the same server-origin var `.env` uses. Unset ⇒ drop it entirely
+      # → a local-only build. bash so it runs the same on the Windows runner (git-bash).
       - name: Prepare build env
         shell: bash
         run: |
           cp .env.sample .env
           grep -v '^VITE_API_URL=' .env > .env.tmp && mv .env.tmp .env
-          if [ -n "${DESKTOP_API_URL}" ]; then
-            echo "VITE_API_URL=${DESKTOP_API_URL}" >> .env
+          if [ -n "${API_ORIGIN}" ]; then
+            echo "VITE_API_URL=${API_ORIGIN}" >> .env
           fi
         env:
-          DESKTOP_API_URL: ${{ vars.DESKTOP_API_URL }}
+          API_ORIGIN: ${{ vars.API_ORIGIN }}
 
       - name: Build desktop installers
         run: npm run tauri-build
