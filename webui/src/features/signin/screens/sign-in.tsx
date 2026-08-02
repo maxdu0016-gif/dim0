@@ -125,7 +125,10 @@ export function SigninPage() {
   // Web uses GIS (needs the web client id); desktop uses the system-browser flow
   // (needs the "Desktop app" client id). Never both.
   const showGoogleWeb = !desktop && Boolean(authMethods?.google && authMethods.google_client_id)
-  const showGoogleDesktop = desktop && Boolean(authMethods?.google && authMethods.google_desktop_client_id)
+  // Desktop availability is independent of the web client — the backend only
+  // returns google_desktop_client_id when the Desktop OAuth client is configured,
+  // so its presence alone gates the button (a deploy may have desktop but no web).
+  const showGoogleDesktop = desktop && Boolean(authMethods?.google_desktop_client_id)
   const showSeparator = showLocalSignin && (showGoogleWeb || showGoogleDesktop)
   const localError = localSigninMutation.isError
     ? (localSigninMutation.error as Error).message || "Unable to sign in"

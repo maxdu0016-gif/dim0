@@ -25,20 +25,22 @@ fn enc(s: &str) -> String {
 }
 
 
-/// Parse `code` and `state` from a redirect request path (`/?code=..&state=..`).
-fn parse_code_state(path: &str) -> (Option<String>, Option<String>) {
+/// Read one query parameter from a request path, URL-decoded.
+fn query_param(path: &str, key: &str) -> Option<String> {
     let query = path.splitn(2, '?').nth(1).unwrap_or("");
-    let mut code = None;
-    let mut state = None;
     for pair in query.split('&') {
         let mut it = pair.splitn(2, '=');
-        match (it.next(), it.next()) {
-            (Some("code"), Some(v)) => code = urlencoding::decode(v).ok().map(|c| c.into_owned()),
-            (Some("state"), Some(v)) => state = urlencoding::decode(v).ok().map(|c| c.into_owned()),
-            _ => {}
+        if it.next() == Some(key) {
+            return it.next().and_then(|v| urlencoding::decode(v).ok()).map(|c| c.into_owned());
         }
     }
-    (code, state)
+    None
+}
+
+
+/// Parse `code` and `state` from a redirect request path (`/?code=..&state=..`).
+fn parse_code_state(path: &str) -> (Option<String>, Option<String>) {
+    (query_param(path, "code"), query_param(path, "state"))
 }
 
 
@@ -56,6 +58,7 @@ fn wait_for_code(server: Server, expected_state: &str) -> Result<String, String>
             Err(e) => return Err(e.to_string()),
         };
         let (code, state) = parse_code_state(request.url());
+        let error = query_param(request.url(), "error");
         let matched = code.is_some() && state.as_deref() == Some(expected_state);
         let body = if matched {
             "<h2>Signed in — you can close this tab and return to Dim0.</h2>"
@@ -71,6 +74,11 @@ fn wait_for_code(server: Server, expected_state: &str) -> Result<String, String>
             } else {
                 Err("OAuth state mismatch".into())
             };
+        }
+        // Google redirects with `?error=access_denied` when the user cancels/denies —
+        // fail fast instead of looping until the timeout.
+        if let Some(e) = error {
+            return Err(format!("Google sign-in was cancelled or failed: {e}"));
         }
     }
 }
@@ -118,13 +126,22 @@ pub async fn google_oauth(
 
 #[cfg(test)]
 mod tests {
-    use super::parse_code_state;
+    use super::{parse_code_state, query_param};
 
     #[test]
     fn parses_code_and_state() {
         let (code, state) = parse_code_state("/?code=abc123&state=xyz&scope=openid");
         assert_eq!(code.as_deref(), Some("abc123"));
         assert_eq!(state.as_deref(), Some("xyz"));
+    }
+
+    #[test]
+    fn reads_error_param() {
+        assert_eq!(
+            query_param("/?error=access_denied&state=xyz", "error").as_deref(),
+            Some("access_denied"),
+        );
+        assert!(query_param("/?code=abc&state=xyz", "error").is_none());
     }
 
     #[test]
