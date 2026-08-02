@@ -29,6 +29,14 @@ up-build: ## Force rebuild images, then start all services for $(PROFILE)
 build: ## Just (re)build images (no start)
 	$(COMPOSE) --profile $(PROFILE) build
 
+.PHONY: desktop-dev
+desktop-dev: ## Run the Tauri desktop app in dev (native window + hot reload); needs Rust
+	cd webui && npm run tauri-dev
+
+.PHONY: desktop-build
+desktop-build: ## Build the desktop installer for this OS → webui/src-tauri/target/release/bundle
+	cd webui && npm run tauri-build
+
 .PHONY: pull
 pull: ## Pull published backend and webui images for DIM0_VERSION
 	DIM0_VERSION=$(DIM0_VERSION) $(COMPOSE_IMAGES_BASE) pull backend webui
