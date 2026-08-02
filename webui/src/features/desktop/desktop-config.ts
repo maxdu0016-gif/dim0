@@ -31,10 +31,23 @@ export const getDesktopApiBase = (): string | undefined => {
 }
 
 
-/** The server URL baked in at build via `VITE_API_URL` (the same env var the web
- *  frontend uses), or `undefined`. A distributor sets it so users just sign in. */
-export const getBakedApiBase = (): string | undefined =>
-  import.meta.env.VITE_API_URL || undefined
+/**
+ * The server URL baked in at build via `VITE_API_URL` (the same env var the web
+ * frontend uses), or `undefined`. A distributor sets it (from the `API_ORIGIN`
+ * release variable) so users just sign in. Normalized to a bare origin — the app
+ * addresses the backend with absolute paths, so a stray path would 404 every call.
+ * Non-throwing (unlike the user-input path) so a misconfig degrades rather than
+ * crashing at module load; the deployer is responsible for using https.
+ */
+export const getBakedApiBase = (): string | undefined => {
+  const raw = import.meta.env.VITE_API_URL
+  if (!raw) return undefined
+  try {
+    return new URL(raw).origin
+  } catch {
+    return raw
+  }
+}
 
 
 /**

@@ -39,6 +39,10 @@ review caught the non-atomic `tx`.)
 - No read-your-writes for a tx's own `list()` or a key under a buffered *range*
   delete (committed reads); no caller relies on it — documented in `tx()`.
 - WAL is enabled on open for durable, concurrent reads. DB lives in the app-data dir.
+- **Known follow-up:** the schema is applied create-only (`CREATE ... IF NOT EXISTS`
+  from `COLLECTIONS`), NOT migrated. Before any `COLLECTIONS` change ships to
+  desktop, `fromDb` needs versioned migrations (`PRAGMA user_version` + steps), like
+  the IndexedDB engine's upgrades — else an added column/index bricks existing DBs.
 
 ## Rejected alternatives
 - **`tauri-plugin-sql`** — pooled connections make multi-statement `tx` non-atomic;

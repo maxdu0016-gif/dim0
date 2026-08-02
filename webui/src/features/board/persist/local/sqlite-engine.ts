@@ -106,7 +106,17 @@ export class SqliteEngine implements StorageEngine {
   }
 
 
-  /** Build an engine over an already-open driver (used by tests). Runs migrations. */
+  /**
+   * Build an engine over an already-open driver (used by tests).
+   *
+   * Applies the schema idempotently (`CREATE ... IF NOT EXISTS`). NOTE: this is
+   * create-only, not a migration system — a future change to `COLLECTIONS` (a new
+   * mirrored column or index) will NOT alter an existing desktop DB, and a
+   * `CREATE INDEX` on a not-yet-added column would then throw. Before any such
+   * schema change ships, this needs versioned migrations (e.g. `PRAGMA
+   * user_version` + per-version steps), like the IndexedDB engine's upgrades. Fine
+   * today: the schema is v1 and stable. (Follow-up; see docs/adr/ADR-DESKTOP-001.)
+   */
   static async fromDb(db: SqlDb): Promise<SqliteEngine> {
     const engine = new SqliteEngine(db)
     for (const stmt of ALL_DDL) await db.execute(stmt)
