@@ -1,14 +1,18 @@
-import { afterEach, describe, expect, it } from "vitest"
+import { afterEach, describe, expect, it, vi } from "vitest"
 import {
   DESKTOP_API_BASE_KEY,
   getDesktopApiBase,
+  getEffectiveApiBase,
   hasDesktopServer,
   isInsecureRemote,
   normalizeApiBase,
 } from "./desktop-config"
 
 
-afterEach(() => localStorage.clear())
+afterEach(() => {
+  localStorage.clear()
+  vi.unstubAllEnvs()
+})
 
 
 describe("normalizeApiBase", () => {
@@ -66,9 +70,28 @@ describe("getDesktopApiBase", () => {
 })
 
 
-describe("hasDesktopServer", () => {
-  it("is true when the user has set a server override", () => {
+describe("hasDesktopServer / getEffectiveApiBase", () => {
+  it("is false when neither a baked default nor an override is set", () => {
+    vi.stubEnv("VITE_API_URL", "")
+    expect(hasDesktopServer()).toBe(false)
+    expect(getEffectiveApiBase()).toBeUndefined()
+  })
+
+  it("is true from a baked VITE_API_URL alone", () => {
+    vi.stubEnv("VITE_API_URL", "https://vendor.example")
+    expect(hasDesktopServer()).toBe(true)
+    expect(getEffectiveApiBase()).toBe("https://vendor.example")
+  })
+
+  it("is true from a localStorage override alone", () => {
+    vi.stubEnv("VITE_API_URL", "")
     localStorage.setItem(DESKTOP_API_BASE_KEY, "https://api.dim0.net")
     expect(hasDesktopServer()).toBe(true)
+  })
+
+  it("the override wins over the baked default", () => {
+    vi.stubEnv("VITE_API_URL", "https://vendor.example")
+    localStorage.setItem(DESKTOP_API_BASE_KEY, "https://override.example")
+    expect(getEffectiveApiBase()).toBe("https://override.example")
   })
 })

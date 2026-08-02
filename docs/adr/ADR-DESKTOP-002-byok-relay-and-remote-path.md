@@ -20,7 +20,10 @@ unchanged — only the transport branches on `isTauri()`):
   (`hasDesktopServer`); a build with neither prompts to connect one. Setting/clearing
   the override MUST reload the webview (the module-load `API_URL` re-resolves
   everywhere) and MUST clear auth tokens; the URL MUST be an **origin root** (no path).
-- **Unset server ⇒ pure local/offline** (BYOK only), zero server contact.
+- **Local/offline = signed out.** The front door makes zero backend calls while
+  signed out, so BYOK-only local use contacts no server regardless of whether one
+  is configured. A build with no server at all defaults to this and never prompts
+  to sign in.
 
 ## Why
 The desktop webview enforces CORS like a browser, so BYOK provider calls need a

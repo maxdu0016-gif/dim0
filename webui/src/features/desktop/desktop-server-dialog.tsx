@@ -13,7 +13,9 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
   clearDesktopApiBase,
+  getBakedApiBase,
   getDesktopApiBase,
+  getEffectiveApiBase,
   isInsecureRemote,
   normalizeApiBase,
   setDesktopApiBase,
@@ -32,11 +34,11 @@ type DesktopServerDialogProps = {
  * sign-in unlocks managed AI + synced boards. Disconnecting returns to local-only.
  */
 export function DesktopServerDialog({ open, onOpenChange }: DesktopServerDialogProps) {
-  const current = getDesktopApiBase()
-  // Prefill with the effective server: the user's override if set, else the
-  // baked-in default (VITE_API_URL), so this "change server" screen shows what's
-  // in use. Disconnect below is gated on `current` — it only clears an override.
-  const [url, setUrl] = useState(current ?? import.meta.env.VITE_API_URL ?? "")
+  const current = getDesktopApiBase() // the user's override — Disconnect clears just this
+  const baked = getBakedApiBase() // build-time default, if the distributor set one
+  // Prefill with the effective server (override else baked) so this "change server"
+  // screen shows what's actually in use.
+  const [url, setUrl] = useState(getEffectiveApiBase() ?? "")
   const [testing, setTesting] = useState(false)
 
   const save = (): void => {
@@ -89,7 +91,7 @@ export function DesktopServerDialog({ open, onOpenChange }: DesktopServerDialogP
           <DialogTitle>Connect to a server</DialogTitle>
           <DialogDescription>
             Point this app at a Dim0 server to sign in, use managed AI, and sync
-            boards across devices. Leave it unset to stay fully local and offline.
+            boards across devices. Sign out anytime to work fully local and offline.
           </DialogDescription>
         </DialogHeader>
 
@@ -115,7 +117,7 @@ export function DesktopServerDialog({ open, onOpenChange }: DesktopServerDialogP
           <div>
             {current ? (
               <Button variant="ghost" onClick={() => clearDesktopApiBase()}>
-                Disconnect
+                {baked ? "Reset to default" : "Disconnect"}
               </Button>
             ) : null}
           </div>

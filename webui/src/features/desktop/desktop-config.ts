@@ -26,15 +26,28 @@ export const getDesktopApiBase = (): string | undefined => {
 }
 
 
+/** The server URL baked in at build via `VITE_API_URL` (the same env var the web
+ *  frontend uses), or `undefined`. A distributor sets it so users just sign in. */
+export const getBakedApiBase = (): string | undefined =>
+  import.meta.env.VITE_API_URL || undefined
+
+
 /**
- * Whether a server is available at all — either baked in at build time via
- * `VITE_API_URL` (the same env var the web frontend uses, so a distributor can
- * ship pointing at their server) or set by the user (localStorage override). When
- * true the app offers sign-in directly; when false it asks the user to connect
- * one. The user override always wins over the baked default (see `config/api.ts`).
+ * The effective server base: the user's localStorage override wins over the baked
+ * default. The single source for that precedence — consumed by `config/api.ts`
+ * (which sets `API_URL`) and the server dialog, so the order lives in one place.
  */
-export const hasDesktopServer = (): boolean =>
-  getDesktopApiBase() !== undefined || Boolean(import.meta.env.VITE_API_URL)
+export const getEffectiveApiBase = (): string | undefined =>
+  getDesktopApiBase() ?? getBakedApiBase()
+
+
+/**
+ * Whether a server is available at all — baked in at build (`VITE_API_URL`) or set
+ * by the user. When true the app offers sign-in directly; a build with neither
+ * prompts to connect one. (Local/offline use doesn't depend on this: the front
+ * door makes zero backend calls while signed out, regardless of a configured server.)
+ */
+export const hasDesktopServer = (): boolean => getEffectiveApiBase() !== undefined
 
 
 /** Schemeless input defaults to `http` for localhost / IP literals (LAN self-host

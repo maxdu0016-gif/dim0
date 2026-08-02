@@ -11,16 +11,13 @@ declare global {
   }
 }
 
-import { getDesktopApiBase } from "@/features/desktop/desktop-config"
+import { getEffectiveApiBase } from "@/features/desktop/desktop-config"
 
-// On the Tauri build there's no docker-entrypoint injecting `__APP_CONFIG__`, so
-// the remote server base is a user setting read from localStorage (canonical
-// reader in desktop-config). Synchronous, so it's available at module load; unset
-// ⇒ falls through, and offline BYOK never needs it.
-const desktopApiBase = getDesktopApiBase()
-
+// The frontend base: a runtime injection (docker-entrypoint's `__APP_CONFIG__` on
+// web) wins; otherwise `getEffectiveApiBase` resolves the desktop override-else-
+// baked-`VITE_API_URL` (and, on web, just `VITE_API_URL`). One precedence, owned
+// by desktop-config. Falls back to the local dev backend.
 const runtime =
   typeof window !== "undefined" ? window.__APP_CONFIG__?.apiBase : undefined
 
-export const API_URL =
-  runtime || desktopApiBase || import.meta.env.VITE_API_URL || "http://localhost:8888"
+export const API_URL = runtime || getEffectiveApiBase() || "http://localhost:8888"
