@@ -1,5 +1,6 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import { preloadCanvasFonts } from './fonts'
 import './index.css'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClient } from './query-client'
@@ -20,6 +21,10 @@ if (!isTauri()) {
   // This class lets the layout reserve the top-left corner for the traffic lights.
   document.documentElement.classList.add("tauri")
 }
+
+// Kick off canvas font loading before first paint so the board doesn't render
+// with the `cursive` fallback (WebKit won't load a canvas-only font on its own).
+preloadCanvasFonts()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
