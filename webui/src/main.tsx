@@ -20,6 +20,8 @@ if (!isTauri()) {
   // Desktop shell uses an overlay title bar (traffic lights float over content).
   // This class lets the layout reserve the top-left corner for the traffic lights.
   document.documentElement.classList.add("tauri")
+  // In fullscreen the traffic lights are hidden, so drop that reserved space.
+  void import("./features/desktop/fullscreen-class").then(m => m.initFullscreenClass())
 }
 
 // Kick off canvas font loading before first paint so the board doesn't render
