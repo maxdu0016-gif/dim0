@@ -18,8 +18,15 @@ export async function initFullscreenClass(): Promise<void> {
   const win = getCurrentWindow()
 
   let checking = false
+  let pending = false
   const apply = async (): Promise<void> => {
-    if (checking) return // collapse the burst of resize events into one IPC check
+    // Collapse the burst of resize events, but keep a trailing run: a resize that
+    // arrives mid-check (before isFullscreen settles) sets `pending`, so we re-check
+    // once after — otherwise we could latch onto the mid-transition state forever.
+    if (checking) {
+      pending = true
+      return
+    }
     checking = true
     try {
       const fullscreen = await win.isFullscreen()
@@ -28,6 +35,10 @@ export async function initFullscreenClass(): Promise<void> {
       // window gone / IPC unavailable — leave the class as-is
     } finally {
       checking = false
+      if (pending) {
+        pending = false
+        void apply()
+      }
     }
   }
 

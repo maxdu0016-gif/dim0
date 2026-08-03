@@ -1,6 +1,8 @@
-/* Web fonts are self-hosted via @fontsource — imported in `src/fonts.ts`, not
-   from the Google Fonts CDN — so the app renders offline with no third-party
-   dependency. */
+/* Main-app web fonts are self-hosted via @fontsource — imported in
+   `src/fonts.ts`, not from the Google Fonts CDN — so the app renders offline
+   with no third-party dependency. (The sandboxed HTML-widget iframe in
+   board/components/flow/widget-document.ts still uses the CDN — tracked
+   separately.) */
 @import "tailwindcss";
 @import "tw-animate-css";
 @source "../node_modules/streamdown/dist/index.js";
