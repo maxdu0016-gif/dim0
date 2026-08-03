@@ -1,10 +1,6 @@
-import { useState } from "react"
 import { useNavigate } from "@tanstack/react-router"
 import { SidebarMenuButton } from "@/components/ui/sidebar"
-import { GlobeIcon, UserProfileIcon } from "@/components/icons"
-import { isTauri } from "@/platform"
-import { hasDesktopServer } from "./desktop-config"
-import { DesktopServerDialog } from "./desktop-server-dialog"
+import { UserProfileIcon } from "@/components/icons"
 
 
 const CTA_CLASS =
@@ -12,49 +8,15 @@ const CTA_CLASS =
 
 
 /**
- * Signed-out account CTA. In the browser it's just "Sign in". On desktop sign-in
- * needs a server first: with none configured the button opens the server dialog;
- * once a server is set it offers sign-in plus a way to change the server.
+ * Signed-out account CTA: sign in to sync & share. The remote server comes from
+ * the build-time `VITE_API_URL` — there is no in-app server picker.
  */
 export function SignInCta() {
   const navigate = useNavigate()
-  const [open, setOpen] = useState(false)
-  const desktop = isTauri()
-  // A baked-in VITE_API_URL (or a user override) counts as "has a server" → offer
-  // sign-in directly. Only a build with no server at all prompts to connect one.
-  const server = desktop && hasDesktopServer()
-
-  if (desktop && !server) {
-    return (
-      <>
-        <SidebarMenuButton className={CTA_CLASS} onClick={() => setOpen(true)}>
-          <GlobeIcon className="size-4 shrink-0" strokeWidth={2} />
-          <span>Connect a server to sign in</span>
-        </SidebarMenuButton>
-        <DesktopServerDialog open={open} onOpenChange={setOpen} />
-      </>
-    )
-  }
-
   return (
-    <>
-      <SidebarMenuButton className={CTA_CLASS} onClick={() => navigate({ to: "/signin" })}>
-        <UserProfileIcon className="size-4 shrink-0" strokeWidth={2} />
-        <span>Sign in to sync &amp; share</span>
-      </SidebarMenuButton>
-      {desktop ? (
-        <>
-          <button
-            type="button"
-            aria-label="Server settings"
-            className="shrink-0 rounded p-1 text-muted-foreground hover:text-foreground"
-            onClick={() => setOpen(true)}
-          >
-            <GlobeIcon className="size-4" strokeWidth={2} />
-          </button>
-          <DesktopServerDialog open={open} onOpenChange={setOpen} />
-        </>
-      ) : null}
-    </>
+    <SidebarMenuButton className={CTA_CLASS} onClick={() => navigate({ to: "/signin" })}>
+      <UserProfileIcon className="size-4 shrink-0" strokeWidth={2} />
+      <span>Sign in to sync &amp; share</span>
+    </SidebarMenuButton>
   )
 }
