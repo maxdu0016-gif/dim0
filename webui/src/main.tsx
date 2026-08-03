@@ -22,6 +22,8 @@ if (!isTauri()) {
   document.documentElement.classList.add("tauri")
   // In fullscreen the traffic lights are hidden, so drop that reserved space.
   void import("./features/desktop/fullscreen-class").then(m => m.initFullscreenClass())
+  // WKWebView treats Backspace as "history back"; stop it stealing node deletes.
+  void import("./features/desktop/backspace-nav").then(m => m.disableBackspaceNavigation())
 }
 
 // Kick off canvas font loading before first paint so the board doesn't render
