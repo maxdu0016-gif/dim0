@@ -1,6 +1,6 @@
-# ADR-DESKTOP-002: Desktop networking — BYOK direct via plugin-http; managed + synced via an optional server URL
+# ADR-DESKTOP-002: Desktop networking — BYOK direct via plugin-http; managed + synced via a build-time server URL
 
-**Status:** Accepted · 2026-08-01
+**Status:** Accepted · 2026-08-01 (amended 2026-08-04: in-app server-URL override removed — baked `VITE_API_URL` only)
 **Applies to:** `webui/src/features/agent/engine/services/desktop-*.ts`, `webui/src/features/agent/engine/byok-client.ts`, `webui/src/features/desktop/**`, `webui/src/config/api.ts`, `webui/src-tauri/capabilities/default.json`
 
 ## Decision
@@ -13,17 +13,15 @@ unchanged — only the transport branches on `isTauri()`):
   `desktop-search.ts` / `desktop-parse.ts` returning the `/ai/*` reply shapes. Every
   provider host MUST be listed in the `http` capability allow-list.
 - **Managed → remote.** `managed` calls stay on the remote server, driven by
-  `API_URL`. The server MAY be **baked in at build** via `VITE_API_URL` (the same
-  env var the web frontend uses — so a distributor ships pointing at their server
-  and users just sign in), and a **user override** MAY be set in localStorage
-  (`getDesktopApiBase`), which wins. Sign-in is offered whenever either exists
-  (`hasDesktopServer`); a build with neither prompts to connect one. Setting/clearing
-  the override MUST reload the webview (the module-load `API_URL` re-resolves
-  everywhere) and MUST clear auth tokens; the URL MUST be an **origin root** (no path).
+  `API_URL`, which is **baked in at build** via `VITE_API_URL` (the same env var
+  the web frontend uses — so a distributor ships pointing at their server and users
+  just sign in). There is **no in-app override**: the server is fixed at build time
+  (`getEffectiveApiBase`). The value is normalized to an **origin root** — any path
+  is dropped, since the app addresses the backend with absolute paths.
 - **Local/offline = signed out.** The front door makes zero backend calls while
   signed out, so BYOK-only local use contacts no server regardless of whether one
-  is configured. A build with no server at all defaults to this and never prompts
-  to sign in.
+  is configured. The sign-in entry point is always shown, but sign-in only
+  succeeds once `VITE_API_URL` points at a real server.
 
 ## Why
 The desktop webview enforces CORS like a browser, so BYOK provider calls need a
@@ -32,9 +30,9 @@ require our server (defeating offline) and can't relay the user's LLM key anyway
 A shipped desktop app can't hold *our* secret keys, so **managed** is served only
 by the remote server, gated on sign-in. One `API_URL` already drives REST, collab
 WS (`wsBaseFromApiUrl`), and managed `/ai/*`, so a single setting lights up the
-whole remote path — no per-subsystem wiring. Reload is required because `API_URL`
-is a module-load const; tokens are cleared because they're minted per-server; the
-root-URL rule exists because the app addresses the backend with absolute paths.
+whole remote path — no per-subsystem wiring. The origin-root normalization exists
+because the app addresses the backend with absolute paths, so any path in
+`VITE_API_URL` would be dropped anyway.
 
 ## Consequences
 - Offline BYOK agent works with the user's keys: LLM, all four search engines
@@ -43,9 +41,6 @@ root-URL rule exists because the app addresses the backend with absolute paths.
 - `fetch` + `code_interpreter` are managed-only by existing design → auto-`off`
   offline (no BYOK key slot / no local sandbox).
 - Adding a BYOK provider = a thin client + its host in the capability allow-list.
-- The server override read is **desktop-scoped** — `getDesktopApiBase` is gated on
-  `isTauri()`, so a stray `dim0.desktop.apiBase` value on a web origin can't repoint
-  `API_URL` (REST / collab / AI).
 - Baking `VITE_API_URL` into the desktop bundle requires the **final `vite build` to
   be dotenv-wrapped** (`webui/package.json` `build`); the web build doesn't need it
   (runtime `__APP_CONFIG__` injection wins), so it's easy to regress — the desktop
@@ -57,9 +52,11 @@ root-URL rule exists because the app addresses the backend with absolute paths.
   managed keys to reuse in a shipped app; only avoids rewriting ~4 thin HTTP calls.
 - **A local Rust HTTP server for `/ai/*`** — more Rust than injecting a fetch; kept
   as a fallback only if plugin-http streaming disappoints.
-- **Accept a server URL with a base path** — the REST layer uses absolute paths and
-  would drop it (while Test, which keeps it, misleadingly passes); rejected up front.
+- **An in-app server-URL override (settings/dialog)** — removed: the server is a
+  build-time concern (`VITE_API_URL`), so a runtime picker added UI, a localStorage
+  precedence, reload-and-clear-tokens plumbing, and a web-safety gate for no real
+  gain. A distributor bakes the URL; there's nothing for an end user to change.
 
 ## Verify
 `grep -rn "tauriFetch\|plugin-http" webui/src/features/agent/engine/services/desktop-http.ts` — BYOK routes through the CORS-free fetch.
-`grep -n "getDesktopApiBase\|clearTokens\|reload" webui/src/features/desktop/desktop-config.ts` — server URL drives API_URL; set/clear reload + drop tokens.
+`grep -n "getEffectiveApiBase\|VITE_API_URL" webui/src/features/desktop/desktop-config.ts` — API_URL comes only from the baked env var (no in-app override).
