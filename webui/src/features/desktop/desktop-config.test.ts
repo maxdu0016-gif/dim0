@@ -23,9 +23,21 @@ describe("getEffectiveApiBase", () => {
     expect(getEffectiveApiBase()).toBe("https://vendor.example")
   })
 
-  it("tolerates a missing scheme — defaults to https, not origin 'null'", () => {
+  it("fills a missing scheme with https for a public host (not origin 'null')", () => {
     vi.stubEnv("VITE_API_URL", "vendor.example")
     expect(getEffectiveApiBase()).toBe("https://vendor.example")
+  })
+
+  it("fills a missing scheme with http for localhost / LAN hosts", () => {
+    vi.stubEnv("VITE_API_URL", "localhost:8888")
+    expect(getEffectiveApiBase()).toBe("http://localhost:8888")
+    vi.stubEnv("VITE_API_URL", "192.168.1.10:8888")
+    expect(getEffectiveApiBase()).toBe("http://192.168.1.10:8888")
+  })
+
+  it("degrades to undefined on a malformed value (rather than an unusable base)", () => {
+    vi.stubEnv("VITE_API_URL", "https://")
+    expect(getEffectiveApiBase()).toBeUndefined()
   })
 
   it("trims surrounding whitespace", () => {
