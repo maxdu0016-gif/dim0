@@ -31,11 +31,11 @@ build: ## Just (re)build images (no start)
 
 .PHONY: desktop-dev
 desktop-dev: ## Run the Tauri desktop app in dev (native window + hot reload); needs Rust
-	cd webui && npm run tauri-dev
+	cd webui && npm run tauri-dev --envfile=$(ENVFILE)
 
 .PHONY: desktop-build
 desktop-build: ## Build the desktop installer for this OS → webui/src-tauri/target/release/bundle
-	cd webui && npm run tauri-build
+	cd webui && npm run tauri-build --envfile=$(ENVFILE)
 
 .PHONY: pull
 pull: ## Pull published backend and webui images for DIM0_VERSION
