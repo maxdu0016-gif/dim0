@@ -137,14 +137,29 @@ export default defineConfig({
         // SPA offline routing: serve the app shell for any deep link (e.g.
         // /local/:id) when offline so client-side routing can take over.
         navigateFallback: "/index.html",
+        // …but NOT for the same-origin mini-app iframe runtime (/mini-app/*).
+        // It's a real document, not an SPA route — without this the nav fallback
+        // serves the host app shell into the iframe once the SW is active, so
+        // every mini-app would render the host app instead of the widget.
+        navigateFallbackDenylist: [/^\/mini-app\//],
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
         // Never precache these — both would trip Workbox's 2 MiB cache-entry
         // limit and (because that's fatal here) fail the prod build:
         //  - stats.html: the ANALYZE=true bundle visualizer, irrelevant at runtime.
         //  - mini-app/**: the iframe runtime is one self-inlined ~5 MB file
-        //    (fonts + JS + CSS), a standalone same-origin asset — not part of the
-        //    app shell, so it doesn't belong in the SW precache anyway.
+        //    (fonts + JS + CSS). Too big to precache; cached at runtime below
+        //    instead, so it still works offline after first load.
         globIgnores: ["**/stats.html", "mini-app/**"],
+        // Runtime-cache the mini-app runtime (excluded from precache above) so it
+        // loads offline. StaleWhileRevalidate: instant from cache, refreshed in
+        // the background so a redeploy propagates on the next load.
+        runtimeCaching: [
+          {
+            urlPattern: /\/mini-app\//,
+            handler: "StaleWhileRevalidate",
+            options: { cacheName: "mini-app-runtime" },
+          },
+        ],
       },
     }),
   ],
