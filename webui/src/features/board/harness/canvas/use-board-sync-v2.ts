@@ -9,9 +9,10 @@
  * boards are completely untouched.
  *
  * Hydration reuses `applyGraphToStore` (one `origin:"remote"` batch → no echo).
- * The local replica gives the outbox its offline durability; the welcome
- * snapshot re-hydrates the base on each load (true offline-first load is a
- * follow-up).
+ * The local replica gives the outbox its offline durability, and the store is
+ * painted from it on load so a board isn't blank offline. The welcome snapshot
+ * seeds that local base on the pristine first connect (`writeInitialBase`);
+ * replacing it on reconnect drift is a follow-up (roadmap).
  */
 import { useEffect, useRef } from "react"
 import type { CanvasStore } from "@canvas-harness/core"

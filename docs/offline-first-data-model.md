@@ -50,6 +50,15 @@ open and an upgrade converge on the same shape).
 - **Load = snapshot + replay.** `load()` reads the snapshot and replays oplog rows
   with `seq > snapshot.seq`, ordered by `serverSeq` (unacked-local sorts last).
   Correctness never depends on oplog truncation.
+- **Synced boards seed the base offline (v2).** A v2 board's welcome snapshot is
+  written to `snapshots` once via `writeInitialBase(graphToContent(welcome))`, but
+  **only on a pristine replica** (no snapshot row, empty oplog, nothing pending) —
+  so it's stored at seq `0`, truncates nothing, and later local/remote ops replay
+  on top (unacked locals stay in the outbox). On reconnect *drift* or once edits
+  exist it **no-ops**. That makes a board readable offline after one online open;
+  the store is painted from the local replica on load (before the welcome).
+  Replacing the base mid-session (drift) needs serverSeq-based truncation —
+  deferred (roadmap).
 - **Snapshot+truncate is one transaction** (`writeSnapshot`) so the dangerous
   inverse (oplog deleted without a snapshot) can't happen on a crash.
 - **The outbox is the oplog tail** past the durable `syncedSeq` cursor — not a
