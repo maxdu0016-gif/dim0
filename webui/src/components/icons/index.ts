@@ -31,6 +31,7 @@ export {
   CloudArrowDownIcon,
   CloudCheckIcon,
   CloudSyncIcon,
+  WifiSlashIcon,
   CodeBlockIcon,
   CodeFileIcon,
   CodeInterpreterIcon,
