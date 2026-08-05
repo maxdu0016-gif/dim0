@@ -110,6 +110,7 @@ export function AppSidebar({ onLogout }: AppSidebarProps) {
       localOnly.map((b) => (
         <LocalBoardItem
           key={b.id}
+          boardId={b.id}
           label={b.title}
           isActive={pathname === `/local/${b.id}`}
           syncing={pendingId === b.id}

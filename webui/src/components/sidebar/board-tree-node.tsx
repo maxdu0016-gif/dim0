@@ -41,6 +41,15 @@ type BoardTreeNodeProps = {
    * note the panel just opened.
    */
   parentFolderId?: string
+  /**
+   * Local mode: children come from `localContents` (filtered by `parentId`) rather
+   * than the backend, and navigation targets the `/local/$boardId/*` routes. Local
+   * persistence has no per-level query, so the whole tree is loaded once by the
+   * board row and threaded down here.
+   */
+  local?: boolean
+  /** Full flat surface-node list for a local board (all levels). Ignored unless `local`. */
+  localContents?: BoardContentItem[]
 }
 
 
@@ -51,7 +60,14 @@ type BoardTreeNodeProps = {
  * canvas children. The kind icon morphs to a chevron on row-hover so
  * the user can expand/collapse without leaving the current view.
  */
-export function BoardTreeNode({ boardId, item, depth, parentFolderId }: BoardTreeNodeProps) {
+export function BoardTreeNode({
+  boardId,
+  item,
+  depth,
+  parentFolderId,
+  local = false,
+  localContents,
+}: BoardTreeNodeProps) {
   const navigate = useNavigate()
   const [expanded, setExpanded] = useState(false)
 
@@ -67,9 +83,16 @@ export function BoardTreeNode({ boardId, item, depth, parentFolderId }: BoardTre
   const fullLabel = item.label?.trim() || UNTITLED_LABEL
   const displayLabel = trimText(fullLabel, 40)
 
-  const { data: children = [], isLoading } = useBoardContents(boardId, item.id, {
-    enabled: isExpandable && expanded,
+  // Synced: fetch this level from the backend on expand. Local: the whole board's
+  // surface list is already in memory (threaded via `localContents`), so filter
+  // children by parentId — the hook is still called (disabled) to keep hook order.
+  const syncedQuery = useBoardContents(boardId, item.id, {
+    enabled: !local && isExpandable && expanded,
   })
+  const children: BoardContentItem[] = local
+    ? (localContents ?? []).filter((c) => (c.parentId ?? null) === item.id)
+    : (syncedQuery.data ?? [])
+  const isLoading = local ? false : syncedQuery.isLoading
 
   const handleNavigate = () => {
     // Keep `current_chat_id` etc. but realign `root_id` to the closest
@@ -82,43 +105,37 @@ export function BoardTreeNode({ boardId, item, depth, parentFolderId }: BoardTre
       delete rest.root_id
       return rest
     }
-    if (item.kind === "sheet") {
+    // Open a surface panel: same shape for synced/local, only the route family
+    // and the board param name (`id` vs `boardId`) differ. Conditional `to`+
+    // `params` can't be expressed in TanStack's typed navigate, hence the cast.
+    const openSurface = (syncedTo: string, localTo: string) => {
       navigate({
-        to: "/boards/$id/sheets/$noteId",
-        params: { id: boardId, noteId: item.id },
+        to: local ? localTo : syncedTo,
+        params: local ? { boardId, noteId: item.id } : { id: boardId, noteId: item.id },
         search: scopeToParentFolder,
-      })
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any)
+    }
+    if (item.kind === "sheet") {
+      openSurface("/boards/$id/sheets/$noteId", "/local/$boardId/sheets/$noteId")
       return
     }
     if (item.kind === "code-sandbox") {
-      navigate({
-        to: "/boards/$id/code-sandbox/$noteId",
-        params: { id: boardId, noteId: item.id },
-        search: scopeToParentFolder,
-      })
+      openSurface("/boards/$id/code-sandbox/$noteId", "/local/$boardId/code-sandbox/$noteId")
       return
     }
     if (item.kind === "widget") {
-      navigate({
-        to: "/boards/$id/widgets/$noteId",
-        params: { id: boardId, noteId: item.id },
-        search: scopeToParentFolder,
-      })
+      openSurface("/boards/$id/widgets/$noteId", "/local/$boardId/widgets/$noteId")
       return
     }
-    if (item.kind === "folder") {
-      navigate({
-        to: "/boards/$id",
-        params: { id: boardId },
-        search: (prev: Record<string, unknown>) => ({ ...prev, root_id: item.id }),
-      })
-      return
-    }
+    // Folder (or fallback): stay on the board route, scope the canvas via root_id.
     navigate({
-      to: "/boards/$id",
-      params: { id: boardId },
-      search: (prev: Record<string, unknown>) => prev,
-    })
+      to: local ? "/local/$boardId" : "/boards/$id",
+      params: local ? { boardId } : { id: boardId },
+      search: (prev: Record<string, unknown>) =>
+        item.kind === "folder" ? { ...prev, root_id: item.id } : prev,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any)
   }
 
   const handleToggle = (e: MouseEvent) => {
@@ -225,6 +242,8 @@ export function BoardTreeNode({ boardId, item, depth, parentFolderId }: BoardTre
                 // Folders bound a new canvas scope; sheets/sub-pages
                 // inherit the closest folder ancestor unchanged.
                 parentFolderId={isFolder ? item.id : parentFolderId}
+                local={local}
+                localContents={localContents}
               />
             ))
           )}
