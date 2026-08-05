@@ -79,7 +79,7 @@ describe("BoardPersistence", () => {
   it("writeInitialBase seeds a base so a synced board loads offline", async () => {
     const p = new BoardPersistence("b")
     await p.init()
-    await p.writeInitialBase(serverBase("s1", "s2"))
+    await p.writeInitialBase(() => serverBase("s1", "s2"))
     p.close()
 
     // Next session / offline: a fresh instance loads the persisted base.
@@ -90,12 +90,24 @@ describe("BoardPersistence", () => {
     p2.close()
   })
 
+  it("writeInitialBase ignores an empty welcome so a real one can still seed", async () => {
+    const p = new BoardPersistence("b")
+    await p.init()
+    // A DB-hiccup `{}` welcome (graphToContent → emptyContent) must NOT lock the
+    // base empty; a subsequent real welcome still seeds it.
+    await p.writeInitialBase(() => serverBase())
+    await p.writeInitialBase(() => serverBase("s1"))
+    const content = await p.load()
+    expect(content.nodes.map((n) => n.id)).toEqual(["s1"])
+    p.close()
+  })
+
   it("writeInitialBase no-ops when a base already exists (drift-safe)", async () => {
     const p = new BoardPersistence("b")
     await p.init()
-    await p.writeInitialBase(serverBase("s1"))
+    await p.writeInitialBase(() => serverBase("s1"))
     // A later (reconnect drift) snapshot must NOT replace the seeded base.
-    await p.writeInitialBase(serverBase("s2", "s3"))
+    await p.writeInitialBase(() => serverBase("s2", "s3"))
     const content = await p.load()
     expect(content.nodes.map((n) => n.id)).toEqual(["s1"])
     p.close()
@@ -109,7 +121,7 @@ describe("BoardPersistence", () => {
     addNode(store, "local1")
     await p.flush() // this.seq > 0 now
 
-    await p.writeInitialBase(serverBase("server1")) // must no-op
+    await p.writeInitialBase(() => serverBase("server1")) // must no-op
 
     const content = await p.load()
     expect(content.nodes.map((n) => n.id)).toEqual(["local1"]) // base skipped, edit intact
@@ -119,7 +131,7 @@ describe("BoardPersistence", () => {
   it("edits after the seeded base replay on top of it (serverSeq order)", async () => {
     const p = new BoardPersistence("b")
     await p.init()
-    await p.writeInitialBase(serverBase("s1"))
+    await p.writeInitialBase(() => serverBase("s1"))
     await p.load() // sync the seq cursor to the base
 
     const store = freshStore("c")

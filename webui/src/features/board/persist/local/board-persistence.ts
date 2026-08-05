@@ -170,19 +170,28 @@ export class BoardPersistence {
    * Seed the local base from a server welcome snapshot so a synced board is
    * readable offline (today the welcome is applied in-memory only and discarded).
    *
-   * Deliberately writes ONLY on a pristine replica — no snapshot row yet, no
-   * oplog, nothing pending — so `writeSnapshot(content, 0)` truncates nothing and
-   * every later local/remote op replays on top (unacked locals stay in the
-   * outbox). On any subsequent snapshot (reconnect drift) or once edits exist it
-   * no-ops: replacing a base mid-session without clobbering interleaved unacked
-   * locals needs a serverSeq-based truncation model (a follow-up). `content` must
-   * be the server-only base (from the welcome graph, not the live store) so
-   * nothing double-applies.
+   * `makeContent` is a thunk: the (non-trivial) graph→content conversion runs
+   * ONLY when we actually write. The caller fires this on every welcome, but a
+   * write happens at most once — deliberately ONLY on a pristine replica: no
+   * snapshot row yet, no oplog, nothing pending or in-flight (we drain the append
+   * queue first so `this.seq` is current). Then `writeSnapshot(content, 0)`
+   * truncates nothing and later local/remote ops replay on top (unacked locals
+   * stay in the outbox).
+   *
+   * Empty content (a DB-hiccup `{}` welcome — the case `applyGraphToStore`'s merge
+   * mode also guards) is NOT written, so a real later welcome can still seed the
+   * base rather than being locked out by an empty snapshot. On reconnect drift or
+   * once edits exist it no-ops: replacing a base mid-session needs serverSeq-based
+   * truncation (a follow-up). `makeContent` must yield the server-only base (from
+   * the welcome graph, not the live store) so nothing double-applies.
    */
-  async writeInitialBase(content: BoardContent): Promise<void> {
+  async writeInitialBase(makeContent: () => BoardContent): Promise<void> {
+    await this.queue // let any in-flight append settle so `this.seq` is current
     if (this.seq !== 0 || this.pending.length > 0) return
     const engine = this.requireEngine()
     if (await engine.get<SnapshotRecord>("snapshots", this.boardId)) return
+    const content = makeContent()
+    if (content.nodes.length === 0 && content.edges.length === 0) return
     await this.writeSnapshot(content, 0)
   }
 

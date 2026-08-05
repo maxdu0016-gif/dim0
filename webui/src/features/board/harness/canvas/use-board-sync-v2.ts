@@ -78,9 +78,9 @@ export const useBoardSyncV2 = (
           // echo/persist) and BEFORE attach, so it isn't recorded; the welcome
           // merges authoritative state on top when online. Projected to the
           // current layer like a local board — persistence stays whole-board.
-          if (content.nodes.length > 0 || content.edges.length > 0) {
-            applyContentToStore(store, content, rootId ?? null)
-          }
+          // Called unconditionally (like the local branch): a no-op on empty
+          // content, and restores groups/frame layout too, not just nodes/edges.
+          applyContentToStore(store, content, rootId ?? null)
           detachPersist = persistence.attach(store) // local replica: outbox + durable edits
           const clientId = store.clientId
           // Seed local presence identity (name + color). Cursor/selection are
@@ -124,7 +124,11 @@ export const useBoardSyncV2 = (
               applyGraphToStore(store, graph, { mode: "merge" })
               // Persist the server base once (pristine replica only, see
               // writeInitialBase) so this synced board loads offline next time.
-              void persistence?.writeInitialBase(graphToContent(graph))
+              // Pass a thunk so graph→content only runs if it actually writes;
+              // best-effort, so swallow a teardown-race rejection (engine closed).
+              void persistence
+                ?.writeInitialBase(() => graphToContent(graph))
+                .catch(() => {})
             },
             normalizeRemote: (batch) => normalizeInboundBatch(batch, store),
             enrichOutbound: (batch) => enrichEdgeMidpoints(dedupeRepeatUpdates(batch), store),
