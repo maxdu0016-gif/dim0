@@ -71,4 +71,25 @@ describe("materializeBoardOffline", () => {
     expect(wrote).toBe(false)
     expect(h.getWholeBoard).not.toHaveBeenCalled()
   })
+
+  it("skips (no fetch) when the replica already has local edits", async () => {
+    // Not pristine: an oplog exists but no base — must not fetch or seed.
+    const p = new BoardPersistence("b", { engine: h.stores.engine! })
+    const { addNode, freshStore } = await import("@/test/canvas")
+    const store = freshStore("c")
+    p.attach(store)
+    addNode(store, "edit-1")
+    await p.flush()
+
+    const wrote = await materializeBoardOffline("b")
+    expect(wrote).toBe(false)
+    expect(h.getWholeBoard).not.toHaveBeenCalled()
+  })
+
+  it("returns false for an empty whole-board graph (nothing to seed)", async () => {
+    h.getWholeBoard.mockResolvedValue({ nodes: [], edges: [] } as unknown as Graph)
+    const wrote = await materializeBoardOffline("b")
+    expect(wrote).toBe(false)
+    expect(h.getWholeBoard).toHaveBeenCalledWith("b")
+  })
 })

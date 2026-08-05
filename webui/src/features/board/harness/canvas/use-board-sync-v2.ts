@@ -85,9 +85,13 @@ export const useBoardSyncV2 = (
           applyContentToStore(store, content, rootId ?? null)
           detachPersist = persistence.attach(store) // local replica: outbox + durable edits
           // Seed the WHOLE board offline once (all layers, not just the opened
-          // one). Self-guarding + best-effort: no-ops if a base already exists,
-          // and a rejection (offline) just means "not materialized this time".
-          void materializeBoardOffline(boardId).catch(() => {})
+          // one). Reuse this mounted persistence (single writer). Self-guarding +
+          // best-effort: no-ops if already seeded / non-pristine, and a rejection
+          // (offline) just means "not materialized this time".
+          void materializeBoardOffline(boardId, {
+            engine: stores.engine,
+            persistence,
+          }).catch(() => {})
           const clientId = store.clientId
           // Seed local presence identity (name + color). Cursor/selection are
           // filled in live by useLocalPresence; attachSync ships changes to peers.

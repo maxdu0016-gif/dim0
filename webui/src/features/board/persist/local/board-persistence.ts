@@ -185,14 +185,15 @@ export class BoardPersistence {
    * truncation (a follow-up). `makeContent` must yield the server-only base (from
    * the welcome graph, not the live store) so nothing double-applies.
    */
-  async writeInitialBase(makeContent: () => BoardContent): Promise<void> {
+  async writeInitialBase(makeContent: () => BoardContent): Promise<boolean> {
     await this.queue // let any in-flight append settle so `this.seq` is current
-    if (this.seq !== 0 || this.pending.length > 0) return
+    if (this.seq !== 0 || this.pending.length > 0) return false
     const engine = this.requireEngine()
-    if (await engine.get<SnapshotRecord>("snapshots", this.boardId)) return
+    if (await engine.get<SnapshotRecord>("snapshots", this.boardId)) return false
     const content = makeContent()
-    if (content.nodes.length === 0 && content.edges.length === 0) return
+    if (content.nodes.length === 0 && content.edges.length === 0) return false
     await this.writeSnapshot(content, 0)
+    return true
   }
 
 
