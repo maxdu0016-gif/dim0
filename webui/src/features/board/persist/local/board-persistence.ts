@@ -166,6 +166,27 @@ export class BoardPersistence {
   }
 
 
+  /**
+   * Seed the local base from a server welcome snapshot so a synced board is
+   * readable offline (today the welcome is applied in-memory only and discarded).
+   *
+   * Deliberately writes ONLY on a pristine replica — no snapshot row yet, no
+   * oplog, nothing pending — so `writeSnapshot(content, 0)` truncates nothing and
+   * every later local/remote op replays on top (unacked locals stay in the
+   * outbox). On any subsequent snapshot (reconnect drift) or once edits exist it
+   * no-ops: replacing a base mid-session without clobbering interleaved unacked
+   * locals needs a serverSeq-based truncation model (a follow-up). `content` must
+   * be the server-only base (from the welcome graph, not the live store) so
+   * nothing double-applies.
+   */
+  async writeInitialBase(content: BoardContent): Promise<void> {
+    if (this.seq !== 0 || this.pending.length > 0) return
+    const engine = this.requireEngine()
+    if (await engine.get<SnapshotRecord>("snapshots", this.boardId)) return
+    await this.writeSnapshot(content, 0)
+  }
+
+
   /** Close the engine if owned, and cancel any pending flush. */
   close(): void {
     if (this.timer !== null) {

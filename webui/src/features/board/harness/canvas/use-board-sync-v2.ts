@@ -32,7 +32,8 @@ import { ReconnectSupervisor } from "../sync/reconnect-supervisor"
 import { attachBoardSync } from "../sync/board-sync"
 import type { BoardSyncHandle } from "../sync/board-sync"
 import { createWebSocketRelay } from "../sync/ws-relay"
-import { applyGraphToStore } from "../persist/snapshot-load"
+import { applyGraphToStore, graphToContent } from "../persist/snapshot-load"
+import { applyContentToStore } from "@/features/board/persist/local/apply-content"
 
 
 const wsBaseFromApiUrl = (apiUrl: string): string => apiUrl.replace(/^http/i, "ws")
@@ -69,8 +70,16 @@ export const useBoardSyncV2 = (
         if (cancelled) return
         persistence = new BoardPersistence(boardId, { engine: stores.engine })
         setBoardPersistenceRef(persistence)
-        return persistence.load().then(() => {
+        return persistence.load().then((content) => {
           if (cancelled || !persistence) return
+          // Paint from the local replica so a synced board isn't blank offline
+          // (or before the welcome arrives). Applied as one remote batch (no
+          // echo/persist) and BEFORE attach, so it isn't recorded; the welcome
+          // merges authoritative state on top when online. Projected to the
+          // current layer like a local board — persistence stays whole-board.
+          if (content.nodes.length > 0 || content.edges.length > 0) {
+            applyContentToStore(store, content, rootId ?? null)
+          }
           detachPersist = persistence.attach(store) // local replica: outbox + durable edits
           const clientId = store.clientId
           // Seed local presence identity (name + color). Cursor/selection are
@@ -112,6 +121,9 @@ export const useBoardSyncV2 = (
                 { deep: true },
               ) as unknown as Graph
               applyGraphToStore(store, graph, { mode: "merge" })
+              // Persist the server base once (pristine replica only, see
+              // writeInitialBase) so this synced board loads offline next time.
+              void persistence?.writeInitialBase(graphToContent(graph))
             },
             normalizeRemote: (batch) => normalizeInboundBatch(batch, store),
             enrichOutbound: (batch) => enrichEdgeMidpoints(dedupeRepeatUpdates(batch), store),
