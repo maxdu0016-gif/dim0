@@ -12,6 +12,7 @@ import {
 import { IconPropertyView } from "@/components/icons/icon-property-view"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { useBoardContents, type BoardContentItem, type BoardContentKind } from "@/features/board/api/list-board-contents"
+import { nodeSurfacePath } from "@/features/board/utils/node-surface-url"
 import { trimText } from "@/lib/common"
 import { UNTITLED_LABEL } from "@/features/board/const"
 
@@ -105,27 +106,17 @@ export function BoardTreeNode({
       delete rest.root_id
       return rest
     }
-    // Open a surface panel: same shape for synced/local, only the route family
-    // and the board param name (`id` vs `boardId`) differ. Conditional `to`+
-    // `params` can't be expressed in TanStack's typed navigate, hence the cast.
-    const openSurface = (syncedTo: string, localTo: string) => {
+    // Surface leaves open the panel route (kind→URL mapping owned by
+    // nodeSurfacePath); only the board param name (`id` vs `boardId`) differs.
+    // Conditional `params` can't be expressed in TanStack's typed navigate,
+    // hence the cast.
+    if (item.kind === "sheet" || item.kind === "code-sandbox" || item.kind === "widget") {
       navigate({
-        to: local ? localTo : syncedTo,
+        to: nodeSurfacePath(item.kind, local),
         params: local ? { boardId, noteId: item.id } : { id: boardId, noteId: item.id },
         search: scopeToParentFolder,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } as any)
-    }
-    if (item.kind === "sheet") {
-      openSurface("/boards/$id/sheets/$noteId", "/local/$boardId/sheets/$noteId")
-      return
-    }
-    if (item.kind === "code-sandbox") {
-      openSurface("/boards/$id/code-sandbox/$noteId", "/local/$boardId/code-sandbox/$noteId")
-      return
-    }
-    if (item.kind === "widget") {
-      openSurface("/boards/$id/widgets/$noteId", "/local/$boardId/widgets/$noteId")
       return
     }
     // Folder (or fallback): stay on the board route, scope the canvas via root_id.

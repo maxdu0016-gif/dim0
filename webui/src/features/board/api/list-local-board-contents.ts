@@ -65,6 +65,12 @@ export const useLocalBoardContents = (
     queryKey: ["localBoardContents", boardId],
     queryFn: () => listLocalBoardContents(boardId),
     enabled: enabled && Boolean(boardId),
-    staleTime: 1000 * 60 * 5,
+    // The on-device board is mutable and there's no invalidation wired to local
+    // canvas edits (unlike the synced `invalidateBoardContents`), so keep it
+    // `stale` — each expand re-reads the store and reflects created / renamed /
+    // deleted surfaces. Local boards are small, so the snapshot+oplog replay is
+    // cheap; `refetchOnWindowFocus` off so we only pay it on an actual expand.
+    staleTime: 0,
+    refetchOnWindowFocus: false,
   })
 }
