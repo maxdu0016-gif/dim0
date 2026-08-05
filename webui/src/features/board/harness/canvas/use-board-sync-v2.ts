@@ -57,11 +57,14 @@ export const useBoardSyncV2 = (
 ): void => {
   const userEmail = useAppStore((s) => s.userEmail)
   const userId = useAppStore((s) => s.userId)
-  const queryClient = useQueryClient()
-  // Held in a ref so a fresh inline `onRole` each render never re-runs the mount
-  // effect (which would tear down + rebuild the coordinator).
+  // Held in refs so neither a fresh inline `onRole` nor a new QueryClient
+  // identity re-runs the mount effect (which would tear down + rebuild the whole
+  // coordinator: stop the supervisor, detach sync, flush+close persistence).
   const onRoleRef = useRef(onRole)
   onRoleRef.current = onRole
+  const queryClient = useQueryClient()
+  const queryClientRef = useRef(queryClient)
+  queryClientRef.current = queryClient
 
   useEffect(() => {
     if (!enabled || !boardId) return
@@ -98,7 +101,7 @@ export const useBoardSyncV2 = (
             .then((wrote) => {
               // Flip the sidebar's offline marker to "ready" without waiting for
               // the status query's staleTime.
-              if (wrote) void queryClient.invalidateQueries({ queryKey: boardOfflineKey(boardId) })
+              if (wrote) void queryClientRef.current.invalidateQueries({ queryKey: boardOfflineKey(boardId) })
             })
             .catch(() => {})
           const clientId = store.clientId
@@ -169,5 +172,5 @@ export const useBoardSyncV2 = (
       const p = persistence
       if (p) void p.flush().finally(() => p.close())
     }
-  }, [store, boardId, enabled, rootId, userEmail, userId, queryClient])
+  }, [store, boardId, enabled, rootId, userEmail, userId])
 }

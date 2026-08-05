@@ -86,10 +86,26 @@ describe("materializeBoardOffline", () => {
     expect(h.getWholeBoard).not.toHaveBeenCalled()
   })
 
-  it("returns false for an empty whole-board graph (nothing to seed)", async () => {
+  it("seeds a base for a genuinely empty whole-board graph (offline-available)", async () => {
+    // An empty board is trivially offline-available (nothing to load), so it
+    // writes an (empty) base and reports success — the offline marker can flip.
     h.getWholeBoard.mockResolvedValue({ nodes: [], edges: [] } as unknown as Graph)
     const wrote = await materializeBoardOffline("b")
-    expect(wrote).toBe(false)
+    expect(wrote).toBe(true)
     expect(h.getWholeBoard).toHaveBeenCalledWith("b")
+
+    const content = await new BoardPersistence("b", { engine: h.stores.engine! }).load()
+    expect(content.nodes).toEqual([])
+  })
+
+  it("de-dupes concurrent calls into a single whole-board fetch", async () => {
+    h.getWholeBoard.mockResolvedValue(wholeGraph())
+    const [a, b] = await Promise.all([
+      materializeBoardOffline("b"),
+      materializeBoardOffline("b"),
+    ])
+    // One shared in-flight run: fetched once, and only one caller wrote.
+    expect(h.getWholeBoard).toHaveBeenCalledTimes(1)
+    expect([a, b].filter(Boolean)).toHaveLength(2) // both observe the same true
   })
 })

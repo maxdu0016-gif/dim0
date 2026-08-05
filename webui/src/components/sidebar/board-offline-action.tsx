@@ -18,6 +18,9 @@ export function BoardOfflineAction({ boardId }: { boardId: string }) {
   const download = useDownloadBoard()
   const downloading = download.isPending
 
+  // Still resolving the idb read — render nothing rather than flash the download
+  // affordance on a board that turns out to already be offline-available.
+  if (offline === undefined) return null
   if (offline) {
     return (
       <SidebarMenuAction

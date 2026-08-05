@@ -13,6 +13,9 @@ import { BoardKindBadge } from "./board-kind-badge"
 const CardOfflineBadge = ({ boardId }: { boardId: string }) => {
   const { data: offline } = useBoardOfflineStatus(boardId)
   const download = useDownloadBoard()
+  // Still resolving the idb read — render nothing rather than flash the download
+  // icon on a board that turns out to already be offline-available.
+  if (offline === undefined) return null
   if (offline) {
     return (
       <span title="Available offline" className="text-secondary-foreground/60">

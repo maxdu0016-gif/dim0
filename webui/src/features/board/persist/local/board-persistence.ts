@@ -178,21 +178,18 @@ export class BoardPersistence {
    * truncates nothing and later local/remote ops replay on top (unacked locals
    * stay in the outbox).
    *
-   * Empty content (a DB-hiccup `{}` welcome — the case `applyGraphToStore`'s merge
-   * mode also guards) is NOT written, so a real later welcome can still seed the
-   * base rather than being locked out by an empty snapshot. On reconnect drift or
-   * once edits exist it no-ops: replacing a base mid-session needs serverSeq-based
-   * truncation (a follow-up). `makeContent` must yield the server-only base (from
-   * the welcome graph, not the live store) so nothing double-applies.
+   * On reconnect drift or once edits exist it no-ops: replacing a base mid-session
+   * needs serverSeq-based truncation (a follow-up). `makeContent` must yield the
+   * server-only base (from the authoritative whole-board fetch, not the live
+   * store) so nothing double-applies — a genuinely empty board writes an empty
+   * base (it's trivially offline-available). Returns whether it wrote.
    */
   async writeInitialBase(makeContent: () => BoardContent): Promise<boolean> {
     await this.queue // let any in-flight append settle so `this.seq` is current
     if (this.seq !== 0 || this.pending.length > 0) return false
     const engine = this.requireEngine()
     if (await engine.get<SnapshotRecord>("snapshots", this.boardId)) return false
-    const content = makeContent()
-    if (content.nodes.length === 0 && content.edges.length === 0) return false
-    await this.writeSnapshot(content, 0)
+    await this.writeSnapshot(makeContent(), 0)
     return true
   }
 

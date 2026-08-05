@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { toast } from "sonner"
 import { getLocalStores } from "@/features/local-stores"
 import { materializeBoardOffline } from "@/features/board/persist/local/materialize-board"
 import type { SnapshotRecord } from "@/features/board/persist/local/idb"
@@ -33,7 +34,8 @@ export function useBoardOfflineStatus(boardId: string) {
 /**
  * Download a synced board for offline use (whole board, all layers) and refresh
  * its offline status. `materializeBoardOffline` is idempotent + best-effort — a
- * rejection surfaces as the mutation's error (e.g. offline: can't download).
+ * rejection (e.g. offline: can't reach the server) surfaces a toast so the click
+ * isn't a silent no-op.
  */
 export function useDownloadBoard() {
   const client = useQueryClient()
@@ -42,5 +44,6 @@ export function useDownloadBoard() {
     onSuccess: (_wrote, boardId) => {
       void client.invalidateQueries({ queryKey: boardOfflineKey(boardId) })
     },
+    onError: () => toast.error("Couldn't download this board for offline use. Check your connection."),
   })
 }
