@@ -16,6 +16,7 @@
  * base on reconnect drift is a follow-up (roadmap).
  */
 import { useEffect, useRef } from "react"
+import { useQueryClient } from "@tanstack/react-query"
 import type { CanvasStore } from "@canvas-harness/core"
 import camelcaseKeys from "camelcase-keys"
 import { API_URL } from "@/config/api"
@@ -37,6 +38,7 @@ import { createWebSocketRelay } from "../sync/ws-relay"
 import { applyGraphToStore } from "../persist/snapshot-load"
 import { applyContentToStore } from "@/features/board/persist/local/apply-content"
 import { materializeBoardOffline } from "@/features/board/persist/local/materialize-board"
+import { boardOfflineKey } from "@/features/board/api/board-offline-status"
 
 
 const wsBaseFromApiUrl = (apiUrl: string): string => apiUrl.replace(/^http/i, "ws")
@@ -55,6 +57,7 @@ export const useBoardSyncV2 = (
 ): void => {
   const userEmail = useAppStore((s) => s.userEmail)
   const userId = useAppStore((s) => s.userId)
+  const queryClient = useQueryClient()
   // Held in a ref so a fresh inline `onRole` each render never re-runs the mount
   // effect (which would tear down + rebuild the coordinator).
   const onRoleRef = useRef(onRole)
@@ -91,7 +94,13 @@ export const useBoardSyncV2 = (
           void materializeBoardOffline(boardId, {
             engine: stores.engine,
             persistence,
-          }).catch(() => {})
+          })
+            .then((wrote) => {
+              // Flip the sidebar's offline marker to "ready" without waiting for
+              // the status query's staleTime.
+              if (wrote) void queryClient.invalidateQueries({ queryKey: boardOfflineKey(boardId) })
+            })
+            .catch(() => {})
           const clientId = store.clientId
           // Seed local presence identity (name + color). Cursor/selection are
           // filled in live by useLocalPresence; attachSync ships changes to peers.
@@ -160,5 +169,5 @@ export const useBoardSyncV2 = (
       const p = persistence
       if (p) void p.flush().finally(() => p.close())
     }
-  }, [store, boardId, enabled, rootId, userEmail, userId])
+  }, [store, boardId, enabled, rootId, userEmail, userId, queryClient])
 }

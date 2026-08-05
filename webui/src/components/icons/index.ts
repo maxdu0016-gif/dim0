@@ -28,6 +28,7 @@ export {
   CloseIcon,
   ClockIcon,
   CloudArrowUpIcon,
+  CloudArrowDownIcon,
   CloudCheckIcon,
   CloudSyncIcon,
   CodeBlockIcon,

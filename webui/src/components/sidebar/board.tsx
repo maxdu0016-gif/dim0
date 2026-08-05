@@ -11,6 +11,7 @@ import { BoardContextIcon, ChatHistoryIcon, ChevronRightIcon, CloudArrowUpIcon, 
 import { ChatsDialog } from "./chats-dialog"
 import { ConfirmDeleteBoardAlert } from "./confirm-delete-board"
 import { BoardTreeNode } from "./board-tree-node"
+import { BoardOfflineAction } from "./board-offline-action"
 import { useBoardContents } from "@/features/board/api/list-board-contents"
 import { useLocalBoardContents } from "@/features/board/api/list-local-board-contents"
 import { useState, type MouseEvent } from "react"
@@ -356,7 +357,9 @@ export function BoardItem({
               <ContextMenuTrigger asChild>
                 <SidebarMenuButton
                   onClick={handleClick}
-                  className="group/board-row text-xs font-medium truncate"
+                  // pr reserves room for the two trailing actions (offline marker
+                  // at right-8 + chats at right-1.5) so the label truncates clear.
+                  className="group/board-row text-xs font-medium truncate pr-14"
                   isActive={isActive}
                 >
                   <span
@@ -419,6 +422,9 @@ export function BoardItem({
           </CollapsibleContent>
         </Collapsible>
       </ContextMenu>
+
+      {/* Offline marker / download — sits left of the chats action (right-8). */}
+      <BoardOfflineAction boardId={boardId} />
 
       <SidebarMenuAction
         className="right-1.5 text-muted-foreground/40 hover:text-muted-foreground hover:bg-transparent"
