@@ -480,8 +480,16 @@ class GraphStore:
         results = await self._content_store.get(link_ids)
         return [result.resource for result in results]
 
-    async def get_graph(self, graph_uid: str, root_id: str | None = None) -> Graph | None:
-        """Retrieve the entire graph by its UID."""
+    async def get_graph(
+        self, graph_uid: str, root_id: str | None = None, all_layers: bool = False
+    ) -> Graph | None:
+        """Retrieve a graph by its UID.
+
+        Scoped to `root_id`'s layer by default (the root layer when `root_id`
+        is None). `all_layers=True` returns the whole board — every layer's
+        nodes and edges — in one payload; used to materialize a synced board for
+        offline use (no per-layer walk). `root_id` is ignored when `all_layers`.
+        """
         async with self._pg_pool.acquire() as conn:
             graph = await get_graph_by_uid(conn, graph_uid)
         if not graph:
@@ -513,7 +521,8 @@ class GraphStore:
         graph.nodes = [
             node
             for node in (result.resource for result in node_results)
-            if (root_id is None and node.parent_id is None)
+            if all_layers
+            or (root_id is None and node.parent_id is None)
             or (root_id is not None and node.parent_id == root_id)
         ]
 
@@ -535,7 +544,7 @@ class GraphStore:
             result.resource
             for result in link_results
             if isinstance(result.resource, Link)
-            and self._link_is_visible_in_scope(result.resource, root_id)
+            and (all_layers or self._link_is_visible_in_scope(result.resource, root_id))
         ]
 
         return graph

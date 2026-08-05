@@ -10,9 +10,10 @@
  *
  * Hydration reuses `applyGraphToStore` (one `origin:"remote"` batch → no echo).
  * The local replica gives the outbox its offline durability, and the store is
- * painted from it on load so a board isn't blank offline. The welcome snapshot
- * seeds that local base on the pristine first connect (`writeInitialBase`);
- * replacing it on reconnect drift is a follow-up (roadmap).
+ * painted from it on load so a board isn't blank offline. On first open the WHOLE
+ * board (all layers) is seeded into the local base via `materializeBoardOffline`
+ * — so every subboard is offline-readable, not just the opened layer. Replacing a
+ * base on reconnect drift is a follow-up (roadmap).
  */
 import { useEffect, useRef } from "react"
 import type { CanvasStore } from "@canvas-harness/core"
@@ -33,8 +34,9 @@ import { ReconnectSupervisor } from "../sync/reconnect-supervisor"
 import { attachBoardSync } from "../sync/board-sync"
 import type { BoardSyncHandle } from "../sync/board-sync"
 import { createWebSocketRelay } from "../sync/ws-relay"
-import { applyGraphToStore, graphToContent } from "../persist/snapshot-load"
+import { applyGraphToStore } from "../persist/snapshot-load"
 import { applyContentToStore } from "@/features/board/persist/local/apply-content"
+import { materializeBoardOffline } from "@/features/board/persist/local/materialize-board"
 
 
 const wsBaseFromApiUrl = (apiUrl: string): string => apiUrl.replace(/^http/i, "ws")
@@ -82,6 +84,10 @@ export const useBoardSyncV2 = (
           // content, and restores groups/frame layout too, not just nodes/edges.
           applyContentToStore(store, content, rootId ?? null)
           detachPersist = persistence.attach(store) // local replica: outbox + durable edits
+          // Seed the WHOLE board offline once (all layers, not just the opened
+          // one). Self-guarding + best-effort: no-ops if a base already exists,
+          // and a rejection (offline) just means "not materialized this time".
+          void materializeBoardOffline(boardId).catch(() => {})
           const clientId = store.clientId
           // Seed local presence identity (name + color). Cursor/selection are
           // filled in live by useLocalPresence; attachSync ships changes to peers.
@@ -117,18 +123,13 @@ export const useBoardSyncV2 = (
             onSnapshot: (snapshot) => {
               // Server ships snake_case; the converters expect camelCase (same as
               // the REST path). Merge mode: never wipe on an empty/partial payload.
+              // This is the live per-layer welcome; the offline base is seeded
+              // separately from the WHOLE board (materializeBoardOffline above).
               const graph = camelcaseKeys(
                 snapshot as Record<string, unknown>,
                 { deep: true },
               ) as unknown as Graph
               applyGraphToStore(store, graph, { mode: "merge" })
-              // Persist the server base once (pristine replica only, see
-              // writeInitialBase) so this synced board loads offline next time.
-              // Pass a thunk so graph→content only runs if it actually writes;
-              // best-effort, so swallow a teardown-race rejection (engine closed).
-              void persistence
-                ?.writeInitialBase(() => graphToContent(graph))
-                .catch(() => {})
             },
             normalizeRemote: (batch) => normalizeInboundBatch(batch, store),
             enrichOutbound: (batch) => enrichEdgeMidpoints(dedupeRepeatUpdates(batch), store),
