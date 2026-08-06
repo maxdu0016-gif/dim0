@@ -8,17 +8,21 @@ import type { OplogRecord, SnapshotRecord } from "./idb"
 
 /**
  * Make a synced board available offline: fetch its WHOLE graph (all layers) and
- * seed it as the local base via `writeInitialBase`.
+ * write it as the local base.
  *
  * Used both on first open (auto, from the sync coordinator — which passes its own
  * mounted `persistence` so there's a single writer) and by the on-demand
  * "download for offline" action (headless — creates a transient instance).
  *
- * Only seeds a **pristine** replica: it bails (no fetch) if a local snapshot
- * already exists or the oplog is non-empty, so it never overwrites edits and
- * never pays the whole-board fetch when it can't seed. Requires network (the
- * fetch); a rejection means "couldn't materialize" — callers treat it as
- * best-effort.
+ * Seeds whenever the replica is **fully synced** (no snapshot yet, and no UNSENT
+ * local edit in the oplog): every oplog entry then is an acked-local or remote
+ * op, so it's already in the server's whole-board fetch, and the fetch is the
+ * complete truth. We write it as the base and fold the (redundant) oplog away.
+ * It only bails when there's an unsent local edit — truncating that would lose an
+ * edit not yet on the server; that case waits on the serverSeq follow-up. (This
+ * is the fix for "an edited synced board can never go offline": a non-empty but
+ * all-acked oplog no longer blocks it.) Requires network (the fetch); a rejection
+ * means "couldn't materialize" — callers treat it as best-effort.
  *
  * Concurrent calls for the same board (e.g. the coordinator's auto-seed on open
  * racing an on-demand "download" click) share one in-flight run, so the whole
@@ -46,17 +50,27 @@ async function doMaterialize(
 ): Promise<boolean> {
   const engine = opts.engine ?? (await getLocalStores()).engine
 
-  // Bail before the network fetch when this replica can't/shouldn't be seeded.
+  // Already have a base → nothing to do.
   if (await engine.get<SnapshotRecord>("snapshots", boardId)) return false
   const oplog = await engine.list<OplogRecord>("oplog", {
     range: { lower: [boardId, 0], upper: [boardId, Number.MAX_SAFE_INTEGER] },
   })
-  if (oplog.length > 0) return false
+  // Defer if any local edit is still unsent (no serverSeq): it isn't in the
+  // server's whole-board fetch, so folding it away below would drop it. Remote
+  // ops and acked-local ops are on the server → safe to fold. Pending unflushed
+  // edits aren't in this read; they land at a seq above `uptoSeq` and survive.
+  const hasUnsentLocal = oplog.some((e) => e.batch.origin !== "remote" && e.serverSeq === undefined)
+  if (hasUnsentLocal) return false
 
   const graph = await getWholeBoard(boardId)
   // Reuse the coordinator's mounted, already-loaded persistence when given (one
-  // writer, its append-queue serializes with the seed); else a transient one for
-  // a headless download — safe because the pre-checks above proved it pristine.
+  // writer); else a transient one for a headless download.
   const persistence = opts.persistence ?? new BoardPersistence(boardId, { engine })
-  return persistence.writeInitialBase(() => graphToContent(graph))
+  // Write the fetch as the base and truncate the oplog up to the max seq we saw
+  // — those entries are all on the server (in the fetch), so folding them away
+  // neither loses nor double-applies. Entries appended during the fetch (seq >
+  // uptoSeq) survive and replay on top. Empty oplog → seq 0, truncates nothing.
+  const uptoSeq = oplog.length > 0 ? oplog[oplog.length - 1].seq : 0
+  await persistence.foldBase(graphToContent(graph), uptoSeq)
+  return true
 }

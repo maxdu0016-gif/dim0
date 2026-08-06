@@ -170,6 +170,10 @@ export class BoardPersistence {
    * Seed the local base from a server welcome snapshot so a synced board is
    * readable offline (today the welcome is applied in-memory only and discarded).
    *
+   * NOTE: no longer called — `materializeBoardOffline` now writes the base via
+   * `foldBase` so it works for already-synced (non-pristine) boards too, not only
+   * pristine ones. Retained as a tested primitive; removable in a follow-up.
+   *
    * `makeContent` is a thunk: the (non-trivial) graph→content conversion runs
    * ONLY when we actually write. The caller fires this on every welcome, but a
    * write happens at most once — deliberately ONLY on a pristine replica: no

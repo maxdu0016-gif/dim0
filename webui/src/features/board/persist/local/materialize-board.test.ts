@@ -72,8 +72,9 @@ describe("materializeBoardOffline", () => {
     expect(h.getWholeBoard).not.toHaveBeenCalled()
   })
 
-  it("skips (no fetch) when the replica already has local edits", async () => {
-    // Not pristine: an oplog exists but no base — must not fetch or seed.
+  it("skips (no fetch) when the replica has an UNSENT local edit", async () => {
+    // An unacked local edit isn't on the server, so it wouldn't be in the fetch;
+    // folding the oplog away would drop it → defer (no fetch, no seed).
     const p = new BoardPersistence("b", { engine: h.stores.engine! })
     const { addNode, freshStore } = await import("@/test/canvas")
     const store = freshStore("c")
@@ -84,6 +85,33 @@ describe("materializeBoardOffline", () => {
     const wrote = await materializeBoardOffline("b")
     expect(wrote).toBe(false)
     expect(h.getWholeBoard).not.toHaveBeenCalled()
+  })
+
+  it("materializes a synced board whose oplog is all acked (not just pristine)", async () => {
+    // The regression this PR fixes: a board that's been edited but is fully
+    // synced (every oplog entry acked → on the server → in the whole-board fetch)
+    // can now go offline; the acked oplog is folded away, no double-apply.
+    h.getWholeBoard.mockResolvedValue(wholeGraph())
+    const { addNode, freshStore } = await import("@/test/canvas")
+    const p = new BoardPersistence("b", { engine: h.stores.engine! })
+    const store = freshStore("c")
+    p.attach(store)
+    addNode(store, "acked-1")
+    await p.flush()
+    await p.setServerSeq(1, 100) // relay ack → no longer an unsent local edit
+    p.close()
+
+    const wrote = await materializeBoardOffline("b")
+    expect(wrote).toBe(true)
+    expect(h.getWholeBoard).toHaveBeenCalledWith("b")
+
+    // Base is the fetched whole board; the folded (acked) oplog doesn't replay.
+    const content = await new BoardPersistence("b", { engine: h.stores.engine! }).load()
+    expect(content.nodes.map((n) => n.id).sort()).toEqual([
+      "child-sheet",
+      "folder",
+      "root-sheet",
+    ])
   })
 
   it("seeds a base for a genuinely empty whole-board graph (offline-available)", async () => {
