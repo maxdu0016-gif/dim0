@@ -75,7 +75,7 @@ const SHAPE_TOOL_IDS = new Set(SHAPE_TOOLS.map((t) => t.id))
 // so the border carries the affordance.
 const baseButtonClass =
   "transition-colors !p-2.5 rounded-lg flex items-center justify-center gap-2 border border-transparent"
-const inactiveClass = `${baseButtonClass} text-card-foreground hover:bg-secondary hover:text-secondary-foreground hover:border-secondary-foreground/30`
+const inactiveClass = `${baseButtonClass} text-card-foreground hover:bg-secondary hover:text-secondary-foreground hover:border-border`
 const activeClass = `${baseButtonClass} bg-secondary text-secondary-foreground`
 
 

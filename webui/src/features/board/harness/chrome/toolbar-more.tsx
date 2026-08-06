@@ -35,7 +35,7 @@ import { ImageSearchDialog } from "./image-search-dialog"
 // Always-present transparent border so the hover border doesn't shift the icon;
 // the fill change alone is near-invisible against the tray (see toolbar.tsx).
 const moreButtonClass =
-  "transition-colors !p-2.5 rounded-lg flex items-center justify-center gap-2 border border-transparent text-card-foreground hover:bg-secondary hover:text-secondary-foreground hover:border-secondary-foreground/30"
+  "transition-colors !p-2.5 rounded-lg flex items-center justify-center gap-2 border border-transparent text-card-foreground hover:bg-secondary hover:text-secondary-foreground hover:border-border"
 
 
 /**
