@@ -14,6 +14,7 @@ import { BoardTreeNode } from "./board-tree-node"
 import { BoardOfflineAction } from "./board-offline-action"
 import { useLocalBoardContents } from "@/features/board/api/list-local-board-contents"
 import { useBoardOfflineStatus } from "@/features/board/api/board-offline-status"
+import { nodeSurfaceKindFromPath } from "@/features/board/utils/node-surface-url"
 import { useState, type MouseEvent } from "react"
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip"
 import { useAppStore } from "@/store"
@@ -23,15 +24,24 @@ import { useListBoards } from "@/features/board/api/list-boards"
 /**
  * The open surface (sheet/code-sandbox/widget) — or scoped folder — node id for
  * `boardId`, read from the URL. Drives the sidebar tree's active-row highlight;
- * `null` unless this is the board on screen. Surface `noteId` wins over a folder
- * `root_id` so opening a note highlights the note, not its parent folder.
+ * `null` unless this is the board on screen. A tree-rendered surface `noteId`
+ * wins over a folder `root_id` (highlight the note, not its parent); a mini-app
+ * (no tree row) falls through to the scoped folder instead of suppressing it.
  */
 function useActiveTreeId(boardId: string): string | null {
   const params = useParams({ strict: false }) as { id?: string; boardId?: string; noteId?: string }
+  const pathname = useRouterState({ select: (s) => s.location.pathname })
   const rootId = useRouterState({ select: (s) => (s.location.search as { root_id?: string }).root_id })
+
+  // Only board routes drive the tree highlight — other routes (`/chats/$id`,
+  // `/subscriptions/$id`) reuse the `$id` param for an unrelated entity.
+  if (!pathname.startsWith("/boards/") && !pathname.startsWith("/local/")) return null
   const openBoardId = params.id ?? params.boardId
   if (openBoardId !== boardId) return null
-  return params.noteId ?? rootId ?? null
+
+  const kind = nodeSurfaceKindFromPath(pathname)
+  const surfaceInTree = kind === "sheet" || kind === "code-sandbox" || kind === "widget"
+  return (surfaceInTree ? params.noteId : undefined) ?? rootId ?? null
 }
 
 
