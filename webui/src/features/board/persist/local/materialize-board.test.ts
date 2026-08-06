@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
+import type { OpBatch } from "@canvas-harness/core"
 import { resetIdb } from "@/test/canvas"
 import type { Graph } from "@/features/board/types/board"
 import { IndexedDbEngine } from "./indexeddb-engine"
@@ -87,31 +88,70 @@ describe("materializeBoardOffline", () => {
     expect(h.getWholeBoard).not.toHaveBeenCalled()
   })
 
-  it("materializes a synced board whose oplog is all acked (not just pristine)", async () => {
+  it("materializes a synced board whose oplog is all acked (folds it, no double-apply)", async () => {
     // The regression this PR fixes: a board that's been edited but is fully
-    // synced (every oplog entry acked → on the server → in the whole-board fetch)
-    // can now go offline; the acked oplog is folded away, no double-apply.
-    h.getWholeBoard.mockResolvedValue(wholeGraph())
+    // synced can now go offline. The acked edit IS on the server, so it's in the
+    // fetch (below); folding the oplog away must not double-apply it.
+    h.getWholeBoard.mockResolvedValue({
+      nodes: [
+        { id: "root-sheet", style: { type: "sheet" }, properties: {}, label: { markdown: "Root" }, parentId: null },
+        { id: "folder", style: { type: "folder" }, properties: {}, label: { markdown: "F" }, parentId: null },
+        { id: "child-sheet", style: { type: "sheet" }, properties: {}, label: { markdown: "Nested" }, parentId: "folder" },
+        { id: "acked-1", style: { type: "sheet" }, properties: {}, label: { markdown: "Acked" }, parentId: null },
+      ],
+      edges: [],
+    } as unknown as Graph)
     const { addNode, freshStore } = await import("@/test/canvas")
     const p = new BoardPersistence("b", { engine: h.stores.engine! })
     const store = freshStore("c")
     p.attach(store)
     addNode(store, "acked-1")
     await p.flush()
-    await p.setServerSeq(1, 100) // relay ack → no longer an unsent local edit
+    await p.setServerSeq(1, 100) // relay ack → on the server → present in the fetch
     p.close()
 
     const wrote = await materializeBoardOffline("b")
     expect(wrote).toBe(true)
     expect(h.getWholeBoard).toHaveBeenCalledWith("b")
 
-    // Base is the fetched whole board; the folded (acked) oplog doesn't replay.
+    // Base = the fetch; the acked oplog is folded away (not replayed), so the
+    // overlapping node "acked-1" appears exactly once.
     const content = await new BoardPersistence("b", { engine: h.stores.engine! }).load()
+    expect(content.nodes.filter((n) => n.id === "acked-1")).toHaveLength(1)
     expect(content.nodes.map((n) => n.id).sort()).toEqual([
+      "acked-1",
       "child-sheet",
       "folder",
       "root-sheet",
     ])
+  })
+
+  it("defers when a relay op is sequenced DURING the fetch (avoids double-apply)", async () => {
+    const { addNode, freshStore } = await import("@/test/canvas")
+    // Capture a relay batch, retagged remote (an acked/remote op — NOT unsent-local),
+    // so the defer is driven purely by the oplog growing across the fetch window.
+    const remoteBatch = () => {
+      const s = freshStore("peer")
+      let captured: OpBatch | undefined
+      const unsub = s.subscribe("change", (b) => {
+        captured = b
+      })
+      addNode(s, "mid-peer")
+      unsub()
+      return { ...captured!, origin: "remote" as const }
+    }
+    h.getWholeBoard.mockImplementation(async () => {
+      // A peer op lands while the whole-board fetch is in flight.
+      const p = new BoardPersistence("b", { engine: h.stores.engine! })
+      p.recordRemote(remoteBatch(), 50)
+      await p.flush()
+      p.close()
+      return wholeGraph()
+    })
+
+    const wrote = await materializeBoardOffline("b")
+    expect(wrote).toBe(false) // oplog grew during the fetch → defer, don't fold
+    expect(await h.stores.engine!.get("snapshots", "b")).toBeUndefined()
   })
 
   it("seeds a base for a genuinely empty whole-board graph (offline-available)", async () => {
