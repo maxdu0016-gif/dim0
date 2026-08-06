@@ -22,7 +22,15 @@
  * `document.fonts` `loadingdone`.
  */
 
-// sans — Atkinson Hyperlegible Next
+// UI sans (DOM chrome, `--font-sans`) — Hanken Grotesk
+import "@fontsource/hanken-grotesk/400.css"
+import "@fontsource/hanken-grotesk/500.css"
+import "@fontsource/hanken-grotesk/600.css"
+import "@fontsource/hanken-grotesk/700.css"
+import "@fontsource/hanken-grotesk/400-italic.css"
+import "@fontsource/hanken-grotesk/700-italic.css"
+// board canvas "sans-serif" style — Atkinson Hyperlegible Next (canvas-harness's
+// built-in FONT_FAMILY_MAP + canvas-lite-markdown both paint this for sans nodes)
 import "@fontsource/atkinson-hyperlegible-next/400.css"
 import "@fontsource/atkinson-hyperlegible-next/500.css"
 import "@fontsource/atkinson-hyperlegible-next/600.css"

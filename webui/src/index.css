@@ -108,8 +108,8 @@
    ============================================================ */
 
 :root {
-  /* UI chrome — Atkinson Hyperlegible Next (Braille Institute, legibility-optimized) */
-  --font-sans: 'Atkinson Hyperlegible Next', system-ui, -apple-system, BlinkMacSystemFont,
+  /* UI chrome — Hanken Grotesk */
+  --font-sans: 'Hanken Grotesk', system-ui, -apple-system, BlinkMacSystemFont,
     'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', ui-sans-serif, sans-serif,
     'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
   --font-serif: 'Lora', ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif;
