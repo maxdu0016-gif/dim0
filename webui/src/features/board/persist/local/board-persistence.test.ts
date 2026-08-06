@@ -90,15 +90,14 @@ describe("BoardPersistence", () => {
     p2.close()
   })
 
-  it("writeInitialBase ignores an empty welcome so a real one can still seed", async () => {
+  it("writeInitialBase writes an (empty) base for a genuinely empty board", async () => {
     const p = new BoardPersistence("b")
     await p.init()
-    // A DB-hiccup `{}` welcome (graphToContent → emptyContent) must NOT lock the
-    // base empty; a subsequent real welcome still seeds it.
-    await p.writeInitialBase(() => serverBase())
-    await p.writeInitialBase(() => serverBase("s1"))
+    // A genuinely empty whole-board fetch is offline-available (nothing to load),
+    // so it writes a base and reports success — the offline marker can flip.
+    expect(await p.writeInitialBase(() => serverBase())).toBe(true)
     const content = await p.load()
-    expect(content.nodes.map((n) => n.id)).toEqual(["s1"])
+    expect(content.nodes).toEqual([])
     p.close()
   })
 

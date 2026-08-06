@@ -16,15 +16,33 @@ import type { OplogRecord, SnapshotRecord } from "./idb"
  *
  * Only seeds a **pristine** replica: it bails (no fetch) if a local snapshot
  * already exists or the oplog is non-empty, so it never overwrites edits and
- * never pays the whole-board fetch when it can't seed. `writeInitialBase` empty-
- * guards the result. Requires network (the fetch); a rejection means "couldn't
- * materialize" — callers treat it as best-effort.
+ * never pays the whole-board fetch when it can't seed. Requires network (the
+ * fetch); a rejection means "couldn't materialize" — callers treat it as
+ * best-effort.
  *
- * Returns whether a base was actually written.
+ * Concurrent calls for the same board (e.g. the coordinator's auto-seed on open
+ * racing an on-demand "download" click) share one in-flight run, so the whole
+ * board is fetched at most once. Returns whether a base was actually written.
  */
-export async function materializeBoardOffline(
+export function materializeBoardOffline(
   boardId: string,
   opts: { engine?: StorageEngine; persistence?: BoardPersistence } = {},
+): Promise<boolean> {
+  const running = inFlight.get(boardId)
+  if (running) return running
+  const run = doMaterialize(boardId, opts).finally(() => inFlight.delete(boardId))
+  inFlight.set(boardId, run)
+  return run
+}
+
+
+/** De-dupes concurrent materialize runs per board (see `materializeBoardOffline`). */
+const inFlight = new Map<string, Promise<boolean>>()
+
+
+async function doMaterialize(
+  boardId: string,
+  opts: { engine?: StorageEngine; persistence?: BoardPersistence },
 ): Promise<boolean> {
   const engine = opts.engine ?? (await getLocalStores()).engine
 

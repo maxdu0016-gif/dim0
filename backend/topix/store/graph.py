@@ -513,10 +513,17 @@ class GraphStore:
                 match=MatchAny(any=["note", "document"]),
             ),
         ]
+        node_filter = Filter(must=node_must_filters)
+        # Fetch EVERY node of the board, not `filt`'s default 1000 cap: this feeds
+        # the whole-board offline base (all layers in one payload), so a silent
+        # truncation would seed a partial base and falsely mark it "available
+        # offline". Size the limit to the actual count and drop the ordering
+        # (irrelevant here) so the scroll pages by MAX_PAGE_SIZE to exhaustion.
+        node_total = await self._content_store.count(filter=node_filter)
         node_results = await self._content_store.filt(
-            filters=Filter(
-                must=node_must_filters
-            )
+            filters=node_filter,
+            limit=node_total,
+            order_by=None,
         )
         graph.nodes = [
             node
@@ -526,19 +533,23 @@ class GraphStore:
             or (root_id is not None and node.parent_id == root_id)
         ]
 
+        link_filter = Filter(
+            must=[
+                FieldCondition(
+                    key="graph_uid",
+                    match=MatchValue(value=graph_uid),
+                ),
+                FieldCondition(
+                    key="type",
+                    match=MatchValue(value="link"),
+                ),
+            ]
+        )
+        link_total = await self._content_store.count(filter=link_filter)
         link_results = await self._content_store.filt(
-            filters=Filter(
-                must=[
-                    FieldCondition(
-                        key="graph_uid",
-                        match=MatchValue(value=graph_uid),
-                    ),
-                    FieldCondition(
-                        key="type",
-                        match=MatchValue(value="link"),
-                    ),
-                ]
-            )
+            filters=link_filter,
+            limit=link_total,
+            order_by=None,
         )
         graph.edges = [
             result.resource
