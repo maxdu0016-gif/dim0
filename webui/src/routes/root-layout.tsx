@@ -133,36 +133,71 @@ export function RootLayout() {
     navigate({ to: "/share/$token", params: { token } })
   }, [isAuthed, location.pathname, navigate])
 
+  // Board/content area (same on web + desktop). The board's own header + toolbar
+  // float inside this over the canvas, so the desktop title LINE must live above
+  // it — not overlap it.
+  const outletArea = (
+    <div className="flex flex-1 w-full min-w-0">
+      <div className="relative flex-1 min-w-0">
+        <Outlet />
+      </div>
+      <Toaster position="top-right" closeButton toastOptions={{ style: { borderRadius: 'var(--radius-xl)' } }} />
+    </div>
+  )
+
+  // The left cluster (sidebar toggle + board title) shared by the web floating
+  // header and the desktop title line.
+  const navCluster = !presentationMode && (
+    <>
+      <SidebarTrigger className="-ml-1" />
+      {isDesktop && <DesktopBrand />}
+      <div className="hidden md:block"><SidebarLabel /></div>
+      <div className="md:hidden"><SidebarLabel mobileContextOnly /></div>
+    </>
+  )
+
   return (
     <ThemeProvider>
       <StyleDefaultsProvider>
         {isAuthed && !isLocalRoute && <OfflineOverlay boardId={syncedBoardId} />}
         <main>
           {showShell ? (
-            <SidebarProvider open={effectiveSidebarOpen} onOpenChange={setSidebarOpen}>
-              {!presentationMode && <AppSidebar onLogout={onLogout} />}
-              <SidebarInset className='overflow-hidden'>
-                <header
-                  data-tauri-drag-region={isDesktop || undefined}
-                  className={`flex shrink-0 items-center gap-2 absolute top-0 inset-x-0 z-50 ${isDesktop ? "h-11 px-3 border-b border-border/60 bg-background/60 backdrop-blur-md [.tauri-fullscreen_&]:hidden" : "h-16 p-4"}`}
-                >
-                  {!presentationMode && <SidebarTrigger className="-ml-1" />}
-                  {isDesktop && !presentationMode && <DesktopBrand />}
-                  {!presentationMode && <div className="hidden md:block"><SidebarLabel /></div>}
-                  {!presentationMode && <div className="md:hidden"><SidebarLabel mobileContextOnly /></div>}
-                  <div className="ml-auto flex items-center gap-2 self-stretch">
-                    <ConnectionIndicator />
-                    {isDesktop && <WindowControls />}
+            <SidebarProvider
+              open={effectiveSidebarOpen}
+              onOpenChange={setSidebarOpen}
+              className={isDesktop ? "flex-col h-svh" : undefined}
+            >
+              {isDesktop ? (
+                <>
+                  {/* Title LINE — its own reserved row above the sidebar + content,
+                      so the board toolbar (which floats below) never overlaps it. */}
+                  <div
+                    data-tauri-drag-region
+                    className="z-50 flex h-11 shrink-0 items-center gap-2 border-b border-border/60 bg-background/80 px-3 backdrop-blur-md [.tauri-fullscreen_&]:hidden"
+                  >
+                    {navCluster}
+                    <div className="ml-auto flex items-center gap-2 self-stretch">
+                      <ConnectionIndicator />
+                      <WindowControls />
+                    </div>
                   </div>
-                </header>
-
-                <div className="flex flex-1 w-full min-w-0">
-                  <div className="relative flex-1 min-w-0">
-                    <Outlet />
+                  <div className="flex min-h-0 w-full flex-1">
+                    {!presentationMode && <AppSidebar onLogout={onLogout} />}
+                    <SidebarInset className="overflow-hidden">{outletArea}</SidebarInset>
                   </div>
-                  <Toaster position="top-right" closeButton toastOptions={{ style: { borderRadius: 'var(--radius-xl)' } }} />
-                </div>
-              </SidebarInset>
+                </>
+              ) : (
+                <>
+                  {!presentationMode && <AppSidebar onLogout={onLogout} />}
+                  <SidebarInset className="overflow-hidden">
+                    <header className="flex h-16 shrink-0 items-center gap-2 p-4 absolute top-0 inset-x-0 z-50">
+                      {navCluster}
+                      <div className="ml-auto"><ConnectionIndicator /></div>
+                    </header>
+                    {outletArea}
+                  </SidebarInset>
+                </>
+              )}
             </SidebarProvider>
           ) : (
             <div className="fixed inset-0">
