@@ -17,6 +17,8 @@ import { getBillingPublicConfig } from '@/features/user-settings/api/billing'
 import { initConnectionState } from '@/features/connection/connection-state'
 import { OfflineOverlay } from '@/features/connection/offline-overlay'
 import { ConnectionIndicator } from '@/features/connection/connection-indicator'
+import { isTauri } from '@/platform'
+import { DesktopBrand, WindowControls } from '@/features/desktop/desktop-chrome'
 import { AuthGraphTexture } from '@/features/signin/components/auth-graph-texture'
 
 export function RootLayout() {
@@ -84,6 +86,9 @@ export function RootLayout() {
     const match = location.pathname.match(/^\/boards\/([^/]+)/)
     return match ? match[1] : null
   }, [location.pathname])
+  // Standalone desktop build: draw our own frameless title bar (brand + custom
+  // window controls) instead of the OS chrome.
+  const isDesktop = isTauri()
   const presentationMode = useBoardAppStore(s => s.presentationMode)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const effectiveSidebarOpen = presentationMode ? false : sidebarOpen
@@ -137,11 +142,18 @@ export function RootLayout() {
             <SidebarProvider open={effectiveSidebarOpen} onOpenChange={setSidebarOpen}>
               {!presentationMode && <AppSidebar onLogout={onLogout} />}
               <SidebarInset className='overflow-hidden'>
-                <header className={`flex h-16 shrink-0 items-center gap-2 p-4 absolute top-0 inset-x-0 z-50 ${effectiveSidebarOpen ? "" : "[.tauri:not(.tauri-fullscreen)_&]:pl-20"}`}>
+                <header
+                  data-tauri-drag-region={isDesktop || undefined}
+                  className={`flex shrink-0 items-center gap-2 absolute top-0 inset-x-0 z-50 ${isDesktop ? "h-11 px-3 border-b border-border/60 bg-background/60 backdrop-blur-md [.tauri-fullscreen_&]:hidden" : "h-16 p-4"}`}
+                >
                   {!presentationMode && <SidebarTrigger className="-ml-1" />}
+                  {isDesktop && !presentationMode && <DesktopBrand />}
                   {!presentationMode && <div className="hidden md:block"><SidebarLabel /></div>}
                   {!presentationMode && <div className="md:hidden"><SidebarLabel mobileContextOnly /></div>}
-                  <div className="ml-auto"><ConnectionIndicator /></div>
+                  <div className="ml-auto flex items-center gap-2 self-stretch">
+                    <ConnectionIndicator />
+                    {isDesktop && <WindowControls />}
+                  </div>
                 </header>
 
                 <div className="flex flex-1 w-full min-w-0">
@@ -154,6 +166,15 @@ export function RootLayout() {
             </SidebarProvider>
           ) : (
             <div className="fixed inset-0">
+              {isDesktop && (
+                <div
+                  data-tauri-drag-region
+                  className="absolute top-0 inset-x-0 z-50 flex h-11 items-center gap-2 px-3 [.tauri-fullscreen_&]:hidden"
+                >
+                  <DesktopBrand />
+                  <div className="ml-auto self-stretch"><WindowControls /></div>
+                </div>
+              )}
               <AuthBackground />
               <div className="absolute inset-0 grid place-items-center px-4 overflow-hidden">
                 <Outlet />

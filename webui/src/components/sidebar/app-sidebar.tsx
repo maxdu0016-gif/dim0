@@ -174,7 +174,7 @@ export function AppSidebar({ onLogout }: AppSidebarProps) {
   return (
     <Sidebar variant="sidebar" collapsible="offcanvas">
       <SidebarContent className="w-full h-full flex flex-col overflow-hidden">
-        <SidebarGroup className="shrink-0 [.tauri:not(.tauri-fullscreen)_&]:pt-7">
+        <SidebarGroup className="shrink-0 [.tauri:not(.tauri-fullscreen)_&]:pt-11">
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
