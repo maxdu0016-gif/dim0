@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import type { OpBatch } from "@canvas-harness/core"
-import { resetIdb } from "@/test/canvas"
+import { addNode, freshStore, resetIdb } from "@/test/canvas"
 import type { Graph } from "@/features/board/types/board"
 import { IndexedDbEngine } from "./indexeddb-engine"
 import { BoardPersistence } from "./board-persistence"
@@ -36,6 +36,19 @@ const wholeGraph = (): Graph =>
     ],
     edges: [],
   }) as unknown as Graph
+
+
+/** A relay batch retagged `remote` (an acked/remote op — never an unsent-local). */
+const remoteBatch = (nodeId: string): OpBatch => {
+  const s = freshStore("peer")
+  let captured: OpBatch | undefined
+  const unsub = s.subscribe("change", (b) => {
+    captured = b
+  })
+  addNode(s, nodeId)
+  unsub()
+  return { ...captured!, origin: "remote" as const }
+}
 
 
 beforeEach(async () => {
@@ -77,7 +90,6 @@ describe("materializeBoardOffline", () => {
     // An unacked local edit isn't on the server, so it wouldn't be in the fetch;
     // folding the oplog away would drop it → defer (no fetch, no seed).
     const p = new BoardPersistence("b", { engine: h.stores.engine! })
-    const { addNode, freshStore } = await import("@/test/canvas")
     const store = freshStore("c")
     p.attach(store)
     addNode(store, "edit-1")
@@ -101,7 +113,6 @@ describe("materializeBoardOffline", () => {
       ],
       edges: [],
     } as unknown as Graph)
-    const { addNode, freshStore } = await import("@/test/canvas")
     const p = new BoardPersistence("b", { engine: h.stores.engine! })
     const store = freshStore("c")
     p.attach(store)
@@ -127,23 +138,11 @@ describe("materializeBoardOffline", () => {
   })
 
   it("defers when a relay op is sequenced DURING the fetch (avoids double-apply)", async () => {
-    const { addNode, freshStore } = await import("@/test/canvas")
-    // Capture a relay batch, retagged remote (an acked/remote op — NOT unsent-local),
-    // so the defer is driven purely by the oplog growing across the fetch window.
-    const remoteBatch = () => {
-      const s = freshStore("peer")
-      let captured: OpBatch | undefined
-      const unsub = s.subscribe("change", (b) => {
-        captured = b
-      })
-      addNode(s, "mid-peer")
-      unsub()
-      return { ...captured!, origin: "remote" as const }
-    }
+    // A remote op (NOT unsent-local) lands mid-fetch, so the defer is driven purely
+    // by the oplog growing across the fetch window.
     h.getWholeBoard.mockImplementation(async () => {
-      // A peer op lands while the whole-board fetch is in flight.
       const p = new BoardPersistence("b", { engine: h.stores.engine! })
-      p.recordRemote(remoteBatch(), 50)
+      p.recordRemote(remoteBatch("mid-peer"), 50)
       await p.flush()
       p.close()
       return wholeGraph()
@@ -152,6 +151,24 @@ describe("materializeBoardOffline", () => {
     const wrote = await materializeBoardOffline("b")
     expect(wrote).toBe(false) // oplog grew during the fetch → defer, don't fold
     expect(await h.stores.engine!.get("snapshots", "b")).toBeUndefined()
+  })
+
+  it("flushes the mounted writer so a BUFFERED mid-fetch relay op still defers", async () => {
+    // The coordinator passes its live persistence; a peer op arriving in the last
+    // ~debounce window of the fetch sits UNFLUSHED in `pending`. materialize must
+    // flush it into IDB before the growth check, else it escapes the defer and
+    // later replays on top of the base (double-apply). Here the mid-fetch op is
+    // recorded but deliberately NOT flushed by the test.
+    const persistence = new BoardPersistence("b", { engine: h.stores.engine! })
+    h.getWholeBoard.mockImplementation(async () => {
+      persistence.recordRemote(remoteBatch("buffered-peer"), 50) // stays in `pending`
+      return wholeGraph()
+    })
+
+    const wrote = await materializeBoardOffline("b", { persistence, engine: h.stores.engine! })
+    expect(wrote).toBe(false) // post-fetch flush surfaces the buffered op → defer
+    expect(await h.stores.engine!.get("snapshots", "b")).toBeUndefined()
+    persistence.close()
   })
 
   it("seeds a base for a genuinely empty whole-board graph (offline-available)", async () => {

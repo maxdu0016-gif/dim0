@@ -69,6 +69,10 @@ async function doMaterialize(
 
   // Already have a base → nothing to do.
   if (await engine.get<SnapshotRecord>("snapshots", boardId)) return false
+  // Flush the mounted writer first so ops buffered in its debounce window are in
+  // IDB and visible to the reads below (the growth check + unsent-local scan both
+  // read the engine directly). No-op for a headless download (no persistence).
+  await opts.persistence?.flush()
   // Bail before the fetch if a local edit is still unsent: it isn't on the
   // server (so not in the fetch), and folding the oplog away would drop it.
   const before = await engine.list<OplogRecord>("oplog", OPLOG_RANGE(boardId))
@@ -76,12 +80,13 @@ async function doMaterialize(
 
   const graph = await getWholeBoard(boardId)
 
-  // Re-read after the fetch. If the oplog GREW during the (seconds-long) fetch
-  // window, a relay op was sequenced that may already be in the fetched base —
-  // and we can't tell which by local seq, so folding could double-apply it (the
-  // hazard the serverSeq model exists to solve). Defer instead; a later open /
-  // download retries once the board is quiet. `setServerSeq` acks don't change
-  // the max seq, so they don't block. Also re-check unsent-local.
+  // Flush again + re-read after the fetch: if the oplog GREW during the (seconds-
+  // long) fetch window, a relay op was sequenced that may already be in the
+  // fetched base — and we can't tell which by local seq, so folding could double-
+  // apply it (the hazard the serverSeq model exists to solve). Defer instead; a
+  // later open/download retries once the board is quiet. `setServerSeq` acks
+  // don't change the max seq, so they don't block. Also re-check unsent-local.
+  await opts.persistence?.flush()
   const after = await engine.list<OplogRecord>("oplog", OPLOG_RANGE(boardId))
   if (maxSeq(after) !== maxSeq(before) || hasUnsentLocal(after)) return false
 
