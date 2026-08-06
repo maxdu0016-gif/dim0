@@ -29,7 +29,10 @@
 .tauri body {
   clip-path: inset(0 round 12px);
 }
-.tauri.tauri-fullscreen body {
+/* Edge-to-edge (fullscreen OR maximized) → square, so the desktop can't show
+   through rounded corners on a window that fills the screen. */
+.tauri.tauri-fullscreen body,
+.tauri.tauri-maximized body {
   clip-path: none;
 }
 

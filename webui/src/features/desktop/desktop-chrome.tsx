@@ -16,7 +16,11 @@ export const DesktopBrand = () => (
 )
 
 
-/** Crisp 10×10 window-control glyphs (thin stroke, square edges) — not the OS ones. */
+/**
+ * Crisp 10×10 window-control glyphs — hand-drawn rather than Phosphor on purpose:
+ * window controls want thin, pixel-aligned (`crispEdges`) strokes that read as OS
+ * chrome, not the rounded content icons Phosphor provides.
+ */
 const Glyph = ({ children }: { children: React.ReactNode }) => (
   <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth={1} shapeRendering="crispEdges">
     {children}
@@ -63,16 +67,20 @@ export const WindowControls = () => {
   useEffect(() => {
     let cancelled = false
     let unlisten: (() => void) | undefined
-    void import("@tauri-apps/api/window").then(async ({ getCurrentWindow }) => {
-      if (cancelled) return
-      const win = getCurrentWindow()
-      winRef.current = win
-      const sync = (): void => void win.isMaximized().then((m) => setMaximized(m)).catch(() => {})
-      sync()
-      const un = await win.onResized(sync)
-      if (cancelled) un()
-      else unlisten = un
-    })
+    void import("@tauri-apps/api/window")
+      .then(async ({ getCurrentWindow }) => {
+        if (cancelled) return
+        const win = getCurrentWindow()
+        winRef.current = win
+        const sync = (): void => void win.isMaximized().then((m) => setMaximized(m)).catch(() => {})
+        sync()
+        const un = await win.onResized(sync)
+        if (cancelled) un()
+        else unlisten = un
+      })
+      // Listen setup can reject (permission/teardown); the glyph just stops
+      // tracking state — don't leave an unhandled rejection.
+      .catch(() => {})
     return () => {
       cancelled = true
       unlisten?.()
