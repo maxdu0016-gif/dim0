@@ -19,8 +19,10 @@ describe("affectsSurfaceTree", () => {
     expect(affectsSurfaceTree(batch([{ type: "node.add", node: { id: "n", data: {} } }]))).toBe(false)
   })
 
-  it("is true when a node is removed (the op carries only an id → refresh)", () => {
-    expect(affectsSurfaceTree(batch([{ type: "node.remove", id: "n" }]))).toBe(true)
+  it("is true when a surface node is removed, false for a non-surface removal", () => {
+    // The remove op carries the full node, so its kind is checkable (like add).
+    expect(affectsSurfaceTree(batch([{ type: "node.remove", node: { id: "n", data: { styleType: "sheet" } } }]))).toBe(true)
+    expect(affectsSurfaceTree(batch([{ type: "node.remove", node: { id: "n", data: { styleType: "note" } } }]))).toBe(false)
   })
 
   it("is true when an update touches label / parent / icon / kind", () => {
