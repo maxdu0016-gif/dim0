@@ -60,20 +60,14 @@ const CREATE_LABELS: Record<string, string> = {
 
 /**
  * Subset of shape tools where a bare click (no drag) still places a
- * node. Click-to-place is the established UX for text and for fixed-
- * size surfaces (folders / sheets / code-sandboxes / widgets); the
- * resizable shapes (rect, ellipse, diamond, …) require an actual
- * drag — sub-5px drags fall through to onClick as a no-op so
- * accidental taps don't litter the canvas with default-size shapes.
+ * node. Intentionally empty: every shape tool now requires a real
+ * drag-to-size gesture, so a bare click (or sub-5px drag) falls
+ * through to onClick as a no-op and never litters the canvas with an
+ * accidental default-size node. Text nodes keep their dedicated
+ * double-click-empty-canvas creation path (`handleDoubleClick` in
+ * harness-canvas.tsx); this set does not affect that.
  */
-const CLICK_PLACE_TOOLS = new Set([
-  "text",
-  "folder",
-  "sheet",
-  "code-sandbox",
-  "widget",
-  "mini-app",
-])
+const CLICK_PLACE_TOOLS = new Set<string>([])
 
 
 /**
