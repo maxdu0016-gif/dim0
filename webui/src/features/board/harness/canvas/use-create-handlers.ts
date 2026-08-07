@@ -1,7 +1,7 @@
 import { useCallback } from "react"
 import { toast } from "sonner"
 import type { CanvasStore, Node } from "@canvas-harness/core"
-import type { CanvasCreateDragEvent, CanvasPointerEvent } from "@canvas-harness/react"
+import type { CanvasCreateDragEvent } from "@canvas-harness/react"
 import {
   MAX_BOARD_DEPTH,
   canCreateSubBoard,
@@ -59,15 +59,27 @@ const CREATE_LABELS: Record<string, string> = {
 
 
 /**
- * Subset of shape tools where a bare click (no drag) still places a
- * node. Intentionally empty: every shape tool now requires a real
- * drag-to-size gesture, so a bare click (or sub-5px drag) falls
- * through to onClick as a no-op and never litters the canvas with an
- * accidental default-size node. Text nodes keep their dedicated
+ * Tools whose node has a canonical default size. A drag-to-create with
+ * one of these places the node at *at least* that default size (drag
+ * only picks the position; the size is floored), so a small drag can't
+ * materialize an unusably tiny fixed surface — e.g. a mini-app or
+ * code-sandbox too small to render its content. Freeform shapes
+ * (rect / ellipse / diamond / …) are absent: drag-to-size is their point.
+ *
+ * Node creation now requires a real drag. A bare click (or sub-5px tap)
+ * has no create handler wired at all, so accidental taps no longer
+ * litter the canvas with default-size nodes. Text keeps its separate
  * double-click-empty-canvas creation path (`handleDoubleClick` in
- * harness-canvas.tsx); this set does not affect that.
+ * harness-canvas.tsx), unaffected by this.
  */
-const CLICK_PLACE_TOOLS = new Set<string>([])
+const DEFAULT_SIZE_TOOLS = new Set([
+  "text",
+  "folder",
+  "sheet",
+  "code-sandbox",
+  "widget",
+  "mini-app",
+])
 
 
 /**
@@ -105,18 +117,20 @@ export const applyStyleMemory = (node: Node, styleMemory: StyleMemoryApi): Node 
 
 
 /**
- * onCreateDrag / onClick handlers for `<Canvas>`. Routes shape-tool
- * gestures into the conversion layer:
+ * onCreateDrag handler for `<Canvas>`. Routes a shape-tool drag-to-create
+ * gesture into the conversion layer:
  *
  *   1. Build a fresh Dim0 Note via `createDefaultNote` so it carries
  *      the right default style + properties for round-trip persistence.
- *   2. Override its `nodePosition` / `nodeSize` from the gesture rect
- *      (drag) or the world click (click + default size).
+ *   2. Set its `nodePosition` from the drag rect, and its `nodeSize`
+ *      from the drag rect (freeform shapes) or floored at the type's
+ *      default (fixed-size surfaces — see `DEFAULT_SIZE_TOOLS`).
  *   3. Convert to a canvas-harness Node and merge the user's sticky
  *      style memory before adding to the store.
  *
- * Select, pan, and arrow tools are handled by the lib internally — we
- * skip them here.
+ * Creation is drag-only: a bare click never places a node (no onClick
+ * create handler is wired). Select, pan, and arrow tools are handled by
+ * the lib internally — we skip them here.
  */
 export const useCreateHandlers = (
   store: CanvasStore,
@@ -125,7 +139,6 @@ export const useCreateHandlers = (
   styleMemory: StyleMemoryApi,
 ): {
   handleCreateDrag: (e: CanvasCreateDragEvent) => void
-  handleClick: (e: CanvasPointerEvent) => void
 } => {
   const userPlan = useAppStore((s) => s.userPlan)
   const currentFolderDepth = useBoardAppStore((s) => s.currentFolderDepth)
@@ -163,9 +176,24 @@ export const useCreateHandlers = (
         type: "position",
         position: { x: e.rect.x, y: e.rect.y },
       }
-      note.properties.nodeSize = {
-        type: "size",
-        size: { width: e.rect.w, height: e.rect.h },
+      // Fixed-size surfaces keep (at least) their canonical default
+      // size: the drag picks the position, but a small drag can't
+      // shrink them into an unusable node. Freeform shapes take the
+      // drag rect as-is (drag-to-size is the point).
+      if (DEFAULT_SIZE_TOOLS.has(e.tool)) {
+        const def = note.properties.nodeSize.size ?? { width: 200, height: 120 }
+        note.properties.nodeSize = {
+          type: "size",
+          size: {
+            width: Math.max(e.rect.w, def.width),
+            height: Math.max(e.rect.h, def.height),
+          },
+        }
+      } else {
+        note.properties.nodeSize = {
+          type: "size",
+          size: { width: e.rect.w, height: e.rect.h },
+        }
       }
       // Auto-select the freshly-created node so the user can
       // immediately resize / style / move it without round-tripping
@@ -177,24 +205,5 @@ export const useCreateHandlers = (
     [store, boardId, rootId, styleMemory, guardCreate],
   )
 
-  const handleClick = useCallback(
-    (e: CanvasPointerEvent): void => {
-      if (!CLICK_PLACE_TOOLS.has(e.tool)) return
-      const dim0Type = canvasTypeToDim0(e.tool)
-      if (!guardCreate(dim0Type)) return
-      const note = createDefaultNote({ boardId: boardId ?? "", nodeType: dim0Type })
-      if (rootId) note.parentId = rootId
-      const size = note.properties.nodeSize.size ?? { width: 200, height: 120 }
-      const { width, height } = size
-      note.properties.nodePosition = {
-        type: "position",
-        position: { x: e.world.x - width / 2, y: e.world.y - height / 2 },
-      }
-      const id = store.addNode(applyStyleMemory(noteToNode(note), styleMemory))
-      store.setSelection([id])
-    },
-    [store, boardId, rootId, styleMemory, guardCreate],
-  )
-
-  return { handleCreateDrag, handleClick }
+  return { handleCreateDrag }
 }
