@@ -39,6 +39,11 @@ class TestGetFilePathConfinement:
         with pytest.raises(ValueError):
             get_file_path("/database/secret")
 
+    def test_rejects_the_data_root_itself(self):
+        """The data dir itself is not a file — reject it (would 500 on read)."""
+        with pytest.raises(ValueError):
+            get_file_path(REP_DATADIR)  # resolves exactly to DATADIR
+
 
 class TestSaveFileConfinement:
     """save_file must refuse to write outside the data root (write mirror of F1)."""
@@ -55,3 +60,8 @@ class TestSaveFileConfinement:
         """A traversal/absolute filename raises ValueError before any write."""
         with pytest.raises(ValueError):
             save_file(filename, b"x", cat="files")
+
+    def test_rejects_the_data_root_itself(self):
+        """A `..` that resolves back to DATADIR is a directory, not a file — reject."""
+        with pytest.raises(ValueError):
+            save_file("..", b"x", cat="files")  # FILE_DIR/.. == DATADIR
