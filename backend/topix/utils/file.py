@@ -112,22 +112,37 @@ def save_base64_image_url(
 def get_file_path(
     rep_path: str
 ) -> str:
-    """Get the absolute file path from the representative path.
+    """Get the absolute file path, confined to the data directory.
+
+    Resolves the representative path and rejects anything that escapes the data
+    root (path traversal, absolute paths outside it, symlink escapes) so a caller
+    can't read arbitrary server files (e.g. `.env`) via `GET /files`.
 
     Args:
         rep_path (str): The representative path of the file.
 
     Returns:
-        str: The absolute path of the file.
+        str: The absolute path of the file, guaranteed to be inside DATADIR.
+
+    Raises:
+        ValueError: If the resolved path escapes the data directory.
 
     """
     # if starts with file://, remove it
     if rep_path.startswith("file://"):
         rep_path = rep_path[len("file://"):]
     if rep_path.startswith(REP_DATADIR):
-        abs_path = DATADIR / rep_path[len(REP_DATADIR) + 1:]
-        return str(abs_path)
-    return rep_path
+        candidate = DATADIR / rep_path[len(REP_DATADIR) + 1:]
+    else:
+        candidate = Path(rep_path)
+
+    # Confine to the data root. `resolve()` collapses `..`/symlinks before the
+    # ancestor check, so a real-path prefix (not a string prefix) is enforced.
+    data_root = DATADIR.resolve()
+    resolved = candidate.resolve()
+    if resolved != data_root and data_root not in resolved.parents:
+        raise ValueError(f"Resolved path escapes the data directory: {rep_path!r}")
+    return str(resolved)
 
 
 def convert_to_base64_url(
