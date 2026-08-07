@@ -87,11 +87,11 @@ const renderThemeTokenBlock = (tokens: WidgetThemeTokens) =>
 
 const WIDGET_BASE_STYLE = `
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:ital,wght@0,200..800;1,200..800&family=Inconsolata:wght@200..900&family=Architects+Daughter&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Hanken+Grotesk:ital,wght@0,100..900;1,100..900&family=Inconsolata:wght@200..900&family=Architects+Daughter&display=swap');
 
     :root {
       ${renderThemeTokenBlock(DEFAULT_WIDGET_TOKENS)}
-      --font-sans: "Atkinson Hyperlegible Next", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --font-sans: "Hanken Grotesk", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       --font-handwriting: "Architects Daughter", cursive;
       color-scheme: light dark;
       font-family: var(--font-sans);

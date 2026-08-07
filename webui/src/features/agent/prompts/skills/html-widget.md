@@ -71,7 +71,7 @@ Ask *"does this help someone understand?"* not *"does this look polished?"*
 
 Two font tokens are available inside the iframe:
 
-- `var(--font-sans)` — Atkinson Hyperlegible Next. **This is the default** — body copy, labels, chart ticks, numbers, data, code. Anywhere legibility matters.
+- `var(--font-sans)` — Hanken Grotesk. **This is the default** — body copy, labels, chart ticks, numbers, data, code. Anywhere legibility matters.
 - `var(--font-handwriting)` — Architects Daughter. **Use sparingly** for titles, section headers, short captions, and hand-drawn-style annotations. This is what matches the canvas voice.
 
 Rules:

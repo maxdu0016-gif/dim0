@@ -22,21 +22,14 @@
  * `document.fonts` `loadingdone`.
  */
 
-// UI sans (DOM chrome, `--font-sans`) — Hanken Grotesk
+// sans — Hanken Grotesk. Both the UI (`--font-sans`) and the board canvas
+// "sans-serif" style (canvas-harness's FONT_FAMILY_MAP + canvas-lite-markdown).
 import "@fontsource/hanken-grotesk/400.css"
 import "@fontsource/hanken-grotesk/500.css"
 import "@fontsource/hanken-grotesk/600.css"
 import "@fontsource/hanken-grotesk/700.css"
 import "@fontsource/hanken-grotesk/400-italic.css"
 import "@fontsource/hanken-grotesk/700-italic.css"
-// board canvas "sans-serif" style — Atkinson Hyperlegible Next (canvas-harness's
-// built-in FONT_FAMILY_MAP + canvas-lite-markdown both paint this for sans nodes)
-import "@fontsource/atkinson-hyperlegible-next/400.css"
-import "@fontsource/atkinson-hyperlegible-next/500.css"
-import "@fontsource/atkinson-hyperlegible-next/600.css"
-import "@fontsource/atkinson-hyperlegible-next/700.css"
-import "@fontsource/atkinson-hyperlegible-next/400-italic.css"
-import "@fontsource/atkinson-hyperlegible-next/700-italic.css"
 // serif — Lora
 import "@fontsource/lora/400.css"
 import "@fontsource/lora/500.css"
@@ -59,7 +52,7 @@ import "@fontsource/shantell-sans/700-italic.css"
 /** Families canvas-harness paints on the board (its `FONT_FAMILY_MAP`). */
 const CANVAS_FONT_FAMILIES = [
   "Architects Daughter",
-  "Atkinson Hyperlegible Next",
+  "Hanken Grotesk",
   "Lora",
   "Inconsolata",
   "Shantell Sans",
