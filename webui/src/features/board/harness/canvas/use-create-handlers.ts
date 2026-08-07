@@ -58,28 +58,14 @@ const CREATE_LABELS: Record<string, string> = {
 }
 
 
-/**
- * Tools whose node has a canonical default size. A drag-to-create with
- * one of these places the node at *at least* that default size (drag
- * only picks the position; the size is floored), so a small drag can't
- * materialize an unusably tiny fixed surface — e.g. a mini-app or
- * code-sandbox too small to render its content. Freeform shapes
- * (rect / ellipse / diamond / …) are absent: drag-to-size is their point.
- *
- * Node creation now requires a real drag. A bare click (or sub-5px tap)
- * has no create handler wired at all, so accidental taps no longer
- * litter the canvas with default-size nodes. Text keeps its separate
- * double-click-empty-canvas creation path (`handleDoubleClick` in
- * harness-canvas.tsx), unaffected by this.
- */
-const DEFAULT_SIZE_TOOLS = new Set([
-  "text",
-  "folder",
-  "sheet",
-  "code-sandbox",
-  "widget",
-  "mini-app",
-])
+// Creation is drag-only. A bare click never places a node — no onClick
+// create handler is wired, and the lib's DRAG_CREATE_MIN_SIZE_PX (5px on
+// screen) drops any too-small gesture before it ever reaches
+// onCreateDrag, so accidental taps create nothing. A committed drag
+// materializes the node at exactly the size the user drew. Text keeps
+// its separate double-click-empty-canvas path (`handleDoubleClick` in
+// harness-canvas.tsx); the lib also excludes the text tool from
+// drag-create entirely.
 
 
 /**
@@ -122,15 +108,14 @@ export const applyStyleMemory = (node: Node, styleMemory: StyleMemoryApi): Node 
  *
  *   1. Build a fresh Dim0 Note via `createDefaultNote` so it carries
  *      the right default style + properties for round-trip persistence.
- *   2. Set its `nodePosition` from the drag rect, and its `nodeSize`
- *      from the drag rect (freeform shapes) or floored at the type's
- *      default (fixed-size surfaces — see `DEFAULT_SIZE_TOOLS`).
+ *   2. Set its `nodePosition` / `nodeSize` from the drag rect.
  *   3. Convert to a canvas-harness Node and merge the user's sticky
  *      style memory before adding to the store.
  *
  * Creation is drag-only: a bare click never places a node (no onClick
- * create handler is wired). Select, pan, and arrow tools are handled by
- * the lib internally — we skip them here.
+ * create handler is wired), and the lib drops sub-5px gestures before
+ * they reach us — so accidental taps create nothing. Select, pan, and
+ * arrow tools are handled by the lib internally — we skip them here.
  */
 export const useCreateHandlers = (
   store: CanvasStore,
@@ -176,24 +161,9 @@ export const useCreateHandlers = (
         type: "position",
         position: { x: e.rect.x, y: e.rect.y },
       }
-      // Fixed-size surfaces keep (at least) their canonical default
-      // size: the drag picks the position, but a small drag can't
-      // shrink them into an unusable node. Freeform shapes take the
-      // drag rect as-is (drag-to-size is the point).
-      if (DEFAULT_SIZE_TOOLS.has(e.tool)) {
-        const def = note.properties.nodeSize.size ?? { width: 200, height: 120 }
-        note.properties.nodeSize = {
-          type: "size",
-          size: {
-            width: Math.max(e.rect.w, def.width),
-            height: Math.max(e.rect.h, def.height),
-          },
-        }
-      } else {
-        note.properties.nodeSize = {
-          type: "size",
-          size: { width: e.rect.w, height: e.rect.h },
-        }
+      note.properties.nodeSize = {
+        type: "size",
+        size: { width: e.rect.w, height: e.rect.h },
       }
       // Auto-select the freshly-created node so the user can
       // immediately resize / style / move it without round-tripping
