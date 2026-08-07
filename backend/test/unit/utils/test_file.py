@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from topix.utils.file import DATADIR, REP_DATADIR, get_file_path, save_file
+from topix.utils.file import DATADIR, IMAGE_DIR, REP_DATADIR, get_file_path, save_file
 
 
 class TestGetFilePathConfinement:
@@ -65,3 +65,17 @@ class TestSaveFileConfinement:
         """A `..` that resolves back to DATADIR is a directory, not a file — reject."""
         with pytest.raises(ValueError):
             save_file("..", b"x", cat="files")  # FILE_DIR/.. == DATADIR
+
+
+def test_directory_targets_rejected_not_500():
+    """A confined path that IS a directory is rejected up front (no open/read on a dir → no 500)."""
+    created = not IMAGE_DIR.exists()
+    IMAGE_DIR.mkdir(parents=True, exist_ok=True)
+    try:
+        with pytest.raises(ValueError):
+            get_file_path(f"{REP_DATADIR}/images")  # → the (existing) images dir
+        with pytest.raises(ValueError):
+            save_file("", b"x", cat="images")  # writes onto IMAGE_DIR itself
+    finally:
+        if created:
+            IMAGE_DIR.rmdir()
