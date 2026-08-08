@@ -28,7 +28,7 @@ import {
   type PriceInfo
 } from "@/features/user-settings/api/billing"
 import { getAccessToken } from "@/features/signin/auth-storage"
-import { decodeJwt, resolveBillingPlan } from "@/lib/decode-jwt"
+import { decodeJwt, resolveBillingPlan, type BillingPlan } from "@/lib/decode-jwt"
 import { isTauri, openExternalUrl } from "@/platform"
 import { useAppStore } from "@/store"
 
@@ -63,6 +63,11 @@ export function BillingScreen() {
   const [billingSummary, setBillingSummary] = useState<BillingSummary | null>(null)
   const [billingPublicConfig, setBillingPublicConfig] = useState<BillingPublicConfig | null>(null)
   const refreshedAfterReturn = useRef(false)
+  // Desktop only: the plan we held when we sent the user out to Stripe, or null
+  // when no Stripe round-trip is in flight. Gates the focus-refresh so it fires
+  // only on return from checkout/portal — never on unrelated window focus.
+  const pendingReturnPlan = useRef<BillingPlan | null>(null)
+  const refreshing = useRef(false)
 
   const searchParams = useMemo(() => new URLSearchParams(window.location.search), [])
 
@@ -82,14 +87,23 @@ export function BillingScreen() {
   }, [billingActive])
 
   // Re-pull the authoritative plan: refresh the token (its claim is updated by
-  // the Stripe webhook), re-derive the plan, and re-read the summary. Idempotent
-  // (pure reads + a token refresh), so it's safe to call on every focus.
-  const refreshBillingState = useCallback(async () => {
-    await refresh()
-    const token = getAccessToken()
-    if (!token) return
-    setUserPlan(resolveBillingPlan(decodeJwt(token)))
-    setBillingSummary(await getBillingSummary())
+  // the Stripe webhook), re-derive the plan, and re-read the summary. Returns the
+  // resolved plan so callers can detect when the webhook has landed. An in-flight
+  // guard prevents two overlapping runs from racing on the summary write.
+  const refreshBillingState = useCallback(async (): Promise<BillingPlan | null> => {
+    if (refreshing.current) return null
+    refreshing.current = true
+    try {
+      await refresh()
+      const token = getAccessToken()
+      if (!token) return null
+      const plan = resolveBillingPlan(decodeJwt(token))
+      setUserPlan(plan)
+      setBillingSummary(await getBillingSummary())
+      return plan
+    } finally {
+      refreshing.current = false
+    }
   }, [setUserPlan])
 
   // Web: Stripe redirects the tab back to `?checkout=success`; refresh once.
@@ -105,18 +119,37 @@ export function BillingScreen() {
   }, [billingActive, searchParams, refreshBillingState])
 
   // Desktop: Stripe opens in the OS browser, so the `?checkout=success` redirect
-  // never reaches this webview. Refresh whenever the app window regains focus —
-  // i.e. when the user clicks back after finishing in the browser. Also catches
-  // portal-side changes (cancel/resume/switch) that have no success URL.
+  // never reaches this webview. When the app window regains focus AFTER we sent
+  // the user to Stripe (pendingReturnPlan set), re-pull the plan. The webhook may
+  // lag the user's return, so poll a few times until the plan changes, then stop
+  // — bounded so an unchanged plan (e.g. a portal visit with no purchase) can't
+  // loop forever. Gated on the pending flag so ordinary alt-tabbing never
+  // triggers a token refresh + fetch.
   useEffect(() => {
     if (!isTauri() || !billingActive) return
     let unlisten: (() => void) | undefined
     let cancelled = false
+
+    const onReturn = async () => {
+      const basePlan = pendingReturnPlan.current
+      if (basePlan === null) return
+      pendingReturnPlan.current = null
+      try {
+        for (let attempt = 0; attempt < 4 && !cancelled; attempt++) {
+          const plan = await refreshBillingState()
+          if (plan !== null && plan !== basePlan) break
+          await new Promise((r) => setTimeout(r, 1500))
+        }
+      } catch {
+        setErrorMessage("Could not refresh billing plan after checkout.")
+      }
+    }
+
     void import("@tauri-apps/api/window").then(({ getCurrentWindow }) => {
       if (cancelled) return
       void getCurrentWindow()
         .onFocusChanged(({ payload: focused }) => {
-          if (focused) void refreshBillingState().catch(() => undefined)
+          if (focused) void onReturn()
         })
         .then((un) => {
           if (cancelled) un()
@@ -145,6 +178,9 @@ export function BillingScreen() {
           }
       const data = await createCheckoutSession(body)
       if (!data.checkout_url) throw new Error("No checkout url returned")
+      // Desktop: arm the focus-refresh so returning from the browser re-pulls
+      // the plan (there's no redirect back into the webview).
+      if (isTauri()) pendingReturnPlan.current = userPlan
       await openExternalUrl(data.checkout_url)
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Could not create checkout session.")
@@ -159,10 +195,13 @@ export function BillingScreen() {
     try {
       // Desktop: omit return_url so the backend defaults it to the hosted web
       // app (the OS browser can't return to the tauri:// origin). Web keeps it.
+      // `createPortalSession({})` — not `()` — so apiFetch sends a JSON body; the
+      // endpoint requires one (empty `{}` is valid: return_url is optional).
       const data = isTauri()
-        ? await createPortalSession()
+        ? await createPortalSession({})
         : await createPortalSession({ return_url: `${window.location.origin}/settings/billing` })
       if (!data.portal_url) throw new Error("No portal url returned")
+      if (isTauri()) pendingReturnPlan.current = userPlan
       await openExternalUrl(data.portal_url)
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Could not open billing portal.")
