@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { BracketsCurly, CardsThree, GithubLogo, Headset, UsersThree } from "@phosphor-icons/react"
 import {
   AwardIcon,
@@ -29,6 +29,7 @@ import {
 } from "@/features/user-settings/api/billing"
 import { getAccessToken } from "@/features/signin/auth-storage"
 import { decodeJwt, resolveBillingPlan } from "@/lib/decode-jwt"
+import { isTauri, openExternalUrl } from "@/platform"
 import { useAppStore } from "@/store"
 
 
@@ -80,40 +81,71 @@ export function BillingScreen() {
     })()
   }, [billingActive])
 
+  // Re-pull the authoritative plan: refresh the token (its claim is updated by
+  // the Stripe webhook), re-derive the plan, and re-read the summary. Idempotent
+  // (pure reads + a token refresh), so it's safe to call on every focus.
+  const refreshBillingState = useCallback(async () => {
+    await refresh()
+    const token = getAccessToken()
+    if (!token) return
+    setUserPlan(resolveBillingPlan(decodeJwt(token)))
+    setBillingSummary(await getBillingSummary())
+  }, [setUserPlan])
+
+  // Web: Stripe redirects the tab back to `?checkout=success`; refresh once.
   useEffect(() => {
     if (!billingActive) return
     if (refreshedAfterReturn.current) return
     if (searchParams.get("checkout") !== "success") return
 
     refreshedAfterReturn.current = true
-    void (async () => {
-      try {
-        await refresh()
-        const token = getAccessToken()
-        if (!token) return
-        const payload = decodeJwt(token)
-        setUserPlan(resolveBillingPlan(payload))
-        const summary = await getBillingSummary()
-        setBillingSummary(summary)
-      } catch {
-        setErrorMessage("Could not refresh billing plan after checkout.")
-      }
-    })()
-  }, [billingActive, searchParams, setUserPlan])
+    void refreshBillingState().catch(() =>
+      setErrorMessage("Could not refresh billing plan after checkout."),
+    )
+  }, [billingActive, searchParams, refreshBillingState])
+
+  // Desktop: Stripe opens in the OS browser, so the `?checkout=success` redirect
+  // never reaches this webview. Refresh whenever the app window regains focus —
+  // i.e. when the user clicks back after finishing in the browser. Also catches
+  // portal-side changes (cancel/resume/switch) that have no success URL.
+  useEffect(() => {
+    if (!isTauri() || !billingActive) return
+    let unlisten: (() => void) | undefined
+    let cancelled = false
+    void import("@tauri-apps/api/window").then(({ getCurrentWindow }) => {
+      if (cancelled) return
+      void getCurrentWindow()
+        .onFocusChanged(({ payload: focused }) => {
+          if (focused) void refreshBillingState().catch(() => undefined)
+        })
+        .then((un) => {
+          if (cancelled) un()
+          else unlisten = un
+        })
+    })
+    return () => {
+      cancelled = true
+      unlisten?.()
+    }
+  }, [billingActive, refreshBillingState])
 
   const onUpgrade = async (plan: PaidPlan) => {
     setErrorMessage(null)
     setBusyAction(plan === "basic" ? "upgrade-basic" : "upgrade-plus")
     try {
-      const successUrl = `${window.location.origin}/settings/billing?checkout=success`
-      const cancelUrl = `${window.location.origin}/settings/billing?checkout=cancel`
-      const data = await createCheckoutSession({
-        plan,
-        success_url: successUrl,
-        cancel_url: cancelUrl,
-      })
+      // Desktop opens Stripe in the OS browser, which can't navigate back to the
+      // tauri:// webview origin — omit the return URLs so the backend defaults
+      // them to the hosted web app. Web keeps its origin-based round-trip.
+      const body = isTauri()
+        ? { plan }
+        : {
+            plan,
+            success_url: `${window.location.origin}/settings/billing?checkout=success`,
+            cancel_url: `${window.location.origin}/settings/billing?checkout=cancel`,
+          }
+      const data = await createCheckoutSession(body)
       if (!data.checkout_url) throw new Error("No checkout url returned")
-      window.location.assign(data.checkout_url)
+      await openExternalUrl(data.checkout_url)
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Could not create checkout session.")
     } finally {
@@ -125,10 +157,13 @@ export function BillingScreen() {
     setErrorMessage(null)
     setBusyAction("manage")
     try {
-      const returnUrl = `${window.location.origin}/settings/billing`
-      const data = await createPortalSession({ return_url: returnUrl })
+      // Desktop: omit return_url so the backend defaults it to the hosted web
+      // app (the OS browser can't return to the tauri:// origin). Web keeps it.
+      const data = isTauri()
+        ? await createPortalSession()
+        : await createPortalSession({ return_url: `${window.location.origin}/settings/billing` })
       if (!data.portal_url) throw new Error("No portal url returned")
-      window.location.assign(data.portal_url)
+      await openExternalUrl(data.portal_url)
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Could not open billing portal.")
     } finally {
