@@ -153,11 +153,22 @@ export default defineConfig({
         // Runtime-cache the mini-app runtime (excluded from precache above) so it
         // loads offline. StaleWhileRevalidate: instant from cache, refreshed in
         // the background so a redeploy propagates on the next load.
+        //
+        // The iframe src carries `?theme=&mode=` (read by theme-bootstrap.js for
+        // first-paint), but the served bytes are theme-independent — the same
+        // static /mini-app/index.html. `ignoreSearch` matches every theme/mode
+        // variant to ONE cache entry, so the 5.4 MB runtime is downloaded once
+        // and shared instead of a cold fetch per palette; `maxEntries: 1` keeps
+        // that single copy (all variants are byte-identical) from accumulating.
         runtimeCaching: [
           {
             urlPattern: /\/mini-app\//,
             handler: "StaleWhileRevalidate",
-            options: { cacheName: "mini-app-runtime" },
+            options: {
+              cacheName: "mini-app-runtime",
+              matchOptions: { ignoreSearch: true },
+              expiration: { maxEntries: 1 },
+            },
           },
         ],
       },
