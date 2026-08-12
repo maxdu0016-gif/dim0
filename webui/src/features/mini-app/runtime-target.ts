@@ -36,23 +36,31 @@ let runtimePrefetched = false
 
 /**
  * Warm the browser + service-worker cache for the mini-app runtime once per
- * session, on idle. The runtime is a single ~5 MB document shared by every
- * mini-app (theme flows via postMessage; the SW keys it ignoring the query, so
- * one warmed entry serves every theme). Called when a board's first mini-app
- * node view mounts, so the first actual open isn't a cold 5 MB fetch. Uses a
- * low-priority `<link rel="prefetch">` so it never competes with visible work.
+ * session, on idle, so the first open isn't a cold ~5 MB fetch. The runtime is a
+ * single document shared by every mini-app (theme flows via postMessage; the SW
+ * keys it ignoring the query, so one warmed entry serves every theme).
+ *
+ * Uses `fetch()` — NOT `<link rel="prefetch">`, which WebKit/WKWebView ignore, so
+ * a prefetch link would be a no-op on the desktop build. A real fetch goes
+ * through the service worker and populates the shared runtime cache on every
+ * engine. Only the same-origin single-frontend runtime is SW-cached under
+ * `/mini-app/`; cross-origin mode is served/cached elsewhere, so skip it there.
  */
 export function prefetchMiniAppRuntime(): void {
-  if (runtimePrefetched || typeof document === "undefined") return
+  if (runtimePrefetched || !SINGLE_FRONTEND || typeof window === "undefined") return
   runtimePrefetched = true
   const warm = (): void => {
-    const link = document.createElement("link")
-    link.rel = "prefetch"
-    link.href = RUNTIME_PATH
-    document.head.appendChild(link)
+    // Consume the body so the SW's cache.put clone isn't backpressured by an
+    // unread tee branch; the transient blob is discarded. Offline → non-fatal.
+    void fetch(RUNTIME_PATH)
+      .then((r) => r.blob())
+      .catch(() => {})
   }
-  if (typeof window !== "undefined" && typeof window.requestIdleCallback === "function") {
-    window.requestIdleCallback(warm)
+  // Pass a `timeout` so it still fires in a backgrounded tab — a plain idle
+  // callback can be deferred indefinitely, which would burn the once-per-session
+  // guard without ever warming.
+  if (typeof window.requestIdleCallback === "function") {
+    window.requestIdleCallback(warm, { timeout: 3000 })
   } else {
     setTimeout(warm, 1000)
   }
