@@ -26,6 +26,7 @@ import {
   useIsInView,
 } from "../../shared-views"
 import { useBoardAppStore } from "../../store/board-app-store"
+import { useMiniAppKeepAlive } from "./use-keep-alive"
 
 
 // Card chrome (padding + traffic-lights row + title slot). Subtracted
@@ -57,6 +58,9 @@ export function MiniAppView({ id }: MiniAppViewProps) {
   const canEdit = useBoardAppStore((s) => s.canEdit)
   const wrapRef = useRef<HTMLDivElement>(null)
   const isInView = useIsInView(wrapRef, "200px")
+  // Keep recently-seen iframes mounted (bounded LRU) so scrolling a node back
+  // into view re-uses the live iframe instead of re-parsing the ~5 MB runtime.
+  const shouldMount = useMiniAppKeepAlive(id as unknown as string, isInView)
   // Gate iframe interaction on selection so canvas pan/zoom gestures
   // pass cleanly through unselected mini-apps. Without this, the
   // iframe's `pointer-events-auto` captures the pointer the moment
@@ -121,7 +125,7 @@ export function MiniAppView({ id }: MiniAppViewProps) {
         )}
       >
         <div className="relative h-full w-full overflow-hidden rounded-xl border border-border/50 bg-background">
-          {source && isInView ? (
+          {source && shouldMount ? (
             <MiniAppMount
               noteId={id as unknown as string}
               source={source}
