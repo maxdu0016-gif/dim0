@@ -11,7 +11,7 @@
 // Mirrors the shape of WidgetView in node-types/widget/view.tsx — the
 // canvas chrome conventions live there.
 
-import { useCallback, useEffect, useRef } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 
 import { CursorClickIcon } from "@phosphor-icons/react"
 import { type NodeId } from "@canvas-harness/core"
@@ -42,6 +42,31 @@ const CARD_CHROME_PX = 48
 // node taller. Stops a runaway widget from monopolizing the board.
 const MAX_AUTO_GROW_PX = 1200
 
+// A node must sit in view this long before its iframe boots. Panning fast across
+// the board flickers nodes in/out in less than this, so we skip mounting (and
+// compositing + bundle-booting) the many iframes the user is only flying past; a
+// deliberate stop lands them in view long enough to mount.
+const MOUNT_SETTLE_MS = 180
+
+
+/**
+ * True only after `inView` has stayed true for `delayMs`, and false the instant it
+ * leaves. Debounces viewport entry so a fast pan (nodes visible < delayMs) never
+ * trips a mount.
+ */
+function useSettledInView(inView: boolean, delayMs: number): boolean {
+  const [settled, setSettled] = useState(false)
+  useEffect(() => {
+    if (!inView) {
+      setSettled(false)
+      return
+    }
+    const t = window.setTimeout(() => setSettled(true), delayMs)
+    return () => window.clearTimeout(t)
+  }, [inView, delayMs])
+  return settled
+}
+
 
 export interface MiniAppViewProps {
   id: NodeId
@@ -64,9 +89,14 @@ export function MiniAppView({ id }: MiniAppViewProps) {
   // observer reports which are actually visible (and don't seed the keep-alive
   // LRU with never-seen nodes).
   const isInView = useIsInView(wrapRef, "200px", false)
+  // Only boot the iframe once the node has settled in view (see MOUNT_SETTLE_MS):
+  // flying past a node during a fast pan never mounts it. Panning BACK to a
+  // recently-visited zone is still instant — keep-alive retains it, so it mounts
+  // via isLive without waiting to re-settle.
+  const settledInView = useSettledInView(isInView, MOUNT_SETTLE_MS)
   // Keep recently-seen iframes mounted (bounded LRU) so scrolling a node back
   // into view re-uses the live iframe instead of re-parsing the ~5 MB runtime.
-  const shouldMount = useMiniAppKeepAlive(id as unknown as string, isInView)
+  const shouldMount = useMiniAppKeepAlive(id as unknown as string, settledInView)
   // Gate iframe interaction on selection so canvas pan/zoom gestures
   // pass cleanly through unselected mini-apps. Without this, the
   // iframe's `pointer-events-auto` captures the pointer the moment
