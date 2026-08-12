@@ -153,16 +153,15 @@ export function MiniAppView({ id }: MiniAppViewProps) {
         className={cn(
           "absolute inset-0 flex flex-col overflow-hidden rounded-2xl border border-dashed border-border bg-background px-2 pb-2 pt-10",
         )}
+        // Kept-alive but off-screen: skip rendering this whole card subtree
+        // (chrome + iframe) so the browser stops its render/paint work and can
+        // throttle the iframe's rAF, while the iframe stays mounted (no re-parse).
+        // Restores instantly on return. `inset-0` is explicit sizing, so
+        // `contain: size` doesn't collapse the box. No-op on webviews without
+        // content-visibility (older WebKit).
+        style={{ contentVisibility: shouldMount && !isInView ? "hidden" : undefined }}
       >
-        <div
-          className="relative h-full w-full overflow-hidden rounded-xl border border-border/50 bg-background"
-          // Kept-alive but off-screen: skip rendering the iframe subtree so the
-          // browser stops painting it and can throttle its rAF, while the iframe
-          // stays mounted (no re-parse). Restores instantly when back in view.
-          // `h-full` is explicit sizing, so `contain: size` doesn't collapse the
-          // box. No-op on webviews without content-visibility (older WebKit).
-          style={{ contentVisibility: shouldMount && !isInView ? "hidden" : undefined }}
-        >
+        <div className="relative h-full w-full overflow-hidden rounded-xl border border-border/50 bg-background">
           {source && shouldMount ? (
             <MiniAppMount
               noteId={id as unknown as string}
