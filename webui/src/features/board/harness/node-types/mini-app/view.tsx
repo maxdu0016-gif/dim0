@@ -3,11 +3,12 @@
 // Wraps the host-side MiniAppMount (which owns the sandboxed iframe,
 // state hydration, and RPC routing) with the standard canvas chrome:
 // traffic lights for delete/expand, a label caption below the card.
-// Iframe lifecycle: the iframe boots only after a node SETTLES in view
-// (MOUNT_SETTLE_MS) — nodes flown past during a fast pan never mount — or
-// immediately if it's kept alive from a recent visit (bounded LRU, useKeepAlive).
-// Once mounted it stays while the node is in view OR retained, so a visible node
-// is never torn down; nodes not yet settled / beyond the LRU show a placeholder.
+// Iframe lifecycle: the iframe boots only when the node is in view AND the board
+// camera is at rest (useBoardCameraAtRest) — panning/scrolling at any speed mounts
+// nothing new, so nodes crossed mid-scroll aren't booted — or immediately if it's
+// kept alive from a recent visit (bounded LRU, useKeepAlive). Once mounted it stays
+// while in view OR retained, so a visible node is never torn down; nodes not yet
+// mounted / beyond the LRU show a placeholder.
 //
 // Mirrors the shape of WidgetView in node-types/widget/view.tsx — the
 // canvas chrome conventions live there.
@@ -28,6 +29,7 @@ import {
   NodeTrafficLights,
   useIsInView,
 } from "../../shared-views"
+import { useBoardCameraAtRest } from "../../canvas/board-camera-motion"
 import { useBoardAppStore } from "../../store/board-app-store"
 import { useMiniAppKeepAlive } from "./use-keep-alive"
 
@@ -42,31 +44,6 @@ const CARD_CHROME_PX = 48
 // scrollbar inside the iframe slot instead of pushing the canvas
 // node taller. Stops a runaway widget from monopolizing the board.
 const MAX_AUTO_GROW_PX = 1200
-
-// A node must sit in view this long before its iframe boots. Panning fast across
-// the board flickers nodes in/out in less than this, so we skip mounting (and
-// compositing + bundle-booting) the many iframes the user is only flying past; a
-// deliberate stop lands them in view long enough to mount.
-const MOUNT_SETTLE_MS = 180
-
-
-/**
- * True only after `inView` has stayed true for `delayMs`, and false the instant it
- * leaves. Debounces viewport entry so a fast pan (nodes visible < delayMs) never
- * trips a mount.
- */
-function useSettledInView(inView: boolean, delayMs: number): boolean {
-  const [settled, setSettled] = useState(false)
-  useEffect(() => {
-    if (!inView) {
-      setSettled(false)
-      return
-    }
-    const t = window.setTimeout(() => setSettled(true), delayMs)
-    return () => window.clearTimeout(t)
-  }, [inView, delayMs])
-  return settled
-}
 
 
 export interface MiniAppViewProps {
@@ -94,20 +71,24 @@ export function MiniAppView({ id }: MiniAppViewProps) {
   // flying past a node during a fast pan never mounts it. Panning BACK to a
   // recently-visited zone is still instant — keep-alive retains it, so it mounts
   // via isLive without waiting to re-settle.
-  const settledInView = useSettledInView(isInView, MOUNT_SETTLE_MS)
+  // Only boot iframes when the camera is at rest: while the user pans/scrolls at
+  // any speed, nodes crossing the viewport are NOT mounted (that churn — compositor
+  // layers + bundle boot + teardown — is the measured scroll jank). A dwell timer
+  // wasn't enough: a moderate scroll keeps a node in view long enough to "settle".
+  const cameraAtRest = useBoardCameraAtRest()
+  const mountReady = isInView && cameraAtRest
   // Retained-set membership: kept alive from a recent visit (bounded LRU) so
   // panning back re-uses the live iframe instead of re-parsing the ~5 MB runtime.
-  const isLive = useMiniAppKeepAlive(id as unknown as string, settledInView)
-  // Boot the iframe once the node settles in view (fast fly-bys never settle, so
-  // they're never mounted) OR when it's kept alive from a recent visit (instant).
-  // Once mounted, KEEP it while the node is in view OR retained — so a genuinely
-  // visible node is never torn down (even if the LRU evicts it before it
-  // re-settles); it unmounts only once off-screen AND evicted.
+  const isLive = useMiniAppKeepAlive(id as unknown as string, mountReady)
+  // Boot the iframe once the node is in view AND the camera has stopped, OR when
+  // it's kept alive from a recent visit (instant). Once mounted, KEEP it while the
+  // node is in view OR retained — so a genuinely visible node is never torn down
+  // (even if the LRU evicts it); it unmounts only once off-screen AND evicted.
   const [shouldMount, setShouldMount] = useState(false)
   useEffect(() => {
-    if (settledInView || isLive) setShouldMount(true)
+    if (mountReady || isLive) setShouldMount(true)
     else if (!isInView && !isLive) setShouldMount(false)
-  }, [settledInView, isLive, isInView])
+  }, [mountReady, isLive, isInView])
   // Gate iframe interaction on selection so canvas pan/zoom gestures
   // pass cleanly through unselected mini-apps. Without this, the
   // iframe's `pointer-events-auto` captures the pointer the moment
