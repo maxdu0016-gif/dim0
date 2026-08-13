@@ -33,14 +33,21 @@ function tick(store: CanvasStore): void {
   if (s.pending.size === 0) return
   // Only admit while the camera is at rest. On motion the requesters withdraw
   // themselves (their `requesting` flips false), draining `pending` — this guard
-  // also covers the sub-frame gap before their effect cleanup runs.
-  if (isBoardCameraAtRest(store) && ++s.frame >= FRAMES_PER_GRANT) {
+  // also covers the sub-frame gap before their effect cleanup runs. Reset the
+  // frame counter while moving so the cascade restarts cleanly on the next settle
+  // (otherwise, with FRAMES_PER_GRANT > 1, the first post-pan grant fires early).
+  if (!isBoardCameraAtRest(store)) {
+    s.frame = 0
+  } else if (++s.frame >= FRAMES_PER_GRANT) {
     s.frame = 0
     // Grant the nearest-to-viewport-center pending request first (center-out).
+    // `bestId === null ||` guarantees a pick even if every priority is Infinity
+    // (null ref) — otherwise that request would never be granted or deleted and
+    // this rAF loop would spin forever, pinning the store.
     let bestId: string | null = null
     let best = Infinity
     for (const [id, r] of s.pending) {
-      if (r.priority < best) {
+      if (bestId === null || r.priority < best) {
         best = r.priority
         bestId = id
       }
@@ -75,5 +82,11 @@ export function requestMountSlot(
   if (s.raf === null) s.raf = requestAnimationFrame(() => tick(store))
   return () => {
     s.pending.delete(id)
+    // Last one out cancels the loop so a drained queue doesn't leave a scheduled
+    // no-op tick (and its store-capturing closure) hanging.
+    if (s.pending.size === 0 && s.raf !== null) {
+      cancelAnimationFrame(s.raf)
+      s.raf = null
+    }
   }
 }

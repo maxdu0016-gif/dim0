@@ -58,6 +58,12 @@ export function useTrackBoardCameraMotion(store: CanvasStore): void {
 }
 
 
+/** Non-reactive read of camera-at-rest for THIS board (for the mount scheduler). */
+export function isBoardCameraAtRest(store: CanvasStore): boolean {
+  return getEntry(store).atRest
+}
+
+
 /**
  * Whether the given board's camera has been at rest for QUIET_MS. Pass
  * `waiting = false` for views that don't currently need to react (already mounted,
@@ -65,12 +71,6 @@ export function useTrackBoardCameraMotion(store: CanvasStore): void {
  * dense board doesn't re-render them — only in-view, not-yet-mounted views
  * re-render on the atRest transition that actually boots them.
  */
-/** Non-reactive read of camera-at-rest for THIS board (for the mount scheduler). */
-export function isBoardCameraAtRest(store: CanvasStore): boolean {
-  return getEntry(store).atRest
-}
-
-
 export function useBoardCameraAtRest(store: CanvasStore, waiting: boolean): boolean {
   const subscribe = useCallback(
     (cb: () => void) => {
