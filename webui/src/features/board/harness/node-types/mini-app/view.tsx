@@ -13,7 +13,7 @@
 // Mirrors the shape of WidgetView in node-types/widget/view.tsx — the
 // canvas chrome conventions live there.
 
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef } from "react"
 
 import { CursorClickIcon } from "@phosphor-icons/react"
 import { type NodeId } from "@canvas-harness/core"
@@ -25,13 +25,16 @@ import { cn } from "@/lib/utils"
 
 import type { NoteNodeData } from "../../convert/note-to-node"
 import {
+  createDeferredMount,
   NodeTitleCaption,
   NodeTrafficLights,
-  useIsInView,
 } from "../../shared-views"
-import { useBoardCameraAtRest } from "../../canvas/board-camera-motion"
 import { useBoardAppStore } from "../../store/board-app-store"
-import { useMiniAppKeepAlive } from "./use-keep-alive"
+
+
+// Retention pool for mini-app iframes — the heaviest node type (~5 MB each), so a
+// small cap. Independent from other node types' pools (see createDeferredMount).
+const useMiniAppMount = createDeferredMount({ cap: 8 })
 
 
 // Card chrome (padding + traffic-lights row + title slot). Subtracted
@@ -53,9 +56,9 @@ export interface MiniAppViewProps {
 
 /**
  * Canvas view for a mini-app note. Renders the iframe via MiniAppMount while the
- * node should stay mounted (in view, or a recently-seen off-screen node kept
- * alive by useMiniAppKeepAlive); otherwise shows a paused-state placeholder card
- * so the rest of the board stays responsive.
+ * node should stay mounted (deferred-mount: in view + camera at rest, or a
+ * recently-retained node); otherwise shows a paused-state placeholder card so the
+ * rest of the board stays responsive.
  */
 export function MiniAppView({ id }: MiniAppViewProps) {
   const node = useNode(id)
@@ -63,32 +66,9 @@ export function MiniAppView({ id }: MiniAppViewProps) {
   const openNodeSurface = useBoardAppStore((s) => s.openNodeSurface)
   const canEdit = useBoardAppStore((s) => s.canEdit)
   const wrapRef = useRef<HTMLDivElement>(null)
-  // initialInView: false — don't mount every node on first load before the
-  // observer reports which are actually visible (and don't seed the keep-alive
-  // LRU with never-seen nodes).
-  const isInView = useIsInView(wrapRef, "200px", false)
-  // Only boot the iframe once the node has settled in view (see MOUNT_SETTLE_MS):
-  // flying past a node during a fast pan never mounts it. Panning BACK to a
-  // recently-visited zone is still instant — keep-alive retains it, so it mounts
-  // via isLive without waiting to re-settle.
-  // Only boot iframes when the camera is at rest: while the user pans/scrolls at
-  // any speed, nodes crossing the viewport are NOT mounted (that churn — compositor
-  // layers + bundle boot + teardown — is the measured scroll jank). A dwell timer
-  // wasn't enough: a moderate scroll keeps a node in view long enough to "settle".
-  const cameraAtRest = useBoardCameraAtRest()
-  const mountReady = isInView && cameraAtRest
-  // Retained-set membership: kept alive from a recent visit (bounded LRU) so
-  // panning back re-uses the live iframe instead of re-parsing the ~5 MB runtime.
-  const isLive = useMiniAppKeepAlive(id as unknown as string, mountReady)
-  // Boot the iframe once the node is in view AND the camera has stopped, OR when
-  // it's kept alive from a recent visit (instant). Once mounted, KEEP it while the
-  // node is in view OR retained — so a genuinely visible node is never torn down
-  // (even if the LRU evicts it); it unmounts only once off-screen AND evicted.
-  const [shouldMount, setShouldMount] = useState(false)
-  useEffect(() => {
-    if (mountReady || isLive) setShouldMount(true)
-    else if (!isInView && !isLive) setShouldMount(false)
-  }, [mountReady, isLive, isInView])
+  // Defer the heavy iframe mount until the node is in view AND the camera is at
+  // rest; keep it while visible or recently-retained. See createDeferredMount.
+  const { shouldMount, isInView } = useMiniAppMount(id as unknown as string, wrapRef)
   // Gate iframe interaction on selection so canvas pan/zoom gestures
   // pass cleanly through unselected mini-apps. Without this, the
   // iframe's `pointer-events-auto` captures the pointer the moment
