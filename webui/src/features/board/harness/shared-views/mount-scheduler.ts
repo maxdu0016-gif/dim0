@@ -4,8 +4,11 @@ import { isBoardCameraAtRest } from "../canvas/board-camera-motion"
 
 // Grant at most one mount per this many animation frames. Spreads N settle-time
 // mounts into a cascade so no single frame boots them all — the fix for the
-// "settle → freeze → jank if you move again" burst. Higher = gentler/slower.
-const FRAMES_PER_GRANT = 1
+// "settle → freeze → jank if you move again" burst. ~4 frames (~15 mounts/s at
+// 60Hz) leaves idle frames between mounts for smoothness — worth most on the
+// in-process desktop (WKWebView) webview, where a mount runs on the host thread.
+// Higher = gentler/slower.
+const FRAMES_PER_GRANT = 4
 
 
 type Request = { priority: number; grant: () => void }
