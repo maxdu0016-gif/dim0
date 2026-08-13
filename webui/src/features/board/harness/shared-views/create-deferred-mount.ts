@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type RefObject } from "react"
+import { useCanvasStore } from "@canvas-harness/react"
 import { create } from "zustand"
 import { useBoardCameraAtRest } from "../canvas/board-camera-motion"
 import { useIsInView } from "./use-is-in-view"
@@ -52,15 +53,22 @@ export function createDeferredMount({
     id: string,
     ref: RefObject<HTMLElement | null>,
   ): DeferredMount {
+    const store = useCanvasStore()
     // initialInView: false — don't mount every node on first load before the
     // observer reports which are actually visible (and don't seed the LRU).
     const isInView = useIsInView(ref, rootMargin, false)
-    const cameraAtRest = useBoardCameraAtRest()
-    const mountReady = isInView && cameraAtRest
 
     const isLive = usePool((s) => s.live.includes(id))
     const touch = usePool((s) => s.touch)
     const release = usePool((s) => s.release)
+
+    // Only an in-view, not-yet-mounted node needs to react to camera motion — a
+    // mounted or off-screen node ignores it, so a pan doesn't re-render every
+    // heavy view on the board (see useBoardCameraAtRest's `waiting`).
+    const mountedRef = useRef(false)
+    const cameraAtRest = useBoardCameraAtRest(store, isInView && !mountedRef.current)
+    const mountReady = isInView && cameraAtRest
+
     const wasActive = useRef(false)
     useEffect(() => {
       if (mountReady) wasActive.current = true
@@ -72,8 +80,13 @@ export function createDeferredMount({
 
     const [shouldMount, setShouldMount] = useState(false)
     useEffect(() => {
-      if (mountReady || isLive) setShouldMount(true)
-      else if (!isInView && !isLive) setShouldMount(false)
+      if (mountReady || isLive) {
+        mountedRef.current = true
+        setShouldMount(true)
+      } else if (!isInView && !isLive) {
+        mountedRef.current = false
+        setShouldMount(false)
+      }
     }, [mountReady, isLive, isInView])
 
     return { shouldMount, isInView }

@@ -79,7 +79,7 @@ export function SheetView({ id }: SheetViewProps) {
   useStopCanvasGesture(bodyRef)
   // Defer mounting the TipTap editor until the card is in view AND the camera is
   // at rest (never mid-scroll); keep recently-seen editors via the bounded LRU.
-  const { shouldMount } = useSheetMount(id as unknown as string, wrapRef)
+  const { shouldMount, isInView } = useSheetMount(id as unknown as string, wrapRef)
 
   const data = (node?.data ?? {}) as Partial<NoteNodeData>
   const boardId = data.graphUid
@@ -187,7 +187,12 @@ export function SheetView({ id }: SheetViewProps) {
           "pointer-events-auto",
           !editing && canEdit ? "cursor-pointer" : "cursor-default",
         )}
-        style={honoredBg ? { backgroundColor: honoredBg } : undefined}
+        style={{
+          ...(honoredBg ? { backgroundColor: honoredBg } : null),
+          // Retained but off-screen: skip rendering the (heavy TipTap) subtree so
+          // the browser stops its layout/paint work while the editor stays mounted.
+          contentVisibility: shouldMount && !isInView ? "hidden" : undefined,
+        }}
         title={!editing && canEdit ? "Double-click to edit" : undefined}
       >
         <div
