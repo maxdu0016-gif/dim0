@@ -359,14 +359,14 @@ outline (capped), budgeted title samples, changes summarized by *where*:
 Board snapshot (point-in-time — re-check with tools before acting on it):
 - Title: Acme Analytics — Product Hub
 - 284 nodes: 180 notes, 32 sheets, 18 mini-apps, 40 documents, 14 folders
-- Layers (14 folders; showing 6 by size):
+- Layers (15 total, top 6 by size):
   - / (root, current): 24 nodes — "North star", "Q3 roadmap", "Open questions", …
   - /Research: 68 nodes — "Persona: analyst", [mini-app] "Survey results", …
   - /Specs: 52 nodes — "Dashboards spec", "Alerting spec", "Export v2", …
   - /Design: 41 nodes — "Design system", flow diagrams, …
   - /Meetings: 38 nodes — [sheet] "2026-08 planning", weekly notes, …
   - /Data-model: 22 nodes — schema diagrams, "Events table", …
-  - + 8 more folders (Archive, Legal, GTM, …) — 39 nodes total
+  - + 9 more (Archive, Legal, GTM, …) — 39 nodes total
 - Selection: 1 sheet — "Alerting spec"
 - Recent changes since last session: +5 added (in /Specs, /Meetings), ~3 edited, -1 deleted
 ```
@@ -379,18 +379,22 @@ Deterministic, budget-driven, top-down; stop adding titles when the budget is hi
 
 1. **Header (always):** `Title` line + `N nodes: <breakdown by type, desc>`. If there are no
    folders, append `— all at root (flat)`.
-2. **Structure:**
-   - *Flat board* → skip "Layers"; render a single `Nodes:` line with budgeted titles.
-   - *Foldered board* → `Layers (K folders; showing M by size):` — folders sorted by node count desc,
-     top `MAX_LAYERS` shown; each line `path (count[, current]): sampled titles`; the remainder
-     collapses to `+ J more folders (names…) — P nodes total`. **The current layer is always
-     included**, even if it wouldn't make the top-K.
+2. **Structure:** ("layer" = root or a folder; root is a *layer*, not a folder, so the wording says
+   "layers" to avoid miscounting root as a folder).
+   - *Flat board* → skip "Layers"; render a single `Nodes:` line with budgeted titles. Flat means
+     the sole layer is root **and** we're viewing root; **inside a folder (rootId set) it is not
+     flat** — even an empty folder gets a `count 0` current layer so the outline shows where you are.
+   - *Foldered board* → `Layers (N total[, top M by size]):` — layers sorted by node count desc, top
+     `MAX_LAYERS` shown; each line `path (count[, current]): sampled titles`; the remainder collapses
+     to `+ J more (names…) — P nodes total`. **The current layer is always included**, even if it
+     wouldn't make the top-K (compute the collapsed remainder as *everything not shown* so the
+     displaced top-K layer isn't dropped and the swapped-in current layer isn't double-counted).
 3. **Title sampling & priority:** one global `MAX_TITLES` budget, filled in order —
    (a) current-layer titles → (b) selected titles → (c) recently-changed titles → (d) largest-layer
-   fill — with a `PER_LAYER_TITLES` cap so one folder can't eat the budget. Non-note types carry a
+   fill — with a `PER_LAYER_TITLES` cap so one layer can't eat the budget. Non-note types carry a
    tag (`[sheet]`, `[mini-app]`, `[document]`, `[code]`); notes render bare.
-4. **Selection (always, if any):** `Selection: <k> <type(s)> — "titles"`. The agent's immediate
-   focus, so never dropped for budget.
+4. **Selection (always, if any):** `Selection: <k> selected — "titles"`, **capped at
+   `MAX_SELECTION_TITLES` (+N more)** — a select-all on a big board must not blow the snapshot budget.
 5. **Recent changes:** from the oplog tail since the device's last-seen seq (`snapshot_meta`).
    `+A added (titles/where), ~E edited (titles), -D deleted`; list up to `RECENT_TITLES` titles, else
    summarize by folder (`in /Specs, /Meetings`). **Omit the line entirely if nothing changed.**
@@ -461,6 +465,12 @@ clobber a piggybacked field). At **turn start** the build reads recent = ops wit
 (read-only); the cursor **advances at turn END** (after the agent's writes land), so the agent's own
 edits this turn are *not* reported back next turn as user changes — recent shows only what the USER
 touched between turns. First time on a device: recent = `[]` (the turn-end advance sets the baseline).
+The turn-end advance **must `flush()` the board's debounced writes first** — otherwise the agent's
+creates/arranges (buffered ~50ms) aren't in the oplog yet, the cursor lands below them, and they
+resurface next turn as user changes. **Known limitation:** a compaction folding the oplog between
+turns can drop those folded ops from the *recent-changes delta* (the scene inventory itself is still
+correct); acceptable because between-turn compaction is rare and only the delta, not the state, is
+affected.
 
 **Wiring/perf:** called in `use-local-submit-prompt.ts` at turn start; `getAllNodes()`/`getSelection()`
 are in-memory reads, `readRecentOps` is one indexed range query. **Rebuilt once per turn (sub-ms);
