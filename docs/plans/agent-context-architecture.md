@@ -391,10 +391,11 @@ Deterministic, budget-driven, top-down; stop adding titles when the budget is hi
    tag (`[sheet]`, `[mini-app]`, `[document]`, `[code]`); notes render bare.
 4. **Selection (always, if any):** `Selection: <k> <type(s)> — "titles"`. The agent's immediate
    focus, so never dropped for budget.
-5. **Recent changes:** from the oplog tail since the last session's last-seen seq (fallback: last
-   `RECENT_OPS_WINDOW` ops). `+A added (titles/where), ~E edited (titles), -D deleted`; list up to
-   `RECENT_TITLES` titles, else summarize by folder (`in /Specs, /Meetings`). **Omit the line
-   entirely if nothing changed.** On a board with no prior session, phrase as `+N this session`.
+5. **Recent changes:** from the oplog tail since the device's last-seen seq (`snapshot_meta`).
+   `+A added (titles/where), ~E edited (titles), -D deleted`; list up to `RECENT_TITLES` titles, else
+   summarize by folder (`in /Specs, /Meetings`). **Omit the line entirely if nothing changed.**
+   Phrased uniformly as "Recent changes since you last checked" (the away-open and a mid-session turn
+   share the same cursor semantics). Still shown on a now-empty board (a full clear is the signal).
 6. **Empty board:** a single line — `Empty board — no nodes yet.`
 
 The renderer is a pure function of the `BoardSnapshot`; it makes **no LLM call** and is rebuilt per
@@ -456,8 +457,10 @@ export const readRecentOps = (
 **The session cursor.** "Recent changes since you last checked" needs a per-device per-board mark.
 Shipped as a dedicated device-local `snapshot_meta` store (`{ boardId, seenSeq }`) — **not**
 `BoardMeta` (server-authoritative on synced boards) and **not** `sync_meta` (a full-put that would
-clobber a piggybacked field). On each build, recent = ops with `seq > seenSeq`; then `seenSeq`
-advances to the current max. First time on a device: recent = `[]` (adopt the baseline).
+clobber a piggybacked field). At **turn start** the build reads recent = ops with `seq > seenSeq`
+(read-only); the cursor **advances at turn END** (after the agent's writes land), so the agent's own
+edits this turn are *not* reported back next turn as user changes — recent shows only what the USER
+touched between turns. First time on a device: recent = `[]` (the turn-end advance sets the baseline).
 
 **Wiring/perf:** called in `use-local-submit-prompt.ts` at turn start; `getAllNodes()`/`getSelection()`
 are in-memory reads, `readRecentOps` is one indexed range query. **Rebuilt once per turn (sub-ms);
@@ -854,7 +857,8 @@ drift.
   `+N this session` with no prior session; non-note type tags; per-title ~40-char truncation;
   **golden tests for the three archetypes**.
 - **`readRecentOps` + collapse:** range `seq > lastSeenSeq`; per-node collapse (add+edit→add,
-  add+delete→cancel, multi-edit→edit); delete title from op payload; `edge.*` ignored; no-change → [].
+  add+remove→cancel, remove+update stays delete, multi-edit→edit); delete title from the `node.remove`
+  op's node; `edge.*` ignored; no-change → []. Recent changes still shown on a now-empty board.
 - **Edge cases that bite:** orphan node (dangling `parentId`); stale `rootId`; stale selection id;
   empty folder; titles with newlines/markdown/emoji + multibyte truncation; 1000-node board (budget
   holds, not O(n²)); deleted-node-in-recentChanges.
