@@ -39,6 +39,7 @@ open and an upgrade converge on the same shape).
 | `boards` | `id` | — | `BoardMeta` |
 | `views` | `boardId` | — | `BoardView` (camera/selection) |
 | `sync_meta` | `boardId` | — | durable `syncedSeq` cursor |
+| `snapshot_meta` | `boardId` | — | device-local `seenSeq` (agent board-snapshot cursor; not synced) |
 | `chats` | `id` | by-board | chat sessions |
 | `chat_messages` | `[chatUid, id]` | — | transcript rows |
 | `documents` | `id` | by-board | ingested doc metadata |

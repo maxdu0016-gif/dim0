@@ -18,6 +18,7 @@ import { getSearchIndexRef } from "@/features/board/search/search-index-ref"
 import { getDocIndexRef } from "@/features/board/search/doc-index-ref"
 import { rebuildDocIndex } from "@/features/board/search/use-doc-index"
 import { getLocalStores } from "@/features/local-stores"
+import type { SnapshotMetaRecord } from "@/features/board/persist/local/idb"
 import { makeDocSearchTool } from "@/features/agent/engine/doc-search"
 import { resolveConfirmDecision, useToolConfirm, type ToolConfirmDecision } from "@/features/agent/engine/tool-confirm-store"
 import { useToolTrustStore } from "@/features/agent/settings/tool-trust-store"
@@ -31,9 +32,11 @@ import { useLocalMessagesStore } from "@/features/agent/store/local-messages-sto
 import { putChatTranscript } from "@/features/agent/api/chat-transcript"
 import type { ChatMessage } from "@/features/agent/types/chat"
 import { agentLog } from "@/features/agent/engine/debug"
+import type { CanvasStore } from "@canvas-harness/core"
 import { latestAssistantText, stepsFromEvents } from "./agent-event-to-step"
 import { toLlmHistory } from "./chat-history"
 import { maybeAutoLabelBoard } from "./describe-board"
+import { buildBoardSnapshot, readRecentOps, renderBoardSnapshot } from "./board-snapshot"
 import { wrapWithMessageContext } from "./message-context"
 
 
@@ -50,6 +53,32 @@ const AGENT_TOOLS = [...agentBuildTools, searchNotes, ...skillTools]
 
 let counter = 0
 const mintId = (): string => `local-${Date.now()}-${counter++}`
+
+
+/**
+ * Assemble the deterministic board-snapshot block (no LLM) for the system prompt:
+ * node inventory, folder outline, selection, and changes since you last checked.
+ *
+ * The "seen" cursor is persisted per device (`snapshot_meta`), so recent changes
+ * span sessions — on the first open after being away, they surface what moved
+ * while you were gone; within a session, what moved since the previous turn.
+ */
+const buildBoardBlock = async (store: CanvasStore, rootId: string | null, boardId: string): Promise<string> => {
+  const { engine, boards } = await getLocalStores()
+  const cursor = await engine.get<SnapshotMetaRecord>("snapshot_meta", boardId)
+  const seenSeq = cursor?.seenSeq ?? 0
+  const ops = await readRecentOps(engine, boardId, seenSeq)
+  const maxSeq = ops.reduce((m, r) => Math.max(m, r.seq), seenSeq)
+  // First time on this device: adopt the current position as the baseline rather
+  // than reporting the whole backlog as "recent".
+  const recent = cursor === undefined ? [] : ops
+  if (cursor === undefined || maxSeq !== seenSeq) {
+    await engine.put<SnapshotMetaRecord>("snapshot_meta", { boardId, seenSeq: maxSeq })
+  }
+  const meta = await boards.getBoard(boardId)
+  const snapshot = buildBoardSnapshot(store, rootId, recent)
+  return renderBoardSnapshot(snapshot, { title: meta?.title ?? "Untitled board" })
+}
 
 
 /**
@@ -169,6 +198,8 @@ export function useLocalSubmitPrompt(boardId: string, syncTranscript = false) {
       const gate = createFlushGate()
       try {
         const system = planSystemPrompt(new Date().toLocaleString())
+        // Deterministic board awareness (no LLM), injected as a standing section.
+        const systemWithBoard = `${system}\n\n## BOARD\n${await buildBoardBlock(store, rootId, boardId)}`
         const search = getSearchIndexRef() ?? undefined
         // External services are managed (signed in); include each tool only when
         // resolvable, so a signed-out user isn't offered an unavailable capability.
@@ -198,8 +229,8 @@ export function useLocalSubmitPrompt(boardId: string, syncTranscript = false) {
         // When documents are attached, steer grounding + citation-by-title (titles
         // are unique per board, so a title names exactly one document).
         const systemWithDocs = hasDocs
-          ? `${system}\n\nThis board has uploaded documents. Use \`doc_search(query)\` — full-text over their contents — and for anything they could answer, call it FIRST, before answering from your own knowledge; ground the answer in the returned passages and cite each document by its exact title. (\`search_notes\` covers the board's own notes.)`
-          : system
+          ? `${systemWithBoard}\n\nThis board has uploaded documents. Use \`doc_search(query)\` — full-text over their contents — and for anything they could answer, call it FIRST, before answering from your own knowledge; ground the answer in the returned passages and cite each document by its exact title. (\`search_notes\` covers the board's own notes.)`
+          : systemWithBoard
         const userMessageForAgent = wrapWithMessageContext(prompt, messageContext)
         // Gate off-board tools (network/code) behind a user confirmation, so a
         // prompt-injected tool call can't silently exfiltrate or run code. A
