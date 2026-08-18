@@ -59,25 +59,39 @@ const mintId = (): string => `local-${Date.now()}-${counter++}`
  * Assemble the deterministic board-snapshot block (no LLM) for the system prompt:
  * node inventory, folder outline, selection, and changes since you last checked.
  *
- * The "seen" cursor is persisted per device (`snapshot_meta`), so recent changes
- * span sessions — on the first open after being away, they surface what moved
- * while you were gone; within a session, what moved since the previous turn.
+ * Reads the per-device "seen" cursor (`snapshot_meta`) but does NOT advance it —
+ * that happens at turn end (`advanceBoardSnapshotCursor`), AFTER the agent's own
+ * writes are committed, so the agent's edits this turn are not reported back to it
+ * next turn as user "recent changes". So recent changes span sessions (first open
+ * after being away shows what moved while you were gone) and, mid-session, show
+ * only what the USER touched between turns.
  */
 const buildBoardBlock = async (store: CanvasStore, rootId: string | null, boardId: string): Promise<string> => {
   const { engine, boards } = await getLocalStores()
   const cursor = await engine.get<SnapshotMetaRecord>("snapshot_meta", boardId)
-  const seenSeq = cursor?.seenSeq ?? 0
-  const ops = await readRecentOps(engine, boardId, seenSeq)
-  const maxSeq = ops.reduce((m, r) => Math.max(m, r.seq), seenSeq)
-  // First time on this device: adopt the current position as the baseline rather
-  // than reporting the whole backlog as "recent".
-  const recent = cursor === undefined ? [] : ops
-  if (cursor === undefined || maxSeq !== seenSeq) {
-    await engine.put<SnapshotMetaRecord>("snapshot_meta", { boardId, seenSeq: maxSeq })
-  }
+  // First time on this device: no baseline yet, so report nothing as "recent"
+  // (the turn-end advance establishes the baseline).
+  const recent = cursor === undefined ? [] : await readRecentOps(engine, boardId, cursor.seenSeq)
   const meta = await boards.getBoard(boardId)
   const snapshot = buildBoardSnapshot(store, rootId, recent)
   return renderBoardSnapshot(snapshot, { title: meta?.title ?? "Untitled board" })
+}
+
+
+/**
+ * Advance the per-device snapshot cursor to the current oplog max. Runs at turn
+ * end (fire-and-forget), after the agent's writes land, so those writes are marked
+ * "seen" and won't resurface as recent changes next turn.
+ */
+const advanceBoardSnapshotCursor = async (boardId: string): Promise<void> => {
+  const { engine } = await getLocalStores()
+  const cursor = await engine.get<SnapshotMetaRecord>("snapshot_meta", boardId)
+  const from = cursor?.seenSeq ?? 0
+  const ops = await readRecentOps(engine, boardId, from)
+  const maxSeq = ops.reduce((m, r) => Math.max(m, r.seq), from)
+  if (cursor === undefined || maxSeq !== from) {
+    await engine.put<SnapshotMetaRecord>("snapshot_meta", { boardId, seenSeq: maxSeq })
+  }
 }
 
 
@@ -319,6 +333,9 @@ export function useLocalSubmitPrompt(boardId: string, syncTranscript = false) {
         }
         // Auto-label a still-"Untitled" board from its first turn (fire-and-forget).
         void maybeAutoLabelBoard(boardId, messages, resolveAgentLlm(config, { signedIn, runId, model: llmModel, byokModel }))
+        // Mark everything up to now (incl. the agent's own writes this turn) as
+        // "seen", so next turn's snapshot reports only what the USER changed.
+        void advanceBoardSnapshotCursor(boardId).catch((e) => agentLog.error("advanceBoardSnapshotCursor", e))
       }
     },
     [asConfig, searchByok, searchEngine, codeByok, llmModel, llmCatalog, signedIn, syncTranscript, setMessages, setChatUid, persist, boardId, navigate],

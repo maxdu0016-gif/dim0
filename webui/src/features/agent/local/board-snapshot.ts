@@ -60,8 +60,6 @@ const PER_LAYER_TITLES = 4
 const CURRENT_LAYER_TITLES = 6
 const RECENT_TITLES = 5
 const TITLE_MAX_CHARS = 40
-/** Fallback tail size for the recent-changes read when no session cursor exists. */
-export const RECENT_OPS_WINDOW = 50
 
 
 const STRUCTURAL_KINDS: ReadonlySet<string> = new Set(["folder", "sheet", "mini-app", "code-sandbox", "widget"])
@@ -205,7 +203,10 @@ const collapseRecent = (recentOps: OplogRecord[], liveTitles: Map<string, string
         labels.set(nodeIdOf(op.node), nodeTitle(op.node))
       } else if (op.type === "node.update") {
         const id = op.id as unknown as string
-        if (net.get(id) !== "add") net.set(id, "edit")
+        // Don't let a stray update override an add (title stays the add's) or a
+        // delete (a node can't be edited after removal — keep the delete).
+        const prev = net.get(id)
+        if (prev !== "add" && prev !== "delete") net.set(id, "edit")
       } else if (op.type === "node.remove") {
         const id = nodeIdOf(op.node)
         if (net.get(id) === "add") net.delete(id)
@@ -233,7 +234,12 @@ export const renderBoardSnapshot = (
   snapshot: BoardSnapshot,
   opts: { title: string },
 ): string => {
-  if (snapshot.total === 0) return "Board snapshot: empty board — no nodes yet."
+  if (snapshot.total === 0) {
+    // Still surface recent changes on a now-empty board — a full clear since you
+    // last checked is exactly the "what moved while I was gone" signal to keep.
+    const recentLine = renderRecent(snapshot.recent)
+    return `Board snapshot: empty board — no nodes yet.${recentLine ? `\n${recentLine}` : ""}`
+  }
 
   const lines: string[] = ["Board snapshot (point-in-time — re-check with tools before acting on it):"]
   lines.push(`- Title: ${opts.title}`)
@@ -280,7 +286,9 @@ const renderLayers = (snapshot: BoardSnapshot): string[] => {
     return `  - ${path}${marker}: ${l.count} node${l.count === 1 ? "" : "s"}${titles}`
   })
 
-  const hidden = layers.slice(shown.length)
+  // Everything not shown (compute after the current-layer swap, so the displaced
+  // top-K folder lands here and the swapped-in current layer is not double-counted).
+  const hidden = layers.filter((l) => !shown.includes(l))
   if (hidden.length) {
     const names = hidden.slice(0, 4).map((l) => l.title).join(", ")
     const nodes = hidden.reduce((sum, l) => sum + l.count, 0)
@@ -309,8 +317,8 @@ const renderRecent = (recent: RecentChange[]): string | null => {
 
 /**
  * Read the oplog tail past `sinceSeq` for the board — one indexed range query.
- * Pass `0` to read the whole log (bounded by the caller to `RECENT_OPS_WINDOW`
- * when there is no session cursor).
+ * The oplog only holds ops since the last snapshot, so the tail is bounded by the
+ * snapshot cadence (not the board's full history).
  */
 export const readRecentOps = (
   engine: StorageEngine,

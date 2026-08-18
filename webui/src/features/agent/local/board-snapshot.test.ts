@@ -157,6 +157,16 @@ describe("recent-changes collapse", () => {
   })
 
 
+  it("keeps a delete when a stray update op follows a remove for the same node", () => {
+    const ops: OplogRecord[] = [
+      opRec(board, 1, [{ type: "node.remove", node: mkNode("x", { label: "X" }) }]),
+      opRec(board, 2, [{ type: "node.update", id: "x" as NodeId, patch: {}, prev: {} }]),
+    ]
+    const snap = buildBoardSnapshot(fakeStore([]), null, ops)
+    expect(snap.recent).toEqual([{ id: "x", op: "delete", label: "X" }])
+  })
+
+
   it("ignores edge ops", () => {
     const ops: OplogRecord[] = [
       opRec(board, 1, [{ type: "edge.add", edge: { id: "e" } as never }]),
@@ -187,18 +197,32 @@ describe("renderBoardSnapshot", () => {
   })
 
 
-  it("always includes the current layer even when it isn't in the top-K by size", () => {
+  it("includes the current layer outside top-K without dropping the displaced folder or double-counting", () => {
+    // 8 folders sized distinctly and all > the root layer (8 folder nodes) except
+    // the current one (F7, size 1), so F7 is outside the top-6 by size.
     const nodes: Node[] = []
-    // 8 folders; the current one ("small") is the smallest so it falls outside top-6.
     for (let f = 0; f < 8; f++) {
       nodes.push(mkNode(`f${f}`, { kind: "folder", label: `F${f}` }))
-      const size = f === 7 ? 1 : 10 - f
+      const size = f === 7 ? 1 : 20 - f // F0=20 … F6=14, F7=1
       for (let i = 0; i < size; i++) nodes.push(mkNode(`f${f}-n${i}`, { parentId: `f${f}` }))
     }
     const out = renderBoardSnapshot(buildBoardSnapshot(fakeStore(nodes), "f7", []), { title: "T" })
-    expect(out).toContain("Layers (")
-    expect(out).toContain("/F7 (current)")
-    expect(out).toContain("more folders")
+    const moreLine = out.split("\n").find((l) => l.includes("more folders")) ?? ""
+    expect(out).toContain("/F7 (current)") // current is shown
+    expect(moreLine).toContain("F5") // the displaced 6th-largest folder is kept (not dropped)
+    expect(moreLine).not.toContain("F7") // current is not re-listed / double-counted
+  })
+
+
+  it("surfaces recent changes even when the board is now empty (everything deleted)", () => {
+    const out = renderBoardSnapshot(
+      buildBoardSnapshot(fakeStore([]), null, [
+        opRec("b", 1, [{ type: "node.remove", node: mkNode("a", { label: "Gone" }) }]),
+      ]),
+      { title: "T" },
+    )
+    expect(out).toContain("empty board")
+    expect(out).toContain("Recent changes since you last checked: -1 deleted")
   })
 
 
