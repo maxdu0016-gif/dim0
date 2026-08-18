@@ -273,7 +273,7 @@ export function useLocalSubmitPrompt(boardId: string, syncTranscript = false) {
         for await (const ev of runAgent({ system: systemWithDocs, userMessage: userMessageForAgent, history, tools, llm, ctx: { store, rootId, search, confirmTool } })) {
           // Streaming yields cumulative assistant_text / reasoning per token —
           // replace the previous snapshot in place instead of appending one event
-          // per token.
+          // per token. (assistant_text renders live; reasoning is shown at turn-end.)
           const prev = events[events.length - 1]
           if ((ev.type === "assistant_text" || ev.type === "reasoning") && prev?.type === ev.type) events[events.length - 1] = ev
           else events.push(ev)

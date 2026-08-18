@@ -91,4 +91,14 @@ describe("assembleStreamedTurn", () => {
     const events = await collect(chunksOf(textChunk("hi")))
     expect(events.some((e) => e.kind === "reasoning")).toBe(false)
   })
+
+  it("an empty reasoning_content does not mask a populated reasoning in the same delta", async () => {
+    const bothChunk = { choices: [{ index: 0, finish_reason: null, delta: { reasoning_content: "", reasoning: "real thought" } }] }
+    const events = await collect(chunksOf(bothChunk, textChunk("A")))
+    expect(events).toEqual([
+      { kind: "reasoning", text: "real thought" },
+      { kind: "delta", text: "A" },
+      { kind: "final", turn: { kind: "text", text: "A" } },
+    ])
+  })
 })

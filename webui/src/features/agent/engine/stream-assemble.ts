@@ -26,7 +26,12 @@ export async function* assembleStreamedTurn(
     // off the raw delta: OpenRouter uses `reasoning`, DeepSeek et al. use
     // `reasoning_content`. Display-only (never re-fed to the model in Phase 2).
     const r = delta as { reasoning?: unknown; reasoning_content?: unknown }
-    const reasoning = typeof r.reasoning_content === "string" ? r.reasoning_content : typeof r.reasoning === "string" ? r.reasoning : ""
+    // Prefer whichever field carries actual text: an empty `reasoning_content`
+    // must not mask a populated `reasoning` in the same delta.
+    const reasoning =
+      (typeof r.reasoning_content === "string" && r.reasoning_content) ||
+      (typeof r.reasoning === "string" && r.reasoning) ||
+      ""
     if (reasoning) yield { kind: "reasoning", text: reasoning }
     for (const tc of delta.tool_calls ?? []) {
       const slot = calls.get(tc.index) ?? { id: "", name: "", arguments: "" }

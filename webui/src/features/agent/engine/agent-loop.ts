@@ -175,7 +175,8 @@ export async function* runAgent(opts: RunAgentOptions): AsyncGenerator<AgentEven
           yield { type: "assistant_text", text: acc }
         } else if (ev.kind === "reasoning") {
           // Reasoning/thinking streams on its own channel; accumulate + emit
-          // cumulatively (like assistant_text) so the UI renders it live.
+          // cumulatively (like assistant_text). The chat UI gates the Reasoning
+          // expander on turn-end, so this fills it once the turn completes.
           reasoningAcc += ev.text
           yield { type: "reasoning", text: reasoningAcc }
         } else if (ev.kind === "tool_start") {
