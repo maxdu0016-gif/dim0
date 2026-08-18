@@ -34,6 +34,7 @@ export const AUTOFIT_DISABLED_TYPES = new Set([
   "widget",
   "mini-app",
   "document",
+  "ink",
 ])
 
 

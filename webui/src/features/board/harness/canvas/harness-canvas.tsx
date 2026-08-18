@@ -79,6 +79,7 @@ import { useViewportPersistence } from "./use-viewport-persistence"
 import { useTrackBoardCameraMotion } from "./board-camera-motion"
 import { useSidebarContentsSync } from "./use-sidebar-contents-sync"
 import { HarnessWrapRefProvider } from "./wrap-ref-provider"
+import { InkInputLayer } from "../ink/ink-input-layer"
 
 
 /**
@@ -113,6 +114,8 @@ export function HarnessCanvas({ local = false }: { local?: boolean } = {}) {
   const store = storeRef.current
 
   const tool = useBoardAppStore((s) => s.tool)
+  const inkColor = useBoardAppStore((s) => s.inkColor)
+  const inkSize = useBoardAppStore((s) => s.inkSize)
   const viewMode = useBoardAppStore((s) => s.viewMode)
   const theme = useBoardTheme()
   const [ready, setReady] = useState(false)
@@ -420,7 +423,11 @@ export function HarnessCanvas({ local = false }: { local?: boolean } = {}) {
       <HarnessWrapRefProvider value={wrapRef}>
         <div
           ref={wrapRef}
-          className="absolute inset-0"
+          className={`absolute inset-0 ${
+            tool === "ink" || tool === "eraser"
+              ? "select-none [-webkit-touch-callout:none]"
+              : ""
+          }`}
           onDragOver={onDragOver}
           onDrop={onDrop}
         >
@@ -434,6 +441,16 @@ export function HarnessCanvas({ local = false }: { local?: boolean } = {}) {
             onCreateDrag={handleCreateDrag}
             onDoubleClick={handleDoubleClick}
             onRenderer={handleRenderer}
+          />
+          <InkInputLayer
+            store={store}
+            wrapRef={wrapRef}
+            boardId={boardId}
+            rootId={rootId}
+            tool={tool}
+            canEdit={canEdit}
+            color={inkColor}
+            size={inkSize}
           />
           <CanvasContextMenu wrapRef={wrapRef} store={store} rendererRef={rendererRef} />
         </div>
@@ -474,12 +491,15 @@ function HarnessCanvasInner({
   // already-self-hiding chrome (readonly chip, top-right strip) stays
   // managed by their own components.
   const presenting = useBoardAppStore((s) => s.presentationMode)
+  // The overlay owns pen/mouse ink gestures. Let touch continue through the
+  // harness pan path so one finger moves the board and pinch zoom still works.
+  const canvasTool = tool === "ink" || tool === "eraser" ? "pan" : tool
   return (
     <>
       {isBoard ? (
         <>
           <Canvas
-            tool={tool}
+            tool={canvasTool}
             theme={theme.resolver}
             selectionColor={theme.selectionColor}
             background={theme.background}
