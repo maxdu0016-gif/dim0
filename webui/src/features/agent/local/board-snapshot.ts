@@ -223,7 +223,12 @@ const collapseRecent = (recentOps: OplogRecord[], liveTitles: Map<string, string
       }
     }
   }
-  return [...net].map(([id, op]) => ({ id, op, label: labels.get(id) ?? liveTitles.get(id) ?? "(untitled)" }))
+  // Drop phantom add/edit for a node that isn't on the board now (e.g. an
+  // add+remove that cancelled, then a stray update flips the empty entry to
+  // "edit"). Deletes are always kept (the node is legitimately gone).
+  return [...net]
+    .filter(([id, op]) => op === "delete" || liveTitles.has(id))
+    .map(([id, op]) => ({ id, op, label: labels.get(id) ?? liveTitles.get(id) ?? "(untitled)" }))
 }
 
 

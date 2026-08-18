@@ -167,6 +167,17 @@ describe("recent-changes collapse", () => {
   })
 
 
+  it("drops a phantom edit for a node added+removed (cancelled) then stray-updated", () => {
+    const ops: OplogRecord[] = [
+      opRec(board, 1, [{ type: "node.add", node: mkNode("y", { label: "Y" }) }]),
+      opRec(board, 2, [{ type: "node.remove", node: mkNode("y", { label: "Y" }) }]),
+      opRec(board, 3, [{ type: "node.update", id: "y" as NodeId, patch: {}, prev: {} }]),
+    ]
+    // "y" isn't on the board now, so the net change is dropped (no phantom edit).
+    expect(buildBoardSnapshot(fakeStore([]), null, ops).recent).toEqual([])
+  })
+
+
   it("ignores edge ops", () => {
     const ops: OplogRecord[] = [
       opRec(board, 1, [{ type: "edge.add", edge: { id: "e" } as never }]),

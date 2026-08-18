@@ -68,20 +68,27 @@ const mintId = (): string => `local-${Date.now()}-${counter++}`
  * only what the USER touched between turns.
  */
 const buildBoardBlock = async (store: CanvasStore, rootId: string | null, boardId: string): Promise<string> => {
-  const { engine, boards } = await getLocalStores()
-  const cursor = await engine.get<SnapshotMetaRecord>("snapshot_meta", boardId)
-  // First time on this device: no baseline yet, so report nothing as "recent"
-  // (the turn-end advance establishes the baseline).
-  const recent = cursor === undefined ? [] : await readRecentOps(engine, boardId, cursor.seenSeq)
-  const meta = await boards.getBoard(boardId)
-  const snapshot = buildBoardSnapshot(store, rootId, recent)
-  return renderBoardSnapshot(snapshot, { title: meta?.title ?? "Untitled board" })
+  // Auxiliary context — a storage hiccup (transient IDB error, blocked upgrade)
+  // must degrade to an empty block, never abort the turn.
+  try {
+    const { engine, boards } = await getLocalStores()
+    const cursor = await engine.get<SnapshotMetaRecord>("snapshot_meta", boardId)
+    // First time on this device: no baseline yet, so report nothing as "recent"
+    // (the turn-end advance establishes the baseline).
+    const recent = cursor === undefined ? [] : await readRecentOps(engine, boardId, cursor.seenSeq)
+    const meta = await boards.getBoard(boardId)
+    const snapshot = buildBoardSnapshot(store, rootId, recent)
+    return renderBoardSnapshot(snapshot, { title: meta?.title ?? "Untitled board" })
+  } catch (e) {
+    agentLog.error("buildBoardBlock", e)
+    return ""
+  }
 }
 
 
 /**
  * Advance the per-device snapshot cursor to the current oplog max. Runs at turn
- * end (fire-and-forget), after the agent's writes land, so those writes are marked
+ * end (awaited, after the agent's writes are flushed), so those writes are marked
  * "seen" and won't resurface as recent changes next turn.
  */
 const advanceBoardSnapshotCursor = async (boardId: string): Promise<void> => {
@@ -218,7 +225,8 @@ export function useLocalSubmitPrompt(boardId: string, syncTranscript = false) {
       try {
         const system = planSystemPrompt(new Date().toLocaleString())
         // Deterministic board awareness (no LLM), injected as a standing section.
-        const systemWithBoard = `${system}\n\n## BOARD\n${await buildBoardBlock(store, rootId, boardId)}`
+        const boardBlock = await buildBoardBlock(store, rootId, boardId)
+        const systemWithBoard = boardBlock ? `${system}\n\n## BOARD\n${boardBlock}` : system
         const search = getSearchIndexRef() ?? undefined
         // External services are managed (signed in); include each tool only when
         // resolvable, so a signed-out user isn't offered an unavailable capability.
@@ -340,7 +348,10 @@ export function useLocalSubmitPrompt(boardId: string, syncTranscript = false) {
         void maybeAutoLabelBoard(boardId, messages, resolveAgentLlm(config, { signedIn, runId, model: llmModel, byokModel }))
         // Mark everything up to now (incl. the agent's own writes this turn) as
         // "seen", so next turn's snapshot reports only what the USER changed.
-        void advanceBoardSnapshotCursor(boardId).catch((e) => agentLog.error("advanceBoardSnapshotCursor", e))
+        // Awaited (not fire-and-forget): the cursor must be committed before this
+        // turn's callback resolves, so a fast back-to-back prompt can't read the
+        // stale cursor and re-report the agent's own writes as user changes.
+        await advanceBoardSnapshotCursor(boardId).catch((e) => agentLog.error("advanceBoardSnapshotCursor", e))
       }
     },
     [asConfig, searchByok, searchEngine, codeByok, llmModel, llmCatalog, signedIn, syncTranscript, setMessages, setChatUid, persist, boardId, navigate],
