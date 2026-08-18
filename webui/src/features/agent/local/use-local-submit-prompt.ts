@@ -271,10 +271,11 @@ export function useLocalSubmitPrompt(boardId: string, syncTranscript = false) {
             () => useToolConfirm.getState().request(req),
           )
         for await (const ev of runAgent({ system: systemWithDocs, userMessage: userMessageForAgent, history, tools, llm, ctx: { store, rootId, search, confirmTool } })) {
-          // Streaming yields a cumulative assistant_text per token — replace the
-          // previous snapshot in place instead of appending one event per token.
+          // Streaming yields cumulative assistant_text / reasoning per token —
+          // replace the previous snapshot in place instead of appending one event
+          // per token.
           const prev = events[events.length - 1]
-          if (ev.type === "assistant_text" && prev?.type === "assistant_text") events[events.length - 1] = ev
+          if ((ev.type === "assistant_text" || ev.type === "reasoning") && prev?.type === ev.type) events[events.length - 1] = ev
           else events.push(ev)
           // Track notes CREATED this turn so we can arrange + recenter them. A
           // write_note that rewrote an existing note reports `created: false` —
