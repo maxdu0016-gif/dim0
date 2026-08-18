@@ -172,7 +172,7 @@ export type BoardSnapshot = {
   truncatedNote?: string                   // "showing 20 of 200 …"
 }
 
-// Pure, no LLM, memoized per (boardId, sceneRevision).
+// Pure, no LLM. Rebuilt per turn (memoization deferred; see open questions).
 export const buildBoardSnapshot = (store: CanvasStore, rootId: string | null, oplogTail): BoardSnapshot
 ```
 
@@ -397,8 +397,8 @@ Deterministic, budget-driven, top-down; stop adding titles when the budget is hi
    entirely if nothing changed.** On a board with no prior session, phrase as `+N this session`.
 6. **Empty board:** a single line — `Empty board — no nodes yet.`
 
-The renderer is a pure function of `(BoardSnapshot, lastSeenSeq)`; it makes **no LLM call** and is
-memoized by scene revision (Part 3 trigger). Titles are truncated per-title to ~40 chars.
+The renderer is a pure function of the `BoardSnapshot`; it makes **no LLM call** and is rebuilt per
+turn (memoization deferred, see Part 3). Titles are truncated per-title to ~40 chars.
 
 ### `buildBoardSnapshot` — the builder (Phase 1 spec, real APIs)
 
@@ -423,41 +423,48 @@ export const readRecentOps = (
   })
 ```
 
-**Field derivation (exact calls / data paths):**
+**Field derivation (exact calls / data paths)** — matches the shipped `board-snapshot.ts`:
 
 - **Scene read:** `store.getAllNodes(): Node[]` — one call. Per node the Dim0 fields live in
   `node.data` (a `NoteNodeData`), *not* the harness built-ins:
-  - **type** = `node.data.noteType ?? "note"` (values: `note` / `folder` / `sheet` / `mini-app` /
-    `code-sandbox` / `widget` / `document` / shape types). Not `node.type` (that's the canvas
-    built-in like `rect`; use `canvasTypeToDim0` only as a fallback).
-  - **title** = `node.data.label` → fallback `firstLine(node.content)` → `"(untitled)"`.
-  - **layer** = `node.data.parentId ?? null` (null = root). A **folder** is a node with
-    `noteType === "folder"`; its `id` is the layer key for its children (children carry
-    `parentId === folder.id`), its `label` is the layer title.
-  - **updatedAt** = `node.data.updatedAt` (tiebreak only; oplog is authoritative for "recent").
-- **counts** = `groupBy(nodes, n => n.data.noteType)` → `Record<type, number>`; total = `nodes.length`.
-- **layers** = group nodes by `parentId`; for each group resolve the folder node's `label` (or
-  `"root"` for `null`), count, and per-layer sampled titles. Sort desc by count; mark
-  `parentId === rootId` as current. (Root always present.)
-- **selection** = `store.getSelection(): NodeId[]` → map each to `store.getNode(id)?.data.label`.
-- **recentChanges** = collapse `recentOps` per node id to a net effect:
-  - `op.type === "node.add"` → `add`, title from `op.node.data.label`.
-  - `op.type === "node.update"` → `edit`, title from the live `store.getNode(id)?.data.label`.
-  - `op.type === "node.delete"` → `delete`, title from the op payload (node is gone from the store).
-  - Edge ops (`edge.*`) are ignored for the snapshot. Net-per-node: an add+edit in the window reads
-    as one `add`; an add+delete cancels out.
-- **empty** = `nodes.length === 0` → `{ counts: {}, … }` → renders the one-line empty form.
+  - **kind** — `node.data.noteType` only distinguishes `"note" | "document"`; the *structural* type
+    (folder / sheet / mini-app / code-sandbox / widget) lives in **`node.data.styleType`** (a
+    `Dim0NodeType`). So: `document` if `noteType === "document"`, else `styleType` when it is one of
+    folder/sheet/mini-app/code-sandbox/widget, else `"note"` (rectangle/ellipse/… all count as
+    notes). **Not `node.type`** (that's the canvas built-in like `rect`).
+  - **title** = `node.data.label?.markdown` (`label` is `RichText`, not a bare string) → fallback
+    `firstLine(node.content)` → `"(untitled)"`, per-title truncated ~40 chars.
+  - **layer** = `node.data.parentId ?? null` (null = root). A **folder** is a node whose
+    `styleType === "folder"`; its `id` is the layer key for its children (children carry
+    `parentId === folder.id`), its `label.markdown` is the layer title.
+- **counts** = group by the derived kind → `Record<kind, number>`; total = `nodes.length`.
+- **layers** = group nodes by `parentId`; resolve each folder's `label.markdown` (or `"root"` for
+  `null`), count, and per-layer sampled titles (selected/recent first). Sort desc by count; mark
+  `parentId === rootId` as current. Orphans (a `parentId` pointing at no existing folder) land at
+  root, not a phantom layer. (Root always present when nodes exist.)
+- **selection** = `store.getSelection(): (NodeId | EdgeId)[]` → filter to node ids (an edge id won't
+  match any node, so it drops out) → each node's title.
+- **recentChanges** = collapse `recentOps` per node id to a net effect. Op types are `node.add` /
+  `node.update` / `node.remove` (**not** `node.delete`):
+  - `node.add` → `add`, title from `op.node.data.label?.markdown`.
+  - `node.update` → `edit`, title from the live `store.getNode(id)?.data.label?.markdown`.
+  - `node.remove` → `delete`, title from `op.node.data.label?.markdown` (the op carries the full
+    node, so the deleted title *is* available).
+  - Edge/group/frame ops are ignored. Net-per-node: add+edit reads as one `add`; add+remove cancels.
+- **empty** = `nodes.length === 0` → the one-line empty form.
 
-**The session cursor (`lastSeenSeq`).** "Since last session" needs a per-board mark. v1: at session
-open, read the board's current max oplog seq (last `oplog` key for `boardId`, or the snapshot/outbox
-`syncedSeq`) and stash it (e.g. `BoardMeta.snapshotSeenSeq` or a tiny per-board record); next open,
-`readRecentOps(…, previousMark)` yields everything since. Fallback when no mark exists: last
-`RECENT_OPS_WINDOW` records (≈50) → phrased `+N this session`.
+**The session cursor.** "Recent changes since you last checked" needs a per-device per-board mark.
+Shipped as a dedicated device-local `snapshot_meta` store (`{ boardId, seenSeq }`) — **not**
+`BoardMeta` (server-authoritative on synced boards) and **not** `sync_meta` (a full-put that would
+clobber a piggybacked field). On each build, recent = ops with `seq > seenSeq`; then `seenSeq`
+advances to the current max. First time on a device: recent = `[]` (adopt the baseline).
 
 **Wiring/perf:** called in `use-local-submit-prompt.ts` at turn start; `getAllNodes()`/`getSelection()`
-are in-memory reads, `readRecentOps` is one indexed IndexedDB range query. Memoize the built snapshot
-by a cheap scene revision (node count + a max-updatedAt, or a store revision counter if the harness
-exposes one) so it recomputes only when the scene actually changed (`SNAPSHOT_DIRTY_DELTA`).
+are in-memory reads, `readRecentOps` is one indexed range query. **Rebuilt once per turn (sub-ms);
+memoization is deliberately *not* implemented** — at once-per-turn frequency a scene-revision memo is
+dead weight (see open questions). (If a memo is ever added for a more frequent in-session refresh,
+note `node.data.updatedAt` is an **ISO string**, so a `max-updatedAt` revision key must not treat it
+as a number.)
 
 ---
 
@@ -473,7 +480,7 @@ Summary (three production modes → three trigger shapes):
 
 | Pillar | Mode | Fires on | Gate (cheap check) | LLM cost |
 |---|---|---|---|---|
-| Board snapshot | compute | turn start (read) | scene changed ≥ `SNAPSHOT_DIRTY_DELTA` since memo | 0 |
+| Board snapshot | compute | turn start (read) | none (rebuilt per turn; memo deferred) | 0 |
 | Board purpose | derive | turn **end** | drift signal true **and** context was read | 1, rare |
 | Conversation context | derive | turn **end** | `turnsSinceRefresh ≥ CONV_CTX_TURNS` OR `tokenGrowth ≥ CONV_CTX_TOKENS` | 1 / N turns |
 | Board / global memory | inline write | **during the turn** | the model's own judgment (WHEN/SKIP prompt) | 0 extra |
@@ -498,9 +505,10 @@ model via `/ai/llm`.
 ## Board snapshot — *compute, on read*
 
 - **Fires on:** every turn, at **turn start**, when the snapshot is assembled into the system prompt.
-- **Gate:** memoized by a cheap scene revision (node count + max `updatedAt`). Recompute only if it
-  moved by ≥ `SNAPSHOT_DIRTY_DELTA` since the last build; otherwise reuse the memo. On session open,
-  always build once.
+- **Gate:** none in v1 — **rebuilt once per turn** (the build is sub-ms). A scene-revision memo
+  (recompute only on a ≥ `SNAPSHOT_DIRTY_DELTA` change; `node.data.updatedAt` is an ISO string, so a
+  `max-updatedAt` key must not be treated as a number) is the *designed* optimization, **deferred**
+  until a more frequent in-session refresh makes it worthwhile (see open questions).
 - **Runs:** `buildBoardSnapshot(store, rootId, recentOps)` + `renderBoardSnapshot` (Part 2 spec).
 - **Cost:** **0 LLM.** In-memory reads + one indexed oplog range query.
 - **Wired at:** `use-local-submit-prompt.ts` turn-start assembly (the `systemWithDocs` seam).
@@ -532,7 +540,7 @@ model via `/ai/llm`.
       nodesTouched.add(nodeIdOf(op))
       if (op.type === "node.add")         charsChanged += sizeOf(op.node)      // label + content
       else if (op.type === "node.update") charsChanged += patchSize(op.patch)  // changed field(s), approx
-      // node.delete: no content in the op payload → counted via nodesTouched only
+      // node.remove: counted as structural churn via nodesTouched (its content mass is not added)
     }
 
   const shouldDerive =
@@ -546,9 +554,9 @@ model via `/ai/llm`.
   covering the slow semantic drift the magnitude heuristics can't see. **Agent mid-turn writes are
   real oplog ops and count** — so set the thresholds above a typical build turn, *or* subtract the
   ops the agent wrote this turn (defers a big build's re-derive to the next turn — cleaner batching;
-  recommended). Notes on the two `node.update` / `node.delete` wrinkles: an update's `patchSize` is
-  an approximation of the true edit delta (over-counts slightly — harmless for a magnitude gate); a
-  delete carries no content, so it only bumps `nodesTouched` — which is exactly why the node-count OR
+  recommended). Notes on the op wrinkles: an update's `patchSize` is an approximation of the true
+  edit delta (over-counts slightly, harmless for a magnitude gate); a `node.remove` carries the full
+  node, but we count it as structural churn (bumps `nodesTouched` only), which is why the node-count OR
   is kept.
 - **Runs:** the extended `describe-board.ts` pass — a single small-model call over the board's
   *current* structure + a content sample (it re-summarizes from state, it does **not** need the
@@ -745,7 +753,7 @@ from the oplog tail; labeled point-in-time. Also exposed as a `get_board_overvie
 + `prompts/index.ts` (new `## BOARD` placeholder); `local/use-local-submit-prompt.ts` (assemble +
 inject at the `systemWithDocs` seam); `engine/tools.ts` + `engine/types.ts` (`get_board_overview`).
 **LoC:** ~250–350. **Risk/notes:** the only subtlety is reading counts/oplog from the canvas-harness
-store API and sampling/capping for large boards; memoize by scene revision. No persistence, no new
+store API and sampling/capping for large boards; rebuilt per turn (memoization deferred). No persistence, no new
 store — lowest-risk first ship.
 
 ## Phase 2 — Reasoning wiring *(Med)*
@@ -835,8 +843,8 @@ drift.
 
 ### Phase 1 — board snapshot
 
-- **`buildBoardSnapshot`:** empty → empty snapshot; flat board → no layers; type breakdown correct;
-  title = `data.label` → first line of `content` → `"(untitled)"`; layer grouping by `parentId`
+- **`buildBoardSnapshot`:** empty → empty snapshot; flat board → no layers; type breakdown by
+  `styleType` correct; title = `data.label?.markdown` → first line of `content` → `"(untitled)"`; layer grouping by `parentId`
   (folder label resolved; `null` = root); current-layer from `rootId`; nested folders; selection
   resolved / empty.
 - **`renderBoardSnapshot`:** budget cap → `(showing X of Y)`; layer cap → `+J more folders …`;
@@ -850,9 +858,8 @@ drift.
 - **Edge cases that bite:** orphan node (dangling `parentId`); stale `rootId`; stale selection id;
   empty folder; titles with newlines/markdown/emoji + multibyte truncation; 1000-node board (budget
   holds, not O(n²)); deleted-node-in-recentChanges.
-- **Memoization/wiring:** identical scene → memo reused; changed ≥ `SNAPSHOT_DIRTY_DELTA` → recompute;
-  `## BOARD` injected at turn start; degenerate omissions (no purpose → snapshot only); the
-  `get_board_overview` tool returns the same text.
+- **Wiring:** `## BOARD` injected at turn start; degenerate omissions (no purpose → snapshot only);
+  the `get_board_overview` tool returns the same text. (Memoization is deferred in v1, so no memo test.)
 
 ### Later phases — highest-value tests (build test-first)
 

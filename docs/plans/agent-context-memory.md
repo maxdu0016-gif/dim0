@@ -1,5 +1,13 @@
 # Agent context & memory — design (discussion draft)
 
+> **SUPERSEDED.** This is the earliest discussion draft; the `DECISION?`/`LEAN:` forks below were
+> resolved in **[`agent-context-architecture.md`](./agent-context-architecture.md)**, which is the
+> single source of truth for the design. Where the two disagree, the architecture doc wins — notably
+> the **memory sync model**: this draft leans toward an opaque per-board *blob* backup, but the
+> resolved design is **per-record sync with per-record LWW** (board memory is shared across
+> collaborators, so a blob would clobber concurrent writes). Kept for the reasoning trail; do not
+> implement from it.
+
 Status: **draft, for discussion.** Nothing here is committed. `DECISION?` marks an
 open fork we need to resolve together; `LEAN:` is my current recommendation.
 
