@@ -289,7 +289,12 @@ export function useLocalSubmitPrompt(boardId: string, syncTranscript = false) {
             createdNodeIds.push(String((ev.result as { id: unknown }).id))
           }
           const now = Date.now()
-          if (gate.shouldFlush(now, { force: ev.type !== "assistant_text" })) {
+          // Token streams (assistant_text AND reasoning) ride the ~10fps throttle;
+          // only structural events (tool start/result) force an immediate repaint.
+          // Forcing on every reasoning token would re-derive stepsFromEvents (O(n))
+          // per token — O(n^2) over a long chain-of-thought.
+          const isTokenStream = ev.type === "assistant_text" || ev.type === "reasoning"
+          if (gate.shouldFlush(now, { force: !isTokenStream })) {
             render(true)
             gate.markFlushed(now)
           }
