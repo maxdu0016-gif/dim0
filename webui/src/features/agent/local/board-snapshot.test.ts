@@ -207,10 +207,34 @@ describe("renderBoardSnapshot", () => {
       for (let i = 0; i < size; i++) nodes.push(mkNode(`f${f}-n${i}`, { parentId: `f${f}` }))
     }
     const out = renderBoardSnapshot(buildBoardSnapshot(fakeStore(nodes), "f7", []), { title: "T" })
-    const moreLine = out.split("\n").find((l) => l.includes("more folders")) ?? ""
+    const moreLine = out.split("\n").find((l) => l.includes(" more (")) ?? ""
     expect(out).toContain("/F7 (current)") // current is shown
     expect(moreLine).toContain("F5") // the displaced 6th-largest folder is kept (not dropped)
     expect(moreLine).not.toContain("F7") // current is not re-listed / double-counted
+    // The Layers section counts layers, not folders (root is a layer): the header
+    // says "N total", and root appears in "+ more (…)" without being called a folder.
+    expect(out).toContain("Layers (9 total")
+    expect(moreLine).not.toContain("folder")
+  })
+
+
+  it("caps the selection list", () => {
+    const nodes = Array.from({ length: 12 }, (_, i) => mkNode(`s${i}`, { label: `Sel ${i}` }))
+    const out = render(
+      nodes,
+      null,
+      nodes.map((n) => n.id as unknown as string),
+    )
+    expect(out).toContain("Selection: 12 selected")
+    expect(out).toContain("+4 more") // 12 selected, 8 shown
+  })
+
+
+  it("shows the current layer even when it is an empty folder", () => {
+    // A folder node at root with no children; the user is inside it.
+    const out = render([mkNode("f", { kind: "folder", label: "Empty" }), mkNode("n")], "f")
+    expect(out).toContain("Layers (")
+    expect(out).toContain("/Empty (current): 0 nodes")
   })
 
 

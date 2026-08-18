@@ -59,6 +59,7 @@ const MAX_LAYERS = 6
 const PER_LAYER_TITLES = 4
 const CURRENT_LAYER_TITLES = 6
 const RECENT_TITLES = 5
+const MAX_SELECTION_TITLES = 8
 const TITLE_MAX_CHARS = 40
 
 
@@ -164,12 +165,19 @@ export const buildBoardSnapshot = (
       sampleTitles: sampleTitles(arr, selected, recentIds, isCurrent ? CURRENT_LAYER_TITLES : PER_LAYER_TITLES),
     })
   }
+  // Inside an empty folder there are no members and thus no layer — add it so the
+  // outline still shows where the user is.
+  if (rootId !== null && !layers.some((l) => l.rootId === rootId)) {
+    layers.push({ rootId, title: folderLabels.get(rootId) ?? "(current folder)", count: 0, sampleTitles: [] })
+  }
   layers.sort((a, b) => b.count - a.count)
 
   return {
     total: nodes.length,
     counts,
-    flat: byParent.size <= 1 && byParent.has(null),
+    // Flat only when the sole layer is root and we're viewing root; inside any
+    // folder (rootId set) there is structure to outline.
+    flat: layers.length <= 1 && layers[0]?.rootId === null,
     layers,
     currentLayer: rootId,
     selection,
@@ -258,7 +266,9 @@ export const renderBoardSnapshot = (
   }
 
   if (snapshot.selection.length) {
-    lines.push(`- Selection: ${snapshot.selection.length} selected — ${snapshot.selection.map((t) => `"${t}"`).join(", ")}`)
+    const sel = snapshot.selection.slice(0, MAX_SELECTION_TITLES)
+    const more = snapshot.selection.length > sel.length ? `, +${snapshot.selection.length - sel.length} more` : ""
+    lines.push(`- Selection: ${snapshot.selection.length} selected — ${sel.map((t) => `"${t}"`).join(", ")}${more}`)
   }
 
   const recentLine = renderRecent(snapshot.recent)
@@ -268,7 +278,10 @@ export const renderBoardSnapshot = (
 }
 
 
-/** The "Layers (…)" outline: top-K by size, current always included, remainder collapsed. */
+/**
+ * The "Layers (…)" outline: top-K by size, current always included, remainder
+ * collapsed. Root is a *layer*, not a folder, so the wording says "layers".
+ */
 const renderLayers = (snapshot: BoardSnapshot): string[] => {
   const layers = snapshot.layers
   const shown = layers.slice(0, MAX_LAYERS)
@@ -277,8 +290,11 @@ const renderLayers = (snapshot: BoardSnapshot): string[] => {
   if (current && !shown.includes(current)) {
     shown[shown.length - 1] = current
   }
+  // Everything not shown (compute after the current-layer swap, so the displaced
+  // top-K layer lands here and the swapped-in current layer is not double-counted).
+  const hidden = layers.filter((l) => !shown.includes(l))
 
-  const header = `- Layers (${layers.length} folder${layers.length === 1 ? "" : "s"}; showing ${Math.min(shown.length, layers.length)} by size):`
+  const header = `- Layers (${layers.length} total${hidden.length ? `, top ${shown.length} by size` : ""}):`
   const rows = shown.map((l) => {
     const path = l.rootId === null ? "/ (root" : `/${l.title}`
     const marker = l.rootId === snapshot.currentLayer ? (l.rootId === null ? ", current)" : " (current)") : l.rootId === null ? ")" : ""
@@ -286,13 +302,10 @@ const renderLayers = (snapshot: BoardSnapshot): string[] => {
     return `  - ${path}${marker}: ${l.count} node${l.count === 1 ? "" : "s"}${titles}`
   })
 
-  // Everything not shown (compute after the current-layer swap, so the displaced
-  // top-K folder lands here and the swapped-in current layer is not double-counted).
-  const hidden = layers.filter((l) => !shown.includes(l))
   if (hidden.length) {
     const names = hidden.slice(0, 4).map((l) => l.title).join(", ")
     const nodes = hidden.reduce((sum, l) => sum + l.count, 0)
-    rows.push(`  - + ${hidden.length} more folder${hidden.length === 1 ? "" : "s"} (${names}${hidden.length > 4 ? ", …" : ""}) — ${nodes} nodes total`)
+    rows.push(`  - + ${hidden.length} more (${names}${hidden.length > 4 ? ", …" : ""}) — ${nodes} nodes total`)
   }
   return [header, ...rows]
 }

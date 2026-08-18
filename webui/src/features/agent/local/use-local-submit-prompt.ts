@@ -19,6 +19,7 @@ import { getDocIndexRef } from "@/features/board/search/doc-index-ref"
 import { rebuildDocIndex } from "@/features/board/search/use-doc-index"
 import { getLocalStores } from "@/features/local-stores"
 import type { SnapshotMetaRecord } from "@/features/board/persist/local/idb"
+import { getBoardPersistenceRef } from "@/features/board/persist/local/board-persistence-ref"
 import { makeDocSearchTool } from "@/features/agent/engine/doc-search"
 import { resolveConfirmDecision, useToolConfirm, type ToolConfirmDecision } from "@/features/agent/engine/tool-confirm-store"
 import { useToolTrustStore } from "@/features/agent/settings/tool-trust-store"
@@ -84,6 +85,10 @@ const buildBoardBlock = async (store: CanvasStore, rootId: string | null, boardI
  * "seen" and won't resurface as recent changes next turn.
  */
 const advanceBoardSnapshotCursor = async (boardId: string): Promise<void> => {
+  // Commit the board's debounced writes (the agent's creates + arrange moves this
+  // turn) to the oplog FIRST — otherwise readRecentOps reads a stale tail and the
+  // cursor lands below the agent's ops, re-reporting them next turn as user changes.
+  await getBoardPersistenceRef()?.flush()
   const { engine } = await getLocalStores()
   const cursor = await engine.get<SnapshotMetaRecord>("snapshot_meta", boardId)
   const from = cursor?.seenSeq ?? 0
