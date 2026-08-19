@@ -17,10 +17,15 @@ import { wrapWithMessageContext } from "./message-context"
 // (MAX_RETRIEVAL_MESSAGES) and per-field cap (MAX_COMPACT_TEXT_LENGTH).
 export const MAX_HISTORY_MESSAGES = 16
 const MAX_COMPACT_TEXT_LENGTH = 10_000
+// How many of the most-recent assistant turns keep FULL tool output; older turns
+// age down to MAX_AGED_OUTPUT_CHARS (bulk dropped, head/ids preserved) so stale
+// output doesn't dominate the re-sent history.
+export const RECENT_FULL_TURNS = 4
+export const MAX_AGED_OUTPUT_CHARS = 500
 
 
-const truncate = (s: string): string =>
-  s.length > MAX_COMPACT_TEXT_LENGTH ? s.slice(0, MAX_COMPACT_TEXT_LENGTH) + "..." : s
+const truncate = (s: string, cap = MAX_COMPACT_TEXT_LENGTH): string =>
+  s.length > cap ? s.slice(0, cap) + "..." : s
 
 
 /** Render a single tool-call argument value as a short string. */
@@ -46,11 +51,12 @@ const compactInput = (input: unknown): string => {
 }
 
 
-/** Short summary of a tool call's output (string truncated, object as JSON). */
-const compactOutput = (output: ToolOutput): string => {
-  if (typeof output === "string") return truncate(output.trim().replace(/\n/g, " "))
+/** Short summary of a tool call's output. `outputCap` shrinks for aged turns so
+ *  stale bulk drops while the head (ids, first fields) survives. */
+const compactOutput = (output: ToolOutput, outputCap: number): string => {
+  if (typeof output === "string") return truncate(output.trim().replace(/\n/g, " "), outputCap)
   try {
-    return truncate(JSON.stringify(output))
+    return truncate(JSON.stringify(output), outputCap)
   } catch {
     return ""
   }
@@ -58,10 +64,10 @@ const compactOutput = (output: ToolOutput): string => {
 
 
 /** One reasoning step as the backend's compact XML-ish block. */
-const compactStep = (step: ReasoningStep): string => {
+const compactStep = (step: ReasoningStep, outputCap: number): string => {
   if (isToolCallStep(step)) {
     const input = compactInput(step.arguments?.input)
-    const output = compactOutput(step.output)
+    const output = compactOutput(step.output, outputCap)
     const parts = [`<ToolCall name="${step.name}">`]
     if (input) parts.push(`<Input>${input}</Input>`)
     if (output) parts.push(`<Output>${output}</Output>`)
@@ -76,14 +82,17 @@ const compactStep = (step: ReasoningStep): string => {
 
 
 /** Wrap a turn's reasoning steps in a `<Reasoning>` block (empty if none). */
-const compactReasoning = (steps: ReasoningStep[]): string => {
-  const body = steps.map(compactStep).filter(Boolean).join("\n\n")
+const compactReasoning = (steps: ReasoningStep[], outputCap: number): string => {
+  const body = steps.map((s) => compactStep(s, outputCap)).filter(Boolean).join("\n\n")
   return body ? `<Reasoning>\n\n${body}\n\n</Reasoning>` : ""
 }
 
 
-/** A message's LLM content: assistant turns prepend their reasoning/tool traces. */
-const compactMessageContent = (message: ChatMessage): string => {
+/**
+ * A message's LLM content: assistant turns prepend their reasoning/tool traces.
+ * `outputCap` bounds tool-output length — smaller for older (aged) turns.
+ */
+const compactMessageContent = (message: ChatMessage, outputCap: number): string => {
   const markdown = message.content.markdown?.trim() ?? ""
   if (message.role !== "assistant") {
     // Mirror the backend's `to_chat_message`: a past user turn re-includes the
@@ -92,15 +101,23 @@ const compactMessageContent = (message: ChatMessage): string => {
     // live turn uses, and returns the bare prompt when there's no context.
     return wrapWithMessageContext(markdown, message.properties?.context?.text)
   }
-  const reasoning = compactReasoning(message.properties?.reasoning?.reasoning ?? [])
+  const reasoning = compactReasoning(message.properties?.reasoning?.reasoning ?? [], outputCap)
   return reasoning ? `${reasoning}\n\n${markdown}`.trim() : markdown
 }
 
 
-/** Convert the stored transcript into the agent's prior-turn context. */
-export const toLlmHistory = (messages: ChatMessage[], max = MAX_HISTORY_MESSAGES): LlmMessage[] =>
-  messages
-    .filter((m) => m.role === "user" || m.role === "assistant")
-    .map((m) => ({ role: m.role as "user" | "assistant", content: compactMessageContent(m) }))
+/**
+ * Convert the stored transcript into the agent's prior-turn context. Tool output
+ * ages by recency: the last `RECENT_FULL_TURNS` kept messages keep full output;
+ * older ones shrink to `MAX_AGED_OUTPUT_CHARS`, so stale bulk doesn't dominate.
+ */
+export const toLlmHistory = (messages: ChatMessage[], max = MAX_HISTORY_MESSAGES): LlmMessage[] => {
+  const kept = messages.filter((m) => m.role === "user" || m.role === "assistant").slice(-max)
+  const recentFrom = kept.length - RECENT_FULL_TURNS
+  return kept
+    .map((m, i) => ({
+      role: m.role as "user" | "assistant",
+      content: compactMessageContent(m, i >= recentFrom ? MAX_COMPACT_TEXT_LENGTH : MAX_AGED_OUTPUT_CHARS),
+    }))
     .filter((m) => m.content !== "")
-    .slice(-max)
+}

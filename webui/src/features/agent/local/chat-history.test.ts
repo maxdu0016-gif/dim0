@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import type { ChatMessage } from "@/features/agent/types/chat"
 import type { ReasoningStep } from "@/features/agent/types/stream"
-import { toLlmHistory } from "./chat-history"
+import { MAX_AGED_OUTPUT_CHARS, RECENT_FULL_TURNS, toLlmHistory } from "./chat-history"
 
 
 const user = (text: string): ChatMessage => ({
@@ -41,6 +41,22 @@ const createNoteStep = (noteId: string, title: string): ReasoningStep => ({
   eventMessages: [],
   arguments: { input: { title } },
 })
+
+
+// A tool step whose output is a big string (e.g. a fetched page), to exercise aging.
+const bigOutputStep = (id: string, size: number): ReasoningStep => ({
+  type: "tool_call",
+  id: `t-${id}`,
+  name: "fetch",
+  thought: "",
+  output: "x".repeat(size),
+  state: "completed",
+  eventMessages: [],
+  arguments: { input: { url: "https://a.com" } },
+})
+
+
+const outputLen = (content: string): number => content.match(/<Output>([\s\S]*?)<\/Output>/)?.[1].length ?? 0
 
 
 describe("toLlmHistory", () => {
@@ -96,5 +112,26 @@ describe("toLlmHistory", () => {
     expect(history).toHaveLength(16)
     expect(history[0].content).toBe("m24")
     expect(history.at(-1)?.content).toBe("m39")
+  })
+
+
+  it("ages old tool output to a small cap while the most-recent turn keeps it full", () => {
+    // A run of tool-only assistant turns; only the last RECENT_FULL_TURNS keep full output.
+    const turns: ChatMessage[] = []
+    for (let i = 0; i < RECENT_FULL_TURNS + 2; i += 1) turns.push(user(`q${i}`), assistant("", [bigOutputStep(`f${i}`, 5000)]))
+    const history = toLlmHistory(turns, turns.length)
+    const oldest = history[1] // first assistant turn — aged out
+    const newest = history.at(-1)! // most recent assistant turn — full
+    expect(outputLen(oldest.content)).toBeLessThanOrEqual(MAX_AGED_OUTPUT_CHARS + 3) // "..." marker
+    expect(outputLen(newest.content)).toBe(5000) // under the 10k full cap, untouched
+  })
+
+
+  it("keeps a created note id visible even after a turn's output ages out", () => {
+    const turns: ChatMessage[] = [user("build"), assistant("", [createNoteStep("n42", "Cats")])]
+    // Pad with recent turns so the note turn is aged out of the full window.
+    for (let i = 0; i < RECENT_FULL_TURNS; i += 1) turns.push(user(`later${i}`), assistant(`ok${i}`))
+    const [, noteTurn] = toLlmHistory(turns, turns.length)
+    expect(noteTurn.content).toContain("n42") // id survives aging (it's at the head)
   })
 })
