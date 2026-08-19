@@ -36,7 +36,7 @@ export type Id = string
  * but boards persisted before unification may still hold a bare string — tolerate
  * both so legacy local boards keep reading. Prefer this over `label.markdown`.
  */
-export const labelText = (label: RichText | string | undefined): string =>
+export const labelText = (label: { markdown?: string } | string | undefined): string =>
   typeof label === "string" ? label : (label?.markdown ?? "")
 
 
