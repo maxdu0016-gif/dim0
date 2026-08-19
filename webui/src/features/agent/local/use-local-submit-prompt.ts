@@ -216,7 +216,11 @@ export function useLocalSubmitPrompt(boardId: string, syncTranscript = false) {
 
       // Prior turns become context (captured before the new turn is appended)
       // so the agent remembers the conversation.
-      let history = toLlmHistory(useLocalMessagesStore.getState().messages)
+      // The transcript through the last COMPLETED turn (before this turn's user +
+      // placeholder are appended below). Compaction summarizes over this so the
+      // gate stamp stays correct and this turn's answer is still folded at turn end.
+      const priorMessages = useLocalMessagesStore.getState().messages
+      let history = toLlmHistory(priorMessages)
 
       // Stamp creation time (mirrors backend Message.created_at) so the UI
       // shows a real timestamp instead of "Pending…".
@@ -284,19 +288,24 @@ export function useLocalSubmitPrompt(boardId: string, syncTranscript = false) {
           ? `${systemWithBoard}\n\n## MEMORY\n<memory>\n${memoryBlock}\n</memory>`
           : systemWithBoard
         const userMessageForAgent = wrapWithMessageContext(prompt, messageContext)
-        // Compaction (Phase 6): when the prompt is over budget, trim history to a
-        // verbatim recent tail — the `## CONVERSATION` summary (built just below)
-        // carries the earlier turns. If the thread was never summarized, block once
-        // to produce that summary FIRST, so the block below reflects it. Fresh or
-        // stale context needs no LLM (the verbatim tail absorbs slight staleness).
-        if (isOverCompactionBudget(systemWithMemory, history, userMessageForAgent)) {
-          const chat = await (await getLocalStores()).chats.getChat(chatUid)
-          if (!chat?.context) await summarizeConversation(chatUid, useLocalMessagesStore.getState().messages, llm)
-          history = compactHistory(history)
+        // Rolling thread summary (already self-fenced as `## CONVERSATION`), built up
+        // front so it counts toward the compaction estimate and stands in for the
+        // trimmed turns after compaction.
+        let conversationBlock = await buildConversationBlock(chatUid)
+        const systemWith = (convo: string) => (convo ? `${systemWithMemory}\n\n${convo}` : systemWithMemory)
+        // Compaction (Phase 6): when the prompt is over budget, fold everything up to
+        // now into the summary (no LLM when already current), THEN trim history to a
+        // verbatim recent tail — the `## CONVERSATION` block carries the earlier turns.
+        // Trim ONLY if a summary is actually available, so a never-summarized thread
+        // whose summarize failed keeps full history instead of losing every prior turn.
+        if (isOverCompactionBudget(systemWith(conversationBlock), history, userMessageForAgent)) {
+          const summary = await summarizeConversation(chatUid, priorMessages, llm)
+          if (summary) {
+            history = compactHistory(history)
+            conversationBlock = await buildConversationBlock(chatUid) // reflect a just-folded summary
+          }
         }
-        // Rolling thread summary (already self-fenced as `## CONVERSATION`).
-        const conversationBlock = await buildConversationBlock(chatUid)
-        const systemWithConversation = conversationBlock ? `${systemWithMemory}\n\n${conversationBlock}` : systemWithMemory
+        const systemWithConversation = systemWith(conversationBlock)
         const search = getSearchIndexRef() ?? undefined
         // External services are managed (signed in); include each tool only when
         // resolvable, so a signed-out user isn't offered an unavailable capability.

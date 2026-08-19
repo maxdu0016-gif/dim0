@@ -130,4 +130,21 @@ describe("summarizeConversation (forced, for compaction)", () => {
     await seedChat("c1", [msg("user", "hi")])
     expect(await summarizeConversation("c1", [msg("user", "hi")], null)).toBeNull()
   })
+
+
+  it("returns null when a never-summarized thread yields no summary (compaction then won't trim)", async () => {
+    await seedChat("c1", [msg("user", "hi"), msg("assistant", "yo")])
+    const llm = new ScriptedLlm([{ kind: "text", text: "   " }]) // whitespace → empty summary
+    expect(await summarizeConversation("c1", [msg("user", "hi"), msg("assistant", "yo")], llm)).toBeNull()
+  })
+
+
+  it("returns the existing summary (non-null) when there's nothing new to fold", async () => {
+    await seedChat("c1", [msg("user", "hi"), msg("assistant", "yo")])
+    const { chats } = await getLocalStores()
+    await chats.setChatContext("c1", "existing summary", { turnAt: 2, tokenAt: 10 })
+    // contextTurnAt (2) == messages.length (2) → no new turns → returns existing, no LLM.
+    const llm = new ScriptedLlm([{ kind: "text", text: "SHOULD NOT RUN" }])
+    expect(await summarizeConversation("c1", [msg("user", "hi"), msg("assistant", "yo")], llm)).toBe("existing summary")
+  })
 })
