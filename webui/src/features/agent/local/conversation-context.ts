@@ -68,17 +68,38 @@ export const maybeRefreshConversationContext = async (
   try {
     const { chats } = await getLocalStores()
     const chat = await chats.getChat(chatUid)
-    if (!chat) return
+    if (!chat || !shouldRefreshConversation(chat, messages.length, transcriptTokens(messages))) return
+  } catch {
+    return // best-effort — never disrupt the turn
+  }
+  await summarizeConversation(chatUid, messages, llm)
+}
+
+
+/**
+ * Fold the thread into its rolling summary NOW, gate bypassed — persist and return
+ * it. Used by compaction to force a summary for a never-summarized thread before
+ * trimming history. Best-effort: returns the existing/`null` context on failure,
+ * never throws. `llm` is injectable for tests.
+ */
+export const summarizeConversation = async (
+  chatUid: string,
+  messages: ChatMessage[],
+  llm: LlmClient | null,
+): Promise<string | null> => {
+  if (!llm || messages.length === 0) return null
+  try {
+    const { chats } = await getLocalStores()
+    const chat = await chats.getChat(chatUid)
+    if (!chat) return null
     const turns = messages.length
     const tokens = transcriptTokens(messages)
-    if (!shouldRefreshConversation(chat, turns, tokens)) return
-
     // Fold every turn since the last summarized index — nothing between refreshes
     // is skipped, and the prior summary carries everything before it. Clamp the
     // index: a mid-thread delete can leave `contextTurnAt` past the current length.
     const sinceIndex = Math.min(chat.contextTurnAt ?? 0, messages.length)
     const newTurns = turnsSince(messages, sinceIndex)
-    if (!newTurns) return // nothing new to fold (e.g. after a deletion)
+    if (!newTurns) return chat.context ?? null // nothing new to fold (e.g. after a deletion)
     const input = `Summary so far:\n${chat.context ?? "(none yet)"}\n\nNew turns:\n${newTurns}`
     const turn = await llm.complete(
       [
@@ -87,10 +108,12 @@ export const maybeRefreshConversationContext = async (
       ],
       [],
     )
-    if (turn.kind !== "text") return
+    if (turn.kind !== "text") return chat.context ?? null
     const summary = turn.text.trim()
-    if (summary) await chats.setChatContext(chatUid, summary, { turnAt: turns, tokenAt: tokens })
+    if (!summary) return chat.context ?? null
+    await chats.setChatContext(chatUid, summary, { turnAt: turns, tokenAt: tokens })
+    return summary
   } catch {
-    // best-effort — never disrupt the turn
+    return null // best-effort — never disrupt the turn
   }
 }

@@ -10,6 +10,7 @@ import type { LlmMessage } from "@/features/agent/engine/types"
 import type { ReasoningStep } from "@/features/agent/types/stream"
 import { isToolCallStep } from "@/features/agent/types/stream"
 import type { ToolOutput } from "@/features/agent/types/tool-outputs"
+import { estimateTokens } from "./conversation-context"
 import { wrapWithMessageContext } from "./message-context"
 
 
@@ -22,6 +23,15 @@ const MAX_COMPACT_TEXT_LENGTH = 10_000
 // output doesn't dominate the re-sent history.
 export const RECENT_FULL_TURNS = 4
 export const MAX_AGED_OUTPUT_CHARS = 500
+
+
+// Compaction (Phase 6). The prompt is trimmed to a verbatim recent tail once its
+// estimated tokens cross COMPACT_PCT of the budget — the injected ## CONVERSATION
+// summary carries the earlier turns. Model-agnostic (the client catalog exposes no
+// per-model window); tunable. 50k stays well under modern windows (200k+).
+export const COMPACT_TOKEN_BUDGET = 50_000
+export const COMPACT_PCT = 0.8
+export const COMPACT_TAIL_MESSAGES = 6
 
 
 const truncate = (s: string, cap = MAX_COMPACT_TEXT_LENGTH): string =>
@@ -133,3 +143,22 @@ export const toLlmHistory = (messages: ChatMessage[], max = MAX_HISTORY_MESSAGES
     content: compactMessageContent(m, i >= fullFrom ? MAX_COMPACT_TEXT_LENGTH : MAX_AGED_OUTPUT_CHARS),
   }))
 }
+
+
+/** Approx tokens of the assembled prompt (system + history + this turn's message). */
+export const estimatePromptTokens = (system: string, history: LlmMessage[], userMessage: string): number =>
+  estimateTokens(system) + history.reduce((n, m) => n + estimateTokens(m.content), 0) + estimateTokens(userMessage)
+
+
+/** Whether the assembled prompt is over the compaction threshold. */
+export const isOverCompactionBudget = (system: string, history: LlmMessage[], userMessage: string): boolean =>
+  estimatePromptTokens(system, history, userMessage) >= COMPACT_PCT * COMPACT_TOKEN_BUDGET
+
+
+/**
+ * Compact history to a verbatim recent tail (Phase 6). The earlier turns are
+ * covered by the standing `## CONVERSATION` summary, so dropping them here bounds
+ * the prompt without losing their gist. Never trims below `COMPACT_TAIL_MESSAGES`
+ * (nothing to gain from trimming the tail we must keep).
+ */
+export const compactHistory = (history: LlmMessage[]): LlmMessage[] => history.slice(-COMPACT_TAIL_MESSAGES)

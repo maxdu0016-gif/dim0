@@ -35,9 +35,9 @@ import type { ChatMessage } from "@/features/agent/types/chat"
 import { agentLog } from "@/features/agent/engine/debug"
 import type { CanvasStore } from "@canvas-harness/core"
 import { latestAssistantText, stepsFromEvents } from "./agent-event-to-step"
-import { toLlmHistory } from "./chat-history"
+import { compactHistory, isOverCompactionBudget, toLlmHistory } from "./chat-history"
 import { maybeAutoLabelBoard, maybeDeriveBoardPurpose } from "./describe-board"
-import { maybeRefreshConversationContext } from "./conversation-context"
+import { maybeRefreshConversationContext, summarizeConversation } from "./conversation-context"
 import { buildBoardSnapshot, readRecentOps, renderBoardSnapshot } from "./board-snapshot"
 import { wrapWithMessageContext } from "./message-context"
 
@@ -216,7 +216,7 @@ export function useLocalSubmitPrompt(boardId: string, syncTranscript = false) {
 
       // Prior turns become context (captured before the new turn is appended)
       // so the agent remembers the conversation.
-      const history = toLlmHistory(useLocalMessagesStore.getState().messages)
+      let history = toLlmHistory(useLocalMessagesStore.getState().messages)
 
       // Stamp creation time (mirrors backend Message.created_at) so the UI
       // shows a real timestamp instead of "Pending…".
@@ -283,6 +283,17 @@ export function useLocalSubmitPrompt(boardId: string, syncTranscript = false) {
         const systemWithMemory = memoryBlock
           ? `${systemWithBoard}\n\n## MEMORY\n<memory>\n${memoryBlock}\n</memory>`
           : systemWithBoard
+        const userMessageForAgent = wrapWithMessageContext(prompt, messageContext)
+        // Compaction (Phase 6): when the prompt is over budget, trim history to a
+        // verbatim recent tail — the `## CONVERSATION` summary (built just below)
+        // carries the earlier turns. If the thread was never summarized, block once
+        // to produce that summary FIRST, so the block below reflects it. Fresh or
+        // stale context needs no LLM (the verbatim tail absorbs slight staleness).
+        if (isOverCompactionBudget(systemWithMemory, history, userMessageForAgent)) {
+          const chat = await (await getLocalStores()).chats.getChat(chatUid)
+          if (!chat?.context) await summarizeConversation(chatUid, useLocalMessagesStore.getState().messages, llm)
+          history = compactHistory(history)
+        }
         // Rolling thread summary (already self-fenced as `## CONVERSATION`).
         const conversationBlock = await buildConversationBlock(chatUid)
         const systemWithConversation = conversationBlock ? `${systemWithMemory}\n\n${conversationBlock}` : systemWithMemory
@@ -317,7 +328,6 @@ export function useLocalSubmitPrompt(boardId: string, syncTranscript = false) {
         const systemWithDocs = hasDocs
           ? `${systemWithConversation}\n\nThis board has uploaded documents. Use \`doc_search(query)\` — full-text over their contents — and for anything they could answer, call it FIRST, before answering from your own knowledge; ground the answer in the returned passages and cite each document by its exact title. (\`search_notes\` covers the board's own notes.)`
           : systemWithConversation
-        const userMessageForAgent = wrapWithMessageContext(prompt, messageContext)
         // Gate off-board tools (network/code) behind a user confirmation, so a
         // prompt-injected tool call can't silently exfiltrate or run code. A
         // standing per-tool "always allow" grant (Settings) skips the prompt for
