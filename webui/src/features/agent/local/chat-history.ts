@@ -108,16 +108,28 @@ const compactMessageContent = (message: ChatMessage, outputCap: number): string 
 
 /**
  * Convert the stored transcript into the agent's prior-turn context. Tool output
- * ages by recency: the last `RECENT_FULL_TURNS` kept messages keep full output;
+ * ages by recency: the last `RECENT_FULL_TURNS` ASSISTANT turns keep full output;
  * older ones shrink to `MAX_AGED_OUTPUT_CHARS`, so stale bulk doesn't dominate.
  */
 export const toLlmHistory = (messages: ChatMessage[], max = MAX_HISTORY_MESSAGES): LlmMessage[] => {
-  const kept = messages.filter((m) => m.role === "user" || m.role === "assistant").slice(-max)
-  const recentFrom = kept.length - RECENT_FULL_TURNS
-  return kept
-    .map((m, i) => ({
-      role: m.role as "user" | "assistant",
-      content: compactMessageContent(m, i >= recentFrom ? MAX_COMPACT_TEXT_LENGTH : MAX_AGED_OUTPUT_CHARS),
-    }))
-    .filter((m) => m.content !== "")
+  // Window = the last `max` messages that render to non-empty content. Emptiness
+  // is cap-independent (aging keeps the <ToolCall> wrapper + markdown), so a
+  // full-cap render is a sound emptiness probe — filter BEFORE slicing so empty
+  // turns don't consume window slots (matches the pre-aging behavior).
+  const window = messages
+    .filter((m) => m.role === "user" || m.role === "assistant")
+    .filter((m) => compactMessageContent(m, MAX_COMPACT_TEXT_LENGTH) !== "")
+    .slice(-max)
+  // Full-output cutoff = the index of the RECENT_FULL_TURNS-th assistant turn from
+  // the end (only assistant turns carry tool output); turns at/after it stay full.
+  let assistantSeen = 0
+  let fullFrom = 0
+  for (let i = window.length - 1; i >= 0; i -= 1) {
+    fullFrom = i
+    if (window[i].role === "assistant" && ++assistantSeen === RECENT_FULL_TURNS) break
+  }
+  return window.map((m, i) => ({
+    role: m.role as "user" | "assistant",
+    content: compactMessageContent(m, i >= fullFrom ? MAX_COMPACT_TEXT_LENGTH : MAX_AGED_OUTPUT_CHARS),
+  }))
 }

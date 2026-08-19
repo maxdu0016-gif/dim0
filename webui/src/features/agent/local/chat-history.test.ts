@@ -127,6 +127,27 @@ describe("toLlmHistory", () => {
   })
 
 
+  it("keeps full output for exactly the last RECENT_FULL_TURNS ASSISTANT turns (not messages)", () => {
+    const turns: ChatMessage[] = []
+    const total = RECENT_FULL_TURNS + 3
+    for (let i = 0; i < total; i += 1) turns.push(user(`q${i}`), assistant("", [bigOutputStep(`f${i}`, 5000)]))
+    const history = toLlmHistory(turns, turns.length)
+    // Assistant entries sit at the odd indices (each preceded by its user turn).
+    const fullCount = history.filter((_, i) => i % 2 === 1).map((h) => outputLen(h.content)).filter((n) => n === 5000).length
+    expect(fullCount).toBe(RECENT_FULL_TURNS) // 4 assistant turns, not 2
+  })
+
+
+  it("does not let an empty-rendering message consume a window slot", () => {
+    // An assistant turn with no text and no reasoning renders to "" — it must not
+    // eat a slot inside the last-`max` window (regression vs filter-before-slice).
+    const msgs = [...Array.from({ length: 16 }, (_, i) => user(`m${i}`)), assistant("", [])]
+    const history = toLlmHistory(msgs, 16)
+    expect(history).toHaveLength(16)
+    expect(history.map((h) => h.content)).toEqual(Array.from({ length: 16 }, (_, i) => `m${i}`))
+  })
+
+
   it("keeps a created note id visible even after a turn's output ages out", () => {
     const turns: ChatMessage[] = [user("build"), assistant("", [createNoteStep("n42", "Cats")])]
     // Pad with recent turns so the note turn is aged out of the full window.
