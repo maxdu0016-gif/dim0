@@ -8,6 +8,7 @@ import {
   estimateTokens,
   maybeRefreshConversationContext,
   shouldRefreshConversation,
+  turnsSince,
 } from "./conversation-context"
 
 
@@ -27,6 +28,24 @@ describe("estimateTokens", () => {
   it("approximates ~4 chars per token", () => {
     expect(estimateTokens("12345678")).toBe(2)
     expect(estimateTokens("")).toBe(0)
+  })
+})
+
+
+describe("turnsSince", () => {
+  it("keeps short but non-empty user turns (ok/yes/no)", () => {
+    const out = turnsSince([msg("user", "ok"), msg("assistant", "sure")], 0)
+    expect(out).toBe("user: ok\n\nassistant: sure")
+  })
+
+  it("drops empty-content messages", () => {
+    expect(turnsSince([msg("user", ""), msg("assistant", "hi")], 0)).toBe("assistant: hi")
+  })
+
+  it("folds every turn since the index (no middle-turn gap)", () => {
+    const all = Array.from({ length: 6 }, (_, i) => msg(i % 2 === 0 ? "user" : "assistant", `t${i}`))
+    // Prior refresh covered the first 2; this fold must include turns 2..5, not just the last few.
+    expect(turnsSince(all, 2)).toBe("user: t2\n\nassistant: t3\n\nuser: t4\n\nassistant: t5")
   })
 })
 

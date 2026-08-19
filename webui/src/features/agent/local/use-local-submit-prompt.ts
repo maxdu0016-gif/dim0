@@ -409,15 +409,20 @@ export function useLocalSubmitPrompt(boardId: string, syncTranscript = false) {
             agentLog.error("putChatTranscript", e),
           )
         }
-        // Turn-end derives (Phase 4), all fire-and-forget — never block the reply.
-        // Each is internally gated + best-effort. Reuse one client for all three.
-        const deriveLlm = resolveAgentLlm(config, { signedIn, runId, model: llmModel, byokModel })
-        // Auto-label a still-"Untitled" board from its first turn.
-        void maybeAutoLabelBoard(boardId, messages, deriveLlm)
-        // Re-derive the board purpose IF it drifted enough; refresh the rolling
-        // conversation summary IF the thread grew enough (both gate internally).
-        void maybeDeriveBoardPurpose(boardId, store, rootId, deriveLlm)
-        if (savedUid) void maybeRefreshConversationContext(savedUid, messages, deriveLlm)
+        // Commit this turn's debounced board writes BEFORE any turn-end derive
+        // reads the oplog — otherwise the purpose drift gate sees a stale tail and
+        // stamps its baseline below the agent's own ops (re-deriving them next turn).
+        await getBoardPersistenceRef()?.flush().catch((e) => agentLog.error("flush", e))
+        // Turn-end derives (Phase 4), fire-and-forget — never block the reply, each
+        // internally gated + best-effort. Reuse the turn's client (same runId).
+        // Auto-label THEN purpose derive are chained (not parallel): both do a
+        // read-modify-write on the same `boards` row, so running them concurrently
+        // would let one's put clobber the other's field (title vs context).
+        void maybeAutoLabelBoard(boardId, messages, llm)
+          .then(() => maybeDeriveBoardPurpose(boardId, store, rootId, llm))
+          .catch((e) => agentLog.error("boardDerive", e))
+        // Conversation summary writes a different store (`chats`) — safe in parallel.
+        if (savedUid) void maybeRefreshConversationContext(savedUid, messages, llm)
         // Mark everything up to now (incl. the agent's own writes this turn) as
         // "seen", so next turn's snapshot reports only what the USER changed.
         // Awaited (not fire-and-forget): the cursor must be committed before this

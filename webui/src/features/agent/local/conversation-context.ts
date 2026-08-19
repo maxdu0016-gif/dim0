@@ -31,13 +31,17 @@ const transcriptTokens = (messages: ChatMessage[]): number =>
   estimateTokens(messages.map((m) => m.content.markdown ?? "").join("\n"))
 
 
-/** The recent turns rendered for the fold input. */
-const recentTurnsText = (messages: ChatMessage[], take = 8): string =>
+/**
+ * The turns to fold this refresh: everything since the last summarized index
+ * (`sinceIndex` = the prior `contextTurnAt`), so no middle turn is skipped when
+ * many accumulate between refreshes. Empty-content messages are dropped by their
+ * actual body, not a rendered-line length (which silently ate short user turns).
+ */
+export const turnsSince = (messages: ChatMessage[], sinceIndex: number): string =>
   messages
-    .filter((m) => m.role === "user" || m.role === "assistant")
-    .slice(-take)
-    .map((m) => `${m.role}: ${m.content.markdown?.trim() ?? ""}`)
-    .filter((line) => line.length > "assistant: ".length)
+    .slice(sinceIndex)
+    .filter((m) => (m.role === "user" || m.role === "assistant") && m.content.markdown.trim() !== "")
+    .map((m) => `${m.role}: ${m.content.markdown.trim()}`)
     .join("\n\n")
 
 
@@ -69,7 +73,9 @@ export const maybeRefreshConversationContext = async (
     const tokens = transcriptTokens(messages)
     if (!shouldRefreshConversation(chat, turns, tokens)) return
 
-    const input = `Summary so far:\n${chat.context ?? "(none yet)"}\n\nLatest turns:\n${recentTurnsText(messages)}`
+    // Fold every turn since the last summarized index — nothing between refreshes
+    // is skipped, and the prior summary carries everything before it.
+    const input = `Summary so far:\n${chat.context ?? "(none yet)"}\n\nNew turns:\n${turnsSince(messages, chat.contextTurnAt ?? 0)}`
     const turn = await llm.complete(
       [
         { role: "system", content: CONV_CTX_PROMPT },
