@@ -508,4 +508,32 @@ describe("memory tools", () => {
     const res = (await recallMemory.run({ query: "BANANAS" }, ctx)) as { results: { title: string }[] }
     expect(res.results.map((r) => r.title)).toEqual(["other"])
   })
+
+
+  it("refuses to update or delete another board's memory via a surfaced id", async () => {
+    // A memory saved on board-2, then a board-1 turn tries to touch it by id.
+    const other = { boardId: "board-2", memory } as unknown as ToolContext
+    const { id } = (await saveMemory.run({ scope: "board", kind: "project", title: "t", summary: "s", body: "foreign" }, other)) as { id: string }
+    const upd = (await updateMemory.run({ id, body: "hijacked" }, ctx)) as { ok: boolean; error?: string }
+    const del = (await deleteMemory.run({ id }, ctx)) as { ok: boolean; error?: string }
+    expect(upd.ok).toBe(false)
+    expect(del.ok).toBe(false)
+    expect((await memory.list("board", "board-2"))[0].body).toBe("foreign") // untouched
+  })
+
+
+  it("still lets a board turn edit global memory (the user's own, cross-board)", async () => {
+    const { id } = (await save({ scope: "global", body: "global pref" })) as { id: string }
+    const res = (await updateMemory.run({ id, body: "revised pref" }, ctx)) as { ok: boolean }
+    expect(res.ok).toBe(true)
+    expect((await memory.list("global", null))[0].body).toBe("revised pref")
+  })
+
+
+  it("reports failure (not success) when updating/deleting an unknown id", async () => {
+    const upd = (await updateMemory.run({ id: "ghost", body: "x" }, ctx)) as { ok: boolean }
+    const del = (await deleteMemory.run({ id: "ghost" }, ctx)) as { ok: boolean }
+    expect(upd.ok).toBe(false)
+    expect(del.ok).toBe(false)
+  })
 })

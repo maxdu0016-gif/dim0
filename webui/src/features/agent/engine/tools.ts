@@ -420,6 +420,33 @@ const scopeBoardId = (scope: MemoryScope, ctx: ToolContext): string | null =>
   scope === "board" ? (ctx.boardId ?? null) : null
 
 
+/** The model-facing over-cap payload: the message + the entries to consolidate. */
+const overCapPayload = (entries: { id: string; title: string; summary: string }[]) => ({
+  ok: false as const,
+  reason: "over_cap" as const,
+  message: "Memory is full for this scope. Delete or merge an entry below, then retry.",
+  entries: entries.map((r) => ({ id: r.id, title: r.title, summary: r.summary })),
+})
+
+
+/** At most this many records come back from a single recall (bounds context cost). */
+const RECALL_MAX = 25
+
+
+/**
+ * Fetch a memory the current turn is allowed to edit/delete: it must exist, be
+ * live, and — if board-scoped — belong to THIS board. Blocks a board turn from
+ * mutating another board's memory via a surfaced/guessed id (global is the user's
+ * own and stays editable from any of their boards).
+ */
+const editableMemory = async (id: string, ctx: ToolContext) => {
+  const rec = await ctx.memory?.get(id)
+  if (!rec || rec.deleted) return { error: "no such memory" as const }
+  if (rec.scope === "board" && rec.boardId !== (ctx.boardId ?? null)) return { error: "that memory belongs to another board" as const }
+  return { rec }
+}
+
+
 export const saveMemory = defineTool({
   name: "save_memory",
   description:
@@ -448,14 +475,7 @@ export const saveMemory = defineTool({
       id: crypto.randomUUID(),
       now: Date.now(),
     })
-    if (!res.ok) {
-      return {
-        ok: false,
-        reason: "over_cap",
-        message: "Memory is full for this scope. Delete or merge an entry below, then retry.",
-        entries: res.entries.map((r) => ({ id: r.id, title: r.title, summary: r.summary })),
-      }
-    }
+    if (!res.ok) return overCapPayload(res.entries)
     return { ok: true, id: res.record.id, scope, title }
   },
 })
@@ -473,7 +493,10 @@ export const updateMemory = defineTool({
   }),
   run: async ({ id, title, summary, body, kind }, ctx) => {
     if (!ctx.memory) return { error: "memory unavailable" }
-    await ctx.memory.update(id, { title, summary, body, kind: kind as MemoryKind | undefined }, Date.now())
+    const owned = await editableMemory(id, ctx)
+    if ("error" in owned) return { ok: false, error: owned.error }
+    const res = await ctx.memory.update(id, { title, summary, body, kind: kind as MemoryKind | undefined }, Date.now())
+    if (!res.ok) return res.reason === "over_cap" ? overCapPayload(res.entries) : { ok: false, error: "no such memory" }
     return { ok: true, id }
   },
 })
@@ -485,8 +508,10 @@ export const deleteMemory = defineTool({
   parameters: z.object({ id: z.string() }),
   run: async ({ id }, ctx) => {
     if (!ctx.memory) return { error: "memory unavailable" }
-    await ctx.memory.remove(id, Date.now())
-    return { ok: true, id }
+    const owned = await editableMemory(id, ctx)
+    if ("error" in owned) return { ok: false, error: owned.error }
+    const removed = await ctx.memory.remove(id, Date.now())
+    return removed ? { ok: true, id } : { ok: false, error: "no such memory" }
   },
 })
 
@@ -507,8 +532,12 @@ export const recallMemory = defineTool({
     const records = (
       await Promise.all(scopes.map((s) => ctx.memory!.list(s, s === "board" ? (ctx.boardId ?? null) : null)))
     ).flat()
-    const hits = q ? records.filter((r) => `${r.title} ${r.summary} ${r.body}`.toLowerCase().includes(q)) : records
-    return { results: hits.map((r) => ({ id: r.id, scope: r.scope, kind: r.kind, title: r.title, summary: r.summary, body: r.body })) }
+    const matched = q ? records.filter((r) => `${r.title} ${r.summary} ${r.body}`.toLowerCase().includes(q)) : records
+    const hits = matched.slice(0, RECALL_MAX)
+    return {
+      results: hits.map((r) => ({ id: r.id, scope: r.scope, kind: r.kind, title: r.title, summary: r.summary, body: r.body })),
+      truncated: matched.length > RECALL_MAX,
+    }
   },
 })
 

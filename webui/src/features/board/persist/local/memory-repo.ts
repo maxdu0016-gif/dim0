@@ -47,7 +47,18 @@ export const memoryHash = (body: string): string => {
 const recordChars = (r: MemoryRecord): number => r.title.length + r.summary.length + r.body.length
 
 
+/** Sum the char weight of a set of records (the scope's used budget). */
+const sumChars = (records: MemoryRecord[]): number => records.reduce((sum, r) => sum + recordChars(r), 0)
+
+
+/** The per-scope char cap. */
+const capFor = (scope: MemoryScope): number => (scope === "board" ? BOARD_MEM_CHARS : GLOBAL_MEM_CHARS)
+
+
 export type AddResult = { ok: true; record: MemoryRecord } | { ok: false; reason: "over_cap"; entries: MemoryRecord[] }
+
+
+export type UpdateResult = { ok: true } | { ok: false; reason: "over_cap"; entries: MemoryRecord[] } | { ok: false; reason: "not_found" }
 
 
 export class MemoryRepo {
@@ -66,17 +77,15 @@ export class MemoryRepo {
   }
 
 
-  /** The live record in this scope with a matching body hash, if any (dedup probe). */
-  async findByHash(scope: MemoryScope, boardId: string | null, hash: string): Promise<MemoryRecord | undefined> {
-    const entries = await this.list(scope, boardId)
-    return entries.find((r) => r.hash === hash)
+  /** One record by id (including tombstoned), or undefined — for ownership checks. */
+  async get(id: string): Promise<MemoryRecord | undefined> {
+    return this.engine.get<MemoryRecord>("memories", id)
   }
 
 
   /** Total char weight of a scope's live records (capacity display + cap check). */
   async charCount(scope: MemoryScope, boardId: string | null): Promise<number> {
-    const entries = await this.list(scope, boardId)
-    return entries.reduce((sum, r) => sum + recordChars(r), 0)
+    return sumChars(await this.list(scope, boardId))
   }
 
 
@@ -101,10 +110,8 @@ export class MemoryRepo {
     const existing = entries.find((r) => r.hash === hash)
     if (existing) return { ok: true, record: existing }
 
-    const cap = scope === "board" ? BOARD_MEM_CHARS : GLOBAL_MEM_CHARS
-    const used = entries.reduce((sum, r) => sum + recordChars(r), 0)
     const incoming = input.title.length + input.summary.length + input.body.length
-    if (used + incoming > cap) return { ok: false, reason: "over_cap", entries }
+    if (sumChars(entries) + incoming > capFor(scope)) return { ok: false, reason: "over_cap", entries }
 
     const record: MemoryRecord = {
       id: input.id,
@@ -126,27 +133,43 @@ export class MemoryRepo {
   }
 
 
-  /** Patch a record's editable fields; re-hashes when the body changes. */
-  async update(id: string, patch: Partial<Pick<MemoryRecord, "title" | "summary" | "body" | "kind">>, now: number): Promise<void> {
+  /**
+   * Patch a record's editable fields; re-hashes when the body changes. Enforces
+   * the same per-scope char cap as `add` (a grow that would overflow is rejected
+   * with the scope's entries), and reports `not_found` for an unknown/tombstoned
+   * id so a caller never misreports a no-op as success.
+   */
+  async update(id: string, patch: Partial<Pick<MemoryRecord, "title" | "summary" | "body" | "kind">>, now: number): Promise<UpdateResult> {
     const current = await this.engine.get<MemoryRecord>("memories", id)
-    if (!current) return
+    if (!current || current.deleted) return { ok: false, reason: "not_found" }
     const body = patch.body ?? current.body
+    // Apply only DEFINED patch fields — spreading `...patch` would clobber an
+    // untouched field to undefined when the caller omits it (passes undefined).
     const next: MemoryRecord = {
       ...current,
-      ...patch,
+      title: patch.title ?? current.title,
+      summary: patch.summary ?? current.summary,
+      kind: patch.kind ?? current.kind,
       body,
       hash: patch.body !== undefined ? memoryHash(body) : current.hash,
       updatedAt: now,
       dirty: true,
     }
+    // Cap check against the scope's OTHER live records (this record is being
+    // replaced), so an edit can't grow memory past the budget `add` guards.
+    const others = (await this.list(current.scope, current.boardId)).filter((r) => r.id !== id)
+    if (sumChars(others) + recordChars(next) > capFor(current.scope)) return { ok: false, reason: "over_cap", entries: [...others, current] }
     await this.engine.put("memories", next)
+    return { ok: true }
   }
 
 
-  /** Soft-delete: mark a tombstone so the removal survives a reload / propagates. */
-  async remove(id: string, now: number): Promise<void> {
+  /** Soft-delete: mark a tombstone so the removal survives a reload / propagates.
+   *  Returns false for an unknown/already-tombstoned id (nothing changed). */
+  async remove(id: string, now: number): Promise<boolean> {
     const current = await this.engine.get<MemoryRecord>("memories", id)
-    if (!current) return
+    if (!current || current.deleted) return false
     await this.engine.put("memories", { ...current, deleted: true, updatedAt: now, dirty: true })
+    return true
   }
 }

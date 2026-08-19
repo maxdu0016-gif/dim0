@@ -96,7 +96,11 @@ const buildMemoryBlock = async (boardId: string): Promise<string> => {
   try {
     const { memories } = await getLocalStores()
     const [board, global] = await Promise.all([memories.list("board", boardId), memories.list("global", null)])
-    const line = (r: { id: string; kind: string; title: string; summary: string }) => `- ${r.id} · [${r.kind}] ${r.title} — ${r.summary}`
+    // Memory text is model-written and could carry a forged `</memory>` to break
+    // the data fence and re-inject as instructions. Neutralize the fence tokens
+    // and flatten newlines so one record stays one line.
+    const clean = (s: string) => s.replace(/<\/?memory>/gi, "").replace(/\s+/g, " ").trim()
+    const line = (r: { id: string; kind: string; title: string; summary: string }) => `- ${r.id} · [${r.kind}] ${clean(r.title)} — ${clean(r.summary)}`
     const sections: string[] = []
     if (board.length > 0) sections.push(`Board:\n${board.map(line).join("\n")}`)
     if (global.length > 0) sections.push(`Global:\n${global.map(line).join("\n")}`)

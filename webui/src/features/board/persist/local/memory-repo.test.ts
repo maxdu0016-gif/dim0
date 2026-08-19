@@ -104,4 +104,29 @@ for (const { label, make } of engineCases) describe(`MemoryRepo (${label})`, () 
     await repo.remove("m1", 2)
     expect(await repo.charCount("board", "b1")).toBe(0)
   })
+
+
+  it("update enforces the char cap (a grow that would overflow is rejected)", async () => {
+    await repo.add(addArgs({ id: "m1", body: "small" }))
+    const res = await repo.update("m1", { body: "z".repeat(BOARD_MEM_CHARS + 1) }, 5)
+    expect(res.ok).toBe(false)
+    if (!res.ok) expect(res.reason).toBe("over_cap")
+    expect((await repo.list("board", "b1"))[0].body).toBe("small") // unchanged
+  })
+
+
+  it("update reports not_found for an unknown or tombstoned id", async () => {
+    expect(await repo.update("ghost", { body: "x" }, 1)).toEqual({ ok: false, reason: "not_found" })
+    await repo.add(addArgs({ id: "m1", body: "x" }))
+    await repo.remove("m1", 2)
+    expect(await repo.update("m1", { body: "y" }, 3)).toEqual({ ok: false, reason: "not_found" })
+  })
+
+
+  it("remove reports whether anything changed", async () => {
+    await repo.add(addArgs({ id: "m1", body: "x" }))
+    expect(await repo.remove("m1", 2)).toBe(true)
+    expect(await repo.remove("m1", 3)).toBe(false) // already tombstoned
+    expect(await repo.remove("ghost", 4)).toBe(false)
+  })
 })
