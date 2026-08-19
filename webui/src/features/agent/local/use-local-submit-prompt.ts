@@ -35,7 +35,7 @@ import type { ChatMessage } from "@/features/agent/types/chat"
 import { agentLog } from "@/features/agent/engine/debug"
 import type { CanvasStore } from "@canvas-harness/core"
 import { latestAssistantText, stepsFromEvents } from "./agent-event-to-step"
-import { compactHistory, isOverCompactionBudget, toLlmHistory } from "./chat-history"
+import { COMPACT_TAIL_MESSAGES, compactHistory, isOverCompactionBudget, toLlmHistory } from "./chat-history"
 import { maybeAutoLabelBoard, maybeDeriveBoardPurpose } from "./describe-board"
 import { maybeRefreshConversationContext, summarizeConversation } from "./conversation-context"
 import { buildBoardSnapshot, readRecentOps, renderBoardSnapshot } from "./board-snapshot"
@@ -293,17 +293,24 @@ export function useLocalSubmitPrompt(boardId: string, syncTranscript = false) {
         // trimmed turns after compaction.
         let conversationBlock = await buildConversationBlock(chatUid)
         const systemWith = (convo: string) => (convo ? `${systemWithMemory}\n\n${convo}` : systemWithMemory)
-        // Compaction (Phase 6): when the prompt is over budget, fold everything up to
-        // now into the summary (no LLM when already current), THEN trim history to a
-        // verbatim recent tail — the `## CONVERSATION` block carries the earlier turns.
-        // Trim ONLY if a summary is actually available, so a never-summarized thread
-        // whose summarize failed keeps full history instead of losing every prior turn.
-        if (isOverCompactionBudget(systemWith(conversationBlock), history, userMessageForAgent)) {
-          const summary = await summarizeConversation(chatUid, priorMessages, llm)
-          if (summary) {
-            history = compactHistory(history)
-            conversationBlock = await buildConversationBlock(chatUid) // reflect a just-folded summary
+        // Compaction (Phase 6): when the prompt is over budget, trim history to a
+        // verbatim recent tail — the `## CONVERSATION` summary carries the dropped
+        // turns. The estimate omits the small, fixed docs steer appended below; the
+        // 40k→50k headroom absorbs it. Trim ONLY once the summary actually covers the
+        // drop point: splice with NO LLM when it already does (the common case, since
+        // the turn-end refresh keeps it fresh), and fold once to catch up when it
+        // lags — never trim without coverage, so no middle turn is silently lost.
+        if (history.length > COMPACT_TAIL_MESSAGES && isOverCompactionBudget(systemWith(conversationBlock), history, userMessageForAgent)) {
+          const dropCount = priorMessages.length - COMPACT_TAIL_MESSAGES // store messages dropped from the sent tail
+          const { chats } = await getLocalStores()
+          const covers = (c?: { context?: string; contextTurnAt?: number }) => !!c?.context && (c.contextTurnAt ?? 0) >= dropCount
+          let chat = await chats.getChat(chatUid)
+          if (!covers(chat)) {
+            await summarizeConversation(chatUid, priorMessages, llm) // blocking catch-up (rare)
+            chat = await chats.getChat(chatUid)
+            if (covers(chat)) conversationBlock = await buildConversationBlock(chatUid) // reflect the fold
           }
+          if (covers(chat)) history = compactHistory(history)
         }
         const systemWithConversation = systemWith(conversationBlock)
         const search = getSearchIndexRef() ?? undefined

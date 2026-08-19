@@ -200,4 +200,17 @@ describe("compaction", () => {
     const short = hist("a", "b")
     expect(compactHistory(short)).toEqual(short)
   })
+
+
+  it("compactHistory drops a leading assistant so the tail starts user-first", () => {
+    // A window whose last COMPACT_TAIL_MESSAGES begin with an assistant turn.
+    const full: LlmMessage[] = [
+      ...Array.from({ length: 4 }, (_, i): LlmMessage => ({ role: "user", content: `x${i}` })),
+      { role: "assistant", content: "a0" }, // this becomes the first of the tail
+      ...Array.from({ length: COMPACT_TAIL_MESSAGES }, (_, i): LlmMessage => ({ role: i % 2 === 0 ? "user" : "assistant", content: `t${i}` })),
+    ]
+    const trimmed = compactHistory(full)
+    expect(trimmed[0].role).toBe("user") // never assistant-first
+    expect(trimmed.length).toBeLessThanOrEqual(COMPACT_TAIL_MESSAGES)
+  })
 })

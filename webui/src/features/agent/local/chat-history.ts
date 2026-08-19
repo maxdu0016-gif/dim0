@@ -158,7 +158,12 @@ export const isOverCompactionBudget = (system: string, history: LlmMessage[], us
 /**
  * Compact history to a verbatim recent tail (Phase 6). The earlier turns are
  * covered by the standing `## CONVERSATION` summary, so dropping them here bounds
- * the prompt without losing their gist. Never trims below `COMPACT_TAIL_MESSAGES`
- * (nothing to gain from trimming the tail we must keep).
+ * the prompt without losing their gist. Drops a leading assistant message so the
+ * tail starts with a user turn — a history that begins assistant-first (before the
+ * turn's user message) is rejected by strict providers (e.g. Anthropic).
  */
-export const compactHistory = (history: LlmMessage[]): LlmMessage[] => history.slice(-COMPACT_TAIL_MESSAGES)
+export const compactHistory = (history: LlmMessage[]): LlmMessage[] => {
+  let tail = history.slice(-COMPACT_TAIL_MESSAGES)
+  while (tail.length > 0 && tail[0].role === "assistant") tail = tail.slice(1)
+  return tail
+}
