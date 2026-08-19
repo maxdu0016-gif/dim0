@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useNavigate } from "@tanstack/react-router"
 import { LocalBoardUrl } from "@/routes"
 import { isTauri } from "@/platform"
@@ -65,7 +65,7 @@ import { useBlockFolderCopy } from "./use-block-folder-copy"
 import { resolveStoredEdgeColors, useStampNewEdges } from "./use-stamp-new-edges"
 import { useStampNewNodes } from "./use-stamp-new-nodes"
 import { useLocalSearchIndex } from "@/features/board/search/use-search-index"
-import { isLocalAgentOnSynced } from "@/features/agent/local/local-agent-flag"
+import { isBrowserAgentActive } from "@/features/agent/local/local-agent-flag"
 import { useLocalDocIndex } from "@/features/board/search/use-doc-index"
 import { useDocNodeCascade } from "@/features/board/harness/agent/use-doc-node-cascade"
 import { useStyleMemory } from "./use-style-memory"
@@ -176,7 +176,9 @@ export function HarnessCanvas({ local = false }: { local?: boolean } = {}) {
   // boards in browser-agent mode. Gating on `local` alone left `search_notes` with
   // a null index (empty results for EVERY query) on synced browser-agent boards.
   // Persistence/hydrate below stays gated on `local` — synced boards still sync.
-  const agentLocalIndexes = local || isLocalAgentOnSynced()
+  // Memoized: the flag is reload-stable, so don't read localStorage every render
+  // of this hot canvas component.
+  const agentLocalIndexes = useMemo(() => isBrowserAgentActive(local), [local])
   useLocalSearchIndex(store, agentLocalIndexes)
   useLocalDocIndex(boardId ?? "", agentLocalIndexes)
   useDocNodeCascade(store, boardId ?? "", agentLocalIndexes)
