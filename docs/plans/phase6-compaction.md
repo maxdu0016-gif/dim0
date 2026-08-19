@@ -54,10 +54,12 @@ So the assembly order becomes: resolve compaction (maybe summarize + update cont
 ## Budget — model-agnostic
 
 The client model catalog (`PublicModel`) carries **no context-window size**, and BYOK targets
-arbitrary provider models, so a per-model window isn't knowable client-side. Use a conservative,
-tunable constant `COMPACT_TOKEN_BUDGET` (proposed ~24_000) at `COMPACT_PCT` (proposed 0.8) — a
-history-cost ceiling that stays safely under every supported model's window and controls token spend.
-(If the catalog later gains a window field, derive the budget from it.)
+arbitrary provider models, so a per-model window isn't knowable client-side. Use a tunable constant
+`COMPACT_TOKEN_BUDGET = 50_000` at `COMPACT_PCT = 0.8` (compact at ~40k prompt tokens). 50k stays
+safely under every supported model's window (modern windows are 200k+) while leaving enough headroom
+that recent history isn't trimmed prematurely on moderately long threads — a lower ceiling (~24k) was
+too eager, sacrificing conversational fidelity to save tokens the models can easily afford. (If the
+catalog later gains a window field, derive the budget from it instead of the constant.)
 
 ## Changes (file by file)
 
