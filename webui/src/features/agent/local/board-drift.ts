@@ -22,10 +22,11 @@ export const BOARD_DRIFT_DAYS = 14
 const DAY_MS = 86_400_000
 
 
-/** The content mass of a node: its label + body length. */
-const nodeMass = (node: unknown): number => {
-  const n = node as { content?: string; data?: { label?: { markdown?: string } } }
-  return (n.data?.label?.markdown?.length ?? 0) + (n.content?.length ?? 0)
+/** The content mass of a node/patch: its label + body length. Only text fields
+ *  count — position/style churn (a layout patch) carries no content mass. */
+const contentMass = (v: unknown): number => {
+  const n = v as { content?: string; data?: { label?: { markdown?: string } } }
+  return (typeof n.content === "string" ? n.content.length : 0) + (n.data?.label?.markdown?.length ?? 0)
 }
 
 
@@ -42,12 +43,13 @@ export const boardDriftSince = (recentOps: OplogRecord[]): BoardDrift => {
     for (const op of rec.batch.ops) {
       if (op.type === "node.add") {
         touched.add(String(op.node.id))
-        charsChanged += nodeMass(op.node)
+        charsChanged += contentMass(op.node)
       } else if (op.type === "node.update") {
         touched.add(String(op.id))
-        // Approx edit delta — over-counts slightly (whole patch), harmless for a
-        // magnitude gate; the true field-level delta isn't worth reconstructing.
-        charsChanged += JSON.stringify(op.patch ?? {}).length
+        // Only the patch's TEXT fields count — a position/style-only patch (e.g.
+        // agent auto-arrange) is churn, not content drift. Over-counts an edit
+        // slightly (whole new field vs true delta), harmless for a magnitude gate.
+        charsChanged += contentMass(op.patch)
       } else if (op.type === "node.remove") {
         // Structural churn only — a delete adds no content mass, but bumps the
         // node-count fallback so a big prune still trips the gate.

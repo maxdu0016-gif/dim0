@@ -47,6 +47,10 @@ describe("turnsSince", () => {
     // Prior refresh covered the first 2; this fold must include turns 2..5, not just the last few.
     expect(turnsSince(all, 2)).toBe("user: t2\n\nassistant: t3\n\nuser: t4\n\nassistant: t5")
   })
+
+  it("is empty when the index is past the end (post-deletion safety)", () => {
+    expect(turnsSince([msg("user", "hi")], 5)).toBe("")
+  })
 })
 
 

@@ -74,8 +74,12 @@ export const maybeRefreshConversationContext = async (
     if (!shouldRefreshConversation(chat, turns, tokens)) return
 
     // Fold every turn since the last summarized index — nothing between refreshes
-    // is skipped, and the prior summary carries everything before it.
-    const input = `Summary so far:\n${chat.context ?? "(none yet)"}\n\nNew turns:\n${turnsSince(messages, chat.contextTurnAt ?? 0)}`
+    // is skipped, and the prior summary carries everything before it. Clamp the
+    // index: a mid-thread delete can leave `contextTurnAt` past the current length.
+    const sinceIndex = Math.min(chat.contextTurnAt ?? 0, messages.length)
+    const newTurns = turnsSince(messages, sinceIndex)
+    if (!newTurns) return // nothing new to fold (e.g. after a deletion)
+    const input = `Summary so far:\n${chat.context ?? "(none yet)"}\n\nNew turns:\n${newTurns}`
     const turn = await llm.complete(
       [
         { role: "system", content: CONV_CTX_PROMPT },

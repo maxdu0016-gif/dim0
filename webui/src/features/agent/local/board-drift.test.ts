@@ -47,10 +47,17 @@ describe("boardDriftSince", () => {
   })
 
 
-  it("counts an update's patch mass and the node as touched", () => {
+  it("counts an update's TEXT content mass and the node as touched", () => {
     const drift = boardDriftSince([rec(1, [updOp("n1", { content: "abcd" })])])
-    expect(drift.charsChanged).toBe(JSON.stringify({ content: "abcd" }).length)
+    expect(drift.charsChanged).toBe(4) // the content text, not the JSON envelope
     expect(drift.nodesTouched).toBe(1)
+  })
+
+
+  it("ignores a layout-only patch's content mass (position churn is not drift)", () => {
+    const drift = boardDriftSince([rec(1, [updOp("n1", { position: { x: 10, y: 20 } })])])
+    expect(drift.charsChanged).toBe(0) // no text changed
+    expect(drift.nodesTouched).toBe(1) // still structural churn
   })
 
 

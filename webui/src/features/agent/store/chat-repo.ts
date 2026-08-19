@@ -91,14 +91,19 @@ export class ChatRepo {
     gate: { turnAt: number; tokenAt: number },
     now: number = Date.now(),
   ): Promise<void> {
-    const prev = await this.engine.get<LocalChat>("chats", chatUid)
-    if (!prev) return
-    await this.engine.put<LocalChat>("chats", {
-      ...prev,
-      context,
-      contextTurnAt: gate.turnAt,
-      contextTokenAt: gate.tokenAt,
-      updatedAt: now,
+    // Read-modify-write in ONE transaction so it serializes against the concurrent
+    // `saveTranscript` (also a chats RMW) — otherwise a next-turn save could read
+    // `prev` before this write lands and clobber the just-written summary.
+    await this.engine.tx(["chats"], async (t) => {
+      const prev = await t.get<LocalChat>("chats", chatUid)
+      if (!prev) return
+      await t.put<LocalChat>("chats", {
+        ...prev,
+        context,
+        contextTurnAt: gate.turnAt,
+        contextTokenAt: gate.tokenAt,
+        updatedAt: now,
+      })
     })
   }
 

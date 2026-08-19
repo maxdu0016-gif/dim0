@@ -271,6 +271,7 @@ export function useLocalSubmitPrompt(boardId: string, syncTranscript = false) {
       // stream builder). Structural events (tool start/result) force an
       // immediate repaint; the final frame below always flushes.
       const gate = createFlushGate()
+      let turnErrored = false
       try {
         const system = planSystemPrompt(new Date().toLocaleString())
         // Deterministic board awareness (no LLM), injected as a standing section.
@@ -388,6 +389,7 @@ export function useLocalSubmitPrompt(boardId: string, syncTranscript = false) {
           })
         }
       } catch (e) {
+        turnErrored = true
         agentLog.error("runAgent", e)
         // Mark it as an error so it doesn't read like a normal answer. An
         // over-quota rejection (429) gets a friendly upgrade nudge instead of a
@@ -409,10 +411,13 @@ export function useLocalSubmitPrompt(boardId: string, syncTranscript = false) {
             agentLog.error("putChatTranscript", e),
           )
         }
-        // Commit this turn's debounced board writes BEFORE any turn-end derive
-        // reads the oplog — otherwise the purpose drift gate sees a stale tail and
-        // stamps its baseline below the agent's own ops (re-deriving them next turn).
-        await getBoardPersistenceRef()?.flush().catch((e) => agentLog.error("flush", e))
+        // Mark everything up to now (incl. the agent's own writes this turn) as
+        // "seen", so next turn's snapshot reports only what the USER changed. Runs
+        // FIRST because it flushes the board's debounced writes — the turn-end
+        // derives below then read a fresh oplog (not a stale tail). Awaited: the
+        // cursor must commit before the callback resolves, so a fast back-to-back
+        // prompt can't read the stale cursor and re-report the agent's own writes.
+        await advanceBoardSnapshotCursor(boardId).catch((e) => agentLog.error("advanceBoardSnapshotCursor", e))
         // Turn-end derives (Phase 4), fire-and-forget — never block the reply, each
         // internally gated + best-effort. Reuse the turn's client (same runId).
         // Auto-label THEN purpose derive are chained (not parallel): both do a
@@ -421,14 +426,9 @@ export function useLocalSubmitPrompt(boardId: string, syncTranscript = false) {
         void maybeAutoLabelBoard(boardId, messages, llm)
           .then(() => maybeDeriveBoardPurpose(boardId, store, rootId, llm))
           .catch((e) => agentLog.error("boardDerive", e))
-        // Conversation summary writes a different store (`chats`) — safe in parallel.
-        if (savedUid) void maybeRefreshConversationContext(savedUid, messages, llm)
-        // Mark everything up to now (incl. the agent's own writes this turn) as
-        // "seen", so next turn's snapshot reports only what the USER changed.
-        // Awaited (not fire-and-forget): the cursor must be committed before this
-        // turn's callback resolves, so a fast back-to-back prompt can't read the
-        // stale cursor and re-report the agent's own writes as user changes.
-        await advanceBoardSnapshotCursor(boardId).catch((e) => agentLog.error("advanceBoardSnapshotCursor", e))
+        // Skip the conversation summary on a failed turn — its transcript ends in a
+        // transient error line that must not enter the durable rolling summary.
+        if (savedUid && !turnErrored) void maybeRefreshConversationContext(savedUid, messages, llm)
       }
     },
     [asConfig, searchByok, searchEngine, codeByok, llmModel, llmCatalog, signedIn, syncTranscript, setMessages, setChatUid, persist, boardId, navigate],
