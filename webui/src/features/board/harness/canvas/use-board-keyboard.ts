@@ -48,6 +48,7 @@ const TOOL_SHORTCUTS: Record<string, string> = {
  *  - M                            → toggle Slides panel
  *  - G                            → open Icons search dialog
  *  - I                            → open Images search dialog
+ *  - Escape                       → return to select tool (unless an overlay owns it)
  *
  * Skipped when focus is in an input / textarea / contentEditable so
  * inline editing keeps the native shortcuts. canvas-harness already
@@ -120,7 +121,55 @@ export const useBoardKeyboard = (store: CanvasStore): void => {
       }
     }
 
+    // Escape returns the canvas to the `select` tool (matches tldraw/excalidraw),
+    // so a create tool (rect / note / arrow / …) isn't left stuck after one shape.
+    // Registered in the CAPTURE phase on purpose: it must read overlay state
+    // BEFORE the same Escape is consumed by a handler that clears it — Radix
+    // dialogs/menus close on a document-level capture handler (clearing
+    // `chromeDialog`), and the presentation / node-surface handlers are window
+    // bubble listeners that clear their own flags. Reading in bubble phase would
+    // race all of them. When an overlay owns the Escape we defer to its close and
+    // leave the tool untouched; canvas-harness's own Escape handler still clears
+    // the selection + aborts an in-progress drag / marquee / draft edge.
+    //
+    // "Is an overlay open?" is a hand-maintained enumeration (store flags below +
+    // the focused-overlay DOM guard). A shared open-overlay signal would be less
+    // fragile — new overlays must remember to opt in here — but that's a broader
+    // refactor; this list covers every dismissable the board mounts today.
+    const onEscape = (e: KeyboardEvent): void => {
+      if (e.key !== "Escape") return
+      if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return
+      if (isTypingTarget(e.target)) return
+      const app = useBoardAppStore.getState()
+      // The tool only exists on the board canvas — no-op in files / list views.
+      if (app.viewMode !== "board") return
+      // Overlays whose open-state lives in the store own the Escape; their own
+      // handlers close them, so don't also steal the tool switch. `chatSheetOpen`
+      // needs the explicit flag because the CopilotSheet is non-modal — focus
+      // stays on the canvas, so the focused-overlay DOM guard below misses it.
+      if (
+        app.chromeDialog ||
+        app.activeNodeSurface ||
+        app.presentationMode ||
+        app.chatSheetOpen
+      )
+        return
+      // Store-less Radix overlays (view menu, context menu, delete-confirm alert)
+      // keep open-state locally — skip when the Escape is focused inside one.
+      const target = e.target
+      if (
+        target instanceof HTMLElement &&
+        target.closest("[role='menu'],[role='dialog'],[role='alertdialog']")
+      )
+        return
+      if (app.tool !== "select") app.setTool("select")
+    }
+
     window.addEventListener("keydown", onKey)
-    return () => window.removeEventListener("keydown", onKey)
+    window.addEventListener("keydown", onEscape, true)
+    return () => {
+      window.removeEventListener("keydown", onKey)
+      window.removeEventListener("keydown", onEscape, true)
+    }
   }, [store])
 }
