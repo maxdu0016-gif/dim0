@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest"
 import { asNodeId } from "@canvas-harness/core"
 import type { Edge } from "@canvas-harness/core"
 import type { DimNodeData } from "@/features/board/model"
+import { labelText } from "@/features/board/model"
 import { BoardRegistry, newLocalBoard } from "@/features/board/persist/local/board-registry"
 import { LocalSearchIndex } from "@/features/board/search/local-index"
 import { addNode, freshStore, resetIdb } from "@/test/canvas"
@@ -26,7 +27,7 @@ const drain = async (gen: AsyncGenerator<AgentEvent>): Promise<AgentEvent[]> => 
 const endNode = (end: Edge["source"]): string => ("nodeId" in end ? String(end.nodeId) : "free")
 
 
-const titleOf = (data: unknown): string => (data as DimNodeData | undefined)?.label ?? ""
+const titleOf = (data: unknown): string => labelText((data as DimNodeData | undefined)?.label)
 
 
 beforeEach(() => {
@@ -643,5 +644,53 @@ describe("runAgent — declined off-board tool is not re-prompted across turns",
     )
     expect(prompts).toBe(1) // approved for the request — only the first call prompted
     expect(ran.value).toBe(2) // both searches ran
+  })
+})
+
+
+describe("runAgent intra-run tool-result cap", () => {
+  // A client that requests one tool call, then captures the messages it's given
+  // on the follow-up round (where the tool result rides as a `tool` message).
+  const captureAfterTool = (toolName: string) => {
+    let captured: LlmMessage[] | null = null
+    const llm: LlmClient = {
+      complete: async (messages) => {
+        if (messages.some((m) => m.role === "tool")) {
+          captured = messages
+          return { kind: "text", text: "done" }
+        }
+        return { kind: "tool_calls", calls: [{ id: "c1", name: toolName, arguments: "{}" }] }
+      },
+    }
+    return { llm, toolMessage: () => captured?.find((m) => m.role === "tool") }
+  }
+
+
+  it("truncates a large tool result (head kept, marker added)", async () => {
+    const bigTool: Tool = { name: "fetch", description: "d", parameters: z.object({}), run: async () => "y".repeat(20000) }
+    const cap = captureAfterTool("fetch")
+    await drain(runAgent({ userMessage: "fetch it", tools: [bigTool], llm: cap.llm, ctx: {} as ToolContext }))
+    const content = cap.toolMessage()?.content ?? ""
+    expect(content.length).toBeLessThan(20000)
+    expect(content).toContain("truncated")
+    expect(content.startsWith('"yyy')).toBe(true) // head preserved
+  })
+
+
+  it("is byte-stable — the same large result truncates identically across runs", async () => {
+    const bigTool: Tool = { name: "fetch", description: "d", parameters: z.object({}), run: async () => "z".repeat(20000) }
+    const a = captureAfterTool("fetch")
+    const b = captureAfterTool("fetch")
+    await drain(runAgent({ userMessage: "x", tools: [bigTool], llm: a.llm, ctx: {} as ToolContext }))
+    await drain(runAgent({ userMessage: "x", tools: [bigTool], llm: b.llm, ctx: {} as ToolContext }))
+    expect(a.toolMessage()?.content).toBe(b.toolMessage()?.content)
+  })
+
+
+  it("leaves a small tool result untouched", async () => {
+    const smallTool: Tool = { name: "get_note", description: "d", parameters: z.object({}), run: async () => ({ id: "n1", ok: true }) }
+    const cap = captureAfterTool("get_note")
+    await drain(runAgent({ userMessage: "read", tools: [smallTool], llm: cap.llm, ctx: {} as ToolContext }))
+    expect(cap.toolMessage()?.content).toBe(JSON.stringify({ id: "n1", ok: true }))
   })
 })

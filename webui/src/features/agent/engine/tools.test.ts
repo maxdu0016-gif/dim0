@@ -1,12 +1,15 @@
 import { beforeEach, describe, expect, it } from "vitest"
 import { asNodeId } from "@canvas-harness/core"
-import type { CanvasStore } from "@canvas-harness/core"
+import type { CanvasStore, Node } from "@canvas-harness/core"
 import { freshStore, resetIdb } from "@/test/canvas"
 import type { DimEdgeData, DimNodeData } from "@/features/board/model"
+import { labelText } from "@/features/board/model"
 import { setBoardThemeMode } from "@/features/board/harness/theme/theme-mode-ref"
 import { LocalSearchIndex } from "@/features/board/search/local-index"
 import type { BoardRegistry } from "@/features/board/persist/local/board-registry"
 import type { ToolContext } from "./types"
+import { InMemoryEngine } from "@/features/board/persist/local/in-memory-engine"
+import { MemoryRepo } from "@/features/board/persist/local/memory-repo"
 import {
   createNote,
   updateNote,
@@ -16,6 +19,10 @@ import {
   editNote,
   searchNotes,
   listBoards,
+  saveMemory,
+  updateMemory,
+  deleteMemory,
+  recallMemory,
 } from "./tools"
 
 
@@ -30,8 +37,8 @@ const fakeRegistry = (boards: { id: string; title: string }[]): BoardRegistry =>
 
 
 // Read helpers over the real store.
-const label = (store: CanvasStore, id: string): unknown =>
-  (store.getNode(asNodeId(id))?.data as DimNodeData | undefined)?.label
+const label = (store: CanvasStore, id: string): string =>
+  labelText((store.getNode(asNodeId(id))?.data as DimNodeData | undefined)?.label)
 const parentOf = (store: CanvasStore, id: string): unknown =>
   (store.getNode(asNodeId(id))?.data as DimNodeData | undefined)?.parentId
 const body = (store: CanvasStore, id: string): string | undefined => store.getNode(asNodeId(id))?.content
@@ -44,7 +51,7 @@ const seed = (store: CanvasStore, id: string, opts: { label?: string; content?: 
     type: "rect",
     x: 0, y: 0, w: 100, h: 50, angle: 0, groups: [],
     content: opts.content ?? "",
-    data: { label: opts.label ?? "", meta: { v: 1, createdAt: 0, updatedAt: 0 } } satisfies DimNodeData,
+    data: { label: { markdown: opts.label ?? "" }, meta: { v: 1, createdAt: 0, updatedAt: 0 } } satisfies DimNodeData,
   })
 }
 
@@ -308,6 +315,29 @@ describe("getNote", () => {
   it("returns an error for a missing note", async () => {
     expect(await getNote.run({ note_id: "ghost" }, ctx)).toEqual({ error: "note not found" })
   })
+
+  it("reads a cross-folder note via boardNotes (not in the layer-scoped store)", async () => {
+    const other = {
+      id: asNodeId("other"), type: "rect", x: 0, y: 0, w: 100, h: 50, angle: 0, z: 0, groups: [],
+      content: "body in another folder", data: { label: { markdown: "Elsewhere" }, meta: { v: 1, createdAt: 0, updatedAt: 0 } },
+    } as unknown as Node
+    const c = { store, rootId: null, boardNotes: new Map([["other", other]]) } as unknown as ToolContext
+    expect(await getNote.run({ note_id: "other" }, c)).toEqual({
+      id: "other", label: "Elsewhere", content: "body in another folder", note_type: "rect",
+    })
+  })
+
+  it("returns the label as a plain string for both RichText and legacy-string labels", async () => {
+    // RichText (production shape) — must be unwrapped to a string, not the object.
+    seed(store, "rich", { label: "Rich Title", content: "b" })
+    expect((await getNote.run({ note_id: "rich" }, ctx) as { label: string }).label).toBe("Rich Title")
+    // Legacy bare-string label (older local board) — tolerated by labelText.
+    store.addNode({
+      id: asNodeId("legacy"), type: "rect", x: 0, y: 0, w: 100, h: 50, angle: 0, groups: [],
+      data: { label: "Legacy Title" as unknown as { markdown: string }, meta: { v: 1, createdAt: 0, updatedAt: 0 } },
+    })
+    expect((await getNote.run({ note_id: "legacy" }, ctx) as { label: string }).label).toBe("Legacy Title")
+  })
 })
 
 
@@ -358,11 +388,11 @@ describe("searchNotes", () => {
     expect(await searchNotes.run({ query: "x" }, { store, rootId: null })).toEqual({ results: [] })
   })
 
-  it("maps hit ids to {id, title, content} from the store", async () => {
+  it("maps hit ids to {id, title, content, parentId} from the store", async () => {
     seed(store, "n1", { label: "Title one", content: "body one" })
     ctx = { store, rootId: null, search: fakeSearch(["n1"]) }
     expect(await searchNotes.run({ query: "one" }, ctx)).toEqual({
-      results: [{ id: "n1", title: "Title one", content: "body one" }],
+      results: [{ id: "n1", title: "Title one", content: "body one", parentId: null }],
     })
   })
 
@@ -381,10 +411,20 @@ describe("searchNotes", () => {
     expect(res.results).toHaveLength(8)
   })
 
-  it("yields empty strings for a hit whose node is gone", async () => {
+  it("drops a stale hit whose node no longer resolves (no phantom empty citation)", async () => {
     ctx = { store, rootId: null, search: fakeSearch(["missing"]) }
-    expect(await searchNotes.run({ query: "x" }, ctx)).toEqual({
-      results: [{ id: "missing", title: "", content: "" }],
+    expect(await searchNotes.run({ query: "x" }, ctx)).toEqual({ results: [] })
+  })
+
+  it("resolves a cross-folder hit via boardNotes (absent from the layer-scoped store)", async () => {
+    // The note lives in another folder → not in the store; the whole-board map has it.
+    const other = {
+      id: asNodeId("other"), type: "rect", x: 0, y: 0, w: 100, h: 50, angle: 0, z: 0, groups: [],
+      content: "cross folder body", data: { label: { markdown: "Other Folder Note" }, meta: { v: 1, createdAt: 0, updatedAt: 0 } },
+    } as unknown as Node
+    ctx = { store, rootId: null, search: fakeSearch(["other"]), boardNotes: new Map([["other", other]]) }
+    expect(await searchNotes.run({ query: "cross" }, ctx)).toEqual({
+      results: [{ id: "other", title: "Other Folder Note", content: "cross folder body", parentId: null }],
     })
   })
 
@@ -432,5 +472,102 @@ describe("defineTool argument validation", () => {
   it("rejects a missing required argument", async () => {
     const res = (await linkNotes.run({ sourceId: "a" }, ctx)) as { error?: string }
     expect(res.error).toMatch(/invalid arguments/)
+  })
+})
+
+
+describe("memory tools", () => {
+  let memory: MemoryRepo
+  let ctx: ToolContext
+
+
+  beforeEach(() => {
+    memory = new MemoryRepo(new InMemoryEngine())
+    ctx = { boardId: "board-1", memory } as unknown as ToolContext
+  })
+
+
+  const save = (over: Record<string, unknown> = {}) =>
+    saveMemory.run({ scope: "board", kind: "project", title: "t", summary: "s", body: "a durable fact", ...over }, ctx)
+
+
+  it("saves a board memory bound to the context board (not a model-supplied one)", async () => {
+    const res = (await save({ body: "board fact" })) as { ok: boolean; id: string }
+    expect(res.ok).toBe(true)
+    const list = await memory.list("board", "board-1")
+    expect(list).toHaveLength(1)
+    expect(list[0].boardId).toBe("board-1")
+    expect(list[0].scope).toBe("board")
+  })
+
+
+  it("routes scope 'global' to the global bucket with boardId null", async () => {
+    await save({ scope: "global", body: "global fact" })
+    expect(await memory.list("board", "board-1")).toEqual([])
+    const global = await memory.list("global", null)
+    expect(global).toHaveLength(1)
+    expect(global[0].boardId).toBe(null)
+  })
+
+
+  it("refuses a board-scoped save when there is no board in context", async () => {
+    const noBoard = { memory } as unknown as ToolContext
+    const res = (await saveMemory.run({ scope: "board", kind: "project", title: "t", summary: "s", body: "x" }, noBoard)) as { error?: string }
+    expect(res.error).toMatch(/no board/)
+    expect(await memory.list("board", "board-1")).toEqual([])
+  })
+
+
+  it("surfaces the over-cap retry payload with current entries", async () => {
+    await save({ body: "x".repeat(3990) })
+    const res = (await save({ body: "y".repeat(100) })) as { ok: boolean; reason?: string; entries?: unknown[] }
+    expect(res.ok).toBe(false)
+    expect(res.reason).toBe("over_cap")
+    expect(res.entries).toHaveLength(1)
+  })
+
+
+  it("update and delete act on a saved id", async () => {
+    const { id } = (await save({ body: "first" })) as { id: string }
+    await updateMemory.run({ id, body: "revised" }, ctx)
+    expect((await memory.list("board", "board-1"))[0].body).toBe("revised")
+    await deleteMemory.run({ id }, ctx)
+    expect(await memory.list("board", "board-1")).toEqual([])
+  })
+
+
+  it("recall filters board ∪ global by a case-insensitive query", async () => {
+    await save({ body: "apples are red", title: "fruit" })
+    await save({ scope: "global", body: "bananas are yellow", title: "other" })
+    const res = (await recallMemory.run({ query: "BANANAS" }, ctx)) as { results: { title: string }[] }
+    expect(res.results.map((r) => r.title)).toEqual(["other"])
+  })
+
+
+  it("refuses to update or delete another board's memory via a surfaced id", async () => {
+    // A memory saved on board-2, then a board-1 turn tries to touch it by id.
+    const other = { boardId: "board-2", memory } as unknown as ToolContext
+    const { id } = (await saveMemory.run({ scope: "board", kind: "project", title: "t", summary: "s", body: "foreign" }, other)) as { id: string }
+    const upd = (await updateMemory.run({ id, body: "hijacked" }, ctx)) as { ok: boolean; error?: string }
+    const del = (await deleteMemory.run({ id }, ctx)) as { ok: boolean; error?: string }
+    expect(upd.ok).toBe(false)
+    expect(del.ok).toBe(false)
+    expect((await memory.list("board", "board-2"))[0].body).toBe("foreign") // untouched
+  })
+
+
+  it("still lets a board turn edit global memory (the user's own, cross-board)", async () => {
+    const { id } = (await save({ scope: "global", body: "global pref" })) as { id: string }
+    const res = (await updateMemory.run({ id, body: "revised pref" }, ctx)) as { ok: boolean }
+    expect(res.ok).toBe(true)
+    expect((await memory.list("global", null))[0].body).toBe("revised pref")
+  })
+
+
+  it("reports failure (not success) when updating/deleting an unknown id", async () => {
+    const upd = (await updateMemory.run({ id: "ghost", body: "x" }, ctx)) as { ok: boolean }
+    const del = (await deleteMemory.run({ id: "ghost" }, ctx)) as { ok: boolean }
+    expect(upd.ok).toBe(false)
+    expect(del.ok).toBe(false)
   })
 })

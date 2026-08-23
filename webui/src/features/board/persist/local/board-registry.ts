@@ -25,7 +25,7 @@ export type BoardRegistryOptions = { engine?: StorageEngine; dbName?: string }
 
 // Every store a board's data spans — the cascade-delete transaction covers all.
 const BOARD_COLLECTIONS: Collection[] = [
-  "boards", "views", "snapshots", "oplog", "chats", "chat_messages", "documents", "chunks", "sync_meta",
+  "boards", "views", "snapshots", "oplog", "chats", "chat_messages", "documents", "chunks", "sync_meta", "snapshot_meta",
 ]
 
 
@@ -84,6 +84,28 @@ export class BoardRegistry {
     const existing = await engine.get<BoardMeta>("boards", id)
     if (!existing) return
     await engine.put("boards", { ...existing, title, updatedAt: now })
+  }
+
+
+  /**
+   * Store the derived board purpose + its drift baseline (wall-clock + oplog seq
+   * at derive time). No-op if the board doesn't exist. `updatedAt` is left as-is —
+   * a purpose derive is not a user-facing edit.
+   */
+  async setBoardContext(
+    id: string,
+    context: string,
+    fingerprint: { derivedAt: number; deriveSeq: number },
+  ): Promise<void> {
+    const engine = this.requireEngine()
+    const existing = await engine.get<BoardMeta>("boards", id)
+    if (!existing) return
+    await engine.put("boards", {
+      ...existing,
+      context,
+      contextDerivedAt: fingerprint.derivedAt,
+      contextDeriveSeq: fingerprint.deriveSeq,
+    })
   }
 
 
@@ -147,6 +169,10 @@ export class BoardRegistry {
       // re-opened), a stale `syncedSeq` makes fresh low-seq edits look already-acked
       // (`outbox.pending()` skips seq <= cursor) → they're never sent to the relay.
       await t.delete("sync_meta", id)
+      // Cascade the agent snapshot cursor for the same reason: a stale `seenSeq`
+      // on a re-hydrated same-id board would omit fresh low-seq edits from the
+      // snapshot's "recent changes" until the seq passes the stale value.
+      await t.delete("snapshot_meta", id)
       // Cascade the board's chats and their message transcripts.
       const chats = await t.list<{ id: string }>("chats", { index: "by-board", range: { lower: id, upper: id } })
       for (const chat of chats) {

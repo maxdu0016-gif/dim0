@@ -12,6 +12,11 @@ const field = (o: unknown, k: string): unknown =>
 const asStr = (v: unknown): string | undefined => (typeof v === "string" ? v : undefined)
 
 
+/** Per-snippet cap for the compact note-citation card — deliberately shorter
+ *  than the full snippet the tool feeds the model (SEARCH_SNIPPET_CHARS). */
+const NOTE_CARD_SNIPPET_CHARS = 200
+
+
 /**
  * Map an engine tool name to the UI ToolName the chat renderers switch on. An
  * unmapped tool keeps its own name (rendered as a generic tool card with a
@@ -97,8 +102,38 @@ const toOutput = (name: string, args: unknown, result: unknown, boardId: string)
       .filter((r) => r.docId !== "")
     return { type: "doc_search", references }
   }
+  if (name === "search_notes") {
+    // Retrieval hits → structured references the message-level Notes card renders
+    // + jumps to (keyed by noteId, with parentId for its layer). Result shape:
+    // { results: [{ id, title, content, parentId }] }. get_note is deliberately
+    // NOT cited here: a targeted read-by-id is usually read-before-edit, not a
+    // source that grounded the answer — a note it read after finding via search
+    // is already cited by that search step.
+    const rows = Array.isArray(field(result, "results")) ? (field(result, "results") as unknown[]) : []
+    const references = rows
+      .map((r) => {
+        const parent = field(r, "parentId")
+        return {
+          noteId: asStr(field(r, "id")) ?? "",
+          label: asStr(field(r, "title")) ?? "",
+          snippet: (asStr(field(r, "content")) ?? "").slice(0, NOTE_CARD_SNIPPET_CHARS),
+          parentId: typeof parent === "string" ? parent : null,
+        }
+      })
+      .filter((r) => r.noteId !== "")
+    return { type: "note_search", references }
+  }
   if (name.startsWith("learn_generate")) {
     return `Loaded ${name.replace("learn_generate_", "").replace(/_/g, " ")} guidance`
+  }
+  if (name === "save_memory" || name === "update_memory" || name === "delete_memory") {
+    // A readable one-liner for the tool card, instead of raw JSON. Over-cap and
+    // unavailable cases surface their own message so the model's retry reads clearly.
+    if (field(result, "reason") === "over_cap") return asStr(field(result, "message")) ?? "Memory is full — consolidate and retry"
+    if (field(result, "error")) return asStr(field(result, "error")) ?? "Memory unavailable"
+    const verb = name === "save_memory" ? "Saved to" : name === "update_memory" ? "Updated" : "Removed from"
+    const title = asStr(field(args, "title"))
+    return `${verb} memory${title ? `: ${title}` : ""}`
   }
   return JSON.stringify(result)
 }
@@ -154,6 +189,14 @@ export const stepsFromEvents = (events: AgentEvent[], boardId: string): Reasonin
       const last = steps[steps.length - 1]
       if (last && last.type === "reasoning_step") last.message = ev.text
       else steps.push({ type: "reasoning_step", id: `text-${seq++}`, reasoning: "", message: ev.text })
+    } else if (ev.type === "reasoning") {
+      // Reasoning/thinking (cumulative) fills the trailing reasoning_step's
+      // `reasoning` slot — the same step whose `message` holds the answer, so the
+      // UI's "Reasoning" expander sits above the reply. A run of tool calls splits
+      // it into pre-tool and post-tool reasoning steps (chain-of-thought order).
+      const last = steps[steps.length - 1]
+      if (last && last.type === "reasoning_step") last.reasoning = ev.text
+      else steps.push({ type: "reasoning_step", id: `reason-${seq++}`, reasoning: ev.text, message: "" })
     }
   }
   // Match the online path: fold text-like "tool" steps (raw_message / synthesizer

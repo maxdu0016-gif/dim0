@@ -7,8 +7,9 @@
  * store; the loop emits `AgentEvent`s the UI maps onto its stream.
  */
 import { z } from "zod"
-import type { CanvasStore } from "@canvas-harness/core"
+import type { CanvasStore, Node } from "@canvas-harness/core"
 import type { BoardRegistry } from "@/features/board/persist/local/board-registry"
+import type { MemoryRepo } from "@/features/board/persist/local/memory-repo"
 import type { LocalSearchIndex } from "@/features/board/search/local-index"
 
 
@@ -60,6 +61,7 @@ export type LlmToolDef = {
  *  then the final turn. */
 export type LlmStreamEvent =
   | { kind: "delta"; text: string }
+  | { kind: "reasoning"; text: string }
   | { kind: "tool_start"; name: string; id?: string }
   | { kind: "final"; turn: LlmTurn }
 
@@ -86,8 +88,19 @@ export type ToolContext = {
    * than relying on a post-hoc rescope.
    */
   rootId?: string | null
+  /** The board this run acts on — memory tools bind board-scoped writes to it. */
+  boardId?: string
   search?: LocalSearchIndex
+  /**
+   * Whole-board id→node lookup (ALL layers), built per turn from persistence.
+   * `search`/`get_note` resolve a hit through this so a cross-folder note (absent
+   * from the layer-scoped `store`) still yields its title/body. Falls back to
+   * `store` for the freshest current-layer edits.
+   */
+  boardNotes?: ReadonlyMap<string, Node>
   registry?: BoardRegistry
+  /** Durable agent memory (board + global facts); absent in tests/headless. */
+  memory?: MemoryRepo
   /**
    * Optional gate for side-effecting / off-board tools (network egress, code
    * execution). The loop calls it before running such a tool; the decision is
@@ -141,4 +154,5 @@ export type AgentEvent =
   | { type: "tool_start"; toolName: string; args: unknown }
   | { type: "tool_result"; toolName: string; result: unknown }
   | { type: "assistant_text"; text: string }
+  | { type: "reasoning"; text: string }
   | { type: "done" }

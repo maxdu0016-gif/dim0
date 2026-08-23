@@ -12,6 +12,7 @@ import { z } from "zod"
 import { asEdgeId, asNodeId } from "@canvas-harness/core"
 import type { Node } from "@canvas-harness/core"
 import type { DimEdgeData, DimNodeData } from "@/features/board/model"
+import { labelText } from "@/features/board/model"
 import { pickRandomColorOfShade } from "@/features/board/lib/colors/tailwind"
 import { AUTOFIT_DISABLED_TYPES } from "@/features/board/harness/convert/note-to-node"
 import { dim0LinkStyleToCanvas, dim0StyleToCanvas } from "@/features/board/harness/convert/style"
@@ -29,8 +30,9 @@ import { createDefaultLinkStyle, createDefaultStyle } from "@/features/board/typ
 import { beneathBorderOrigin } from "@/features/board/harness/agent/beneath-border"
 import { validateMiniAppSource } from "@/features/mini-app/validate"
 import { defineTool } from "./types"
-import type { Tool } from "./types"
+import type { Tool, ToolContext } from "./types"
 import { estimateNoteSize } from "./note-size"
+import type { MemoryKind, MemoryScope } from "@/features/board/persist/local/idb"
 
 
 /**
@@ -120,6 +122,16 @@ const NODE_TYPE: Record<string, string> = {
 const toNodeType = (t: string): string => NODE_TYPE[t] ?? "rect"
 
 
+/**
+ * Resolve a note by id across the WHOLE board: the layer-scoped `store` (freshest,
+ * for the current folder's live edits) first, then the per-turn whole-board
+ * `boardNotes` snapshot for notes in other folders. Without the fallback,
+ * search_notes / get_note can't read a cross-folder hit.
+ */
+const resolveBoardNode = (ctx: ToolContext, id: string): Node | undefined =>
+  ctx.store.getNode(asNodeId(id)) ?? ctx.boardNotes?.get(id)
+
+
 export const createNote = defineTool({
   name: "create_note",
   description: "Create a note on the board with a title and optional body.",
@@ -149,7 +161,7 @@ export const createNote = defineTool({
         groups: [],
         content: body,
         style: canonicalNodeStyle(storedColors),
-        data: { label: title, parentId: ctx.rootId ?? undefined, meta: meta(), _storedColors: storedColors } satisfies DimNodeData,
+        data: { label: { markdown: title }, parentId: ctx.rootId ?? undefined, meta: meta(), _storedColors: storedColors } satisfies DimNodeData,
       })
     })
     return { id: String(nodeId), created: true }
@@ -173,7 +185,7 @@ export const updateNote = defineTool({
     const patch: Partial<Node> = {}
     if (typeof body === "string") patch.content = body
     if (typeof title === "string") {
-      patch.data = { ...(node.data as DimNodeData | undefined), label: title, meta: meta() }
+      patch.data = { ...(node.data as DimNodeData | undefined), label: { markdown: title }, meta: meta() }
     }
     ctx.store.batch(() => ctx.store.updateNode(nid, patch))
     return { id: String(nid) }
@@ -262,7 +274,7 @@ export const writeNote = defineTool({
           ctx.store.updateNode(id, {
             type: nodeType,
             content,
-            data: { ...prev, label: label || prev?.label || "", meta: meta() },
+            data: { ...prev, label: label ? { markdown: label } : (prev?.label ?? { markdown: "" }), meta: meta() },
             ...(autoFitStyle ? { style: { ...(node.style ?? {}), ...autoFitStyle } } : {}),
           }),
         )
@@ -297,7 +309,7 @@ export const writeNote = defineTool({
         groups: [],
         content,
         ...(style ? { style } : {}),
-        data: { label: label ?? "", parentId: ctx.rootId ?? undefined, meta: meta(), _storedColors: storedColors } satisfies DimNodeData,
+        data: { label: { markdown: label ?? "" }, parentId: ctx.rootId ?? undefined, meta: meta(), _storedColors: storedColors } satisfies DimNodeData,
       })
     })
     return { id: String(id), created: true }
@@ -312,12 +324,13 @@ export const getNote = defineTool({
     note_id: z.string().describe("Id of the note to read."),
   }),
   run: async ({ note_id }, ctx) => {
-    const id = asNodeId(note_id)
-    const node = ctx.store.getNode(id)
+    // Whole-board resolve so a note in another folder (not in the layer-scoped
+    // store) is still readable — search_notes can surface cross-folder ids.
+    const node = resolveBoardNode(ctx, note_id)
     if (!node) return { error: "note not found" }
     return {
-      id: String(id),
-      label: (node.data as DimNodeData | undefined)?.label ?? "",
+      id: note_id,
+      label: labelText((node.data as DimNodeData | undefined)?.label),
       content: node.content ?? "",
       note_type: node.type,
     }
@@ -341,7 +354,7 @@ export const editNote = defineTool({
     if (!node) return { error: "note not found" }
 
     const prev = node.data as DimNodeData | undefined
-    const current = field === "label" ? prev?.label ?? "" : node.content ?? ""
+    const current = field === "label" ? labelText(prev?.label) : node.content ?? ""
 
     const occurrences = old ? current.split(old).length - 1 : 0
     if (occurrences === 0) return { error: "`old` not found in field" }
@@ -352,7 +365,7 @@ export const editNote = defineTool({
 
     ctx.store.batch(() =>
       field === "label"
-        ? ctx.store.updateNode(id, { data: { ...prev, label: updated, meta: meta() } })
+        ? ctx.store.updateNode(id, { data: { ...prev, label: { markdown: updated }, meta: meta() } })
         : ctx.store.updateNode(id, { content: updated }),
     )
     return { id: String(id) }
@@ -373,20 +386,27 @@ const asText = (value: unknown): string => (typeof value === "string" ? value : 
 export const searchNotes = defineTool({
   name: "search_notes",
   description:
-    "Full-text search the board's existing notes. Returns each match's id, title," +
-    " and a content snippet — usually enough to answer without a separate get_note.",
+    "Full-text search the board's existing notes across ALL folders/layers (not just the" +
+    " current one). Returns each match's id, title, and a content snippet — usually enough" +
+    " to answer without a separate get_note.",
   parameters: z.object({
     query: z.string().describe("Full-text query matched against note titles and bodies."),
   }),
   run: async ({ query }, ctx) => {
     if (!ctx.search) return { results: [] }
     const ids = (await ctx.search.query(query)).slice(0, SEARCH_MAX_HITS)
-    const results = ids.map((id) => {
-      const node = ctx.store.getNode(asNodeId(id))
+    const results = ids.flatMap((id) => {
+      // Resolve whole-board: a cross-folder hit isn't in the layer-scoped store.
+      const node = resolveBoardNode(ctx, id)
+      // A stale index entry (node deleted from the store) resolves to nothing —
+      // drop it so neither the model nor the chat cites a phantom empty note.
+      if (!node) return []
       // Title is `data.label`; the body lives in the native `node.content`.
-      const title = asText((node?.data as DimNodeData | undefined)?.label)
-      const content = asText(node?.content).slice(0, SEARCH_SNIPPET_CHARS)
-      return { id, title, content }
+      const title = labelText((node.data as DimNodeData | undefined)?.label)
+      const content = asText(node.content).slice(0, SEARCH_SNIPPET_CHARS)
+      // parentId lets the chat cite the hit + jump to its layer + node.
+      const parentId = (node.data as DimNodeData | undefined)?.parentId ?? null
+      return [{ id, title, content, parentId }]
     })
     return { results }
   },
@@ -403,6 +423,145 @@ export const listBoards = defineTool({
     return { boards: boards.map((b) => ({ id: b.id, title: b.title })) }
   },
 })
+
+
+// ── Memory tools ──────────────────────────────────────────────────────────────
+// Durable facts the agent saves and re-reads across turns/sessions. `scope` +
+// `boardId` are bound from context, NEVER from the model — it passes only scope +
+// content, so a board turn can't write into another board or forge a global fact.
+
+const MEMORY_KIND = z.enum(["user", "feedback", "project", "reference"])
+const MEMORY_SCOPE = z.enum(["board", "global"])
+
+
+/** Resolve the boardId a scoped write targets (null for global, ctx-bound for board). */
+const scopeBoardId = (scope: MemoryScope, ctx: ToolContext): string | null =>
+  scope === "board" ? (ctx.boardId ?? null) : null
+
+
+/** The model-facing over-cap payload: the message + the entries to consolidate. */
+const overCapPayload = (entries: { id: string; title: string; summary: string }[]) => ({
+  ok: false as const,
+  reason: "over_cap" as const,
+  message: "Memory is full for this scope. Delete or merge an entry below, then retry.",
+  entries: entries.map((r) => ({ id: r.id, title: r.title, summary: r.summary })),
+})
+
+
+/** At most this many records come back from a single recall (bounds context cost). */
+const RECALL_MAX = 25
+
+
+/**
+ * Fetch a memory the current turn is allowed to edit/delete: it must exist, be
+ * live, and — if board-scoped — belong to THIS board. Blocks a board turn from
+ * mutating another board's memory via a surfaced/guessed id (global is the user's
+ * own and stays editable from any of their boards).
+ */
+const editableMemory = async (id: string, ctx: ToolContext) => {
+  const rec = await ctx.memory?.get(id)
+  if (!rec || rec.deleted) return { error: "no such memory" as const }
+  if (rec.scope === "board" && rec.boardId !== (ctx.boardId ?? null)) return { error: "that memory belongs to another board" as const }
+  return { rec }
+}
+
+
+export const saveMemory = defineTool({
+  name: "save_memory",
+  description:
+    "Save a durable fact so you remember it in later turns and sessions. Use for stable user" +
+    " preferences, decisions, or what a board is about. SKIP anything derivable from the board," +
+    " trivial, ephemeral, or your own mid-turn scratch work. Scope 'board' = about this board;" +
+    " 'global' = about the user across boards. Over the cap, the save is rejected with current" +
+    " entries — consolidate (update/delete) and retry.",
+  parameters: z.object({
+    scope: MEMORY_SCOPE,
+    kind: MEMORY_KIND.describe("user = who they are; feedback = how to work; project = what this is about; reference = a pointer."),
+    title: z.string().describe("Short slug naming the fact."),
+    summary: z.string().describe("ONE line — the retrieval key shown in the always-on index."),
+    body: z.string().describe("The fact. For feedback/project, add **Why:** and **How to apply:** lines."),
+  }),
+  run: async ({ scope, kind, title, summary, body }, ctx) => {
+    if (!ctx.memory) return { error: "memory unavailable" }
+    if (scope === "board" && !ctx.boardId) return { error: "no board in context for a board-scoped memory" }
+    const res = await ctx.memory.add({
+      scope,
+      boardId: scopeBoardId(scope, ctx),
+      kind: kind as MemoryKind,
+      title,
+      summary,
+      body,
+      id: crypto.randomUUID(),
+      now: Date.now(),
+    })
+    if (!res.ok) return overCapPayload(res.entries)
+    return { ok: true, id: res.record.id, scope, title }
+  },
+})
+
+
+export const updateMemory = defineTool({
+  name: "update_memory",
+  description: "Revise a saved memory by id (from the memory index or a recall). Use to consolidate or correct a fact.",
+  parameters: z.object({
+    id: z.string(),
+    title: z.string().optional(),
+    summary: z.string().optional(),
+    body: z.string().optional(),
+    kind: MEMORY_KIND.optional(),
+  }),
+  run: async ({ id, title, summary, body, kind }, ctx) => {
+    if (!ctx.memory) return { error: "memory unavailable" }
+    const owned = await editableMemory(id, ctx)
+    if ("error" in owned) return { ok: false, error: owned.error }
+    const res = await ctx.memory.update(id, { title, summary, body, kind: kind as MemoryKind | undefined }, Date.now())
+    if (!res.ok) return res.reason === "over_cap" ? overCapPayload(res.entries) : { ok: false, error: "no such memory" }
+    return { ok: true, id }
+  },
+})
+
+
+export const deleteMemory = defineTool({
+  name: "delete_memory",
+  description: "Delete a saved memory by id (from the memory index or a recall). Use to drop a stale or wrong fact.",
+  parameters: z.object({ id: z.string() }),
+  run: async ({ id }, ctx) => {
+    if (!ctx.memory) return { error: "memory unavailable" }
+    const owned = await editableMemory(id, ctx)
+    if ("error" in owned) return { ok: false, error: owned.error }
+    const removed = await ctx.memory.remove(id, Date.now())
+    return removed ? { ok: true, id } : { ok: false, error: "no such memory" }
+  },
+})
+
+
+export const recallMemory = defineTool({
+  name: "recall_memory",
+  description:
+    "Look up saved memories. The board + global index is already in your prompt, so recall is only" +
+    " needed for a targeted lookup or when the set is large. Omit scope to search both.",
+  parameters: z.object({
+    scope: MEMORY_SCOPE.optional(),
+    query: z.string().optional().describe("Case-insensitive substring over title/summary/body; omit to list all."),
+  }),
+  run: async ({ scope, query }, ctx) => {
+    if (!ctx.memory) return { results: [] }
+    const scopes: MemoryScope[] = scope ? [scope] : ["board", "global"]
+    const q = query?.trim().toLowerCase()
+    const records = (
+      await Promise.all(scopes.map((s) => ctx.memory!.list(s, s === "board" ? (ctx.boardId ?? null) : null)))
+    ).flat()
+    const matched = q ? records.filter((r) => `${r.title} ${r.summary} ${r.body}`.toLowerCase().includes(q)) : records
+    const hits = matched.slice(0, RECALL_MAX)
+    return {
+      results: hits.map((r) => ({ id: r.id, scope: r.scope, kind: r.kind, title: r.title, summary: r.summary, body: r.body })),
+      truncated: matched.length > RECALL_MAX,
+    }
+  },
+})
+
+
+export const memoryTools: Tool[] = [saveMemory, updateMemory, deleteMemory, recallMemory]
 
 
 export const localTools: Tool[] = [createNote, updateNote, linkNotes, searchNotes, listBoards]
