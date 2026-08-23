@@ -395,13 +395,18 @@ export const searchNotes = defineTool({
   run: async ({ query }, ctx) => {
     if (!ctx.search) return { results: [] }
     const ids = (await ctx.search.query(query)).slice(0, SEARCH_MAX_HITS)
-    const results = ids.map((id) => {
+    const results = ids.flatMap((id) => {
       // Resolve whole-board: a cross-folder hit isn't in the layer-scoped store.
       const node = resolveBoardNode(ctx, id)
+      // A stale index entry (node deleted from the store) resolves to nothing —
+      // drop it so neither the model nor the chat cites a phantom empty note.
+      if (!node) return []
       // Title is `data.label`; the body lives in the native `node.content`.
-      const title = labelText((node?.data as DimNodeData | undefined)?.label)
-      const content = asText(node?.content).slice(0, SEARCH_SNIPPET_CHARS)
-      return { id, title, content }
+      const title = labelText((node.data as DimNodeData | undefined)?.label)
+      const content = asText(node.content).slice(0, SEARCH_SNIPPET_CHARS)
+      // parentId lets the chat cite the hit + jump to its layer + node.
+      const parentId = (node.data as DimNodeData | undefined)?.parentId ?? null
+      return [{ id, title, content, parentId }]
     })
     return { results }
   },
