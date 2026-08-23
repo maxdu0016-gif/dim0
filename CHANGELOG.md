@@ -1,3 +1,18 @@
+## v0.3.87 (2026-08-23)
+
+### Feat
+
+- **prompts**: make skill-loading mandatory before write_note (#241)
+- **agent**: surface found notes as clickable citations in chat (#240)
+- **webui**: escape returns to select tool, else closes open dialog (#238)
+
+### Fix
+
+- **agent**: re-expand doc source card when its title is cited (#243)
+- **webui**: broaden escape overlay guard + restore two-step cancel (#246)
+- **repo**: tag release commit with all manifests synced (#242)
+- **webui**: note-card/board links use `center` (the consumed nav param) (#239)
+
 ## v0.3.86 (2026-08-21)
 
 ### Feat
