@@ -1,3 +1,9 @@
+## v0.3.89 (2026-08-24)
+
+### Fix
+
+- **board**: place applied mindmaps beneath existing board content (#248)
+
 ## v0.3.88 (2026-08-24)
 
 ### Refactor
