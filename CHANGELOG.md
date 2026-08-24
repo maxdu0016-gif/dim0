@@ -1,3 +1,9 @@
+## v0.3.88 (2026-08-24)
+
+### Refactor
+
+- **board**: rebuild canvas context menu on Radix menu primitives (#247)
+
 ## v0.3.87 (2026-08-23)
 
 ### Feat
