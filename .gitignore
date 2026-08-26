@@ -46,3 +46,4 @@ ios-native/ios/*.xcworkspace/
 ios-native/ios/Pods/
 ios-native/ios/.derived-data/
 ios-native/node_modules/
+ios-native/builds/
