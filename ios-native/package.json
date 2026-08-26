@@ -4,6 +4,8 @@
   "private": true,
   "scripts": {
     "eas-build-pre-install": "bash ./scripts/prepare-ios-project.sh"
+  },
+  "devDependencies": {
+    "expo-modules-autolinking": "57.0.11"
   }
 }
-

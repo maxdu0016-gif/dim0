@@ -8,7 +8,10 @@
     "ios": {
       "bundleIdentifier": "com.dim0.canvas",
       "buildNumber": "1",
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "extra": {
       "eas": {
@@ -17,4 +20,3 @@
     }
   }
 }
-

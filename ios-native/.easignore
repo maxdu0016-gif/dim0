@@ -1,5 +1,13 @@
-.derived-data/
-ios/*.xcodeproj/
-ios/*.xcworkspace/
-ios/Pods/
+# EAS archives from the Git repository root even when invoked in this app folder.
+backend/
+build/
+docs/
+scripts/
+webui/
+.github/
 
+ios-native/node_modules/
+ios-native/ios/.derived-data/
+ios-native/ios/*.xcodeproj/
+ios-native/ios/*.xcworkspace/
+ios-native/ios/Pods/
