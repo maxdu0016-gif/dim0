@@ -29,20 +29,41 @@ final class CanvasViewModel: NSObject, ObservableObject {
     @Published private(set) var saveState: SaveState = .loading
     @Published private(set) var canUndo = false
     @Published private(set) var canRedo = false
+    @Published private(set) var localSyncState: LocalSyncServer.State = .starting
+    @Published private(set) var connectedComputerCount = 0
+    @Published private(set) var lastSyncMessage = "尚未同步"
 
     let canvasView = PencilCanvasView()
 
     private let store: CanvasDocumentStore
+    private let syncServer: LocalSyncServer
+    private let syncSessionId: String
     private var pendingSave: Task<Void, Never>?
     private var toolBeforeEraser: CanvasTool = .pen
     private var didCenterInitialViewport = false
+    private var syncRevision = 0
 
-    init(store: CanvasDocumentStore = CanvasDocumentStore()) {
+    init(
+        store: CanvasDocumentStore = CanvasDocumentStore(),
+        syncServer: LocalSyncServer = LocalSyncServer()
+    ) {
         self.store = store
+        self.syncServer = syncServer
+        self.syncSessionId = Self.persistentSyncSessionId()
         super.init()
         configureCanvas()
+        configureLocalSync()
         loadDocument()
     }
+
+    var localSyncAddress: String? {
+        guard case .ready(let address) = localSyncState else { return nil }
+        return address
+    }
+
+    var localSyncPort: UInt16 { syncServer.port }
+
+    var pairingCode: String { syncServer.pairingCode }
 
     /// Undoes one local PencilKit action without involving sync or networking.
     func undo() {
@@ -82,6 +103,26 @@ final class CanvasViewModel: NSObject, ObservableObject {
         persistCurrentDrawing()
     }
 
+    /// Exports completed strokes and publishes one full, idempotent desktop snapshot.
+    func syncNow() {
+        syncRevision += 1
+        let snapshot = PencilStrokeExporter.snapshot(
+            drawing: canvasView.drawing,
+            sessionId: syncSessionId,
+            revision: syncRevision
+        )
+
+        do {
+            let data = try JSONEncoder().encode(snapshot)
+            syncServer.publish(snapshot: data)
+            lastSyncMessage = connectedComputerCount > 0
+                ? "已同步 \(snapshot.strokes.count) 笔"
+                : "快照已准备，等待电脑连接"
+        } catch {
+            lastSyncMessage = "同步数据生成失败"
+        }
+    }
+
     /// Centers the large PencilKit surface once, leaving later viewport changes untouched.
     func centerInitialViewportIfNeeded() {
         guard !didCenterInitialViewport, canvasView.bounds.width > 0 else { return }
@@ -104,13 +145,31 @@ final class CanvasViewModel: NSObject, ObservableObject {
         canvasView.bouncesZoom = true
         canvasView.alwaysBounceHorizontal = true
         canvasView.alwaysBounceVertical = true
-        canvasView.contentSize = CGSize(width: 12_000, height: 12_000)
+        canvasView.contentSize = CanvasGeometry.contentSize
         canvasView.contentInsetAdjustmentBehavior = .never
         canvasView.delaysContentTouches = false
         canvasView.onPencilDoubleTap = { [weak self] in
             self?.toggleEraser()
         }
         applySelectedTool()
+    }
+
+    private func configureLocalSync() {
+        syncServer.onStateChange = { [weak self] state in
+            self?.localSyncState = state
+        }
+        syncServer.onPeerCountChange = { [weak self] count in
+            self?.connectedComputerCount = count
+            if count > 0 {
+                self?.lastSyncMessage = "电脑已连接"
+            }
+        }
+        syncServer.onSnapshotRequested = { [weak self] in
+            DispatchQueue.main.async {
+                self?.syncNow()
+            }
+        }
+        syncServer.start()
     }
 
     private func loadDocument() {
@@ -175,6 +234,16 @@ final class CanvasViewModel: NSObject, ObservableObject {
         canUndo = canvasView.undoManager?.canUndo ?? false
         canRedo = canvasView.undoManager?.canRedo ?? false
     }
+
+    private static func persistentSyncSessionId() -> String {
+        let key = "dim0.native-sync.session-id"
+        if let existing = UserDefaults.standard.string(forKey: key) {
+            return existing
+        }
+        let created = UUID().uuidString.lowercased()
+        UserDefaults.standard.set(created, forKey: key)
+        return created
+    }
 }
 
 extension CanvasViewModel: PKCanvasViewDelegate {
@@ -183,4 +252,3 @@ extension CanvasViewModel: PKCanvasViewDelegate {
         scheduleSave()
     }
 }
-

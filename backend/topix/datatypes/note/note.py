@@ -73,6 +73,8 @@ class NoteProperties(ResourceProperties):
         default_factory=lambda: TextProperty(text="python")
     )
     ink_data: InkProperty | None = None
+    # Stable iPad session/stroke identity for idempotent full-snapshot reconciliation.
+    native_ink_source: TextProperty | None = None
 
 
 class Note(Resource):

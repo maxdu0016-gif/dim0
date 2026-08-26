@@ -23,14 +23,20 @@ def test_ink_note_validates_and_serializes_to_wire() -> None:
                 "intrinsicWidth": 20,
                 "intrinsicHeight": 20,
             },
+            "native_ink_source": {
+                "type": "text",
+                "text": '{"sessionId":"ad7dbd1d-7235-49c9-854f-c00613504eae","strokeId":"abc"}',
+            },
         },
     })
 
     assert note.style.type == NodeType.INK
     assert note.properties.ink_data is not None
     assert note.properties.ink_data.intrinsic_width == 20
+    assert note.properties.native_ink_source is not None
 
     wire = note_to_wire_node(note)
     assert wire["type"] == "ink"
     assert wire["data"]["styleType"] == NodeType.INK
     assert wire["data"]["properties"]["ink_data"]["outline"]
+    assert wire["data"]["properties"]["native_ink_source"]["type"] == "text"

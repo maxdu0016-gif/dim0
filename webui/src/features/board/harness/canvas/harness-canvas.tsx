@@ -80,6 +80,7 @@ import { useTrackBoardCameraMotion } from "./board-camera-motion"
 import { useSidebarContentsSync } from "./use-sidebar-contents-sync"
 import { HarnessWrapRefProvider } from "./wrap-ref-provider"
 import { InkInputLayer } from "../ink/ink-input-layer"
+import { NativeIpadSyncControl } from "../native-sync/native-ipad-sync-control"
 
 
 /**
@@ -432,6 +433,10 @@ export function HarnessCanvas({ local = false }: { local?: boolean } = {}) {
           onDrop={onDrop}
         >
           <HarnessCanvasInner
+            store={store}
+            boardId={boardId}
+            parentId={rootId}
+            canEdit={canEdit}
             theme={theme}
             tool={tool}
             ready={ready}
@@ -461,6 +466,10 @@ export function HarnessCanvas({ local = false }: { local?: boolean } = {}) {
 
 
 type InnerProps = {
+  store: CanvasStore
+  boardId: string | null
+  parentId: string | null
+  canEdit: boolean
   theme: ReturnType<typeof useBoardTheme>
   tool: string
   ready: boolean
@@ -474,6 +483,10 @@ type InnerProps = {
 
 
 function HarnessCanvasInner({
+  store,
+  boardId,
+  parentId,
+  canEdit,
   theme,
   tool,
   ready,
@@ -564,6 +577,13 @@ function HarnessCanvasInner({
         — the container is invisible when empty.
       */}
       <div className="absolute right-3 top-3 z-50 flex items-center gap-2">
+        {ready && canEdit && boardId && (
+          <NativeIpadSyncControl
+            store={store}
+            boardId={boardId}
+            parentId={parentId}
+          />
+        )}
         {canCollab && <HarnessPeerChip />}
         <HarnessReadonlyChip />
         {/* Local boards have no collab chrome, so surface an explicit

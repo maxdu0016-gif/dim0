@@ -11,8 +11,18 @@ Expo runtime, or a `WKWebView` canvas.
 - Pen, highlighter, vector eraser, color selection, undo, and redo.
 - Apple Pencil double-tap toggles the eraser.
 - Drawing data is stored atomically on the iPad after the user pauses.
-- Networking, collaboration, and AI are intentionally absent from the input
-  path in this milestone.
+- Foreground LAN pairing exposes completed strokes to the desktop as a
+  versioned, idempotent full snapshot.
+- Networking and AI remain absent from the Pencil input path: no touch or frame
+  waits for serialization, a socket, or a server response.
+
+## Pair with the desktop canvas
+
+1. Keep the iPad app open and put the iPad and computer on the same Wi-Fi.
+2. Open the sync panel in the iPad toolbar and note its address and pairing code.
+3. Open **iPad** in the desktop canvas's top-right toolbar and enter both values.
+4. Press **立即同步** on either device after writing. The desktop reconciles the
+   complete iPad drawing into ordinary persisted Dim0 ink nodes.
 
 ## Generate and run the Xcode project
 

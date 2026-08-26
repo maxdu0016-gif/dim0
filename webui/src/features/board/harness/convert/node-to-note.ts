@@ -18,6 +18,7 @@ export const nodeToNote = (node: Node): Note => {
   const extraProperties = data.properties ?? {}
   const relayProperties = extraProperties as typeof extraProperties & {
     ink_data?: NoteProperties["inkData"]
+    native_ink_source?: NoteProperties["nativeInkSource"]
   }
   const groupIds = node.groups as unknown as string[]
 
@@ -38,6 +39,7 @@ export const nodeToNote = (node: Node): Note => {
     status: extraProperties.status,
     summary: extraProperties.summary,
     inkData: extraProperties.inkData ?? relayProperties.ink_data,
+    nativeInkSource: extraProperties.nativeInkSource ?? relayProperties.native_ink_source,
   }
 
   return {

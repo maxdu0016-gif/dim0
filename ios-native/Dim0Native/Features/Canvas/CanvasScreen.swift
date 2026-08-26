@@ -3,6 +3,7 @@ import SwiftUI
 struct CanvasScreen: View {
     @ObservedObject var model: CanvasViewModel
     @State private var isClearConfirmationPresented = false
+    @State private var isSyncPanelPresented = false
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -44,6 +45,8 @@ struct CanvasScreen: View {
             Label(model.saveState.label, systemImage: saveStateImage)
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(model.saveState == .failed ? Color.red : Color.secondary)
+
+            syncButton
 
             Button {
                 isClearConfirmationPresented = true
@@ -109,6 +112,105 @@ struct CanvasScreen: View {
         }
     }
 
+    private var syncButton: some View {
+        Button {
+            isSyncPanelPresented = true
+        } label: {
+            HStack(spacing: 5) {
+                Image(systemName: model.connectedComputerCount > 0 ? "desktopcomputer.and.arrow.down" : "arrow.triangle.2.circlepath")
+                if model.connectedComputerCount > 0 {
+                    Text("\(model.connectedComputerCount)")
+                        .font(.system(size: 12, weight: .semibold))
+                }
+            }
+            .frame(minWidth: 36, minHeight: 36)
+            .padding(.horizontal, model.connectedComputerCount > 0 ? 5 : 0)
+            .background(
+                model.connectedComputerCount > 0 ? Color.green.opacity(0.14) : Color.clear,
+                in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+            )
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(model.connectedComputerCount > 0 ? Color.green : Color.primary)
+        .accessibilityLabel("电脑同步")
+        .popover(isPresented: $isSyncPanelPresented, arrowEdge: .top) {
+            syncPanel
+                .presentationCompactAdaptation(.popover)
+        }
+    }
+
+    private var syncPanel: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Label("电脑同步", systemImage: "desktopcomputer")
+                    .font(.headline)
+                Spacer()
+                Circle()
+                    .fill(model.connectedComputerCount > 0 ? Color.green : Color.orange)
+                    .frame(width: 9, height: 9)
+            }
+
+            if let address = model.localSyncAddress {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("iPad 地址")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text("\(address):\(model.localSyncPort)")
+                        .font(.system(.body, design: .monospaced, weight: .semibold))
+                        .textSelection(.enabled)
+                }
+
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("配对码")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text(model.pairingCode)
+                        .font(.system(size: 28, weight: .bold, design: .monospaced))
+                        .tracking(3)
+                        .textSelection(.enabled)
+                }
+            } else {
+                Text(localSyncStateMessage)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+
+            Text("在电脑画布右上角打开 iPad 同步，输入上面的地址和配对码。两台设备需要连接同一个 Wi-Fi。")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Button {
+                model.syncNow()
+            } label: {
+                Label("立即同步到电脑", systemImage: "arrow.triangle.2.circlepath")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(model.connectedComputerCount == 0)
+
+            Text(model.lastSyncMessage)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .center)
+        }
+        .padding(18)
+        .frame(width: 340)
+    }
+
+    private var localSyncStateMessage: String {
+        switch model.localSyncState {
+        case .stopped:
+            "同步服务未启动"
+        case .starting:
+            "正在启动局域网同步"
+        case .ready(let address):
+            "同步地址：\(address):\(model.localSyncPort)"
+        case .failed(let message):
+            "同步服务启动失败：\(message)"
+        }
+    }
+
     private func toolButton(_ tool: CanvasTool) -> some View {
         Button {
             model.selectedTool = tool
@@ -135,4 +237,3 @@ struct CanvasScreen: View {
         .foregroundStyle(enabled ? Color.primary : Color.secondary.opacity(0.35))
     }
 }
-
