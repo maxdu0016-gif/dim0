@@ -8,6 +8,4 @@ webui/
 
 ios-native/node_modules/
 ios-native/ios/.derived-data/
-ios-native/ios/*.xcodeproj/
-ios-native/ios/*.xcworkspace/
 ios-native/ios/Pods/
