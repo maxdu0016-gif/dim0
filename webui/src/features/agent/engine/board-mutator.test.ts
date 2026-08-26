@@ -4,6 +4,7 @@ import type { CanvasStore } from "@canvas-harness/core"
 import { freshStore, resetIdb } from "@/test/canvas"
 import type { DimNodeData } from "@/features/board/model"
 import { labelText } from "@/features/board/model"
+import { resolveFamilyShade } from "@/features/board/lib/colors/tailwind"
 import { StoreMutator } from "./board-mutator"
 
 
@@ -13,6 +14,8 @@ beforeEach(() => resetIdb())
 const label = (store: CanvasStore, id: string): string =>
   labelText((store.getNode(asNodeId(id))?.data as DimNodeData | undefined)?.label)
 const body = (store: CanvasStore, id: string): string => store.getNode(asNodeId(id))?.content ?? ""
+const stored = (store: CanvasStore, id: string) =>
+  (store.getNode(asNodeId(id))?.data as DimNodeData | undefined)?._storedColors
 
 
 describe("StoreMutator", () => {
@@ -57,6 +60,62 @@ describe("StoreMutator", () => {
     expect(body(store, "ghost")).toBe("born here")
   })
 
+  it("rewriteNote preserves the existing type when note_type is omitted", async () => {
+    const store = freshStore("b")
+    const m = new StoreMutator(store, null)
+    const { id } = await m.createNote({ content: "x", type: "sheet" })
+    expect(store.getNode(asNodeId(id))?.type).toBe("sheet")
+    await m.rewriteNote(id, { content: "rewritten" }) // no type → must stay a sheet
+    expect(store.getNode(asNodeId(id))?.type).toBe("sheet")
+  })
+
+  it("rewriteNote recolors an existing note when a color is passed", async () => {
+    const store = freshStore("b")
+    const m = new StoreMutator(store, null)
+    const { id } = await m.createNote({ content: "x" })
+    await m.rewriteNote(id, { content: "x", colors: { background: "amber" } })
+    expect(stored(store, id)?.backgroundColor).toBe(resolveFamilyShade("amber", 200))
+  })
+
+  it("rewriteNote recolors a sheet at the light shade and projects it onto style", async () => {
+    const store = freshStore("b")
+    const m = new StoreMutator(store, null)
+    const { id } = await m.createNote({ content: "x", type: "sheet" })
+    await m.rewriteNote(id, { content: "x", colors: { background: "sky" } }) // type preserved → sheet
+    expect(stored(store, id)?.backgroundColor).toBe(resolveFamilyShade("sky", 100))
+    expect(store.getNode(asNodeId(id))?.style?.backgroundColor).toBeTruthy()
+  })
+
+  it("recolor overrides only the named channel, preserving the others", async () => {
+    const store = freshStore("b")
+    const m = new StoreMutator(store, null)
+    const { id } = await m.createNote({ content: "x", colors: { background: "amber" } })
+    const bgBefore = stored(store, id)?.backgroundColor
+    await m.rewriteNote(id, { content: "x", colors: { border: "black" } }) // border only
+    const after = stored(store, id)
+    expect(after?.backgroundColor).toBe(bgBefore) // fill preserved, not randomized
+    expect(after?.strokeColor).toBe("#000000") // border applied
+  })
+
+  it("a border-only color on a sheet does not project a (random) background", async () => {
+    const store = freshStore("b")
+    const m = new StoreMutator(store, null)
+    const { id } = await m.createNote({ content: "x", type: "sheet", colors: { border: "black" } })
+    // Sheets honor only a fill tint; a border-only request must not paint style.
+    expect(store.getNode(asNodeId(id))?.style?.backgroundColor).toBeUndefined()
+  })
+
+  it("resolves the transparent and white specials (transparent fill → black text)", async () => {
+    const store = freshStore("b")
+    const m = new StoreMutator(store, null)
+    const t = await m.createNote({ content: "x", colors: { background: "transparent" } })
+    expect(stored(store, t.id)?.backgroundColor).toBe("#00000000")
+    expect(stored(store, t.id)?.textColor).toBe("#000000") // transparent sits on the light board
+    const w = await m.createNote({ content: "x", colors: { background: "white" } })
+    expect(stored(store, w.id)?.backgroundColor).toBe("#ffffff")
+    expect(stored(store, w.id)?.textColor).toBe("#000000")
+  })
+
   it("patchNote updates only the fields provided", async () => {
     const store = freshStore("b")
     const m = new StoreMutator(store, null)
@@ -67,6 +126,43 @@ describe("StoreMutator", () => {
     await m.patchNote(id, { label: "Renamed" })
     expect(label(store, id)).toBe("Renamed")
     expect(body(store, id)).toBe("changed") // untouched
+  })
+
+  it("createNote resolves named colors to _storedColors (family→shade-200, border, black text)", async () => {
+    const store = freshStore("b")
+    const m = new StoreMutator(store, null)
+    const { id } = await m.createNote({ content: "x", colors: { background: "amber", border: "black" } })
+    expect(stored(store, id)).toEqual({
+      backgroundColor: resolveFamilyShade("amber", 200),
+      strokeColor: "#000000",
+      textColor: "#000000",
+    })
+  })
+
+  it("createNote falls back to a random fill for an unknown color name (never throws)", async () => {
+    const store = freshStore("b")
+    const m = new StoreMutator(store, null)
+    const { id } = await m.createNote({ content: "x", colors: { background: "not-a-color" } })
+    const colors = stored(store, id)
+    expect(colors?.backgroundColor).toMatch(/^#/) // some hex, not empty
+    expect(colors?.strokeColor).toBe("#00000000") // border omitted → transparent
+  })
+
+  it("resolves a sheet's color at the light shade (100) and projects it onto style so the sheet view honors it", async () => {
+    const store = freshStore("b")
+    const m = new StoreMutator(store, null)
+    const { id } = await m.createNote({ content: "x", type: "sheet", colors: { background: "amber" } })
+    // Sheets honor only a shade-100 tint → resolve there, not 200.
+    expect(stored(store, id)?.backgroundColor).toBe(resolveFamilyShade("amber", 100))
+    // Projected onto node.style so the sheet view's honoredBg path paints it.
+    expect(store.getNode(asNodeId(id))?.style?.backgroundColor).toBeTruthy()
+  })
+
+  it("derives white text on a dark fill for contrast (background=black)", async () => {
+    const store = freshStore("b")
+    const m = new StoreMutator(store, null)
+    const { id } = await m.createNote({ content: "x", colors: { background: "black" } })
+    expect(stored(store, id)?.textColor).toBe("#ffffff")
   })
 
   it("createLink attaches an edge at node centers with the parent layer", async () => {

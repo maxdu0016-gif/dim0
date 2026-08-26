@@ -283,6 +283,36 @@ describe("writeNote", () => {
     expect(store.getNode(asNodeId("brand-new"))).toBeDefined()
   })
 
+  it("rewriting without note_type keeps the note's existing type (doesn't reset to rect)", async () => {
+    const made = (await writeNote.run({ content: "b", note_type: "sheet" }, ctx)) as { id: string }
+    expect(store.getNode(asNodeId(made.id))?.type).toBe("sheet")
+    await writeNote.run({ content: "rewritten", note_id: made.id }, ctx)
+    expect(store.getNode(asNodeId(made.id))?.type).toBe("sheet") // preserved, not → rect
+  })
+
+  it("refuses to write to a note that lives in another folder (no colliding duplicate)", async () => {
+    // Resolvable whole-board (boardNotes) but absent from the current-layer store.
+    const other = {
+      id: asNodeId("other"), type: "rect", x: 0, y: 0, w: 100, h: 50, angle: 0, z: 0, groups: [],
+      content: "elsewhere", data: { label: { markdown: "Elsewhere" }, meta: { v: 1, createdAt: 0, updatedAt: 0 } },
+    } as unknown as Node
+    const c = { store, rootId: null, boardNotes: new Map([["other", other]]) } as unknown as ToolContext
+    const before = store.getAllNodes().length
+    const res = (await writeNote.run({ content: "x", note_id: "other" }, c)) as { error?: string }
+    expect(res.error).toMatch(/another folder/)
+    expect(store.getAllNodes().length).toBe(before) // no duplicate node created
+  })
+
+  it("edit_note refuses a note that lives in another folder (consistent with write_note)", async () => {
+    const other = {
+      id: asNodeId("other"), type: "rect", x: 0, y: 0, w: 100, h: 50, angle: 0, z: 0, groups: [],
+      content: "body", data: { label: { markdown: "E" }, meta: { v: 1, createdAt: 0, updatedAt: 0 } },
+    } as unknown as Node
+    const c = { store, rootId: null, boardNotes: new Map([["other", other]]) } as unknown as ToolContext
+    const res = (await editNote.run({ note_id: "other", field: "content", old: "body", new: "x" }, c)) as { error?: string }
+    expect(res.error).toMatch(/another folder/)
+  })
+
   it("rejects an invalid mini-app without creating a node", async () => {
     const before = store.getAllNodes().length
     const res = (await writeNote.run({ content: "const x = 1", note_type: "mini-app" }, ctx)) as { error?: string }
@@ -297,6 +327,19 @@ describe("writeNote", () => {
     )) as { id?: string; error?: string }
     expect(res.error).toBeUndefined()
     expect(store.getNode(asNodeId(res.id!))?.type).toBe("mini-app")
+  })
+
+  it("validates a bare rewrite of an existing mini-app (note_type omitted)", async () => {
+    const made = (await writeNote.run(
+      { content: "function Widget() { return <div>hi</div> }", note_type: "mini-app" },
+      ctx,
+    )) as { id: string }
+    // No note_type → rewriteNote preserves the mini-app type, so the invalid
+    // source must still be caught (regression guard for the type-preserve fix).
+    const res = (await writeNote.run({ content: "const x =", note_id: made.id }, ctx)) as { error?: string }
+    expect(res.error).toMatch(/mini-app invalid/)
+    // Original source left intact (rejected before the write).
+    expect(store.getNode(asNodeId(made.id))?.content).toBe("function Widget() { return <div>hi</div> }")
   })
 })
 

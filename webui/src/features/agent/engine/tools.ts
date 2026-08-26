@@ -39,6 +39,14 @@ const resolveBoardNode = (ctx: ToolContext, id: string): Node | undefined =>
   ctx.store.getNode(asNodeId(id)) ?? ctx.boardNotes?.get(id)
 
 
+// Model-facing color params — a color NAME (scheme + a few examples, not the full
+// list, so the tool schema stays lean). Resolved leniently by the mutator.
+const BG_COLOR_DESC = "Fill color by name — a Tailwind family (amber, sky, rose, slate, emerald, …) or white/black/transparent. Applies to plain notes and (as a light tint) sheets; mini-app/widget/code notes ignore it. Omit for an automatic color; 'transparent' for no fill."
+const BORDER_COLOR_DESC = "Border color, same scheme as background (plain notes only). Omit for no border."
+const colorsFor = (background?: string, border?: string): { background?: string; border?: string } | undefined =>
+  background || border ? { background, border } : undefined
+
+
 export const createNote = defineTool({
   name: "create_note",
   description: "Create a note on the board with a title and optional body.",
@@ -48,9 +56,11 @@ export const createNote = defineTool({
     body: z.string().optional().describe("The note body — prose or markdown."),
     x: z.number().optional().describe("Optional x canvas position; defaults beneath existing content (auto-arranged after the turn)."),
     y: z.number().optional().describe("Optional y canvas position; defaults beneath existing content (auto-arranged after the turn)."),
+    background_color: z.string().optional().describe(BG_COLOR_DESC),
+    border_color: z.string().optional().describe(BORDER_COLOR_DESC),
   }),
-  run: async ({ id, title = "", body = "", x, y }, ctx) =>
-    mutatorFor(ctx).createNote({ id, content: body, label: title, type: "rect", x, y }),
+  run: async ({ id, title = "", body = "", x, y, background_color, border_color }, ctx) =>
+    mutatorFor(ctx).createNote({ id, content: body, label: title, type: "rect", x, y, colors: colorsFor(background_color, border_color) }),
 })
 
 
@@ -93,24 +103,35 @@ export const writeNote = defineTool({
     label: z.string().optional().describe("Optional short title, stored separately from the body."),
     note_type: z.string().optional().describe("Visual note type: rectangle | sheet | mini-app | widget."),
     note_id: z.string().optional().describe("Existing note id to fully rewrite; omit to create a new note."),
+    background_color: z.string().optional().describe(BG_COLOR_DESC),
+    border_color: z.string().optional().describe(BORDER_COLOR_DESC),
   }),
-  run: async ({ content, label, note_type, note_id }, ctx) => {
+  run: async ({ content, label, note_type, note_id, background_color, border_color }, ctx) => {
+    const existing = note_id ? ctx.store.getNode(asNodeId(note_id)) : undefined
     // Validate a mini-app before persisting, so a malformed one is rejected with
-    // line/col for the agent to fix this turn (not a silently-broken note).
-    if (note_type === "mini-app") {
+    // line/col for the agent to fix this turn (not a silently-broken note). Key off
+    // the RESULTING type: an explicit mini-app, OR a bare rewrite of an existing
+    // mini-app (rewriteNote preserves the type when note_type is omitted).
+    const willBeMiniApp = note_type === "mini-app" || (!note_type && existing?.type === "mini-app")
+    if (willBeMiniApp) {
       const v = validateMiniAppSource(content)
       if (!v.ok) {
         return { error: `mini-app invalid: ${v.message}${v.line ? ` (line ${v.line}:${v.column})` : ""}` }
       }
     }
 
-    const spec = { content, label, type: note_type }
+    const spec = { content, label, type: note_type, colors: colorsFor(background_color, border_color) }
     const board = mutatorFor(ctx)
-    // Existing note → full rewrite (NOT a creation, so the turn won't re-arrange or
-    // recenter it); otherwise create (born beneath the border, arranged post-turn).
-    return note_id && ctx.store.getNode(asNodeId(note_id))
-      ? board.rewriteNote(note_id, spec)
-      : board.createNote({ ...spec, id: note_id })
+    if (note_id) {
+      // In the current layer → full rewrite (NOT a creation; the turn won't
+      // re-arrange/recenter it). Existing but in ANOTHER folder → refuse rather
+      // than create a colliding duplicate (cross-folder writes aren't supported
+      // yet). Nowhere → a brand-new note with this explicit id.
+      if (existing) return board.rewriteNote(note_id, spec)
+      if (resolveBoardNode(ctx, note_id)) return { error: "That note is in another folder. Open that folder before editing it." }
+      return board.createNote({ ...spec, id: note_id })
+    }
+    return board.createNote(spec)
   },
 })
 
@@ -148,7 +169,14 @@ export const editNote = defineTool({
   }),
   run: async ({ note_id, field, old, new: replacement, replace_all }, ctx) => {
     const node = ctx.store.getNode(asNodeId(note_id))
-    if (!node) return { error: "note not found" }
+    if (!node) {
+      // A cross-folder note (resolvable whole-board but not in this layer) can't be
+      // edited from here yet — say so, consistent with write_note, instead of a
+      // bare "not found".
+      return resolveBoardNode(ctx, note_id)
+        ? { error: "That note is in another folder. Open that folder before editing it." }
+        : { error: "note not found" }
+    }
 
     // Compute the replacement here (tool logic); the write goes through the port.
     const prev = node.data as DimNodeData | undefined

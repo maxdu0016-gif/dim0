@@ -13,7 +13,8 @@
 import { asEdgeId, asNodeId } from "@canvas-harness/core"
 import type { CanvasStore, Node } from "@canvas-harness/core"
 import type { DimEdgeData, DimNodeData } from "@/features/board/model"
-import { pickRandomColorOfShade } from "@/features/board/lib/colors/tailwind"
+import { FAMILIES, pickRandomColorOfShade, resolveFamilyShade, toBaseHex } from "@/features/board/lib/colors/tailwind"
+import { hexToRgb } from "@/features/board/utils/color"
 import { AUTOFIT_DISABLED_TYPES } from "@/features/board/harness/convert/note-to-node"
 import { dim0LinkStyleToCanvas, dim0StyleToCanvas } from "@/features/board/harness/convert/style"
 import {
@@ -40,6 +41,8 @@ export type NoteSpec = {
   /** Optional explicit position; omitted → beneath the current board border. */
   x?: number
   y?: number
+  /** Optional fill / border by color NAME (a `FAMILIES` id); omitted → random fill. */
+  colors?: { background?: string; border?: string }
 }
 
 
@@ -75,6 +78,99 @@ const randomNoteColors = (): StoredColors => ({
   strokeColor: "#00000000",
   textColor: "#000000",
 })
+
+
+// Note fill shade per type. Rectangles use 200 (the default note look); sheets
+// honor only a LIGHT tint (their view gates on shade-100), so agent-set sheet
+// colors resolve there. Types not listed use the rectangle default.
+const NOTE_SHADE = 200
+const SHADE_BY_TYPE: Record<string, number> = { sheet: 100 }
+const shadeForType = (nodeType: string): number => SHADE_BY_TYPE[nodeType] ?? NOTE_SHADE
+
+
+/**
+ * Resolve a color NAME (a `FAMILIES` id — a Tailwind family, or the specials
+ * white / black / transparent) to a paper-adapted hex at the given shade. `null`
+ * for an unknown name, so the caller can fall back to a default.
+ */
+const resolveColorName = (name: string, shade: number): string | null => {
+  const fam = FAMILIES.find((f) => f.id === name)
+  if (!fam) return null
+  if (fam.transparent) return "#00000000"
+  if (fam.fixedHex) return fam.fixedHex
+  return fam.family ? resolveFamilyShade(fam.family, shade) : null
+}
+
+
+/**
+ * Legible text color for a fill: white on a dark background, black otherwise.
+ * A transparent fill (`#RRGGBB00`) sits on the light board → black.
+ */
+const textColorFor = (bgHex: string | undefined): string => {
+  if (!bgHex || /^#[0-9a-fA-F]{6}00$/.test(bgHex)) return "#000000"
+  const base = toBaseHex(bgHex)
+  if (!base) return "#000000"
+  const { r, g, b } = hexToRgb(base)
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b < 140 ? "#ffffff" : "#000000"
+}
+
+
+/**
+ * Build a note's stored colors from optional family-name choices, at the shade
+ * the note type honors. Falls back to a random fill (the default look); text is
+ * derived from the fill for contrast. Unresolvable names are ignored (fall back),
+ * never throw.
+ */
+const resolveNoteColors = (colors: NoteSpec["colors"], nodeType: string): StoredColors => {
+  const shade = shadeForType(nodeType)
+  const random = randomNoteColors()
+  const bg = colors?.background ? resolveColorName(colors.background, shade) : null
+  const border = colors?.border ? resolveColorName(colors.border, shade) : null
+  const backgroundColor = bg ?? random.backgroundColor
+  return {
+    backgroundColor,
+    strokeColor: border ?? random.strokeColor,
+    textColor: textColorFor(backgroundColor),
+  }
+}
+
+
+// Custom (non-rect) types whose view paints a background from the node style, so
+// an agent-set color should be projected onto `style` (not just stored).
+const COLORABLE_CUSTOM_TYPES = new Set(["sheet"])
+
+
+/**
+ * Whether a color request actually affects this node type — and thus should be
+ * applied. Rectangles honor fill + border; sheets honor only a background tint
+ * (no border in their view), so a border-only request on a sheet is a no-op and
+ * must NOT trigger a (random) fill; other types ignore color entirely.
+ */
+const colorTargets = (nodeType: string, colors: NoteSpec["colors"]): boolean => {
+  if (nodeType === "rect") return !!(colors?.background || colors?.border)
+  if (COLORABLE_CUSTOM_TYPES.has(nodeType)) return !!colors?.background
+  return false
+}
+
+
+/**
+ * Recolor an EXISTING note: override only the channels the caller named,
+ * preserving the note's other stored colors (and its text unless the fill
+ * changed). Unlike `resolveNoteColors` (create), this never randomizes an
+ * unspecified channel.
+ */
+const mergeNoteColors = (existing: StoredColors | undefined, colors: NoteSpec["colors"], nodeType: string): StoredColors => {
+  const shade = shadeForType(nodeType)
+  const base = existing ?? randomNoteColors()
+  const bg = colors?.background ? resolveColorName(colors.background, shade) : null
+  const border = colors?.border ? resolveColorName(colors.border, shade) : null
+  const backgroundColor = bg ?? base.backgroundColor
+  return {
+    backgroundColor,
+    strokeColor: border ?? base.strokeColor,
+    textColor: bg ? textColorFor(backgroundColor) : (base.textColor ?? textColorFor(backgroundColor)),
+  }
+}
 
 
 // Default box size per canvas node type (mirrors backend get_default_note_size).
@@ -157,14 +253,19 @@ export class StoreMutator implements BoardMutator {
   async createNote(spec: NoteSpec): Promise<{ id: string; created: true }> {
     const nodeType = toNodeType(spec.type ?? "")
     const autoFitStyle = AUTOFIT_DISABLED_TYPES.has(nodeType) ? { autoFit: false } : undefined
-    const storedColors = randomNoteColors()
+    const storedColors = resolveNoteColors(spec.colors, nodeType)
     const { w, h } = noteGeometry(nodeType, spec.content)
     const origin = beneathBorderOrigin(this.store)
-    // Plain rectangles are painted by the lib from `style`; custom types paint via
-    // their own view and only need autoFit disabled at birth.
-    const style = nodeType === "rect"
-      ? { ...canonicalNodeStyle(storedColors), ...(autoFitStyle ?? {}) }
-      : autoFitStyle
+    // Plain rectangles are painted by the lib from `style`. A colorable custom
+    // type (sheet) whose FILL was explicitly set gets it projected onto `style`
+    // so its own view honors it; other custom types paint via their own view and
+    // only need autoFit disabled at birth.
+    const style: Record<string, unknown> | undefined =
+      nodeType === "rect"
+        ? { ...canonicalNodeStyle(storedColors), ...(autoFitStyle ?? {}) }
+        : colorTargets(nodeType, spec.colors)
+          ? this.colorStyle(nodeType, storedColors, {}, autoFitStyle)
+          : autoFitStyle
     const id = asNodeId(spec.id || this.store.generateId())
     this.store.batch(() => {
       this.store.addNode({
@@ -189,20 +290,50 @@ export class StoreMutator implements BoardMutator {
     return { id: String(id), created: true }
   }
 
+  /**
+   * Project stored colors onto a style for a colorable type (rect / sheet),
+   * theme-adapted. `baseStyle` is the style to fold the colors into (the
+   * canonical rect base on create, the existing node style on recolor).
+   */
+  private colorStyle(nodeType: string, storedColors: StoredColors, baseStyle: Record<string, unknown>, autoFitStyle?: { autoFit: boolean }): Record<string, unknown> {
+    const mode = getBoardThemeMode()
+    const display = mode === "dark" ? adaptNodeColors(storedColors, "dark") : storedColors
+    if (nodeType === "rect") return { ...applyColorsToStyle(baseStyle, display), ...(autoFitStyle ?? {}) }
+    return applyColorsToStyle({ ...baseStyle, ...(autoFitStyle ?? {}) }, display) // colorable custom (sheet)
+  }
+
   async rewriteNote(id: string, spec: NoteSpec): Promise<{ id: string; created: boolean }> {
     const nid = asNodeId(id)
     const node = this.store.getNode(nid)
     // No such node → treat as a create with this id (mirrors write_note fallthrough).
     if (!node) return this.createNote({ ...spec, id })
-    const nodeType = toNodeType(spec.type ?? "")
+    // Preserve the existing type when the caller didn't ask to change it — a bare
+    // body rewrite must NOT silently convert a sheet / mini-app into a rectangle.
+    const nodeType = spec.type ? toNodeType(spec.type) : node.type
     const autoFitStyle = AUTOFIT_DISABLED_TYPES.has(nodeType) ? { autoFit: false } : undefined
     const prev = node.data as DimNodeData | undefined
+
+    const data: DimNodeData = {
+      ...prev,
+      label: spec.label ? { markdown: spec.label } : (prev?.label ?? { markdown: "" }),
+      meta: meta(),
+    } as DimNodeData
+    // Default: keep the existing style (+ autoFit for custom types). Recolor only
+    // the channels the caller named (merge, don't randomize the rest), and only
+    // for a type/channel that actually honors it.
+    let style: Record<string, unknown> | undefined = autoFitStyle ? { ...(node.style ?? {}), ...autoFitStyle } : undefined
+    if (colorTargets(nodeType, spec.colors)) {
+      const storedColors = mergeNoteColors(prev?._storedColors, spec.colors, nodeType)
+      data._storedColors = storedColors
+      style = this.colorStyle(nodeType, storedColors, node.style ?? {}, autoFitStyle)
+    }
+
     this.store.batch(() =>
       this.store.updateNode(nid, {
         type: nodeType,
         content: spec.content,
-        data: { ...prev, label: spec.label ? { markdown: spec.label } : (prev?.label ?? { markdown: "" }), meta: meta() },
-        ...(autoFitStyle ? { style: { ...(node.style ?? {}), ...autoFitStyle } } : {}),
+        data,
+        ...(style ? { style } : {}),
       }),
     )
     return { id: String(nid), created: false }
