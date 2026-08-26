@@ -159,20 +159,20 @@ struct CanvasScreen: View {
                         .font(.system(.body, design: .monospaced, weight: .semibold))
                         .textSelection(.enabled)
                 }
-
-                VStack(alignment: .leading, spacing: 5) {
-                    Text("配对码")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Text(model.pairingCode)
-                        .font(.system(size: 28, weight: .bold, design: .monospaced))
-                        .tracking(3)
-                        .textSelection(.enabled)
-                }
             } else {
                 Text(localSyncStateMessage)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
+            }
+
+            VStack(alignment: .leading, spacing: 5) {
+                Text("配对码")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text(model.pairingCode)
+                    .font(.system(size: 28, weight: .bold, design: .monospaced))
+                    .tracking(3)
+                    .textSelection(.enabled)
             }
 
             Text("在电脑画布右上角打开 iPad 同步，输入上面的地址和配对码。两台设备需要连接同一个 Wi-Fi。")

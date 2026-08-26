@@ -48,6 +48,7 @@ final class LocalSyncServer {
 
             do {
                 let parameters = NWParameters.tcp
+                parameters.includePeerToPeer = true
                 let webSocketOptions = NWProtocolWebSocket.Options()
                 webSocketOptions.autoReplyPing = true
                 parameters.defaultProtocolStack.applicationProtocols.insert(webSocketOptions, at: 0)
@@ -57,6 +58,14 @@ final class LocalSyncServer {
                     return
                 }
                 let listener = try NWListener(using: parameters, on: endpointPort)
+                // Advertising a declared Bonjour service is the supported way to
+                // make iPadOS present Local Network privacy consent. A bare TCP
+                // listener can become ready without ever prompting, leaving the
+                // port unreachable from the paired computer.
+                listener.service = NWListener.Service(
+                    name: "Dim0 iPad",
+                    type: "_dim0sync._tcp"
+                )
                 listener.newConnectionHandler = { [weak self] connection in
                     self?.accept(connection)
                 }
