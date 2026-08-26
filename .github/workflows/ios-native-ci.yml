@@ -12,7 +12,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   compile:
@@ -31,6 +31,17 @@ jobs:
 
       - name: Generate Xcode project
         run: xcodegen generate
+
+      - name: Persist generated Xcode project
+        if: github.ref == 'refs/heads/codex/ipad-native-pencilkit' && github.actor != 'github-actions[bot]'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f Dim0Native.xcodeproj
+          if ! git diff --cached --quiet; then
+            git commit -m "build(ios): generate xcode project"
+            git push
+          fi
 
       - name: Export generated Xcode project
         uses: actions/upload-artifact@v4
