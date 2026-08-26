@@ -19,10 +19,10 @@ Expo runtime, or a `WKWebView` canvas.
 ```sh
 brew install xcodegen
 cd ios-native
+cd ios
 xcodegen generate
 open Dim0Native.xcodeproj
 ```
 
 The bundle identifier is `com.dim0.canvas` so the existing Apple Developer
 device registration and provisioning profile can be reused.
-

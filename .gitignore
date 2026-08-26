@@ -41,5 +41,7 @@ next-steps.md
 dev-docs/
 
 # Native iOS generated files
-ios-native/*.xcodeproj/
-ios-native/.derived-data/
+ios-native/ios/*.xcodeproj/
+ios-native/ios/*.xcworkspace/
+ios-native/ios/Pods/
+ios-native/ios/.derived-data/

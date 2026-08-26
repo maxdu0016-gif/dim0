@@ -16,7 +16,7 @@ targets:
     type: application
     platform: iOS
     sources:
-      - path: Dim0Native
+      - path: ../Dim0Native
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.dim0.canvas
@@ -37,7 +37,7 @@ targets:
     type: bundle.unit-test
     platform: iOS
     sources:
-      - path: Dim0NativeTests
+      - path: ../Dim0NativeTests
     dependencies:
       - target: Dim0Native
     settings:
@@ -45,3 +45,4 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.dim0.canvas.tests
         GENERATE_INFOPLIST_FILE: YES
         CODE_SIGNING_ALLOWED: NO
+

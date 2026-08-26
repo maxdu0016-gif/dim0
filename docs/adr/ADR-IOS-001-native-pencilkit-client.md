@@ -35,6 +35,7 @@ iPad-specific interaction changes from destabilizing the mature web product.
 
 ```sh
 cd ios-native
+cd ios
 xcodegen generate
 xcodebuild -project Dim0Native.xcodeproj -scheme Dim0Native \
   -sdk iphonesimulator CODE_SIGNING_ALLOWED=NO build

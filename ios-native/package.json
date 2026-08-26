@@ -1,0 +1,9 @@
+{
+  "name": "dim0-native-ios-build",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "eas-build-pre-install": "bash ./scripts/prepare-ios-project.sh"
+  }
+}
+

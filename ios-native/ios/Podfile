@@ -1,0 +1,8 @@
+platform :ios, '17.0'
+
+install! 'cocoapods', :deterministic_uuids => false
+project 'Dim0Native.xcodeproj'
+
+target 'Dim0Native' do
+end
+

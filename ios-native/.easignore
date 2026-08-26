@@ -1,0 +1,5 @@
+.derived-data/
+ios/*.xcodeproj/
+ios/*.xcworkspace/
+ios/Pods/
+

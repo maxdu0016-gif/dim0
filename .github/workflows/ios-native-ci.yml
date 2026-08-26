@@ -20,7 +20,7 @@ jobs:
     timeout-minutes: 20
     defaults:
       run:
-        working-directory: ios-native
+        working-directory: ios-native/ios
 
     steps:
       - name: Check out source
@@ -43,4 +43,3 @@ jobs:
             -derivedDataPath .derived-data \
             CODE_SIGNING_ALLOWED=NO \
             | xcpretty
-
