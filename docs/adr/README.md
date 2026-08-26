@@ -14,4 +14,5 @@ by ID from other docs instead of restating the decision (each fact lives once).
 | [ADR-DESKTOP-001](./ADR-DESKTOP-001-rusqlite-local-storage.md) | Desktop storage is rusqlite (single connection, atomic `sql_tx`), not a pooled SQL driver. |
 | [ADR-DESKTOP-002](./ADR-DESKTOP-002-byok-relay-and-remote-path.md) | Desktop: BYOK goes direct via plugin-http (offline); managed + synced ride a build-time server URL (`API_URL` from `VITE_API_URL`). |
 | [ADR-DESKTOP-003](./ADR-DESKTOP-003-distribution-and-unsigned-install.md) | Desktop distribution: tagged GitHub Release; terminal install is prompt-free even unsigned (ad-hoc signed, no quarantine/MOTW). |
+| [ADR-IOS-001](./ADR-IOS-001-native-pencilkit-client.md) | iPad uses a native PencilKit client; it shares protocols with Dim0 but not the web UI runtime. |
 | [ADR-BILLING-001](./ADR-BILLING-001-oss-mode-when-billing-inactive.md) | Billing-inactive deploys run full-OSS (plan `plus`, no limits); one plan resolver, consumed by the frontend. |

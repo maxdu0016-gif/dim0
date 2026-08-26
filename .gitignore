@@ -39,3 +39,7 @@ sharing-archi.md
 next-steps.md
 # internal design/planning docs — local only
 dev-docs/
+
+# Native iOS generated files
+ios-native/*.xcodeproj/
+ios-native/.derived-data/

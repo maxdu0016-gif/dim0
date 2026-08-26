@@ -1,0 +1,46 @@
+name: iOS native CI
+
+on:
+  push:
+    paths:
+      - "ios-native/**"
+      - ".github/workflows/ios-native-ci.yml"
+  pull_request:
+    paths:
+      - "ios-native/**"
+      - ".github/workflows/ios-native-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compile:
+    runs-on: macos-15
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: ios-native
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Compile app and tests
+        run: |
+          set -o pipefail
+          xcodebuild build-for-testing \
+            -project Dim0Native.xcodeproj \
+            -scheme Dim0Native \
+            -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath .derived-data \
+            CODE_SIGNING_ALLOWED=NO \
+            | xcpretty
+
