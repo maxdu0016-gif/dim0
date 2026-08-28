@@ -29,6 +29,7 @@ import {
 import { getBoardThemeMode } from "@/features/board/harness/theme/theme-mode-ref"
 import { createDefaultLinkStyle, createDefaultStyle } from "@/features/board/types/style"
 import { beneathBorderOrigin } from "@/features/board/harness/agent/beneath-border"
+import { bumpMeta, freshMeta } from "@/features/board/utils/node-meta"
 import { estimateNoteSize } from "./note-size"
 
 
@@ -243,11 +244,6 @@ const noteGeometry = (nodeType: string, content: string): { w: number; h: number
 }
 
 
-/** Fresh SyncMeta stamp for a created/updated entity. */
-const meta = (): DimNodeData["meta"] => {
-  const t = Date.now()
-  return { v: 1, createdAt: t, updatedAt: t }
-}
 
 
 /**
@@ -332,7 +328,7 @@ export class StoreMutator implements BoardMutator {
         data: {
           label: { markdown: spec.label ?? "" },
           parentId: this.rootId ?? undefined,
-          meta: meta(),
+          meta: freshMeta(),
           _storedColors: storedColors,
         } satisfies DimNodeData,
       })
@@ -400,7 +396,7 @@ export class StoreMutator implements BoardMutator {
     const data: DimNodeData = {
       ...prev,
       label: spec.label ? { markdown: spec.label } : (prev?.label ?? { markdown: "" }),
-      meta: meta(),
+      meta: bumpMeta(prev?.meta), // rewrite = edit → preserve createdAt, advance updatedAt
     } as DimNodeData
     // Default: keep the existing style (+ autoFit for custom types). Recolor only
     // the channels the caller named (merge, don't randomize the rest), and only
@@ -427,10 +423,15 @@ export class StoreMutator implements BoardMutator {
     const nid = asNodeId(id)
     const node = this.store.getNode(nid)
     if (!node) return
+    // Nothing to change → no-op. Avoids a spurious "Edited" stamp and a needless
+    // store/sync op when update_note is called with neither content nor label.
+    if (patch.content === undefined && patch.label === undefined) return
     const prev = node.data as DimNodeData | undefined
-    const next: Partial<Node> = {}
+    // A real edit advances the freshness stamp (preserving createdAt), so the note
+    // reads as "Edited" — whether the caller changed the content, the label, or both.
+    const next: Partial<Node> = { data: { ...prev, meta: bumpMeta(prev?.meta) } as DimNodeData }
     if (patch.content !== undefined) next.content = patch.content
-    if (patch.label !== undefined) next.data = { ...prev, label: { markdown: patch.label }, meta: meta() }
+    if (patch.label !== undefined) next.data = { ...(next.data as DimNodeData), label: { markdown: patch.label } }
     this.store.batch(() => this.store.updateNode(nid, next))
   }
 
@@ -456,7 +457,7 @@ export class StoreMutator implements BoardMutator {
         data: {
           label: spec.label || undefined,
           parentId: this.rootId ?? undefined,
-          meta: meta(),
+          meta: freshMeta(),
           _storedColors: storedColors,
         } satisfies DimEdgeData,
       })
