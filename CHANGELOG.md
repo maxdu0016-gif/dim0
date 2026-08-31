@@ -1,3 +1,26 @@
+## v0.3.90 (2026-08-31)
+
+### Feat
+
+- **agent**: navigate tool + working folder (off-scene authoring) (#262)
+- **agent**: arrange_notes tool for on-demand layout (#257)
+- **agent**: relational note placement (near an existing note) (#256)
+- **agent**: give the agent spatial context for selected notes (#255)
+- **agent**: let the agent set note colors by name (#253)
+
+### Fix
+
+- **board**: sheet @-mentions + subpages on local boards (#265)
+- **agent**: land create_folder (S9) on main (#264)
+- **sync**: pump deep-layer cascade deletes through the sync intake (#260)
+- **board**: unify node freshness stamp so agent notes show Created/Edited (#258)
+- **drawify**: use handwriting font for drawn nodes and links (#249)
+
+### Refactor
+
+- **sync**: extract submitLocalBatch as the single local intake (#259)
+- **agent**: introduce BoardMutator write port (behavior-neutral) (#250)
+
 ## v0.3.89 (2026-08-24)
 
 ### Fix
