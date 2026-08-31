@@ -23,6 +23,7 @@ import type { Note, NoteProperties } from "@/features/board/types/note"
 import type { IconProperty } from "@/features/newsfeed/types/properties"
 import type { NoteNodeData } from "../../convert/note-to-node"
 import { useBoardAppStore } from "../../store/board-app-store"
+import { useOffSceneNote } from "./use-off-scene-note"
 
 
 export type SheetPanelProps = {
@@ -46,22 +47,33 @@ export const SheetPanel = memo(function SheetPanel({
   nodeId,
   onClose,
 }: SheetPanelProps) {
-  const store = useCanvasStore()
+  const liveStore = useCanvasStore()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const localNode = useNode(nodeId as NodeId)
-  const localData = (localNode?.data ?? {}) as Partial<NoteNodeData>
+  const liveNode = useNode(nodeId as NodeId)
   const activeBoardId = useBoardAppStore((s) => s.boardId)
   const openNodeSurface = useBoardAppStore((s) => s.openNodeSurface)
 
+  // A sub-page lives in a layer that isn't on the canvas, so it's absent from the
+  // live store. Load it OFF-SCENE from the local replica — read + sync-correct
+  // edit — instead of the REST path, which 404s for a local (unsynced) board.
+  const off = useOffSceneNote(liveStore, activeBoardId ?? null, nodeId, !liveNode)
+  const localNode = liveNode ?? off.node
+  // The store that actually holds the note: the live canvas store for an on-canvas
+  // sheet, else the off-scene store (whose edits sync via its own change wiring).
+  const store = liveNode ? liveStore : off.store ?? liveStore
+  const localData = (localNode?.data ?? {}) as Partial<NoteNodeData>
   const isLocalNote = !!localNode
+  // While the off-scene load is in flight we don't yet know if the note exists —
+  // don't flash "no longer exists".
+  const offSceneLoading = !liveNode && !!activeBoardId && !off.ready
 
-  // REST fallback for sheets not present on the current canvas scope
-  // (sub-pages reached via the editor's `/subpage` slash command).
+  // REST fallback ONLY for a synced note not yet materialized locally: the
+  // off-scene load has settled (`off.ready`) without finding it in the replica.
   const { data: fetchedNote, isLoading: isFetchingNote } = useGetNote({
     boardId: activeBoardId ?? undefined,
     noteId: nodeId,
-    enabled: !isLocalNote && !!activeBoardId,
+    enabled: !isLocalNote && off.ready && !!activeBoardId,
   })
 
   // Resolved view of the note — prefer local store, fall back to fetch.
@@ -75,13 +87,17 @@ export const SheetPanel = memo(function SheetPanel({
     localData.graphUid ?? fetchedNote?.graphUid ?? activeBoardId ?? null
   const exists = isLocalNote || !!fetchedNote
 
-  const { data: notePath = [] } = useGetNotePath({
+  const { data: restPath = [] } = useGetNotePath({
     boardId: boardId ?? undefined,
     noteId: nodeId,
-    // Mirror the useGetNote gate above: a local note's path is resolved from the
-    // store/local breadcrumb, never the backend (which 401s logged-out).
-    enabled: !isLocalNote && !!boardId,
+    // REST only for a synced note not materialized locally (mirror the useGetNote
+    // gate). A local sub-page's ancestor chain comes from the off-scene load
+    // below — the backend `/path` 404s on a local board.
+    enabled: !isLocalNote && off.ready && !!boardId,
   })
+  // Off-scene sub-pages resolve their breadcrumb + stack (ancestor chain) locally,
+  // by walking parentId over the replica; on-canvas top-level notes have none.
+  const notePath = off.node ? off.path : restPath
   const ancestors = useMemo(() => notePath.slice(0, -1), [notePath])
   // The open note's live title/icon are `noteLabel` / its iconData (store for
   // local notes, fetch for sub-pages); the path's trailing segment can lag a
@@ -177,12 +193,14 @@ export const SheetPanel = memo(function SheetPanel({
       // store.updateNode below already keeps it in sync.
       if (boardId) {
         queryClient.setQueriesData<BoardContentItem[]>(
-          { queryKey: ["boardContents", boardId] },
+          { queryKey: ["localBoardContents", boardId] },
           (old) => applyTitleUpdateToBoardContents(old, nodeId, trimmed || null),
         )
       }
       if (isLocalNote) {
-        const prevData = (localNode?.data ?? {}) as Record<string, unknown>
+        // Read the freshest data from the target store (not the render-time
+        // snapshot) so a prior off-scene edit isn't clobbered by a stale merge.
+        const prevData = (store.getNode(nodeId as NodeId)?.data ?? {}) as Record<string, unknown>
         store.updateNode(nodeId as NodeId, {
           data: {
             ...prevData,
@@ -193,7 +211,7 @@ export const SheetPanel = memo(function SheetPanel({
         persistRemote({ label: trimmed ? { markdown: trimmed } : undefined })
       }
     },
-    [isLocalNote, localNode?.data, nodeId, noteLabel, persistRemote, store, boardId, queryClient],
+    [isLocalNote, nodeId, noteLabel, persistRemote, store, boardId, queryClient],
   )
 
   const stopTitleEdit = useCallback(
@@ -235,13 +253,13 @@ export const SheetPanel = memo(function SheetPanel({
       // expanded folder) gets the matching item updated in place.
       if (boardId) {
         queryClient.setQueriesData<BoardContentItem[]>(
-          { queryKey: ["boardContents", boardId] },
+          { queryKey: ["localBoardContents", boardId] },
           (old) => applyIconUpdateToBoardContents(old, nodeId, next),
         )
       }
 
       if (isLocalNote) {
-        const prevData = (localNode?.data ?? {}) as Record<string, unknown>
+        const prevData = (store.getNode(nodeId as NodeId)?.data ?? {}) as Record<string, unknown>
         const prevProps =
           (prevData.properties as Partial<NoteProperties> | undefined) ?? {}
         store.updateNode(nodeId as NodeId, {
@@ -265,7 +283,6 @@ export const SheetPanel = memo(function SheetPanel({
     },
     [
       isLocalNote,
-      localNode?.data,
       nodeId,
       store,
       fetchedNote,
@@ -300,7 +317,7 @@ export const SheetPanel = memo(function SheetPanel({
   // REST fetch has settled (otherwise sub-pages flash that message
   // before their data arrives).
   if (!exists) {
-    if (isFetchingNote) {
+    if (offSceneLoading || isFetchingNote) {
       return (
         <div
           className={`${PANEL_CLASS} items-center justify-center text-sm text-muted-foreground`}
