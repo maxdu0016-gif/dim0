@@ -35,6 +35,27 @@ for (const { label, make } of engineCases) describe(`BoardRegistry (${label})`, 
   })
 
 
+  it("setBoardContext stores the purpose + drift baseline, leaving title/kind intact", async () => {
+    const reg = new BoardRegistry({ engine })
+    const board = newLocalBoard("Ideas", 1000)
+    await reg.createBoard(board)
+    await reg.setBoardContext(board.id, "A board about trip planning.", { derivedAt: 5000, deriveSeq: 42 })
+    const meta = await reg.getBoard(board.id)
+    expect(meta?.context).toBe("A board about trip planning.")
+    expect(meta?.contextDerivedAt).toBe(5000)
+    expect(meta?.contextDeriveSeq).toBe(42)
+    expect(meta?.title).toBe("Ideas") // untouched
+    expect(meta?.kind).toBe("local-only")
+  })
+
+
+  it("setBoardContext no-ops for a board that doesn't exist", async () => {
+    const reg = new BoardRegistry({ engine })
+    await reg.setBoardContext("ghost", "x", { derivedAt: 1, deriveSeq: 1 })
+    expect(await reg.getBoard("ghost")).toBeUndefined()
+  })
+
+
   it("deleteBoard cascades: meta + view + content all removed, no orphans", async () => {
     const reg = new BoardRegistry({ engine })
     const board = newLocalBoard("Doomed", 1000)
@@ -88,11 +109,16 @@ for (const { label, make } of engineCases) describe(`BoardRegistry (${label})`, 
     await reg.createBoard(board)
     await engine.put("sync_meta", { boardId: board.id, syncedSeq: 42 })
     await engine.put("sync_meta", { boardId: "other-board", syncedSeq: 7 })
+    // Same trap for the agent snapshot cursor.
+    await engine.put("snapshot_meta", { boardId: board.id, seenSeq: 42 })
+    await engine.put("snapshot_meta", { boardId: "other-board", seenSeq: 7 })
 
     await reg.deleteBoard(board.id)
 
     expect(await engine.get("sync_meta", board.id)).toBeUndefined()
     expect(await engine.get("sync_meta", "other-board")).toBeDefined() // spared
+    expect(await engine.get("snapshot_meta", board.id)).toBeUndefined()
+    expect(await engine.get("snapshot_meta", "other-board")).toBeDefined() // spared
   })
 
 

@@ -56,6 +56,24 @@ export interface DocSearchOutput {
   references: DocRef[]
 }
 
+
+/** One note `search_notes` surfaced — the node's id + label so the chat can
+ *  render it as a card and jump to it on the board. `parentId` is the note's
+ *  folder/layer (for cross-folder navigation). */
+export interface NoteRef {
+  noteId: string
+  label: string
+  snippet: string
+  parentId: string | null
+}
+
+
+/** The `search_notes` output: the board notes retrieval surfaced this turn. */
+export interface NoteSearchOutput {
+  type: "note_search"
+  references: NoteRef[]
+}
+
 export interface CodeInterpreterOutput {
   type: "code_interpreter"
   status: "success" | "error" | "timeout"
@@ -138,6 +156,7 @@ export type ToolOutput =
   | WebSearchOutput
   | MemorySearchOutput
   | DocSearchOutput
+  | NoteSearchOutput
   | CodeInterpreterOutput
   | WriteNoteOutput
   | CreateNoteOutput

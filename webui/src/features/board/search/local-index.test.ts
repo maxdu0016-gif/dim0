@@ -1,8 +1,16 @@
 import { describe, expect, it } from "vitest"
 import fc from "fast-check"
 import { asNodeId } from "@canvas-harness/core"
+import type { Node, NodeId } from "@canvas-harness/core"
 import { addNode, freshStore } from "@/test/canvas"
 import { LocalSearchIndex } from "./local-index"
+
+
+const richNode = (id: string, label: string, content = ""): Node =>
+  ({
+    id: id as NodeId, type: "rect", x: 0, y: 0, w: 100, h: 50, angle: 0, z: 0, groups: [],
+    content, data: { label: { markdown: label }, meta: { v: 1, createdAt: 0, updatedAt: 0 } },
+  }) as unknown as Node
 
 
 describe("LocalSearchIndex", () => {
@@ -19,7 +27,24 @@ describe("LocalSearchIndex", () => {
   })
 
 
-  it("does not crash when a node's label is not a string", async () => {
+  it("indexes the PRODUCTION title shape (data.label is a RichText object)", async () => {
+    // Regression: production stores `data.label` as `{ markdown }`, not a string,
+    // so the index used to read every title as empty — titles were unsearchable.
+    const store = freshStore("c")
+    const index = new LocalSearchIndex()
+    index.attach(store)
+
+    addNode(store, "n1")
+    store.updateNode(asNodeId("n1"), {
+      data: { label: { markdown: "Napoleon" } as unknown as string, meta: { v: 1, createdAt: 0, updatedAt: 0 } },
+    })
+    await index.idle()
+
+    expect(await index.query("Napoleon")).toContain("n1") // title is searchable
+  })
+
+
+  it("does not crash when a node's label is neither string nor RichText", async () => {
     const store = freshStore("c")
     const index = new LocalSearchIndex()
     index.attach(store)
@@ -28,14 +53,14 @@ describe("LocalSearchIndex", () => {
     await index.idle()
     expect(await index.query("ok")).toContain("n1")
 
-    // A node type puts a non-string in data.label — must not reject the insert
-    // (which would otherwise poison the whole update queue).
+    // A stray non-string, non-RichText label must not reject the insert (which
+    // would otherwise poison the whole update queue).
     store.updateNode(asNodeId("n1"), {
-      data: { label: { markdown: "x" } as unknown as string, meta: { v: 1, createdAt: 0, updatedAt: 0 } },
+      data: { label: 42 as unknown as string, meta: { v: 1, createdAt: 0, updatedAt: 0 } },
     })
     await index.idle()
 
-    expect(index.count()).toBe(1) // still indexed, just no title text
+    expect(index.count()).toBe(1) // still indexed, just no usable title text
     expect(await index.query("ok")).toHaveLength(0) // old title dropped on upsert
 
     // The queue still works for later nodes.
@@ -113,6 +138,16 @@ describe("LocalSearchIndex", () => {
       }),
       { numRuns: 40 },
     )
+  })
+
+
+  it("indexNodes seeds a whole-board node list (all layers) so search spans folders", async () => {
+    // Nodes from DIFFERENT layers — never all present in the layer-scoped store at
+    // once; the agent's per-turn whole-board index is built from a list like this.
+    const index = new LocalSearchIndex()
+    await index.indexNodes([richNode("root", "root note"), richNode("deep", "buried in a folder")])
+    expect(await index.query("root")).toContain("root")
+    expect(await index.query("buried")).toContain("deep") // a note in another folder is findable
   })
 })
 

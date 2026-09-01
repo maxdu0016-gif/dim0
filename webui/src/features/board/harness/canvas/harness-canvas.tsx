@@ -50,6 +50,7 @@ import { saveLocalThumbnail } from "@/features/board/local/save-local-thumbnail"
 import { setBoardPersistenceRef } from "@/features/board/persist/local/board-persistence-ref"
 import { ShareButton } from "@/features/sharing/share-button"
 import { BoardKindBadge } from "@/features/board/components/board-kind-badge"
+import { BoardBreadcrumb } from "@/features/board/components/breadcrumb/board-breadcrumb"
 import { useBoardAppStore } from "../store/board-app-store"
 import { createBoardStore } from "../store/create-board-store"
 import { adaptEdgeColors, adaptNodeColors, applyColorsToEdgeStyle } from "../theme/color-adapter"
@@ -66,6 +67,7 @@ import { useBlockFolderCopy } from "./use-block-folder-copy"
 import { resolveStoredEdgeColors, useStampNewEdges } from "./use-stamp-new-edges"
 import { useStampNewNodes } from "./use-stamp-new-nodes"
 import { useLocalSearchIndex } from "@/features/board/search/use-search-index"
+import { isBrowserAgentActive } from "@/features/agent/local/local-agent-flag"
 import { useLocalDocIndex } from "@/features/board/search/use-doc-index"
 import { useDocNodeCascade } from "@/features/board/harness/agent/use-doc-node-cascade"
 import { useStyleMemory } from "./use-style-memory"
@@ -203,11 +205,19 @@ export function HarnessCanvas({ local = false }: { local?: boolean } = {}) {
   useStampNewEdges(store, boardId, rootId)
   useStampNewNodes(store, boardId, rootId)
   useSidebarContentsSync(store, boardId)
-  useLocalSearchIndex(store, local)
-  useLocalDocIndex(boardId ?? "", local)
-  useDocNodeCascade(store, boardId ?? "", local)
+  // The browser agent's local indexes (note search + doc Q&A) must exist whenever
+  // the browser agent is the active engine — on local-only boards AND on synced
+  // boards in browser-agent mode. Gating on `local` alone left `search_notes` with
+  // a null index (empty results for EVERY query) on synced browser-agent boards.
+  // Persistence/hydrate below stays gated on `local` — synced boards still sync.
+  // Memoized: the flag is reload-stable, so don't read localStorage every render
+  // of this hot canvas component.
+  const agentLocalIndexes = useMemo(() => isBrowserAgentActive(local), [local])
+  useLocalSearchIndex(store, agentLocalIndexes)
+  useLocalDocIndex(boardId ?? "", agentLocalIndexes)
+  useDocNodeCascade(store, boardId ?? "", agentLocalIndexes)
   useBlockFolderCopy(store)
-  useHarnessApplyMindMap(store, boardId, rootId)
+  useHarnessApplyMindMap(store, boardId, rootId, ready)
   useHydrateIconNodes(store, boardId, rootId, ready)
   useThemeColorProjection(store, ready)
   // Local boards store the thumbnail in IndexedDB; capture only at the root
@@ -582,6 +592,16 @@ function HarnessCanvasInner({
         mounted everywhere so the modal editor opens from any view.
       */}
       {!presenting && <HarnessToolbar local={!canCollab} />}
+      {/* Unified location bar: [Board] › … › [Leaf ✎]. Web mounts it here as a
+          canvas overlay, above the surface backdrop so it stays crisp +
+          interactive while a sheet is open; desktop renders it in the reserved
+          title bar (see SidebarLabel), which the backdrop never covers. */}
+      {!presenting && !isTauri() && (
+        <BoardBreadcrumb
+          local={!canCollab}
+          className="absolute left-14 top-4 z-[60] max-w-[calc(100vw-8rem)]"
+        />
+      )}
       {/*
         Top-right chrome row: save status + share button live in one
         flex container so they never overlap (z-stack collisions cost

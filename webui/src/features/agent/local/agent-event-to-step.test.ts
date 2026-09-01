@@ -246,4 +246,111 @@ describe("stepsFromEvents", () => {
       ]),
     ).toBe("second")
   })
+
+
+  it("reasoning fills the same step whose message holds the answer", () => {
+    const events: AgentEvent[] = [
+      { type: "reasoning", text: "First I consider X." },
+      { type: "assistant_text", text: "The answer is X." },
+    ]
+    expect(stepsFromEvents(events, "b")).toEqual([
+      { type: "reasoning_step", id: expect.any(String), reasoning: "First I consider X.", message: "The answer is X." },
+    ])
+  })
+
+
+  it("splits reasoning around a tool call into pre-tool and post-tool steps", () => {
+    const events: AgentEvent[] = [
+      { type: "reasoning", text: "I should search." },
+      { type: "tool_start", toolName: "search_notes", args: { query: "x" } },
+      { type: "tool_result", toolName: "search_notes", result: { results: [] } },
+      { type: "reasoning", text: "Nothing found, I'll answer." },
+      { type: "assistant_text", text: "No matches." },
+    ]
+    const steps = stepsFromEvents(events, "b")
+    expect(steps.map((s) => s.type)).toEqual(["reasoning_step", "tool_call", "reasoning_step"])
+    expect(steps[0]).toMatchObject({ reasoning: "I should search.", message: "" })
+    expect(steps[2]).toMatchObject({ reasoning: "Nothing found, I'll answer.", message: "No matches." })
+  })
+
+
+  it("renders a save_memory call as a readable memory step (not raw JSON)", () => {
+    const steps = stepsFromEvents(
+      [
+        { type: "tool_start", toolName: "save_memory", args: { scope: "board", title: "Prefers dark mode" } },
+        { type: "tool_result", toolName: "save_memory", result: { ok: true, id: "m1", title: "Prefers dark mode" } },
+      ],
+      "b",
+    )
+    const step = steps[0]
+    expect(step.type === "tool_call" && step.output).toBe("Saved to memory: Prefers dark mode")
+  })
+
+
+  it("surfaces the over-cap message on a rejected save_memory", () => {
+    const steps = stepsFromEvents(
+      [
+        { type: "tool_start", toolName: "save_memory", args: { title: "x" } },
+        { type: "tool_result", toolName: "save_memory", result: { ok: false, reason: "over_cap", message: "Memory is full for this scope. Delete or merge an entry below, then retry." } },
+      ],
+      "b",
+    )
+    const step = steps[0]
+    expect(step.type === "tool_call" && step.output).toMatch(/Memory is full/)
+  })
+
+
+  it("maps search_notes hits to a note_search output with node ids + parentId (not a JSON string)", () => {
+    const steps = stepsFromEvents(
+      [
+        { type: "tool_start", toolName: "search_notes", args: { query: "cats" } },
+        {
+          type: "tool_result",
+          toolName: "search_notes",
+          result: { results: [{ id: "n1", title: "Cats", content: "meow", parentId: "folder-1" }] },
+        },
+      ],
+      "board-1",
+    )
+    const step = steps[0]
+    expect(step.type === "tool_call" && typeof step.output !== "string" && step.output).toEqual({
+      type: "note_search",
+      references: [{ noteId: "n1", label: "Cats", snippet: "meow", parentId: "folder-1" }],
+    })
+  })
+
+
+  it("does NOT cite a get_note read as a note_search source (read-by-id is often read-before-edit)", () => {
+    const [step] = stepsFromEvents(
+      [
+        { type: "tool_start", toolName: "get_note", args: { note_id: "n9" } },
+        { type: "tool_result", toolName: "get_note", result: { id: "n9", label: "Root note", content: "body" } },
+      ],
+      "board-1",
+    )
+    // Falls through to the raw-JSON output; never becomes a note_search citation.
+    expect(step.type === "tool_call" && typeof step.output === "string").toBe(true)
+  })
+
+
+  it("renders arrange_notes as a readable 'Arranged N notes' step", () => {
+    const [step] = stepsFromEvents(
+      [
+        { type: "tool_start", toolName: "arrange_notes", args: {} },
+        { type: "tool_result", toolName: "arrange_notes", result: { arranged: 6 } },
+      ],
+      "b",
+    )
+    expect(step.type === "tool_call" && step.output).toBe("Arranged 6 notes")
+  })
+
+
+  it("latestAssistantText ignores reasoning (answer body only)", () => {
+    expect(
+      latestAssistantText([
+        { type: "reasoning", text: "thinking…" },
+        { type: "assistant_text", text: "the answer" },
+      ]),
+    ).toBe("the answer")
+  })
 })

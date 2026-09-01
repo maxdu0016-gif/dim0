@@ -1,3 +1,86 @@
+## v0.3.92 (2026-09-01)
+
+### Feat
+
+- **board**: unify breadcrumbs into a persistent location bar (#267)
+
+## v0.3.91 (2026-09-01)
+
+### Feat
+
+- **auth**: web Google sign-in via redirect (auth-code + PKCE) (#266)
+
+## v0.3.90 (2026-08-31)
+
+### Feat
+
+- **agent**: navigate tool + working folder (off-scene authoring) (#262)
+- **agent**: arrange_notes tool for on-demand layout (#257)
+- **agent**: relational note placement (near an existing note) (#256)
+- **agent**: give the agent spatial context for selected notes (#255)
+- **agent**: let the agent set note colors by name (#253)
+
+### Fix
+
+- **board**: sheet @-mentions + subpages on local boards (#265)
+- **agent**: land create_folder (S9) on main (#264)
+- **sync**: pump deep-layer cascade deletes through the sync intake (#260)
+- **board**: unify node freshness stamp so agent notes show Created/Edited (#258)
+- **drawify**: use handwriting font for drawn nodes and links (#249)
+
+### Refactor
+
+- **sync**: extract submitLocalBatch as the single local intake (#259)
+- **agent**: introduce BoardMutator write port (behavior-neutral) (#250)
+
+## v0.3.89 (2026-08-24)
+
+### Fix
+
+- **board**: place applied mindmaps beneath existing board content (#248)
+
+## v0.3.88 (2026-08-24)
+
+### Refactor
+
+- **board**: rebuild canvas context menu on Radix menu primitives (#247)
+
+## v0.3.87 (2026-08-23)
+
+### Feat
+
+- **prompts**: make skill-loading mandatory before write_note (#241)
+- **agent**: surface found notes as clickable citations in chat (#240)
+- **webui**: escape returns to select tool, else closes open dialog (#238)
+
+### Fix
+
+- **agent**: re-expand doc source card when its title is cited (#243)
+- **webui**: broaden escape overlay guard + restore two-step cancel (#246)
+- **repo**: tag release commit with all manifests synced (#242)
+- **webui**: note-card/board links use `center` (the consumed nav param) (#239)
+
+## v0.3.86 (2026-08-21)
+
+### Feat
+
+- **webui**: make note search span all folders, not just the current layer (#235)
+- **agent**: compact history to a recent tail when the prompt is over budget (#232)
+- **agent**: bound tool output intra-run and age it across turns (#231)
+- **agent**: derive board purpose + rolling conversation context (#230)
+- **agent**: durable board + global memory store and tools (#229)
+- **agent**: forward reasoning through the managed transport (#228)
+- **agent**: capture streamed reasoning in the browser engine (BYOK) (#227)
+- **agent**: inject a deterministic board snapshot into the agent context (#226)
+
+### Fix
+
+- **webui**: make browser-agent note search work (build the index; index titles) (#233)
+
+### Refactor
+
+- **webui**: unify node label to RichText, matching backend (#234)
+
 ## v0.3.85 (2026-08-13)
 
 ### Fix

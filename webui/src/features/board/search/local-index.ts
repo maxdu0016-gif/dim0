@@ -14,23 +14,25 @@
 import { count, create, getByID, insert, remove, search } from "@orama/orama"
 import type { CanvasStore, Node, NodeId } from "@canvas-harness/core"
 import type { DimNodeData } from "@/features/board/model"
+import { labelText } from "@/features/board/model"
 
 
 const SCHEMA = { title: "string", body: "string" } as const
 
 
 /**
- * Coerce a value to a plain string for the index. `data.label` / `content` are
- * typed `string`, but the store types `data` as generic and some node types put
- * a non-string there — Orama's `"string"` schema then rejects the whole insert.
- * A non-string just isn't full-text-indexed, which is correct.
+ * Coerce a value to a plain string for the index. `content` is typed `string`,
+ * but the store types `data` as generic; a non-string just isn't full-text
+ * indexed (Orama's `"string"` schema would otherwise reject the whole insert).
  */
 const asText = (value: unknown): string => (typeof value === "string" ? value : "")
 
 
 const docOf = (node: Node) => ({
   id: node.id,
-  title: asText((node.data as DimNodeData | undefined)?.label),
+  // `data.label` is RichText (`{ markdown }`); `labelText` also tolerates a legacy
+  // bare string. A naive string read indexed every title as empty (unsearchable).
+  title: labelText((node.data as DimNodeData | undefined)?.label),
   body: asText(node.content),
 })
 
@@ -40,7 +42,8 @@ export class LocalSearchIndex {
   private queue: Promise<void> = Promise.resolve()
 
 
-  /** Subscribe to store changes, keeping the index in sync. Returns unsubscribe. */
+  /** Subscribe to store changes, keeping the index in sync with the live (current-
+   *  layer) store. Returns unsubscribe. */
   attach(store: CanvasStore): () => void {
     return store.subscribe("change", (batch) => {
       for (const op of batch.ops) {
@@ -49,6 +52,14 @@ export class LocalSearchIndex {
         else if (op.type === "node.remove") this.enqueue(() => this.removeDoc(op.node.id))
       }
     })
+  }
+
+
+  /** Merge a set of nodes (the whole board, across layers) into the index — the
+   *  whole-board build so search spans every folder, not just the current layer. */
+  async indexNodes(nodes: Node[]): Promise<void> {
+    for (const node of nodes) this.enqueue(() => this.upsertNode(node))
+    await this.queue
   }
 
 
@@ -93,11 +104,15 @@ export class LocalSearchIndex {
 
   private async upsert(store: CanvasStore, id: NodeId): Promise<void> {
     const node = store.getNode(id)
-    if (!node) return
+    if (node) await this.upsertNode(node)
+  }
+
+
+  private async upsertNode(node: Node): Promise<void> {
     // remove-then-insert (not Orama `update`): insert preserves the doc's `id`
     // field, whereas `update` reassigns a fresh id — which would break getByID.
-    if (getByID(this.db, id) !== undefined) {
-      await remove(this.db, id)
+    if (getByID(this.db, node.id) !== undefined) {
+      await remove(this.db, node.id)
     }
     await insert(this.db, docOf(node))
   }

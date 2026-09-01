@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest"
-import { asBatchId, asClientId, asNodeId, type OpBatch } from "@canvas-harness/core"
+import { asBatchId, asClientId, asNodeId, type Node, type OpBatch } from "@canvas-harness/core"
 import type { CanvasStore } from "@canvas-harness/core"
+import { makeBatch } from "@/features/board/harness/make-batch"
 import { addEdge, addNode, freshStore } from "@/test/canvas"
 import type { DimNodeData } from "@/features/board/model"
+import { labelText } from "@/features/board/model"
 import { MemoryRelay } from "@/test/sync-relay"
 import { InMemoryEngine } from "@/features/board/persist/local/in-memory-engine"
 import { BoardOutbox } from "@/features/board/persist/local/board-outbox"
@@ -89,8 +91,8 @@ const edgeIds = (store: CanvasStore): string[] =>
   store.getAllEdges().map((e) => e.id).sort()
 
 
-const labelOf = (store: CanvasStore, id: string): string | undefined =>
-  (store.getAllNodes().find((n) => n.id === id)?.data as DimNodeData | undefined)?.label
+const labelOf = (store: CanvasStore, id: string): string =>
+  labelText((store.getAllNodes().find((n) => n.id === id)?.data as DimNodeData | undefined)?.label)
 
 
 const xOf = (store: CanvasStore, id: string): number | undefined =>
@@ -106,6 +108,48 @@ const setLabel = (store: CanvasStore, id: string, label: string): void => {
 
 
 describe("board sync coordinator", () => {
+  it("submitLocalBatch(scene:false) ships a headless batch without injecting it into the local scene", async () => {
+    const relay = new MemoryRelay()
+    const a = makeClient(relay, "A")
+    const b = makeClient(relay, "B")
+
+    // Seed an in-scene edit on A so there IS a rebasable local entry, to prove
+    // the headless batch is treated differently from a store commit.
+    addNode(a.store, "local1", "in-scene")
+
+    // A headless producer: a batch NOT applied to A's live store (e.g. a
+    // cross-layer write to an unloaded folder). It records to the oplog itself,
+    // then enters the intake as an off-scene batch — no direct store write.
+    const node = {
+      id: asNodeId("h1"),
+      type: "rect",
+      x: 0,
+      y: 0,
+      w: 100,
+      h: 50,
+      angle: 0,
+      groups: [],
+      data: { label: { markdown: "headless" }, meta: { v: 1, createdAt: 0, updatedAt: 0 } },
+    } as unknown as Node
+    const batch = makeBatch(a.store, "local", [{ type: "node.add", node }])
+    a.persistence.record(batch)
+    a.sync.submitLocalBatch(batch, { scene: false })
+    await a.sync.settle()
+    await b.sync.settle()
+
+    // The peer converges from the headless write (it shipped through the outbox),
+    // but it never lands in the submitter's own loaded scene.
+    expect(ids(b.store)).toEqual(["h1", "local1"])
+    expect(ids(a.store)).toEqual(["local1"]) // h1 was never applied to A's store
+
+    // A concurrent remote op triggers a rebase. Because the headless batch is NOT
+    // in the rebase set, its off-scene ops must NOT be injected into A's scene.
+    addNode(b.store, "b1", "peer")
+    await b.sync.settle()
+    await a.sync.settle()
+    expect(ids(a.store)).toEqual(["b1", "local1"]) // still no h1
+  })
+
   it("propagates a local edit to the other client (no self-echo, no dupes)", async () => {
     const relay = new MemoryRelay()
     const a = makeClient(relay, "A")
@@ -640,7 +684,7 @@ describe("E1.5 protocol handlers", () => {
         for (const op of b.ops) {
           if (op.type === "node.add") {
             const data = op.node.data as DimNodeData
-            data.label = `${data.label} (themed)`
+            data.label = { markdown: `${labelText(data.label)} (themed)` }
           }
         }
       },
@@ -654,16 +698,15 @@ describe("E1.5 protocol handlers", () => {
         type: "node.add",
         node: {
           id: asNodeId("n1"), type: "rect", x: 0, y: 0, z: 0, w: 100, h: 50, angle: 0,
-          groups: [], data: { label: "raw", meta: { v: 1, createdAt: 0, updatedAt: 0 } },
+          groups: [], data: { label: { markdown: "raw" }, meta: { v: 1, createdAt: 0, updatedAt: 0 } },
         },
       }],
     }
     c.push({ kind: "peer-op", seq: 1, batch: raw })
     await c.sync.settle()
 
-    const label = (c.store.getAllNodes().find((n) => n.id === "n1")?.data as DimNodeData | undefined)?.label
-    expect(label).toBe("raw (themed)") // store got the normalized copy
-    expect((raw.ops[0] as { node: { data: DimNodeData } }).node.data.label).toBe("raw") // input untouched
+    expect(labelOf(c.store, "n1")).toBe("raw (themed)") // store got the normalized copy
+    expect(labelText((raw.ops[0] as { node: { data: DimNodeData } }).node.data.label)).toBe("raw") // input untouched
     c.sync.detach()
   })
 })
