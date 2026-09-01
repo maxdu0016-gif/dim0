@@ -1,3 +1,9 @@
+## v0.3.92 (2026-09-01)
+
+### Feat
+
+- **board**: unify breadcrumbs into a persistent location bar (#267)
+
 ## v0.3.91 (2026-09-01)
 
 ### Feat
