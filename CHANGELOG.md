@@ -1,3 +1,9 @@
+## v0.3.91 (2026-09-01)
+
+### Feat
+
+- **auth**: web Google sign-in via redirect (auth-code + PKCE) (#266)
+
 ## v0.3.90 (2026-08-31)
 
 ### Feat
