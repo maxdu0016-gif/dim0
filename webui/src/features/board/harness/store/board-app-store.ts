@@ -114,6 +114,19 @@ export type BoardAppState = {
 
   // Modal surface for sheet / code-sandbox / widget nodes.
   activeNodeSurface: OpenNodeSurface | null
+  /**
+   * Imperative rename for the currently open surface, registered by the active
+   * panel (which owns the note's store / off-scene / REST write path). The
+   * unified breadcrumb edits the open leaf through this so it doesn't spin up a
+   * second, competing store for the same node. `null` when no surface is open.
+   */
+  activeSurfaceRename: ((title: string) => void) | null
+  /**
+   * Live title of the open surface, registered by the active panel. Lets the
+   * breadcrumb show the leaf title for a surface that isn't in the on-device list
+   * yet (a synced sub-page loaded via REST). `null` when no surface is open.
+   */
+  activeSurfaceLabel: string | null
 
   // Which floating chrome dialog/menu is open (one at a time).
   chromeDialog: ChromeDialog | null
@@ -147,6 +160,8 @@ export type BoardAppActions = {
 
   openNodeSurface: (nodeId: string, kind: NodeSurfaceKind) => void
   closeNodeSurface: () => void
+  setActiveSurfaceRename: (rename: ((title: string) => void) | null) => void
+  setActiveSurfaceLabel: (label: string | null) => void
 
   setChromeDialog: (dialog: ChromeDialog | null) => void
 }
@@ -172,6 +187,8 @@ const initialState: BoardAppState = {
   boardBackground: null,
   boardBackgroundTexture: null,
   activeNodeSurface: null,
+  activeSurfaceRename: null,
+  activeSurfaceLabel: null,
   chromeDialog: null,
 }
 
@@ -197,6 +214,8 @@ export const useBoardAppStore = create<BoardAppState & BoardAppActions>((set, ge
       activeSlideId: null,
       chatSheetOpen: false,
       activeNodeSurface: null,
+      activeSurfaceRename: null,
+      activeSurfaceLabel: null,
       chromeDialog: null,
       boardBackground: boardId ? getBoardBackground(boardId) : null,
       boardBackgroundTexture: boardId ? getBoardBackgroundTexture(boardId) : null,
@@ -237,17 +256,26 @@ export const useBoardAppStore = create<BoardAppState & BoardAppActions>((set, ge
     }),
 
   openNodeSurface: (nodeId, kind) => {
-    set({ activeNodeSurface: { nodeId, kind } })
+    // Drop the outgoing surface's rename hook; the incoming panel registers its
+    // own on mount. Until then the breadcrumb safely falls back to an off-scene
+    // rename for the new leaf.
+    set({
+      activeNodeSurface: { nodeId, kind },
+      activeSurfaceRename: null,
+      activeSurfaceLabel: null,
+    })
     const boardId = get().boardId
     if (!boardId || !_navigateOpen) return
     _navigateOpen(kind, boardId, nodeId)
   },
   closeNodeSurface: () => {
-    set({ activeNodeSurface: null })
+    set({ activeNodeSurface: null, activeSurfaceRename: null, activeSurfaceLabel: null })
     const boardId = get().boardId
     if (!boardId || !_navigateClose) return
     _navigateClose(boardId)
   },
+  setActiveSurfaceRename: (rename) => set({ activeSurfaceRename: rename }),
+  setActiveSurfaceLabel: (label) => set({ activeSurfaceLabel: label }),
 
   setChromeDialog: (dialog) => set({ chromeDialog: dialog }),
 }))
