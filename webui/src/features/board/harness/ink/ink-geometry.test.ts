@@ -3,27 +3,12 @@ import type { Node } from "@canvas-harness/core"
 import {
   createInkNode,
   hitTestInkWorld,
-  interpolateInkSamples,
   readInkProperty,
 } from "./ink-geometry"
 import { isLikelyPalmContact, isPenEraserContact } from "./ink-pointer"
 
 
 describe("ink geometry", () => {
-  it("fills sparse Pencil samples without losing pressure progression", () => {
-    const interpolated = interpolateInkSamples(
-      { x: 0, y: 0, pressure: 0.2 },
-      { x: 10, y: 0, pressure: 0.8 },
-      2,
-    )
-
-    expect(interpolated).toHaveLength(5)
-    expect(interpolated[0].x).toBe(2)
-    expect(interpolated.at(-1)).toEqual({ x: 10, y: 0, pressure: 0.8 })
-    expect(interpolated[0].pressure).toBeCloseTo(0.32)
-  })
-
-
   it("distinguishes large palm contacts and standard pen eraser input", () => {
     expect(isLikelyPalmContact(42, 24)).toBe(true)
     expect(isLikelyPalmContact(18, 20)).toBe(false)

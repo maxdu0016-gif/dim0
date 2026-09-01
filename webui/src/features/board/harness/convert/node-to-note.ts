@@ -4,6 +4,7 @@ import { applyColorsToStyle } from "../theme/color-adapter"
 import type { NoteNodeData } from "./note-to-node"
 import { canvasTypeToDim0 } from "./node-type"
 import { canvasStyleToDim0 } from "./style"
+import { readInkProperty } from "../ink/ink-geometry"
 
 
 const RAD_TO_DEG = 180 / Math.PI
@@ -38,7 +39,7 @@ export const nodeToNote = (node: Node): Note => {
     mimeType: extraProperties.mimeType,
     status: extraProperties.status,
     summary: extraProperties.summary,
-    inkData: extraProperties.inkData ?? relayProperties.ink_data,
+    inkData: extraProperties.inkData ?? relayProperties.ink_data ?? readInkProperty(node) ?? undefined,
     nativeInkSource: extraProperties.nativeInkSource ?? relayProperties.native_ink_source,
   }
 

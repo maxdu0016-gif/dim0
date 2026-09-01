@@ -10,6 +10,21 @@ export const isTauri = (): boolean =>
   typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
 
 
+declare global {
+  interface Window {
+    __DIM0_IOS_NATIVE__?: {
+      version: number
+      platform: "ipad"
+    }
+  }
+}
+
+
+/** True when the complete web app is hosted by Dim0's native iPad WKWebView shell. */
+export const isIOSNative = (): boolean =>
+  typeof window !== "undefined" && window.__DIM0_IOS_NATIVE__?.platform === "ipad"
+
+
 /**
  * True inside a **WebKit-based** Tauri webview — macOS (`WKWebView`) and Linux
  * (`WebKitGTK`), where `backdrop-filter` re-samples the backdrop every frame and

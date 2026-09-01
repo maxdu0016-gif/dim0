@@ -7,7 +7,8 @@ import { queryClient } from './query-client'
 import { router } from './routes'
 import { RouterProvider } from '@tanstack/react-router'
 import { registerSW } from 'virtual:pwa-register'
-import { isTauri, isWebKitWebview } from './platform'
+import { isIOSNative, isTauri, isWebKitWebview } from './platform'
+import { initNativePencilBridge } from './features/ios/native-pencil-bridge'
 
 /**
  * Registers the PWA service worker and keeps it up to date automatically.
@@ -28,6 +29,11 @@ if (!isTauri()) {
   void import("./features/desktop/fullscreen-class").then(m => m.initFullscreenClass())
   // WKWebView treats Backspace as "history back"; stop it stealing node deletes.
   void import("./features/desktop/backspace-nav").then(m => m.disableBackspaceNavigation())
+}
+
+if (isIOSNative()) {
+  document.documentElement.classList.add("ios-native")
+  initNativePencilBridge()
 }
 
 // Kick off canvas font loading before first paint so the board doesn't render

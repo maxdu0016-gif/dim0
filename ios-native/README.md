@@ -1,28 +1,33 @@
-# Dim0 Native for iPad
+# Dim0 for iPad
 
-This directory is the clean-room native iPad client. The application target is
-SwiftUI + UIKit + PencilKit only: it does not embed the web app, React Native,
-Expo runtime, or a `WKWebView` canvas.
+The iPad target now hosts the complete Dim0 application in a persistent native
+`WKWebView`. It is the same product as the browser and desktop clients: AI chat,
+notes, files, mini-apps, local boards, synced boards, presentation mode, and all
+canvas node types remain available instead of being rebuilt as a reduced native
+client.
 
-## Current milestone
+Apple Pencil input is rendered immediately by a transparent native `PKCanvasView`
+over the active board. When PencilKit reports tool use has ended, the shell sends
+only that completed stroke's sampled points and pressure to the web app. The web
+adapter converts those screen coordinates through the current canvas camera,
+creates one formal ink node in `CanvasStore`, and acknowledges the native stroke
+only after the node is accepted. Persistence, undo, and WebSocket v2 collaboration
+therefore use the same path as ordinary web-created ink; a full `PKDrawing` archive
+is never the board data source. Finger pan/zoom remains on the web canvas, and the
+native double-tap bridge switches between the shared pen and eraser tools.
 
-- PencilKit owns the complete Apple Pencil input and rendering path.
-- Finger gestures pan and zoom; finger touches do not create ink.
-- Pen, highlighter, vector eraser, color selection, undo, and redo.
-- Apple Pencil double-tap toggles the eraser.
-- Drawing data is stored atomically on the iPad after the user pauses.
-- Foreground LAN pairing exposes completed strokes to the desktop as a
-  versioned, idempotent full snapshot.
-- Networking and AI remain absent from the Pencil input path: no touch or frame
-  waits for serialization, a socket, or a server response.
+## Application URL
 
-## Pair with the desktop canvas
+Release builds load the dedicated iPad frontend at
+`https://dim0-ipad-pencil.pages.dev` by default. Change `Dim0AppURL` in
+`ios/Info.plist` to point the shell at another hosted/self-hosted Dim0 frontend.
+For an Xcode development run, the `DIM0_APP_URL` scheme environment variable
+overrides the plist value, for example `http://192.168.1.20:5175`.
 
-1. Keep the iPad app open and put the iPad and computer on the same Wi-Fi.
-2. Open the sync panel in the iPad toolbar and note its address and pairing code.
-3. Open **iPad** in the desktop canvas's top-right toolbar and enter both values.
-4. Press **立即同步** on either device after writing. The desktop reconciles the
-   complete iPad drawing into ordinary persisted Dim0 ink nodes.
+The shell keeps a persistent WebKit data store, so authentication, IndexedDB
+local boards, preferences, and cached web assets survive app restarts. Native
+file input and download/share handling keep document upload and export usable on
+iPad.
 
 ## Generate and run the Xcode project
 

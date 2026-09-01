@@ -29,7 +29,16 @@
         <string>_dim0sync._tcp</string>
     </array>
     <key>NSLocalNetworkUsageDescription</key>
-    <string>用于在同一 Wi-Fi 下把 iPad 笔迹同步到电脑上的 Dim0 画布。</string>
+    <string>用于连接同一 Wi-Fi 中自行托管的 Dim0 服务。</string>
+    <key>NSAppTransportSecurity</key>
+    <dict>
+        <key>NSAllowsArbitraryLoadsInWebContent</key>
+        <true/>
+        <key>NSAllowsLocalNetworking</key>
+        <true/>
+    </dict>
+    <key>Dim0AppURL</key>
+    <string>https://dim0-ipad-pencil.pages.dev</string>
     <key>UIApplicationSceneManifest</key>
     <dict>
         <key>UIApplicationSupportsMultipleScenes</key>

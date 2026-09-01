@@ -12,6 +12,7 @@ import {
 import { getBoardThemeMode } from "../theme/theme-mode-ref"
 import { dim0TypeToCanvas } from "./node-type"
 import { dim0StyleToCanvas } from "./style"
+import { withCanvasHarnessInkData } from "../ink/ink-geometry"
 
 
 const DEG_TO_RAD = Math.PI / 180
@@ -155,7 +156,7 @@ export const noteToNode = (note: Note | Document): Node => {
     }
   }
 
-  return {
+  return withCanvasHarnessInkData({
     id: asNodeId(note.id),
     type: canvasType,
     x: pos.x,
@@ -168,5 +169,5 @@ export const noteToNode = (note: Note | Document): Node => {
     content: body,
     style,
     data: finalData,
-  }
+  })
 }

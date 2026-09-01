@@ -28,3 +28,11 @@ struct NativeInkSnapshot: Codable, Equatable, Sendable {
     let strokes: [NativeInkStroke]
 }
 
+/// Versioned one-stroke handoff sent after PencilKit finishes a tool gesture.
+struct NativeCompletedInkStroke: Codable, Equatable, Sendable {
+    let kind = "dim0.native-pencil.stroke"
+    let version = 1
+    let sessionId: String
+    let contextId: String
+    let stroke: NativeInkStroke
+}

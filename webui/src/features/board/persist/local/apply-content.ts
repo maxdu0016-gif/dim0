@@ -10,6 +10,7 @@ import {
 } from "@/features/board/harness/theme/color-adapter"
 import { storedNodeColorsOf } from "@/features/board/harness/theme/apply-node-colors"
 import { getBoardThemeMode } from "@/features/board/harness/theme/theme-mode-ref"
+import { withCanvasHarnessInkData } from "@/features/board/harness/ink/ink-geometry"
 
 
 /**
@@ -49,10 +50,11 @@ export const applyContentToStore = (
   for (const group of scoped.groups) ops.push({ type: "group.upsert", group })
 
   for (const node of scoped.nodes) {
-    const stored = storedNodeColorsOf(node as unknown as Node)
+    const upgraded = withCanvasHarnessInkData(node as unknown as Node)
+    const stored = storedNodeColorsOf(upgraded)
     const display = mode === "dark" ? adaptNodeColors(stored, "dark") : stored
-    const style = applyColorsToStyle(node.style ?? {}, display)
-    ops.push({ type: "node.add", node: { ...node, style } })
+    const style = applyColorsToStyle(upgraded.style ?? {}, display)
+    ops.push({ type: "node.add", node: { ...upgraded, style } })
   }
 
   for (const edge of scoped.edges) {

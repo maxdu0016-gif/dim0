@@ -11,7 +11,19 @@
         "scheme": "Dim0Native",
         "buildConfiguration": "Release"
       }
+    },
+    "production": {
+      "distribution": "store",
+      "credentialsSource": "remote",
+      "ios": {
+        "scheme": "Dim0Native",
+        "buildConfiguration": "Release"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {}
     }
   }
 }
-

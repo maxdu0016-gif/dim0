@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useNavigate } from "@tanstack/react-router"
 import { LocalBoardUrl } from "@/routes"
 import { isTauri } from "@/platform"
@@ -18,6 +18,7 @@ import {
   Minimap,
   type ArrowToolDefaults,
   type CanvasPointerEvent,
+  type InkToolDefaults,
 } from "@canvas-harness/react"
 import {
   Sheet,
@@ -51,7 +52,7 @@ import { ShareButton } from "@/features/sharing/share-button"
 import { BoardKindBadge } from "@/features/board/components/board-kind-badge"
 import { useBoardAppStore } from "../store/board-app-store"
 import { createBoardStore } from "../store/create-board-store"
-import { adaptEdgeColors, applyColorsToEdgeStyle } from "../theme/color-adapter"
+import { adaptEdgeColors, adaptNodeColors, applyColorsToEdgeStyle } from "../theme/color-adapter"
 import { getBoardThemeMode } from "../theme/theme-mode-ref"
 import { useBoardTheme } from "../theme/use-board-theme"
 import { useThemeColorProjection } from "../theme/use-theme-color-projection"
@@ -79,8 +80,8 @@ import { useViewportPersistence } from "./use-viewport-persistence"
 import { useTrackBoardCameraMotion } from "./board-camera-motion"
 import { useSidebarContentsSync } from "./use-sidebar-contents-sync"
 import { HarnessWrapRefProvider } from "./wrap-ref-provider"
-import { InkInputLayer } from "../ink/ink-input-layer"
-import { NativeIpadSyncControl } from "../native-sync/native-ipad-sync-control"
+import { createDim0InkNode } from "../ink/ink-geometry"
+import { useNativePencilCanvas } from "@/features/ios/use-native-pencil-canvas"
 
 
 /**
@@ -134,6 +135,34 @@ export function HarnessCanvas({ local = false }: { local?: boolean } = {}) {
     if (useBoardAppStore.getState().presentationMode) r.setHideFrames(true)
   }, [])
   const queryClient = useQueryClient()
+  const displayInkColor = getBoardThemeMode() === "dark"
+    ? (adaptNodeColors({ strokeColor: inkColor }, "dark").strokeColor ?? inkColor)
+    : inkColor
+  const inkDefaults = useMemo<InkToolDefaults>(() => ({
+    size: inkSize,
+    color: displayInkColor,
+    createNode: (input) => boardId
+      ? createDim0InkNode(input, {
+          boardId,
+          parentId: rootId,
+          color: inkColor,
+          displayColor: displayInkColor,
+        })
+      : null,
+  }), [boardId, rootId, inkColor, inkSize, displayInkColor])
+  const presenting = useBoardAppStore((s) => s.presentationMode)
+  useNativePencilCanvas({
+    store,
+    wrapRef,
+    boardId,
+    parentId: rootId,
+    ready,
+    canEdit,
+    enabled: tool === "ink" && viewMode === "board" && !presenting,
+    color: inkColor,
+    displayColor: displayInkColor,
+    size: inkSize,
+  })
 
   // Bridge for the agent's post-stream apply block (lives outside this
   // component tree). Closures capture the current store + scope so the
@@ -433,9 +462,6 @@ export function HarnessCanvas({ local = false }: { local?: boolean } = {}) {
           onDrop={onDrop}
         >
           <HarnessCanvasInner
-            store={store}
-            boardId={boardId}
-            parentId={rootId}
             canEdit={canEdit}
             theme={theme}
             tool={tool}
@@ -443,19 +469,10 @@ export function HarnessCanvas({ local = false }: { local?: boolean } = {}) {
             viewMode={viewMode}
             canCollab={!local}
             arrowDefaults={arrowDefaults}
+            inkDefaults={inkDefaults}
             onCreateDrag={handleCreateDrag}
             onDoubleClick={handleDoubleClick}
             onRenderer={handleRenderer}
-          />
-          <InkInputLayer
-            store={store}
-            wrapRef={wrapRef}
-            boardId={boardId}
-            rootId={rootId}
-            tool={tool}
-            canEdit={canEdit}
-            color={inkColor}
-            size={inkSize}
           />
           <CanvasContextMenu wrapRef={wrapRef} store={store} rendererRef={rendererRef} />
         </div>
@@ -466,9 +483,6 @@ export function HarnessCanvas({ local = false }: { local?: boolean } = {}) {
 
 
 type InnerProps = {
-  store: CanvasStore
-  boardId: string | null
-  parentId: string | null
   canEdit: boolean
   theme: ReturnType<typeof useBoardTheme>
   tool: string
@@ -476,6 +490,7 @@ type InnerProps = {
   viewMode: "board" | "files" | "list"
   canCollab: boolean
   arrowDefaults: ArrowToolDefaults
+  inkDefaults: InkToolDefaults
   onCreateDrag: ReturnType<typeof useCreateHandlers>["handleCreateDrag"]
   onDoubleClick: (e: CanvasPointerEvent) => void
   onRenderer: (r: Renderer) => void
@@ -483,9 +498,6 @@ type InnerProps = {
 
 
 function HarnessCanvasInner({
-  store,
-  boardId,
-  parentId,
   canEdit,
   theme,
   tool,
@@ -493,6 +505,7 @@ function HarnessCanvasInner({
   viewMode,
   canCollab,
   arrowDefaults,
+  inkDefaults,
   onCreateDrag,
   onDoubleClick,
   onRenderer,
@@ -504,9 +517,7 @@ function HarnessCanvasInner({
   // already-self-hiding chrome (readonly chip, top-right strip) stays
   // managed by their own components.
   const presenting = useBoardAppStore((s) => s.presentationMode)
-  // The overlay owns pen/mouse ink gestures. Let touch continue through the
-  // harness pan path so one finger moves the board and pinch zoom still works.
-  const canvasTool = tool === "ink" || tool === "eraser" ? "pan" : tool
+  const canvasTool = !canEdit && (tool === "ink" || tool === "eraser") ? "pan" : tool
   return (
     <>
       {isBoard ? (
@@ -525,6 +536,7 @@ function HarnessCanvasInner({
             renderCustomNodeView={renderView}
             editorAdapter={createHarnessTextareaEditor}
             arrowDefaults={arrowDefaults}
+            inkDefaults={inkDefaults}
             onCreateDrag={onCreateDrag}
             onDoubleClick={onDoubleClick}
             onRenderer={onRenderer}
@@ -577,13 +589,6 @@ function HarnessCanvasInner({
         — the container is invisible when empty.
       */}
       <div className="absolute right-3 top-3 z-50 flex items-center gap-2">
-        {ready && canEdit && boardId && (
-          <NativeIpadSyncControl
-            store={store}
-            boardId={boardId}
-            parentId={parentId}
-          />
-        )}
         {canCollab && <HarnessPeerChip />}
         <HarnessReadonlyChip />
         {/* Local boards have no collab chrome, so surface an explicit

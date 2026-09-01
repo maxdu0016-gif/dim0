@@ -15,11 +15,14 @@ enum PencilStrokeExporter {
         NativeInkSnapshot(
             sessionId: sessionId,
             revision: revision,
-            strokes: drawing.strokes.compactMap(exportStroke)
+            strokes: drawing.strokes.compactMap {
+                exportStroke($0, origin: CanvasGeometry.syncOrigin)
+            }
         )
     }
 
-    private static func exportStroke(_ stroke: PKStroke) -> NativeInkStroke? {
+    /// Converts one completed PencilKit stroke to sampled points relative to the supplied origin.
+    static func exportStroke(_ stroke: PKStroke, origin: CGPoint) -> NativeInkStroke? {
         let path = stroke.path
         guard path.count > 0 else { return nil }
 
@@ -28,10 +31,18 @@ enum PencilStrokeExporter {
         var points: [NativeInkPoint] = []
 
         while parametricValue < lastParametricValue {
-            points.append(exportPoint(path.interpolatedPoint(at: parametricValue), transform: stroke.transform))
+            points.append(exportPoint(
+                path.interpolatedPoint(at: parametricValue),
+                transform: stroke.transform,
+                origin: origin
+            ))
             parametricValue += parametricStep
         }
-        points.append(exportPoint(path.interpolatedPoint(at: lastParametricValue), transform: stroke.transform))
+        points.append(exportPoint(
+            path.interpolatedPoint(at: lastParametricValue),
+            transform: stroke.transform,
+            origin: origin
+        ))
 
         guard !points.isEmpty else { return nil }
         let tool: NativeInkStroke.Tool = stroke.ink.inkType == .marker ? .highlighter : .pen
@@ -55,15 +66,17 @@ enum PencilStrokeExporter {
         )
     }
 
+    /// Projects one PencilKit sample into the caller's local coordinate space.
     private static func exportPoint(
         _ point: PKStrokePoint,
-        transform: CGAffineTransform
+        transform: CGAffineTransform,
+        origin: CGPoint
     ) -> NativeInkPoint {
         let location = point.location.applying(transform)
         let pressure = point.force > 0 ? point.force : 0.5
         return NativeInkPoint(
-            x: Double(location.x - CanvasGeometry.syncOrigin.x),
-            y: Double(location.y - CanvasGeometry.syncOrigin.y),
+            x: Double(location.x - origin.x),
+            y: Double(location.y - origin.y),
             pressure: Double(max(0.05, min(1, pressure)))
         )
     }
@@ -131,4 +144,3 @@ enum PencilStrokeExporter {
         withUnsafeBytes(of: &bigEndian) { data.append(contentsOf: $0) }
     }
 }
-
