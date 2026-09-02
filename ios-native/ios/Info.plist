@@ -32,8 +32,6 @@
     <string>用于连接同一 Wi-Fi 中自行托管的 Dim0 服务。</string>
     <key>NSAppTransportSecurity</key>
     <dict>
-        <key>NSAllowsArbitraryLoadsInWebContent</key>
-        <true/>
         <key>NSAllowsLocalNetworking</key>
         <true/>
     </dict>

@@ -86,6 +86,11 @@ struct Dim0WebView: UIViewRepresentable {
         ) {
             guard message.frameInfo.isMainFrame,
                   message.name == "dim0NativePencil",
+                  Dim0WebAppConfiguration.isTrustedAppOrigin(
+                      scheme: message.frameInfo.securityOrigin.protocol,
+                      host: message.frameInfo.securityOrigin.host,
+                      port: message.frameInfo.securityOrigin.port
+                  ),
                   let body = message.body as? [String: Any],
                   body["kind"] as? String == "dim0.native-pencil.configure",
                   (body["version"] as? NSNumber)?.intValue == 1,
@@ -136,7 +141,11 @@ struct Dim0WebView: UIViewRepresentable {
             windowFeatures: WKWindowFeatures
         ) -> WKWebView? {
             if navigationAction.targetFrame == nil, let requestURL = navigationAction.request.url {
-                webView.load(URLRequest(url: requestURL))
+                if Dim0WebAppConfiguration.isTrustedAppURL(requestURL) {
+                    webView.load(URLRequest(url: requestURL))
+                } else {
+                    UIApplication.shared.open(requestURL)
+                }
             }
             return nil
         }
@@ -155,7 +164,7 @@ struct Dim0WebView: UIViewRepresentable {
 
             if navigationAction.shouldPerformDownload {
                 decisionHandler(.download)
-            } else if scheme == "http" || scheme == "https" || scheme == "about" || scheme == "blob" {
+            } else if Dim0WebAppConfiguration.isAllowedWebURL(url) {
                 decisionHandler(.allow)
             } else {
                 UIApplication.shared.open(url)
