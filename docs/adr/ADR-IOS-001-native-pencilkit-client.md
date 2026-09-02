@@ -1,53 +1,61 @@
-# ADR-IOS-001: Native PencilKit iPad client
+# ADR-IOS-001: Hybrid PencilKit iPad client
 
 **Status:** Accepted  
-**Applies to:** `ios-native/**`, `webui/src/features/board/harness/native-sync/**`
+**Applies to:** `ios-native/**`, `webui/src/features/ios/**`, board ink integration
 
 ## Decision
 
-The iPad client is a separate SwiftUI/UIKit application whose handwriting
-surface is owned by PencilKit. It may share Dim0's board operation protocol,
-sync service, file formats, and AI HTTP APIs, but it does not embed the React
-canvas, React Native, Expo runtime, or a `WKWebView` as its primary workspace.
+The iPad client is a SwiftUI/UIKit shell that hosts the complete Dim0 web
+application in a persistent `WKWebView`. A transparent, Pencil-only
+`PKCanvasView` is positioned over the active board while the ink tool is
+selected. The web workspace remains the source of truth for nodes, persistence,
+history, collaboration, AI, files, and mini-apps.
 
-The Pencil input loop is always local: PencilKit renders first, local storage
-commits second, and synchronization consumes completed local strokes only when
-the user or paired desktop requests a snapshot. No network acknowledgement may
-block a touch event or frame.
+The Pencil input loop is always local: PencilKit renders immediately and no
+JavaScript or network acknowledgement blocks a touch event or frame. After the
+gesture completes, the shell sends sampled points and pressure for each stroke
+to the trusted main-frame bridge. The web adapter converts screen coordinates
+through the current camera and commits an ordinary `ink` node to `CanvasStore`.
 
-The first synchronization boundary is a foreground-only LAN WebSocket hosted
-by the iPad. A six-digit code pairs the browser without requiring Google login.
-The iPad sends a versioned full snapshot; the browser reconciles it into normal
-Dim0 `ink` nodes using deterministic UUIDs. Existing local persistence, relay
-sync, and AI context therefore consume the imported ink through their ordinary
-board-store path rather than a second canvas implementation.
+The bridge acknowledges a native stroke only after the store accepts its
+deterministic node id. Retries are idempotent. The normal local persistence and
+v2 collaboration paths then store and relay the node; PencilKit's `PKDrawing`
+is only a transient rendering buffer, not a second document format.
 
 ## Why
 
-Apple Pencil latency is sensitive to JavaScript work, DOM reconciliation,
-WebSocket scheduling, and serialization on the touch path. PencilKit provides
-iPadOS prediction, coalescing, pressure, tilt, and native rendering without
-duplicating that machinery. Keeping the native client separate also prevents
-iPad-specific interaction changes from destabilizing the mature web product.
+Apple Pencil latency is sensitive to JavaScript work, DOM reconciliation, and
+serialization on the touch path. PencilKit provides iPadOS prediction,
+coalescing, pressure, tilt, and native rendering without duplicating that
+machinery. Hosting the existing web product avoids rebuilding rich notes,
+mini-apps, authentication, collaboration, and the agent in Swift while the
+native overlay supplies app-specific Pencil behavior that the PWA cannot.
 
 ## Consequences
 
-- The web and iPad clients use an explicit, runtime-validated snapshot contract.
-- Web-only UI components are not reused on iPad; product behavior is reused at
-  protocol and service boundaries.
-- PencilKit drawing bytes are local persistence, not the final cross-platform
-  synchronization format.
-- The iPad app must stay foregrounded while a desktop is connected in this LAN
-  milestone; cloud/offline outbox transport can replace the connection later.
-- AI stays on the existing web board path. Handwriting OCR/semantic indexing is
-  a separate milestone from transporting and persisting native ink geometry.
+- The complete Dim0 UI and data model remain shared with browser and desktop.
+- The native message handler accepts configuration only from the configured
+  Dim0 app origin and the main frame.
+- Completed native strokes become ordinary canvas-harness ink nodes; no native
+  snapshot reconciliation or parallel sync protocol is required.
+- Finger pan and pinch zoom stay on the web canvas. PencilKit owns only Pencil
+  input, and `UIPencilInteraction` forwards double-tap tool switching.
+- A network outage can still affect remotely hosted UI resources. A future
+  milestone may bundle the web app or add a verified offline update package.
+- Handwriting OCR and semantic indexing remain separate from ink transport.
+- App Store review must be supported by the native Pencil, file, sharing, and
+  recovery behavior rather than presenting the shell as a repackaged website.
 
 ## Verify
 
 ```sh
-cd ios-native
-cd ios
+cd ios-native/ios
 xcodegen generate
-xcodebuild -project Dim0Native.xcodeproj -scheme Dim0Native \
-  -sdk iphonesimulator CODE_SIGNING_ALLOWED=NO build
+xcodebuild build-for-testing \
+  -project Dim0Native.xcodeproj \
+  -scheme Dim0Native \
+  -configuration Debug \
+  -destination 'generic/platform=iOS Simulator' \
+  -derivedDataPath .derived-data \
+  CODE_SIGNING_ALLOWED=NO
 ```
