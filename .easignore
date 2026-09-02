@@ -1,4 +1,4 @@
-# EAS archives from the Git repository root even when invoked in this app folder.
+# The EAS project lives in ios-native, but the archive root is this Git repository.
 backend/
 build/
 docs/
@@ -7,5 +7,6 @@ webui/
 .github/
 
 ios-native/node_modules/
+ios-native/builds/
 ios-native/ios/.derived-data/
 ios-native/ios/Pods/
