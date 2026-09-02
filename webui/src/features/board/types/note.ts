@@ -27,8 +27,6 @@ export interface NoteProperties {
   status?: KeywordProperty
   summary?: TextProperty
   inkData?: InkProperty
-  /** Durable source tag used to reconcile full snapshots from the native iPad canvas. */
-  nativeInkSource?: TextProperty
 }
 
 

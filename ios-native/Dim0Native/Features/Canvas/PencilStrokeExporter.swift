@@ -6,21 +6,6 @@ import UIKit
 enum PencilStrokeExporter {
     private static let parametricStep: CGFloat = 0.25
 
-    /// Converts a completed PencilKit drawing into the versioned web ink contract.
-    static func snapshot(
-        drawing: PKDrawing,
-        sessionId: String,
-        revision: Int
-    ) -> NativeInkSnapshot {
-        NativeInkSnapshot(
-            sessionId: sessionId,
-            revision: revision,
-            strokes: drawing.strokes.compactMap {
-                exportStroke($0, origin: CanvasGeometry.syncOrigin)
-            }
-        )
-    }
-
     /// Converts one completed PencilKit stroke to sampled points relative to the supplied origin.
     static func exportStroke(_ stroke: PKStroke, origin: CGPoint) -> NativeInkStroke? {
         let path = stroke.path
