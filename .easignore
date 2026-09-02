@@ -1,12 +1,12 @@
 # The EAS project lives in ios-native, but the archive root is this Git repository.
-backend/
-build/
-docs/
-scripts/
-webui/
-.github/
+/backend/
+/build/
+/docs/
+/scripts/
+/webui/
+/.github/
 
-ios-native/node_modules/
-ios-native/builds/
-ios-native/ios/.derived-data/
-ios-native/ios/Pods/
+/ios-native/node_modules/
+/ios-native/builds/
+/ios-native/ios/.derived-data/
+/ios-native/ios/Pods/
