@@ -15,7 +15,7 @@ permissions:
   contents: read
 
 jobs:
-  compile:
+  test:
     runs-on: macos-15
     timeout-minutes: 20
     defaults:
@@ -44,14 +44,15 @@ jobs:
           path: ios-native/ios/Dim0Native.xcodeproj
           if-no-files-found: error
 
-      - name: Compile app and tests
+      - name: Build and test
         run: |
           set -o pipefail
-          xcodebuild build-for-testing \
+          simulator_id="$(xcrun simctl list devices available --json | python3 -c 'import json, sys; devices=json.load(sys.stdin)["devices"]; print(next(device["udid"] for runtime in devices.values() for device in runtime if device["isAvailable"] and device["name"].startswith("iPad")))')"
+          xcodebuild test \
             -project Dim0Native.xcodeproj \
             -scheme Dim0Native \
             -configuration Debug \
-            -destination 'generic/platform=iOS Simulator' \
+            -destination "platform=iOS Simulator,id=$simulator_id" \
             -derivedDataPath .derived-data \
             CODE_SIGNING_ALLOWED=NO \
             | xcpretty
