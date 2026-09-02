@@ -39,5 +39,8 @@ xcodegen generate
 open Dim0Native.xcodeproj
 ```
 
+`ios/project.yml` is the source of truth. The generated `.xcodeproj` is ignored
+and is recreated locally, by EAS, and by GitHub Actions before every build.
+
 The bundle identifier is `com.dim0.canvas` so the existing Apple Developer
 device registration and provisioning profile can be reused.

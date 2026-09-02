@@ -32,8 +32,10 @@ jobs:
       - name: Generate Xcode project
         run: xcodegen generate
 
-      - name: Verify generated project is current
-        run: git diff --exit-code -- Dim0Native.xcodeproj
+      - name: Verify native shell sources are generated
+        run: |
+          grep -q "Dim0WebAppScreen.swift" Dim0Native.xcodeproj/project.pbxproj
+          grep -q "NativePencilWebContainer.swift" Dim0Native.xcodeproj/project.pbxproj
 
       - name: Export generated Xcode project
         uses: actions/upload-artifact@v4
