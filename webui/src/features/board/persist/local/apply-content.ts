@@ -57,9 +57,13 @@ export const applyContentToStore = (
     const style = applyColorsToStyle(upgraded.style ?? {}, display)
     // Normalize a legacy bare-string label to RichText so the store invariant
     // (data.label is RichText) holds — older local boards persisted strings.
-    const data = upgraded.data
-      ? { ...upgraded.data, label: asRichLabel(upgraded.data.label) }
-      : upgraded.data
+    const upgradedData = upgraded.data as Record<string, unknown> | undefined
+    const data = upgradedData
+      ? {
+          ...upgradedData,
+          label: asRichLabel(upgradedData.label as Parameters<typeof asRichLabel>[0]),
+        }
+      : upgradedData
     ops.push({ type: "node.add", node: { ...upgraded, style, data } })
   }
 
