@@ -13,4 +13,3 @@ struct PencilCanvasRepresentable: UIViewRepresentable {
         }
     }
 }
-

@@ -54,4 +54,3 @@ actor CanvasDocumentStore {
             .appendingPathComponent("canvas-v1.drawing", isDirectory: false)
     }
 }
-

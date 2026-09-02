@@ -1,6 +1,6 @@
 # ADR-IOS-001: Hybrid PencilKit iPad client
 
-**Status:** Accepted  
+**Status:** Accepted
 **Applies to:** `ios-native/**`, `webui/src/features/ios/**`, board ink integration
 
 ## Decision

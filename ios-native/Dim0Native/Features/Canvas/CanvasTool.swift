@@ -24,7 +24,6 @@ enum CanvasTool: String, CaseIterable, Identifiable {
         }
     }
 }
-
 enum InkColor: String, CaseIterable, Identifiable {
     case charcoal
     case blue
@@ -44,4 +43,3 @@ enum InkColor: String, CaseIterable, Identifiable {
 
     var color: Color { Color(uiColor: uiColor) }
 }
-
