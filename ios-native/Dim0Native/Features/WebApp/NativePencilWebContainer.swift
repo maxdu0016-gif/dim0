@@ -11,10 +11,8 @@ final class NativePencilWebContainer: UIView, PKCanvasViewDelegate {
     private let sessionId: String
     private var overlayFrame = CGRect.zero
     private var acknowledgedStrokeIds = Set<String>()
-    private var completedStrokeIds = Set<String>()
-    private var contextIdsByStrokeId: [String: String] = [:]
     private var inFlightStrokeIds = Set<String>()
-    private var storedColorsByStrokeId: [String: String] = [:]
+    private var pendingStrokes: [String: NativeCompletedInkStroke]
     private var isUsingTool = false
     private var lastDoubleTapAt = Date.distantPast
     private var contextId = ""
@@ -25,6 +23,7 @@ final class NativePencilWebContainer: UIView, PKCanvasViewDelegate {
     init(webView: PencilAwareWebView) {
         self.webView = webView
         self.sessionId = Self.persistentSessionId()
+        self.pendingStrokes = Self.loadPendingStrokes()
         super.init(frame: .zero)
         configureViews()
     }
@@ -76,18 +75,27 @@ final class NativePencilWebContainer: UIView, PKCanvasViewDelegate {
     /// Records the finished stroke before submitting it to the active web canvas.
     func canvasViewDidEndUsingTool(_ canvasView: PKCanvasView) {
         isUsingTool = false
+        var addedPendingStroke = false
         for pencilStroke in canvasView.drawing.strokes {
             guard let stroke = PencilStrokeExporter.exportStroke(pencilStroke, origin: .zero) else {
                 continue
             }
-            completedStrokeIds.insert(stroke.id)
-            if contextIdsByStrokeId[stroke.id] == nil {
-                contextIdsByStrokeId[stroke.id] = contextId
-            }
-            if storedColorsByStrokeId[stroke.id] == nil {
-                storedColorsByStrokeId[stroke.id] = storedColor
-            }
+            guard pendingStrokes[stroke.id] == nil else { continue }
+            pendingStrokes[stroke.id] = NativeCompletedInkStroke(
+                sessionId: sessionId,
+                contextId: contextId,
+                stroke: NativeInkStroke(
+                    id: stroke.id,
+                    tool: stroke.tool,
+                    color: storedColor,
+                    width: stroke.width,
+                    opacity: stroke.opacity,
+                    points: stroke.points
+                )
+            )
+            addedPendingStroke = true
         }
+        if addedPendingStroke { persistPendingStrokes() }
         removeAcknowledgedStrokes()
         submitCompletedStrokes()
     }
@@ -126,38 +134,23 @@ final class NativePencilWebContainer: UIView, PKCanvasViewDelegate {
 
     /// Retries only stroke identifiers recorded by the end-of-tool delegate callback.
     private func submitCompletedStrokes() {
-        for pencilStroke in pencilCanvas.drawing.strokes {
-            guard let stroke = PencilStrokeExporter.exportStroke(pencilStroke, origin: .zero),
-                  completedStrokeIds.contains(stroke.id),
-                  contextIdsByStrokeId[stroke.id] == contextId,
-                  !inFlightStrokeIds.contains(stroke.id) else {
+        for message in pendingStrokes.values {
+            guard message.contextId == contextId,
+                  !inFlightStrokeIds.contains(message.stroke.id) else {
                 continue
             }
-            submit(stroke)
+            submit(message)
         }
     }
 
     /// Dispatches one sampled stroke to JavaScript and waits for synchronous store acceptance.
-    private func submit(_ stroke: NativeInkStroke) {
-        let bridgedStroke = NativeInkStroke(
-            id: stroke.id,
-            tool: stroke.tool,
-            color: storedColorsByStrokeId[stroke.id] ?? storedColor,
-            width: stroke.width,
-            opacity: stroke.opacity,
-            points: stroke.points
-        )
-        let message = NativeCompletedInkStroke(
-            sessionId: sessionId,
-            contextId: contextIdsByStrokeId[stroke.id] ?? contextId,
-            stroke: bridgedStroke
-        )
+    private func submit(_ message: NativeCompletedInkStroke) {
         guard let data = try? JSONEncoder().encode(message),
               let json = String(data: data, encoding: .utf8) else {
             return
         }
 
-        inFlightStrokeIds.insert(stroke.id)
+        inFlightStrokeIds.insert(message.stroke.id)
         let script = """
         (() => {
           const detail = \(json);
@@ -169,9 +162,11 @@ final class NativePencilWebContainer: UIView, PKCanvasViewDelegate {
         webView.evaluateJavaScript(script) { [weak self] result, _ in
             Task { @MainActor [weak self] in
                 guard let self else { return }
-                self.inFlightStrokeIds.remove(stroke.id)
+                self.inFlightStrokeIds.remove(message.stroke.id)
                 guard result as? Bool == true else { return }
-                self.acknowledgedStrokeIds.insert(stroke.id)
+                self.pendingStrokes.removeValue(forKey: message.stroke.id)
+                self.persistPendingStrokes()
+                self.acknowledgedStrokeIds.insert(message.stroke.id)
                 if !self.isUsingTool {
                     self.removeAcknowledgedStrokes()
                 }
@@ -184,11 +179,6 @@ final class NativePencilWebContainer: UIView, PKCanvasViewDelegate {
         guard !acknowledgedStrokeIds.isEmpty else { return }
         let removedIds = acknowledgedStrokeIds
         acknowledgedStrokeIds.removeAll()
-        completedStrokeIds.subtract(removedIds)
-        for strokeId in removedIds {
-            contextIdsByStrokeId.removeValue(forKey: strokeId)
-            storedColorsByStrokeId.removeValue(forKey: strokeId)
-        }
         let remaining = pencilCanvas.drawing.strokes.filter { stroke in
             guard let id = PencilStrokeExporter.exportStroke(stroke, origin: .zero)?.id else {
                 return true
@@ -196,6 +186,26 @@ final class NativePencilWebContainer: UIView, PKCanvasViewDelegate {
             return !removedIds.contains(id)
         }
         pencilCanvas.drawing = PKDrawing(strokes: remaining)
+    }
+
+    /// Persists the small failure outbox so an app restart cannot discard completed Pencil input.
+    private func persistPendingStrokes() {
+        // ponytail: UserDefaults is enough for the normally empty queue; move to a file if offline drawing is added.
+        let messages = pendingStrokes.values.sorted { $0.stroke.id < $1.stroke.id }
+        if messages.isEmpty {
+            UserDefaults.standard.removeObject(forKey: Self.pendingStrokesKey)
+        } else if let data = try? JSONEncoder().encode(messages) {
+            UserDefaults.standard.set(data, forKey: Self.pendingStrokesKey)
+        }
+    }
+
+    /// Restores strokes that were not acknowledged before the previous process exited.
+    private static func loadPendingStrokes() -> [String: NativeCompletedInkStroke] {
+        guard let data = UserDefaults.standard.data(forKey: pendingStrokesKey),
+              let messages = try? JSONDecoder().decode([NativeCompletedInkStroke].self, from: data) else {
+            return [:]
+        }
+        return Dictionary(uniqueKeysWithValues: messages.map { ($0.stroke.id, $0) })
     }
 
     /// Returns the stable installation session used to derive idempotent web node identifiers.
@@ -208,6 +218,8 @@ final class NativePencilWebContainer: UIView, PKCanvasViewDelegate {
         UserDefaults.standard.set(created, forKey: key)
         return created
     }
+
+    private static let pendingStrokesKey = "dim0.native-pencil.pending-strokes-v1"
 }
 
 

@@ -13,8 +13,10 @@ adapter converts those screen coordinates through the current canvas camera,
 creates one formal ink node in `CanvasStore`, and acknowledges the native stroke
 only after the node is accepted. Persistence, undo, and WebSocket v2 collaboration
 therefore use the same path as ordinary web-created ink; a full `PKDrawing` archive
-is never the board data source. Finger pan/zoom remains on the web canvas, and the
-native double-tap bridge switches between the shared pen and eraser tools.
+is never the board data source. A normally empty native outbox retains completed,
+unacknowledged strokes across app restarts. Finger pan/zoom remains on the web
+canvas, and the native double-tap bridge switches between the shared pen and
+eraser tools.
 
 ## Application URL
 
