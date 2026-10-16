@@ -117,7 +117,7 @@ final class NotebookSessionTests: XCTestCase {
         let session = NotebookSession(notebook: notebook, context: context)
         let selection = RegionSelection(pageID: page.id, rect: CGRect(x: 40, y: 100, width: 300, height: 80), image: UIImage())
 
-        session.insertCard(text: "这是答案", for: selection)
+        session.insertCard(text: "这是答案", pageID: selection.pageID, below: selection.rect)
 
         XCTAssertEqual(page.cards?.count, 1)
         let card = page.cardContents[0]
