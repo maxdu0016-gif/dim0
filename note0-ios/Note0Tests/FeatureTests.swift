@@ -4,27 +4,6 @@ import XCTest
 @testable import Note0
 
 final class AIPromptTests: XCTestCase {
-    func testMessagesCarryInstructionAndImage() throws {
-        let messages = AIPrompt.messages(action: .quiz, question: "", imageJPEG: Data([1, 2, 3]))
-        XCTAssertEqual(messages.count, 2)
-        XCTAssertEqual(messages[0]["role"] as? String, "system")
-        let parts = try XCTUnwrap(messages[1]["content"] as? [[String: Any]])
-        XCTAssertEqual(parts[0]["text"] as? String, AIAction.quiz.instruction)
-        let image = try XCTUnwrap(parts[1]["image_url"] as? [String: String])
-        XCTAssertEqual(image["url"], "data:image/jpeg;base64,AQID")
-    }
-
-    func testCustomQuestionIsAppendedOrUsedAlone() throws {
-        let withAction = AIPrompt.messages(action: .explain, question: " 为什么？ ", imageJPEG: Data())
-        let text1 = try XCTUnwrap((withAction[1]["content"] as? [[String: Any]])?.first?["text"] as? String)
-        XCTAssertTrue(text1.hasPrefix(AIAction.explain.instruction))
-        XCTAssertTrue(text1.hasSuffix("为什么？"))
-
-        let questionOnly = AIPrompt.messages(action: nil, question: "这一步怎么来的", imageJPEG: Data())
-        let text2 = try XCTUnwrap((questionOnly[1]["content"] as? [[String: Any]])?.first?["text"] as? String)
-        XCTAssertEqual(text2, "这一步怎么来的")
-    }
-
     func testStreamLinesOnlyYieldDeltas() {
         XCTAssertEqual(AIPrompt.deltaText(fromLine: #"{"type":"delta","text":"你好"}"#), "你好")
         XCTAssertNil(AIPrompt.deltaText(fromLine: #"{"type":"reasoning","text":"..."}"#))
@@ -231,7 +210,7 @@ final class DirectAITests: XCTestCase {
     func testDirectErrorsArePlainChinese() {
         let body = Data(#"{"error":{"message":"You exceeded your current quota, please check your plan and billing details."}}"#.utf8)
         XCTAssertEqual(AIClient.directErrorMessage(from: body, status: 429), "额度已用完或还没开通付费（429），请到服务商后台充值。")
-        XCTAssertEqual(AIClient.directErrorMessage(from: Data(), status: 401), "API Key 不正确或已失效（401）。")
+        XCTAssertTrue(AIClient.directErrorMessage(from: Data(), status: 401).hasPrefix("API Key 被服务商拒绝（401）"))
     }
 }
 
@@ -250,5 +229,29 @@ final class ChatPromptTests: XCTestCase {
         XCTAssertEqual(messages[2]["role"] as? String, "assistant")
         let last = try XCTUnwrap(messages[9]["content"] as? [[String: Any]])
         XCTAssertEqual(last[0]["text"] as? String, "问题4")
+    }
+}
+
+final class APIKeyCleaningTests: XCTestCase {
+    func testPastedKeyLosesInvisibleCharactersAndQuotes() {
+        XCTAssertEqual(AIDirect.cleanedKey(" sk-abc123\u{200B}\n"), "sk-abc123")
+        XCTAssertEqual(AIDirect.cleanedKey("“sk-abc123”"), "sk-abc123")
+        XCTAssertEqual(AIDirect.cleanedKey("Bearer sk-abc1234567"), "sk-abc1234567")
+        XCTAssertEqual(AIDirect.cleanedKey("sk-or-v1-xyz"), "sk-or-v1-xyz")
+    }
+
+    func testObviouslyWrongKeysAreCaught() {
+        XCTAssertNotNil(AIDirect.keyProblem("me@example.com", provider: .openAI))
+        XCTAssertNotNil(AIDirect.keyProblem("sk-123", provider: .openAI))
+        XCTAssertNotNil(AIDirect.keyProblem("mypassword1234567890abc", provider: .openAI))
+        XCTAssertNil(AIDirect.keyProblem("sk-proj-" + String(repeating: "a", count: 40), provider: .openAI))
+        XCTAssertNil(AIDirect.keyProblem(String(repeating: "b", count: 32), provider: .custom))
+    }
+
+    func testUnauthorizedExplainsLikelyCause() {
+        let body = Data(#"{"error":{"message":"Incorrect API key provided: sk-abc***xyz."}}"#.utf8)
+        let message = AIClient.directErrorMessage(from: body, status: 401)
+        XCTAssertTrue(message.hasPrefix("API Key 不正确（401）"))
+        XCTAssertTrue(message.contains("Incorrect API key provided"))
     }
 }

@@ -224,7 +224,12 @@ struct OwnKeySettings: View {
 
     @State private var provider = AIDirect.provider
     @State private var customBaseURL = AIDirect.customBaseURL
-    @State private var apiKey = AIDirect.apiKey
+    /// What is being typed or pasted; only saved when "保存" is tapped, so
+    /// re-focusing the field or AutoFill can never overwrite a working key.
+    @State private var newKey = ""
+    @State private var editingKey = AIDirect.apiKey.isEmpty
+    @State private var keyMessage: String?
+    @State private var savedKey = AIDirect.apiKey
     @State private var model = AIDirect.model
     @State private var isTesting = false
     @State private var testResult: (ok: Bool, text: String)?
@@ -254,10 +259,42 @@ struct OwnKeySettings: View {
                             .padding(12)
                         Divider()
                     }
-                    SecureField(provider.keyHint, text: $apiKey)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
+                    if editingKey {
+                        HStack(spacing: 8) {
+                            TextField(provider.keyHint, text: $newKey)
+                                .textContentType(.oneTimeCode)
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled()
+                                .font(.callout.monospaced())
+                                .privacySensitive()
+                            if !savedKey.isEmpty {
+                                Button("取消") {
+                                    newKey = ""
+                                    keyMessage = nil
+                                    editingKey = false
+                                }
+                                .buttonStyle(.borderless)
+                            }
+                            Button("保存", action: saveKey)
+                                .buttonStyle(.borderedProminent)
+                                .controlSize(.small)
+                                .disabled(newKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        }
                         .padding(12)
+                    } else {
+                        HStack {
+                            Text("API Key：\(savedKey.prefix(7))…\(savedKey.suffix(4))（\(savedKey.count) 位）")
+                                .font(.callout.monospaced())
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            Button("更换") {
+                                newKey = ""
+                                editingKey = true
+                            }
+                            .buttonStyle(.borderless)
+                        }
+                        .padding(12)
+                    }
                     Divider()
                     TextField("模型（留空用 \(provider.defaultModel.isEmpty ? "服务商默认" : provider.defaultModel)）", text: $model)
                         .textInputAutocapitalization(.never)
@@ -265,6 +302,12 @@ struct OwnKeySettings: View {
                         .padding(12)
                 }
                 .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 10))
+
+                if let keyMessage {
+                    Label(keyMessage, systemImage: "exclamationmark.circle")
+                        .font(.footnote)
+                        .foregroundStyle(.red)
+                }
 
                 HStack {
                     Button {
@@ -296,8 +339,25 @@ struct OwnKeySettings: View {
         .onChange(of: useOwnKey) { _, value in AIDirect.useOwnKey = value }
         .onChange(of: provider) { _, value in AIDirect.provider = value; testResult = nil }
         .onChange(of: customBaseURL) { _, value in AIDirect.customBaseURL = value; testResult = nil }
-        .onChange(of: apiKey) { _, value in AIDirect.apiKey = value; testResult = nil }
         .onChange(of: model) { _, value in AIDirect.model = value; testResult = nil }
+    }
+
+    private func saveKey() {
+        let key = AIDirect.cleanedKey(newKey)
+        if let problem = AIDirect.keyProblem(key, provider: provider) {
+            keyMessage = problem
+            return
+        }
+        AIDirect.apiKey = key
+        savedKey = AIDirect.apiKey
+        newKey = ""
+        keyMessage = nil
+        editingKey = false
+        testResult = nil
+        // Pick the matching service for keys that say where they are from.
+        if key.hasPrefix("sk-or-") { provider = .openRouter }
+        else if key.hasPrefix("sk-proj-") || key.hasPrefix("sk-svcacct-") { provider = .openAI }
+        Task { await test() }
     }
 
     private func test() async {
